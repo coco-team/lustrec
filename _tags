@@ -1,0 +1,10 @@
+# OASIS_START
+# DO NOT EDIT (digest: 54aa7498411485980381101fb69226dd)
+# Executable lustrec
+"src/main_lustre_compiler.native": pkg_unix
+"src/main_lustre_compiler.native": pkg_str
+"src/main_lustre_compiler.native": pkg_ocamlgraph
+<src/*.ml{,i}>: pkg_unix
+<src/*.ml{,i}>: pkg_str
+<src/*.ml{,i}>: pkg_ocamlgraph
+# OASIS_STOP

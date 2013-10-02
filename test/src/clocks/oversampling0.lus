@@ -1,0 +1,24 @@
+
+node f(x :int ) returns (cpt , y :int )
+let
+  y = x + 1;
+  cpt = (0 fby cpt) + 1;
+tel
+
+node g(x :int ; c : bool ) returns (out :int )
+var t, cpt , y, last_y :int;
+let
+  (cpt , y) = f(t);
+  t = merge c (true -> x) (false -> last_y when false(c));
+  last_y = 0 fby y;
+  out = y when false(c);
+tel
+(*
+node main (x:int) returns (out :int; c:bool)
+var toto:int;
+let
+  toto = 1 ;
+  c = true fby false fby c;
+  out = g(x,toto=0);
+tel
+*)

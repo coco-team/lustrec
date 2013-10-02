@@ -1,0 +1,22 @@
+OASISFormat: 0.2
+Name:        Lustre Compiler
+Version:     1.2
+Synopsis:    Lustre compiler C and Java backends
+Authors:     
+License:     LGPL-2.1
+Plugins:     DevFiles (0.2)
+# , Custom (0.2)
+PreBuildCommand: ./svn_version.sh 
+PostInstallCommand: mkdir -p /usr/local/include/lustrec; cp include/* /usr/local/include/lustrec/ 
+
+Executable lustrec
+  Path:       src
+  BuildTools: ocamlbuild
+  MainIs:     main_lustre_compiler.ml
+  BuildDepends: ocamlgraph,str,unix 
+  CompiledObject: native
+Test nonregression
+  Type: custom
+  Command: make test-compile 
+  WorkingDirectory: test
+  Run: true

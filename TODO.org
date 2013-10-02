@@ -1,0 +1,31 @@
+* TODO
+** include files
+** main function
+*** add a clean test to forbid array arguments for main node
+    (no available input/output methods)
+** test suite
+*** for complex dependency graphs (notably mem/mem cyclic dependencies)
+*** for clocks
+*** for arrays (non-generic nodes)
+** compare with lus2c (verimag)
+** extension
+*** array access: done
+*** add an option to dynamically check array accesses: done
+*** power operator: done
+*** automaton
+*** annotations to ACSL
+** init checking
+*** to be done !!!
+** normalization
+*** sub-expression sharing seems to be not totally working: fixed
+*** improve behavior for power and access operators:done
+*** more type-directed normalization (notably to improve code gen for arrays): done
+*** reuse of dead vars instead of systematically allocating new local vars
+*** add a clean test for used but undefined nodes
+** typing
+*** correct typing of arith ops (real/int with subtyping ?)
+*** display array dimensions with correct names: done
+*** clocks must not be static inputs: done
+** clock calculus
+*** extension from named clocks to valued clocks ?
+*** static inputs should be polymorphic, as global constants are: done
