@@ -1,0 +1,40 @@
+
+
+--A messed up counter:
+--x = 0: 0,1,2,3,4,3,4,...
+--x = 1: 0,1,2,3,4,5,2,3,4,5,...
+--A is MSB, C is LSB
+--property: never reach state 6 or 7
+
+node loop6counter (x:bool) returns (out:bool);
+var a,b,c:bool;
+let
+  a = false -> (pre(b) and pre(c)) or
+               (pre(x) and pre(a) and not pre(c));
+  b = false -> (not pre(b) and pre(c)) or
+               (pre(b) and not pre(c)) or
+               (not pre(x) and pre(a));
+  c = false -> not pre(c);
+  out = a and c;
+tel
+
+node intloop6counter (x:bool) returns (out:bool);
+var time: int;
+let
+  time = 0 -> if pre(time) = 5 then 2
+            else if pre(time) = 4 then
+              if not pre(x) then 3 
+              else 5
+            else pre time + 1;
+  out = (time = 5);
+tel
+
+
+node top (x:bool) returns (OK:bool);
+var b,d:bool;
+let
+  b = loop6counter(x);
+  d = intloop6counter(x);
+  OK = not x or b = d;
+  --%PROPERTY OK;
+tel

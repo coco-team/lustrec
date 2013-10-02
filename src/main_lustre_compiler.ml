@@ -1,0 +1,205 @@
+(* ----------------------------------------------------------------------------
+ * SchedMCore - A MultiCore Scheduling Framework
+ * Copyright (C) 2009-2013, ONERA, Toulouse, FRANCE - LIFL, Lille, FRANCE
+ * Copyright (C) 2012-2013, INPT, Toulouse, FRANCE
+ *
+ * This file is part of Prelude
+ *
+ * Prelude is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation ; either version 2 of
+ * the License, or (at your option) any later version.
+ *
+ * Prelude is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY ; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this program ; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
+ * USA
+ *---------------------------------------------------------------------------- *)
+
+(* This module is used for the lustre to C compiler *)
+
+open Format
+open Log
+
+let usage = "Usage: lustrec [options] <source-file>"
+
+let extensions = [".ec";".lus"]
+
+let rec compile basename extension =
+  let source_name = basename^extension in
+  Location.input_name := source_name;
+  let lexbuf = Lexing.from_channel (open_in source_name) in
+  Location.init lexbuf source_name;
+  (* Parsing *)
+  report ~level:1 (fun fmt -> fprintf fmt "@[<v>.. parsing file %s@,@?" source_name);
+  let prog =
+    try
+      Parse.prog Parser_lustre.prog Lexer_lustre.token lexbuf
+    with (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
+      Parse.report_error err;
+      raise exc
+  in
+  (* Extract includes *)
+  report ~level:1 (fun fmt -> fprintf fmt ".. extracting includes@,@?");
+  let includes = 
+    List.fold_right 
+      (fun d accu -> match d.Corelang.top_decl_desc with | Corelang.Include s -> s::accu | _ -> accu) 
+      prog [] 
+  in
+  List.iter (fun s -> let basename = Filename.chop_suffix s ".lus" in 
+		      report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ ");
+		      compile basename ".lus";
+		      report ~level:1 (fun fmt -> fprintf fmt "@]@,@?")
+
+  ) includes;
+  (* Unfold consts *)
+  (*let prog = Corelang.prog_unfold_consts prog in*)
+
+  (* Sorting nodes *)
+  let prog = SortProg.sort prog in
+
+  (* Typing *)
+  report ~level:1 (fun fmt -> fprintf fmt ".. typing@,@?");
+  begin
+    try
+      Typing.type_prog Basic_library.type_env prog
+      (*Typing.uneval_prog_generics prog*)
+    with (Types.Error (loc,err)) as exc ->
+      Format.eprintf "Typing error at loc %a: %a@]@."
+      Location.pp_loc loc
+      Types.pp_error err;
+      raise exc
+  end;
+  if !Options.print_types then
+    report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,@?" Corelang.pp_prog_type prog);
+  
+  (* Clock calculus *)
+  report ~level:1 (fun fmt -> fprintf fmt ".. clock calculus@,@?");
+  begin
+    try
+      Clock_calculus.clock_prog Basic_library.clock_env prog
+    with (Clocks.Error (loc,err)) as exc ->
+      Location.print loc;
+      eprintf "Clock calculus error at loc %a: %a@]@." Location.pp_loc loc Clocks.pp_error err;
+      raise exc
+  end;
+  if !Options.print_clocks then
+    report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,@?" Corelang.pp_prog_clock prog);
+
+  (* Delay calculus *)
+(*
+  if(!Options.delay_calculus)
+  then
+    begin
+      report ~level:1 (fun fmt -> fprintf fmt ".. initialisation analysis@?");
+      try
+	Delay_calculus.delay_prog Basic_library.delay_env prog
+      with (Delay.Error (loc,err)) as exc ->
+	Location.print loc;
+	eprintf "%a" Delay.pp_error err;
+	Utils.track_exception ();
+	raise exc
+    end;
+*)
+  (*
+    eprintf "Causality analysis@.@?";
+  (* Causality analysis *)
+    begin
+    try
+    Causality.check_causal_prog prog
+    with (Causality.Cycle v) as exc ->
+    Causality.pp_error err_formatter v;
+    raise exc
+    end;
+  *)
+  (* Computes and stores generic calls for each node,
+     only useful for ANSI C90 compliant generic node compilation *)
+  if !Options.ansi then Causality.NodeDep.compute_generic_calls prog;
+  (*Hashtbl.iter (fun id td -> match td.Corelang.top_decl_desc with Corelang.Node nd -> Format.eprintf "%s calls %a" id Causality.NodeDep.pp_generic_calls nd | _ -> ()) Corelang.node_table;*)
+
+  (* Normalization phase *)
+  report ~level:1 (fun fmt -> fprintf fmt ".. normalization@,@?");
+  let normalized_prog = Normalization.normalize_prog prog in
+  Typing.uneval_prog_generics normalized_prog;
+  report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,@?" Printers.pp_prog normalized_prog);
+  (* Checking array accesses *)
+  if !Options.check then
+    begin
+      report ~level:1 (fun fmt -> fprintf fmt ".. array access checks@,@?");
+      Access.check_prog normalized_prog;
+    end;
+
+  (* DFS with modular code generation *)
+  report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,@?");
+  let machine_code = Machine_code.translate_prog normalized_prog in
+  report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,@?"
+    (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
+
+    machine_code);
+
+  (* Printing code *)
+  let basename    = Filename.basename basename in
+  if !Options.java then
+    failwith "Sorry, but not yet supported !"
+    (*let source_file = basename ^ ".java" in
+    report ~level:1 (fun fmt -> fprintf fmt ".. opening file %s@,@?" source_file);
+    let source_out = open_out source_file in
+    let source_fmt = formatter_of_out_channel source_out in
+    report ~level:1 (fun fmt -> fprintf fmt ".. java code generation@,@?");
+    Java_backend.translate_to_java source_fmt basename normalized_prog machine_code;*)
+  else begin
+    let header_file = basename ^ ".h" in (* Could be changed *)
+    let source_file = basename ^ ".c" in (* Could be changed *)
+    let spec_file_opt = if !Options.c_spec then 
+	(
+	  let spec_file = basename ^ "_spec.c" in
+	  report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s, %s and %s@,@?" header_file source_file spec_file);
+	  Some spec_file 
+	) else (
+	  report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s and %s@,@?" header_file source_file);
+	  None 
+	 )
+    in 
+    let header_out = open_out header_file in
+    let header_fmt = formatter_of_out_channel header_out in
+    let source_out = open_out source_file in
+    let source_fmt = formatter_of_out_channel source_out in
+    let spec_fmt_opt = match spec_file_opt with
+	None -> None
+      | Some f -> Some (formatter_of_out_channel (open_out f))
+    in
+    report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,@?");
+    C_backend.translate_to_c header_fmt source_fmt spec_fmt_opt basename normalized_prog machine_code;
+  end;
+  report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
+  (* We stop the process here *)
+  exit 0
+  
+let anonymous filename =
+  let ok_ext, ext = List.fold_left (fun (ok, ext) ext' -> if not ok && Filename.check_suffix filename ext' then true, ext' else ok, ext) (false, "") extensions in
+  if ok_ext then
+    let basename = Filename.chop_suffix filename ext in
+    compile basename ext
+  else
+    raise (Arg.Bad ("Can only compile *.lus or *.ec files"))
+
+let _ =
+  Corelang.add_internal_funs ();
+  try
+    Printexc.record_backtrace true;
+    Arg.parse Options.options anonymous usage
+  with
+  | Parse.Syntax_err _ | Lexer_lustre.Error _ 
+  | Types.Error (_,_) | Clocks.Error (_,_)
+  | Corelang.Error _ (*| Task_set.Error _*) 
+  | Causality.Cycle _ -> exit 1
+  | exc -> (Utils.track_exception (); raise exc)
+
+(* Local Variables: *)
+(* compile-command:"make -C .." *)
+(* End: *)

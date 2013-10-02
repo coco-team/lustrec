@@ -1,0 +1,14 @@
+-- a simple 0 to 5 boolean counter (A is LSB, C is MSB)
+-- property is that it should never reach 6 or 7
+
+node top (x:bool) returns (OK:bool);
+var a,b,c:bool;
+let
+  a = false -> not pre(a);
+  b = false -> (not pre(c) and not pre(b) and pre(a)) or 
+           (pre(b) and not pre(a));
+  c = false -> (pre(c) and not pre(a)) or (pre(b) and pre(a));
+  OK = true -> pre(true -> pre b) = not b;
+--  --%PROPERTY not (c and b);
+--%PROPERTY OK;
+tel

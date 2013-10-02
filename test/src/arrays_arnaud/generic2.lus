@@ -1,0 +1,15 @@
+const PI = 3;
+
+imported node imp1(const m:int; a:int^(PI*m)) returns (c:int^m);
+
+imported node imp2(const n:int; a:int^n) returns (d:int^n);
+    
+node base(const p:int; x:int^(PI*p)) returns (y:int^p)
+var z:int^(PI*p)^2;
+    t;
+let
+  t = imp2(PI*p, x);
+  z = [t, t];
+  y = imp1(p, (pre z)[1]);
+tel
+

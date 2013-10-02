@@ -1,0 +1,13 @@
+node top (x:bool) returns (OK:bool);
+var a,b,c:bool;
+let
+  a = true -> pre(c);
+  b = false -> pre(a);
+  c = false -> pre(b);
+  OK = ((not a or not b and c) or 
+        (not a and b and not c) or 
+        (a and not b and not c) or 
+        (a and b and c)) and not (a and b and c);
+  --%MAIN;
+  --%PROPERTY OK;
+tel

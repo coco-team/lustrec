@@ -1,0 +1,1855 @@
+
+
+node top(onOff: bool; 
+      decelSet: bool; 
+      accelResume: bool; 
+      cancel: bool; 
+      brakePedal: bool; 
+      carGear: int ; 
+      carSpeed: real; 
+      validInputs: bool) returns (OK: bool);
+
+var
+   mode: int ; 
+      cruiseThrottle: real; 
+      desiredSpeed: real; 
+      VRP1: bool; 
+      VRP2: bool; 
+      CP8a: bool; 
+      VRP3: bool; 
+      VRP4: bool; 
+      SP4: bool; 
+      SP5: bool; 
+      SP6: bool; 
+      SP7: bool; 
+      SP3b: bool; 
+      SP3c: bool; 
+      SP3: bool; 
+      SP3a: bool; 
+      SP2: bool; 
+      SP1: bool; 
+      SP8: bool; 
+      SP9: bool; 
+      SP10: bool; 
+      SP11: bool;
+   zz0: bool; 
+   zz1: bool; 
+   zz2: real; 
+   zz3: bool; 
+   zz4: bool; 
+   zz5: real; 
+   zz6: int ; 
+   zz7: int ; 
+   zz8: int ; 
+   zz9: int ; 
+   zz10: int ; 
+   zz11: int ; 
+   zz12: int ; 
+   zz13: int ; 
+   zz14: int ; 
+   zz15: bool; 
+   zz16: int ; 
+   zz17: int ; 
+   zz18: int ; 
+   zz19: bool; 
+   zz20: int ; 
+   zz21: int ; 
+   zz22: int ; 
+   zz23: bool; 
+   zz24: bool; 
+   zz25: int ; 
+   zz26: bool; 
+   zz27: bool; 
+   zz28: int ; 
+   zz29: int ; 
+   zz30: bool; 
+   zz31: bool; 
+   zz32: int ; 
+   zz33: bool; 
+   zz34: int ; 
+   zz35: int ; 
+   zz36: bool; 
+   zz37: bool; 
+   zz38: int ; 
+   zz39: bool; 
+   zz40: int ; 
+   zz41: int ; 
+   zz42: bool; 
+   zz43: bool; 
+   zz44: int ; 
+   zz45: int ; 
+   zz46: int ; 
+   zz47: bool; 
+   zz48: bool; 
+   zz49: int ; 
+   zz50: int ; 
+   zz51: int ; 
+   zz52: bool; 
+   zz53: int ; 
+   zz54: int ; 
+   zz55: int ; 
+   zz56: bool; 
+   zz57: bool; 
+   zz58: int ; 
+   zz59: int ; 
+   zz60: int ; 
+   zz61: int ; 
+   zz62: int ; 
+   zz63: int ; 
+   zz64: bool; 
+   zz65: bool; 
+   zz66: int ; 
+   zz67: int ; 
+   zz68: int ; 
+   zz69: int ; 
+   zz70: int ; 
+   zz71: int ; 
+   zz72: bool; 
+   zz74: int ; 
+   zz75: int ; 
+   zz76: int ; 
+   zz77: int ; 
+   zz78: int ; 
+   zz79: int ; 
+   zz80: int ; 
+   zz81: int ; 
+   zz82: bool; 
+   zz83: int ; 
+   zz84: int ; 
+   zz85: int ; 
+   zz86: int ; 
+   zz87: bool; 
+   zz88: bool; 
+   zz89: int ; 
+   zz90: bool; 
+   zz91: int ; 
+   zz92: int ; 
+   zz93: bool; 
+   zz94: bool; 
+   zz95: int ; 
+   zz96: bool; 
+   zz97: int ; 
+   zz98: int ; 
+   zz99: bool; 
+   zz100: bool; 
+   zz101: int ; 
+   zz102: int ; 
+   zz103: int ; 
+   zz104: bool; 
+   zz105: bool; 
+   zz106: int ; 
+   zz107: bool; 
+   zz108: int ; 
+   zz109: int ; 
+   zz110: int ; 
+   zz111: int ; 
+   zz112: bool; 
+   zz113: int ; 
+   zz114: int ; 
+   zz115: int ; 
+   zz116: bool; 
+   zz117: bool; 
+   zz118: int ; 
+   zz119: int ; 
+   zz120: int ; 
+   zz121: int ; 
+   zz122: int ; 
+   zz123: int ; 
+   zz124: int ; 
+   zz125: int ; 
+   zz126: int ; 
+   zz127: int ; 
+   zz128: bool; 
+   zz129: int ; 
+   zz130: int ; 
+   zz131: int ; 
+   zz132: int ; 
+   zz133: bool; 
+   zz134: int ; 
+   zz135: int ; 
+   zz136: int ; 
+   zz137: int ; 
+   zz138: bool; 
+   zz139: bool; 
+   zz140: int ; 
+   zz141: bool; 
+   zz142: int ; 
+   zz143: int ; 
+   zz144: bool; 
+   zz145: bool; 
+   zz146: int ; 
+   zz147: int ; 
+   zz148: int ; 
+   zz149: int ; 
+   zz150: int ; 
+   zz151: bool; 
+   zz152: bool; 
+   zz153: int ; 
+   zz154: int ; 
+   zz155: bool; 
+   zz156: int ; 
+   zz157: int ; 
+   zz158: bool; 
+   zz159: int ; 
+   zz160: int ; 
+   zz161: int ; 
+   zz162: bool; 
+   zz163: bool; 
+   zz164: bool; 
+   zz165: bool; 
+   zz166: int ; 
+   zz167: int ; 
+   zz168: int ; 
+   zz169: int ; 
+   zz170: int ; 
+   zz171: bool; 
+   zz172: int ; 
+   zz173: int ; 
+   zz174: int ; 
+   zz175: int ; 
+   zz176: int ; 
+   zz177: bool; 
+   zz178: bool; 
+   zz179: bool; 
+   zz180: bool; 
+   zz181: bool; 
+   zz182: bool; 
+   zz183: bool; 
+   zz184: bool; 
+   zz185: bool; 
+   zz186: bool; 
+   zz187: bool; 
+   zz188: bool; 
+   zz189: bool; 
+   zz190: real; 
+   zz191: bool; 
+   zz192: bool; 
+   zz193: bool; 
+   zz194: bool; 
+   zz195: bool; 
+   zz196: bool; 
+   zz197: bool; 
+   zz198: bool; 
+   zz199: bool; 
+   zz200: bool; 
+   zz201: bool; 
+   zz202: bool; 
+   zz203: bool; 
+   zz204: real; 
+   zz205: real; 
+   zz206: bool; 
+   zz207: bool; 
+   zz208: bool; 
+   zz209: bool; 
+   zz210: bool; 
+   zz211: real; 
+   zz212: bool; 
+   zz213: bool; 
+   zz214: bool; 
+   zz215: bool; 
+   zz216: bool; 
+   zz217: bool; 
+   zz218: real; 
+   zz219: real; 
+   zz220: real; 
+   zz221: real; 
+   zz222: real; 
+   zz223: real; 
+   zz224: real; 
+   zz225: real; 
+   zz226: real; 
+   zz227: real; 
+   zz228: real; 
+   zz229: real; 
+   zz230: real; 
+   zz231: bool; 
+   zz232: bool; 
+   zz233: bool; 
+   zz234: bool; 
+   zz235: bool; 
+   zz236: bool; 
+   zz237: bool; 
+   zz238: bool; 
+   zz239: bool;
+
+let 
+   zz166 = 
+      (if (0 >= zz168)
+         then 0
+         else zz168);
+
+   zz168 = 
+      (if accelResume
+         then zz167
+         else 0);
+
+   zz169 = (0 -> (pre zz170));
+
+   zz172 = 
+      (if (0 >= zz174)
+         then 0
+         else zz174);
+
+   zz174 = 
+      (if decelSet
+         then zz173
+         else 0);
+
+   zz175 = (0 -> (pre zz176));
+
+   zz156 = (0 -> (pre zz161));
+
+   zz157 = (0 -> (pre mode));
+
+   zz159 = 
+      (if SP3c
+         then 1
+         else 0);
+
+   (* Beginning transition segment: trans20
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz93 = ((zz91 = 8) and 
+      (((
+      (if ((zz185 = true) = false)
+         then 0
+         else 1) <> 0) and 
+      (
+      (if ((zz186 = true) = false)
+         then 0
+         else 1) <> 0)) and 
+      (not zz88)));
+
+   (* Beginning transition segment: trans19
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz99 = ((zz97 = 8) and 
+      (((
+      (if ((zz180 = true) = false)
+         then 0
+         else 1) <> 0) and 
+      (
+      (if ((zz186 = true) = false)
+         then 0
+         else 1) <> 0)) and 
+      (not zz94)));
+
+   (* Beginning transition segment: trans22
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz104 = ((zz102 = 7) and 
+      (((
+      (if ((zz185 = true) = false)
+         then 0
+         else 1) <> 0) and 
+      (
+      (if ((zz186 = true) = false)
+         then 0
+         else 1) <> 0)) and 
+      (not zz100)));
+
+   (* Beginning transition segment: trans24
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz24 = ((zz108 = 4) and 
+      (
+      (if ((zz185 = true) = false)
+         then 0
+         else 1) <> 0));
+
+   (* Beginning transition segment: trans14
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz30 = ((zz28 = 4) and 
+      ((
+      (if ((zz171 = true) = false)
+         then 0
+         else 1) <> 0) and 
+      (not zz24)));
+
+   (* Beginning transition segment: trans15
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz36 = ((zz34 = 4) and 
+      ((
+      (if ((zz177 = true) = false)
+         then 0
+         else 1) <> 0) and 
+      (not zz31)));
+
+   (* Beginning transition segment: trans17
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz42 = ((zz40 = 6) and 
+      ((
+      (if ((zz177 = false) = false)
+         then 0
+         else 1) <> 0) and 
+      (not zz37)));
+
+   (* Beginning transition segment: trans16
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz47 = ((zz45 = 5) and 
+      ((
+      (if ((zz171 = false) = false)
+         then 0
+         else 1) <> 0) and 
+      (not zz43)));
+
+   zz57 = ((zz58 = 4) or 
+      ((zz58 = 5) or 
+      (zz58 = 6)));
+
+   zz63 = 
+      (if (not 
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz101 >= 3) and 
+         (zz101 <= 6)))
+         then 
+               (* <Enter state> path: On.Active maps to field: __root and value: 3 *)
+               3
+         else zz101);
+
+   (* Beginning transition segment: trans18
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz64 = ((not 
+      (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+      ((zz101 >= 3) and 
+      (zz101 <= 6))) and 
+
+      (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+      ((zz63 >= 3) and 
+      (zz63 <= 6)));
+
+   (* Beginning transition segment: trans12
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz116 = ((not 
+      (* <In state> path: On maps to field: __root and value range: [2, 8] *)
+      ((zz146 >= 2) and 
+      (zz146 <= 8))) and 
+
+      (* <In state> path: On maps to field: __root and value range: [2, 8] *)
+      ((zz115 >= 2) and 
+      (zz115 <= 8)));
+
+   zz120 = 
+      (if (zz142 = 1)
+         then 
+               (* <Exit state> path: Off maps to field: __root and value: 0 *)
+               0
+         else zz142);
+
+   zz137 = 
+      (if 
+         (* <In state> path: On maps to field: __root and value range: [2, 8] *)
+         ((zz156 >= 2) and 
+         (zz156 <= 8))
+         then 
+               (* <Exit state> path: On maps to field: __root and value: 0 *)
+               0
+         else zz136);
+
+   SP3c = true;
+
+   zz171 = (zz170 = 20);
+
+   (* Condition actions for transition segment: trans22: NONE
+      Transition action(s) for transition: trans22
+      <complete> is true if either: 
+         1. this transition has completed, or 
+         2. a higher-priority transition has already completed 
+       *)
+   zz105 = (zz104 or 
+      zz100);
+
+   zz127 = 
+      (if (zz156 = 4)
+         then 
+               (* <Exit state> path: On.Active.Maintain maps to field: __root and value: 3 *)
+               3
+         else zz156);
+
+   zz204 = cruiseThrottle;
+
+   zz165 = (mode = 6);
+
+   SP7 = ((not zz165) or 
+      zz208);
+
+   zz136 = 
+      (if 
+         (* <In state> path: On maps to field: __root and value range: [2, 8] *)
+         ((zz156 >= 2) and 
+         (zz156 <= 8))
+         then zz123
+         else zz135);
+
+   (* Exit action(s) for transition: On_Init -> On_Active *)
+   zz106 = 
+      (if zz104
+         then zz60
+         else zz102);
+
+   zz173 = (zz175 + 1);
+
+   zz81 = 
+      (if (zz147 = 4)
+         then 
+               (* <Exit state> path: On.Active.Maintain maps to field: __root and value: 3 *)
+               3
+         else zz147);
+
+   zz181 = (carGear = 3);
+
+   zz79 = 
+      (if (zz84 = 6)
+         then 
+               (* <Exit state> path: On.Active.Decrease maps to field: __root and value: 3 *)
+               3
+         else zz84);
+
+   (* Exit action(s) for transition: On_Active_Maintain -> On_Active_Decrease *)
+   zz38 = 
+      (if zz36
+         then zz14
+         else zz34);
+
+   (* Exit action(s) for transition: On -> On_Init: NONE
+      Transition action(s) for transition: On -> On_Init: NONE
+      Entry action(s) for transition: On -> On_Init *)
+   zz119 = 
+      (if zz116
+         then zz114
+         else zz143);
+   (* Transition segment: trans12 complete. *)
+
+   zz78 = 
+      (if (not (zz89 = 8))
+         then 3
+         else zz148);
+
+   zz15 = 
+      (if (zz34 = 4)
+         then false
+         else zz33);
+
+   zz83 = 
+      (if 
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz147 >= 3) and 
+         (zz147 <= 6))
+         then zz81
+         else zz147);
+
+   zz54 = 
+      (if (not (zz55 = 4))
+         then 4
+         else zz103);
+
+   zz192 = (zz211 > desiredSpeed);
+
+   zz16 = 
+      (if (not (zz32 = 5))
+         then 
+               (* <Enter state> path: On.Active.Increase maps to field: __root and value: 5 *)
+               5
+         else zz32);
+
+   zz158 = (false -> (pre zz162));
+
+   SP3a = ((not (not zz163)) or 
+      (not zz199));
+
+   (* Exit action(s) for transition: On_Active -> On_Active_Maintain: NONE
+      Transition action(s) for transition: On_Active -> On_Active_Maintain: NONE
+      Entry action(s) for transition: On_Active -> On_Active_Maintain *)
+   zz67 = 
+      (if zz64
+         then zz62
+         else zz98);
+   (* Transition segment: trans18 complete. *)
+
+   (* Condition actions for transition segment: trans17: NONE
+      Transition action(s) for transition: trans17
+      <complete> is true if either: 
+         1. this transition has completed, or 
+         2. a higher-priority transition has already completed 
+       *)
+   zz43 = (zz42 or 
+      zz37);
+
+   zz76 = 
+      (if (zz91 = 8)
+         then 
+               (* <Exit state> path: On.Inactive maps to field: __root and value: 2 *)
+               2
+         else zz91);
+
+   zz80 = 
+      (if (zz83 = 5)
+         then 
+               (* <Exit state> path: On.Active.Increase maps to field: __root and value: 3 *)
+               3
+         else zz83);
+
+   zz198 = (zz197 or 
+      zz196);
+
+   zz193 = (desiredSpeed <> 0.0);
+
+   SP1 = ((not (not zz186)) or 
+      zz187);
+
+   zz231 = (cruiseThrottle <= 100.0);
+
+   zz123 = 
+      (if (zz135 = 8)
+         then 
+               (* <Exit state> path: On.Inactive maps to field: __root and value: 2 *)
+               2
+         else zz135);
+
+   zz19 = 
+      (if (zz28 = 4)
+         then false
+         else zz27);
+
+   (* Condition actions for transition segment: trans20: NONE
+      Transition action(s) for transition: trans20
+      <complete> is true if either: 
+         1. this transition has completed, or 
+         2. a higher-priority transition has already completed 
+       *)
+   zz94 = (zz93 or 
+      zz88);
+
+   cruiseThrottle = 
+      (if zz201
+         then zz226
+         else 0.0);
+
+   zz86 = 
+      (if 
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz147 >= 3) and 
+         (zz147 <= 6))
+         then 
+               (* <Exit state> path: On.Active maps to field: __root and value: 2 *)
+               2
+         else zz85);
+
+   VRP1 = (zz232 and 
+      zz231);
+
+   zz131 = 
+      (if 
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz156 >= 3) and 
+         (zz156 <= 6))
+         then zz125
+         else zz130);
+
+   zz235 = (desiredSpeed < 0.0);
+
+   SP9 = ((not zz214) or 
+      zz215);
+
+   zz138 = 
+      (if 
+         (* <In state> path: On maps to field: __root and value range: [2, 8] *)
+         ((zz156 >= 2) and 
+         (zz156 <= 8))
+         then zz133
+         else zz158);
+
+   zz65 = ((zz66 = 4) or 
+      ((zz66 = 5) or 
+      (zz66 = 6)));
+
+   zz194 = (desiredSpeed >= 15.0);
+
+   zz197 = (mode = 1);
+
+   VRP3 = (not zz237);
+
+   zz6 = 
+      (if (not (zz49 = 4))
+         then 
+               (* <Enter state> path: On.Active.Maintain maps to field: __root and value: 4 *)
+               4
+         else zz49);
+
+   (* Exit action(s) for transition: On_Active_Maintain -> On_Active_Increase *)
+   zz33 = 
+      (if zz30
+         then zz19
+         else zz27);
+
+   zz134 = 
+      (if 
+         (* <In state> path: On maps to field: __root and value range: [2, 8] *)
+         ((zz156 >= 2) and 
+         (zz156 <= 8))
+         then zz132
+         else zz156);
+
+   zz61 = 
+      (if (not (zz63 = 4))
+         then 
+               (* <Enter state> path: On.Active.Maintain maps to field: __root and value: 4 *)
+               4
+         else zz63);
+
+   (* Transition action(s) for transition: On_Active_Maintain -> On_Active_Increase: NONE
+      Entry action(s) for transition: On_Active_Maintain -> On_Active_Increase *)
+   zz34 = 
+      (if zz30
+         then zz16
+         else zz32);
+   (* Transition segment: trans14 complete. *)
+
+   (* Exit action(s) for transition: On -> Off *)
+   zz141 = 
+      (if zz139
+         then zz138
+         else zz158);
+
+   (* Beginning transition segment: trans13
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz139 = (
+      (* <In state> path: On maps to field: __root and value range: [2, 8] *)
+      ((zz156 >= 2) and 
+      (zz156 <= 8)) and 
+      (not onOff));
+
+   zz178 = accelResume;
+
+   zz234 = (desiredSpeed >= 0.0);
+
+   (* Transition action(s) for transition: On_Active_Decrease -> On_Active_Maintain: NONE
+      Entry action(s) for transition: On_Active_Decrease -> On_Active_Maintain *)
+   zz45 = 
+      (if zz42
+         then zz9
+         else zz44);
+   (* Transition segment: trans17 complete. *)
+
+   zz121 = 
+      (if (not (zz140 = 1))
+         then 
+               (* <Enter state> path: Off maps to field: __root and value: 1 *)
+               1
+         else zz140);
+
+   zz184 = (true -> (pre zz183));
+
+   (* Exit action(s) for transition: On -> On_Init: NONE
+      Transition action(s) for transition: On -> On_Init: NONE
+      Entry action(s) for transition: On -> On_Init *)
+   zz118 = 
+      (if zz116
+         then zz113
+         else zz115);
+   (* Transition segment: trans12 complete. *)
+
+   zz191 = (zz189 and 
+      zz188);
+
+   (* Transition action(s) for transition: On_Active_Maintain -> On_Active_Decrease: NONE
+      Entry action(s) for transition: On_Active_Maintain -> On_Active_Decrease *)
+   zz41 = 
+      (if zz36
+         then zz13
+         else zz35);
+   (* Transition segment: trans15 complete. *)
+
+   (* Transition action(s) for transition: On_Active_Maintain -> On_Active_Increase: NONE
+      Entry action(s) for transition: On_Active_Maintain -> On_Active_Increase *)
+   zz35 = 
+      (if zz30
+         then zz17
+         else zz29);
+   (* Transition segment: trans14 complete. *)
+
+   zz208 = (zz211 >= desiredSpeed);
+
+   zz200 = (zz223 = 0.0);
+
+   zz154 = 
+      (if (not (zz156 = 1))
+         then 1
+         else zz157);
+
+   OK = ((zz74 = 4) or 
+      ((zz74 = 5) or 
+      (zz74 = 6)));
+
+   (* Transition action(s) for transition: On -> Off: NONE
+      Entry action(s) for transition: On -> Off *)
+   zz142 = 
+      (if zz139
+         then zz121
+         else zz140);
+   (* Transition segment: trans13 complete. *)
+
+   zz124 = 
+      (if (zz134 = 7)
+         then 
+               (* <Exit state> path: On.Init maps to field: __root and value: 2 *)
+               2
+         else zz134);
+
+   VRP4 = ((zz238 or 
+      zz195) or 
+      zz239);
+
+   (* Exit action(s) for transition: On_Active -> On_Active_Maintain: NONE
+      Transition action(s) for transition: On_Active -> On_Active_Maintain: NONE
+      Entry action(s) for transition: On_Active -> On_Active_Maintain *)
+   zz75 = 
+      (if zz72
+         then zz70
+         else zz92);
+   (* Transition segment: trans18 complete. *)
+
+   zz233 = (desiredSpeed <= 100.0);
+
+   zz223 = 
+      (if zz217
+         then zz2
+         else zz218);
+
+   zz185 = ((not zz184) and 
+      zz183);
+
+   zz180 = ((not zz179) and 
+      zz178);
+
+   zz239 = (desiredSpeed = carSpeed);
+
+   (* Transition action(s) for transition: Off -> On: NONE
+      Entry action(s) for transition: Off -> On *)
+   zz148 = 
+      (if zz144
+         then zz119
+         else zz143);
+   (* Transition segment: trans23 complete. *)
+
+   zz115 = 
+      (if (not 
+         (* <In state> path: On maps to field: __root and value range: [2, 8] *)
+         ((zz146 >= 2) and 
+         (zz146 <= 8)))
+         then 
+               (* <Enter state> path: On maps to field: __root and value: 2 *)
+               2
+         else zz146);
+
+   (* Transition action(s) for transition: On_Active_Maintain -> On_Active_Decrease: NONE
+      Entry action(s) for transition: On_Active_Maintain -> On_Active_Decrease *)
+   zz40 = 
+      (if zz36
+         then zz12
+         else zz38);
+   (* Transition segment: trans15 complete. *)
+
+   (* Exit action(s) for transition: On -> Off *)
+   zz140 = 
+      (if zz139
+         then zz137
+         else zz156);
+
+   (* Exit action(s) for transition: On_Active_Maintain -> On_Active_Decrease *)
+   zz39 = 
+      (if zz36
+         then zz15
+         else zz33);
+
+   zz8 = 
+      (if (zz45 = 5)
+         then 
+               (* <Exit state> path: On.Active.Increase maps to field: __root and value: 3 *)
+               3
+         else zz45);
+
+   zz122 = 
+      (if (not (zz140 = 1))
+         then 1
+         else zz157);
+
+   zz179 = (true -> (pre zz178));
+
+   zz82 = 
+      (if (zz147 = 4)
+         then false
+         else zz141);
+
+   zz203 = (zz201 or 
+      zz202);
+
+   zz186 = (((((not cancel) and 
+      (not brakePedal)) and 
+      zz181) and 
+      zz182) and 
+      validInputs);
+
+   zz183 = decelSet;
+
+   zz155 = (true -> 
+      (if (pre SP3c)
+         then false
+         else (pre zz155)));
+
+   zz196 = (mode = 2);
+
+   zz161 = zz160;
+
+   zz9 = 
+      (if (not (zz44 = 4))
+         then 
+               (* <Enter state> path: On.Active.Maintain maps to field: __root and value: 4 *)
+               4
+         else zz44);
+
+   (* Transition action(s) for transition: On_Inactive -> On_Active *)
+   zz96 = 
+      (if zz93
+         then true
+         else zz90);
+
+   zz52 = 
+      (if ((not zz48) and 
+         (zz50 = 4))
+         then false
+         else zz39);
+
+   zz0 = zz217;
+
+   zz2 = (
+      (if (zz1 and 
+         (not zz0))
+         then 0.0
+         else (zz222 + 0.05)) -> 
+      (if (zz1 and 
+         (not zz0))
+         then 0.0
+         else 
+      (if zz0
+         then (zz222 + 0.05)
+         else (pre zz2))));
+
+   zz1 = (true -> 
+      (if (pre zz0)
+         then false
+         else (pre zz1)));
+
+   (* Transition action(s) for transition: On_Active_Increase -> On_Active_Maintain: NONE
+      Entry action(s) for transition: On_Active_Increase -> On_Active_Maintain *)
+   zz51 = 
+      (if zz47
+         then zz7
+         else zz46);
+   (* Transition segment: trans16 complete. *)
+
+   zz162 = 
+      (if SP3c
+         then 
+               (if zz155
+                  then zz158
+                  else zz151)
+         else zz158);
+
+   (* Condition actions for transition segment: trans19: NONE
+      Transition action(s) for transition: trans19
+      <complete> is true if either: 
+         1. this transition has completed, or 
+         2. a higher-priority transition has already completed 
+       *)
+   zz100 = (zz99 or 
+      zz94);
+
+   zz53 = 
+      (if (not (zz55 = 4))
+         then 
+               (* <Enter state> path: On.Active.Maintain maps to field: __root and value: 4 *)
+               4
+         else zz55);
+
+   zz188 = (desiredSpeed <> 100.0);
+
+   SP10 = ((not zz191) or 
+      zz192);
+
+   zz13 = 
+      (if (not (zz38 = 6))
+         then 5
+         else zz35);
+
+   zz201 = ((zz163 or 
+      zz164) or 
+      zz165);
+
+   zz14 = 
+      (if (zz34 = 4)
+         then 
+               (* <Exit state> path: On.Active.Maintain maps to field: __root and value: 3 *)
+               3
+         else zz34);
+
+   zz126 = 
+      (if (zz129 = 5)
+         then 
+               (* <Exit state> path: On.Active.Increase maps to field: __root and value: 3 *)
+               3
+         else zz129);
+
+   (* Exit action(s) for outer loop transition: On_Active_Maintain *)
+   zz26 = 
+      (if zz24
+         then zz23
+         else zz107);
+
+   (* Exit action(s) for transition: Off -> On *)
+   zz146 = 
+      (if zz144
+         then zz120
+         else zz142);
+
+   zz199 = (
+      (if (zz162 = false)
+         then 0.0
+         else 1.0) = 1.0);
+
+   zz227 = (desiredSpeed - carSpeed);
+
+   zz150 = 
+      (if ((not zz145) and 
+
+         (* <In state> path: On maps to field: __root and value range: [2, 8] *)
+         ((zz147 >= 2) and 
+         (zz147 <= 8)))
+         then zz111
+         else zz148);
+
+   zz177 = (zz176 = 20);
+
+   (* Transition action(s) for outer loop transition: On_Active_Maintain *)
+   zz27 = 
+      (if zz24
+         then true
+         else zz26);
+
+   (* Entry action(s) for transition: On_Inactive -> On_Active *)
+   zz97 = 
+      (if zz93
+         then zz74
+         else zz95);
+   (* Transition segment: trans20 complete. *)
+
+   zz195 = (desiredSpeed = 0.0);
+
+   zz71 = 
+      (if (not 
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz95 >= 3) and 
+         (zz95 <= 6)))
+         then 
+               (* <Enter state> path: On.Active maps to field: __root and value: 3 *)
+               3
+         else zz95);
+
+   zz62 = 
+      (if (not (zz63 = 4))
+         then 4
+         else zz98);
+
+   zz229 = 
+      (if (zz228 < ( -10.0))
+         then ( -10.0)
+         else 
+      (if (zz228 > 10.0)
+         then 10.0
+         else zz228));
+
+   (* Transition action(s) for transition: On_Inactive -> On_Active: NONE
+      Entry action(s) for transition: On_Inactive -> On_Active *)
+   zz103 = 
+      (if zz99
+         then zz67
+         else zz98);
+   (* Transition segment: trans19 complete. *)
+
+   zz55 = 
+      (if (not 
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz106 >= 3) and 
+         (zz106 <= 6)))
+         then 
+               (* <Enter state> path: On.Active maps to field: __root and value: 3 *)
+               3
+         else zz106);
+
+   (* Beginning transition segment: trans18
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz56 = ((not 
+      (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+      ((zz106 >= 3) and 
+      (zz106 <= 6))) and 
+
+      (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+      ((zz55 >= 3) and 
+      (zz55 <= 6)));
+
+   (* Beginning transition segment: trans18
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz72 = ((not 
+      (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+      ((zz95 >= 3) and 
+      (zz95 <= 6))) and 
+
+      (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+      ((zz71 >= 3) and 
+      (zz71 <= 6)));
+
+   (* Transition action(s) for transition: On_Active -> On_Inactive: NONE
+      Entry action(s) for transition: On_Active -> On_Inactive *)
+   zz91 = 
+      (if zz88
+         then zz77
+         else zz89);
+   (* Transition segment: trans21 complete. *)
+
+   zz202 = (mode = 3);
+
+   zz221 = 
+      (if zz162
+         then carSpeed
+         else zz223);
+
+   SP2 = ((not (not zz201)) or 
+      zz187);
+
+   (* Entry action(s) for transition: On_Init -> On_Active *)
+   zz108 = 
+      (if zz104
+         then zz58
+         else zz106);
+   (* Transition segment: trans22 complete. *)
+
+   zz238 = (desiredSpeed = zz211);
+
+   zz212 = (zz211 = desiredSpeed);
+
+   (* Beginning transition segment: trans21
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz88 = (
+      (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+      ((zz147 >= 3) and 
+      (zz147 <= 6)) and 
+      (not zz186));
+
+   (* Condition actions for transition segment: trans16: NONE
+      Transition action(s) for transition: trans16
+      <complete> is true if either: 
+         1. this transition has completed, or 
+         2. a higher-priority transition has already completed 
+       *)
+   zz48 = (zz47 or 
+      zz43);
+
+   SP4 = ((not zz203) or 
+      zz194);
+
+   zz149 = 
+      (if ((not zz145) and 
+
+         (* <In state> path: On maps to field: __root and value range: [2, 8] *)
+         ((zz147 >= 2) and 
+         (zz147 <= 8)))
+         then zz110
+         else zz147);
+
+   zz132 = 
+      (if 
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz156 >= 3) and 
+         (zz156 <= 6))
+         then 
+               (* <Exit state> path: On.Active maps to field: __root and value: 2 *)
+               2
+         else zz131);
+
+   zz112 = 
+      (if ((not zz105) and 
+
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz108 >= 3) and 
+         (zz108 <= 6)))
+         then zz52
+         else zz107);
+
+   (* Exit action(s) for transition: On_Active_Decrease -> On_Active_Maintain *)
+   zz44 = 
+      (if zz42
+         then zz11
+         else zz40);
+
+   zz215 = (zz211 < desiredSpeed);
+
+   zz236 = (desiredSpeed > 0.0);
+
+   zz113 = 
+      (if (not (zz115 = 7))
+         then 
+               (* <Enter state> path: On.Init maps to field: __root and value: 7 *)
+               7
+         else zz115);
+
+   (* Transition action(s) for transition: On_Active_Increase -> On_Active_Maintain: NONE
+      Entry action(s) for transition: On_Active_Increase -> On_Active_Maintain *)
+   zz50 = 
+      (if zz47
+         then zz6
+         else zz49);
+   (* Transition segment: trans16 complete. *)
+
+   (* Exit action(s) for transition: On_Inactive -> On_Active *)
+   zz95 = 
+      (if zz93
+         then zz76
+         else zz91);
+
+   zz3 = zz216;
+
+   zz5 = (
+      (if (zz4 and 
+         (not zz3))
+         then 0.0
+         else (zz222 - 0.05)) -> 
+      (if (zz4 and 
+         (not zz3))
+         then 0.0
+         else 
+      (if zz3
+         then (zz222 - 0.05)
+         else (pre zz5))));
+
+   zz4 = (true -> 
+      (if (pre zz3)
+         then false
+         else (pre zz4)));
+
+   zz60 = 
+      (if (zz102 = 7)
+         then 
+               (* <Exit state> path: On.Init maps to field: __root and value: 2 *)
+               2
+         else zz102);
+
+   (* Entry action(s) for transition: On_Init -> On_Active *)
+   zz109 = 
+      (if zz104
+         then zz59
+         else zz103);
+   (* Transition segment: trans22 complete. *)
+
+   zz205 = (0.0 -> (pre zz204));
+
+   zz209 = zz163;
+
+   zz216 = zz164;
+
+   zz217 = zz165;
+
+   zz117 = (
+      (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+      ((zz118 >= 3) and 
+      (zz118 <= 6)) or 
+      ((zz118 = 7) or 
+      (zz118 = 8)));
+
+   zz70 = 
+      (if (not (zz71 = 4))
+         then 4
+         else zz92);
+
+   zz22 = 
+      (if (zz108 = 4)
+         then 
+               (* <Exit state> path: On.Active.Maintain maps to field: __root and value: 3 *)
+               3
+         else zz108);
+
+   zz160 = 
+      (if SP3c
+         then 
+               (if zz155
+                  then zz153
+                  else zz149)
+         else zz156);
+
+   VRP2 = (zz234 and 
+      zz233);
+
+   zz153 = 
+      (if (not (zz156 = 1))
+         then 
+               (* <Enter state> path: Off maps to field: __root and value: 1 *)
+               1
+         else zz156);
+
+   (* Exit action(s) for transition: On_Active -> On_Active_Maintain: NONE
+      Transition action(s) for transition: On_Active -> On_Active_Maintain: NONE
+      Entry action(s) for transition: On_Active -> On_Active_Maintain *)
+   zz58 = 
+      (if zz56
+         then zz53
+         else zz55);
+   (* Transition segment: trans18 complete. *)
+
+   (* Beginning transition segment: trans23
+      <fired> is true if the following are true: 
+         1. the previous transition guard was true, 
+         2. the source node for the transition is active, 
+         3. the condition for the transition to fire is true, and 
+         4. no higher-priority transition has completed (not <complete>) *)
+   zz144 = ((zz142 = 1) and 
+      (onOff and 
+      (not zz139)));
+
+   (* Condition actions for transition segment: trans15: NONE
+      Transition action(s) for transition: trans15
+      <complete> is true if either: 
+         1. this transition has completed, or 
+         2. a higher-priority transition has already completed 
+       *)
+   zz37 = (zz36 or 
+      zz31);
+
+   zz222 = (0.0 -> (pre desiredSpeed));
+
+   zz228 = (zz227 * 1.0);
+
+   zz68 = 
+      (if (zz97 = 8)
+         then 
+               (* <Exit state> path: On.Inactive maps to field: __root and value: 2 *)
+               2
+         else zz97);
+
+   zz125 = 
+      (if (zz130 = 6)
+         then 
+               (* <Exit state> path: On.Active.Decrease maps to field: __root and value: 3 *)
+               3
+         else zz130);
+
+   zz170 = 
+      (if (zz166 <= 20)
+         then zz166
+         else 20);
+
+   zz167 = (zz169 + 1);
+
+   zz11 = 
+      (if (zz40 = 6)
+         then 
+               (* <Exit state> path: On.Active.Decrease maps to field: __root and value: 3 *)
+               3
+         else zz40);
+
+   zz163 = (mode = 4);
+
+   zz187 = (cruiseThrottle = 0.0);
+
+   zz129 = 
+      (if 
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz156 >= 3) and 
+         (zz156 <= 6))
+         then zz127
+         else zz156);
+
+   (* Exit action(s) for transition: On_Active -> On_Inactive *)
+   zz90 = 
+      (if zz88
+         then zz87
+         else zz141);
+
+   (* Transition action(s) for transition: On_Active_Decrease -> On_Active_Maintain: NONE
+      Entry action(s) for transition: On_Active_Decrease -> On_Active_Maintain *)
+   zz46 = 
+      (if zz42
+         then zz10
+         else zz41);
+   (* Transition segment: trans17 complete. *)
+
+   (* Entry action(s) for transition: On_Inactive -> On_Active *)
+   zz98 = 
+      (if zz93
+         then zz75
+         else zz92);
+   (* Transition segment: trans20 complete. *)
+
+   (* Exit action(s) for transition: On_Active_Maintain -> On_Active_Increase *)
+   zz32 = 
+      (if zz30
+         then zz18
+         else zz28);
+
+   zz225 = (zz230 + zz224);
+
+   zz190 = desiredSpeed;
+
+   zz207 = (zz211 <= desiredSpeed);
+
+   (* Exit action(s) for outer loop transition: On_Active_Maintain *)
+   zz25 = 
+      (if zz24
+         then zz22
+         else zz108);
+
+   mode = 
+      (if SP3c
+         then 
+               (if zz155
+                  then zz154
+                  else zz150)
+         else zz157);
+
+   SP5 = ((not zz163) or 
+      zz206);
+
+   zz135 = 
+      (if 
+         (* <In state> path: On maps to field: __root and value range: [2, 8] *)
+         ((zz156 >= 2) and 
+         (zz156 <= 8))
+         then zz124
+         else zz134);
+
+   zz111 = 
+      (if ((not zz105) and 
+
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz108 >= 3) and 
+         (zz108 <= 6)))
+         then zz51
+         else zz109);
+
+   SP3b = ((not zz198) or 
+      zz200);
+
+   (* Transition action(s) for transition: On -> Off: NONE
+      Entry action(s) for transition: On -> Off *)
+   zz143 = 
+      (if zz139
+         then zz122
+         else zz157);
+   (* Transition segment: trans13 complete. *)
+
+   zz219 = 
+      (if zz202
+         then zz222
+         else 0.0);
+
+   zz23 = 
+      (if (zz108 = 4)
+         then false
+         else zz107);
+
+   (* Condition actions for transition segment: trans23: NONE
+      Transition action(s) for transition: trans23
+      <complete> is true if either: 
+         1. this transition has completed, or 
+         2. a higher-priority transition has already completed 
+       *)
+   zz145 = (zz144 or 
+      zz139);
+
+   (* Exit action(s) for transition: On_Active -> On_Active_Maintain: NONE
+      Transition action(s) for transition: On_Active -> On_Active_Maintain: NONE
+      Entry action(s) for transition: On_Active -> On_Active_Maintain *)
+   zz66 = 
+      (if zz64
+         then zz61
+         else zz63);
+   (* Transition segment: trans18 complete. *)
+
+   SP3 = ((not zz198) or 
+      zz195);
+
+   zz232 = (cruiseThrottle >= 0.0);
+
+   zz110 = 
+      (if ((not zz105) and 
+
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz108 >= 3) and 
+         (zz108 <= 6)))
+         then zz50
+         else zz108);
+
+   zz152 = ((zz153 = 1) or 
+
+      (* <In state> path: On maps to field: __root and value range: [2, 8] *)
+      ((zz153 >= 2) and 
+      (zz153 <= 8)));
+
+   (* Transition action(s) for transition: On_Init -> On_Active *)
+   zz107 = 
+      (if zz104
+         then true
+         else zz96);
+
+   (* Exit action(s) for transition: On_Active -> On_Inactive *)
+   zz89 = 
+      (if zz88
+         then zz86
+         else zz147);
+
+   SP11 = ((not zz193) or 
+      zz194);
+
+   zz220 = 
+      (if zz163
+         then zz222
+         else zz219);
+
+   zz21 = 
+      (if (not (zz25 = 4))
+         then 4
+         else zz109);
+
+   zz213 = (false -> (pre zz216));
+
+   (* Transition action(s) for transition: On_Inactive -> On_Active: NONE
+      Entry action(s) for transition: On_Inactive -> On_Active *)
+   zz102 = 
+      (if zz99
+         then zz66
+         else zz101);
+   (* Transition segment: trans19 complete. *)
+
+   zz176 = 
+      (if (zz172 <= 20)
+         then zz172
+         else 20);
+
+   zz130 = 
+      (if 
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz156 >= 3) and 
+         (zz156 <= 6))
+         then zz126
+         else zz129);
+
+   zz237 = (zz236 and 
+      zz235);
+
+   (* Exit action(s) for transition: On_Inactive -> On_Active *)
+   zz101 = 
+      (if zz99
+         then zz68
+         else zz97);
+
+   zz164 = (mode = 5);
+
+   zz17 = 
+      (if (not (zz32 = 5))
+         then 6
+         else zz29);
+
+   (* Exit action(s) for transition: On_Active -> On_Active_Maintain: NONE
+      Transition action(s) for transition: On_Active -> On_Active_Maintain: NONE
+      Entry action(s) for transition: On_Active -> On_Active_Maintain *)
+   zz74 = 
+      (if zz72
+         then zz69
+         else zz71);
+   (* Transition segment: trans18 complete. *)
+
+   zz230 = (zz229 / 20.0);
+
+   CP8a = ((not zz162) or 
+      zz201);
+
+   zz133 = 
+      (if 
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz156 >= 3) and 
+         (zz156 <= 6))
+         then zz128
+         else zz158);
+
+   SP6 = ((not zz164) or 
+      zz207);
+
+   zz151 = 
+      (if ((not zz145) and 
+
+         (* <In state> path: On maps to field: __root and value range: [2, 8] *)
+         ((zz147 >= 2) and 
+         (zz147 <= 8)))
+         then zz112
+         else zz141);
+
+   zz189 = (false -> (pre zz217));
+
+   zz214 = (zz213 and 
+      zz193);
+
+   (* Entry action(s) for outer loop transition: On_Active_Maintain *)
+   zz28 = 
+      (if zz24
+         then zz20
+         else zz25);
+   (* Transition segment: trans24 complete. *)
+
+   zz206 = (zz205 = cruiseThrottle);
+
+   zz12 = 
+      (if (not (zz38 = 6))
+         then 
+               (* <Enter state> path: On.Active.Decrease maps to field: __root and value: 6 *)
+               6
+         else zz38);
+
+   zz224 = (0.0 -> (pre cruiseThrottle));
+
+   zz87 = 
+      (if 
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz147 >= 3) and 
+         (zz147 <= 6))
+         then zz82
+         else zz141);
+
+   (* Exit action(s) for transition: On_Active -> On_Active_Maintain: NONE
+      Transition action(s) for transition: On_Active -> On_Active_Maintain: NONE
+      Entry action(s) for transition: On_Active -> On_Active_Maintain *)
+   zz59 = 
+      (if zz56
+         then zz54
+         else zz103);
+   (* Transition segment: trans18 complete. *)
+
+   zz128 = 
+      (if (zz156 = 4)
+         then false
+         else zz158);
+
+   (* Transition action(s) for transition: Off -> On: NONE
+      Entry action(s) for transition: Off -> On *)
+   zz147 = 
+      (if zz144
+         then zz118
+         else zz146);
+   (* Transition segment: trans23 complete. *)
+
+   SP8 = ((not zz210) or 
+      zz212);
+
+   zz7 = 
+      (if (not (zz49 = 4))
+         then 4
+         else zz46);
+
+   desiredSpeed = 
+      (if (zz221 < 0.0)
+         then 0.0
+         else 
+      (if (zz221 > 100.0)
+         then 100.0
+         else zz221));
+
+   (* Entry action(s) for outer loop transition: On_Active_Maintain *)
+   zz29 = 
+      (if zz24
+         then zz21
+         else zz109);
+   (* Transition segment: trans24 complete. *)
+
+   zz18 = 
+      (if (zz28 = 4)
+         then 
+               (* <Exit state> path: On.Active.Maintain maps to field: __root and value: 3 *)
+               3
+         else zz28);
+
+   zz114 = 
+      (if (not (zz115 = 7))
+         then 2
+         else zz143);
+
+   zz211 = (0.0 -> (pre zz190));
+
+   zz226 = 
+      (if (zz225 < 0.0)
+         then 0.0
+         else 
+      (if (zz225 > 100.0)
+         then 100.0
+         else zz225));
+
+   zz69 = 
+      (if (not (zz71 = 4))
+         then 
+               (* <Enter state> path: On.Active.Maintain maps to field: __root and value: 4 *)
+               4
+         else zz71);
+
+   zz20 = 
+      (if (not (zz25 = 4))
+         then 
+               (* <Enter state> path: On.Active.Maintain maps to field: __root and value: 4 *)
+               4
+         else zz25);
+
+   (* Condition actions for transition segment: trans14: NONE
+      Transition action(s) for transition: trans14
+      <complete> is true if either: 
+         1. this transition has completed, or 
+         2. a higher-priority transition has already completed 
+       *)
+   zz31 = (zz30 or 
+      zz24);
+
+   zz218 = 
+      (if zz216
+         then zz5
+         else zz220);
+
+   zz10 = 
+      (if (not (zz44 = 4))
+         then 4
+         else zz41);
+
+   zz77 = 
+      (if (not (zz89 = 8))
+         then 
+               (* <Enter state> path: On.Inactive maps to field: __root and value: 8 *)
+               8
+         else zz89);
+
+   (* Transition action(s) for transition: On_Active -> On_Inactive: NONE
+      Entry action(s) for transition: On_Active -> On_Inactive *)
+   zz92 = 
+      (if zz88
+         then zz78
+         else zz148);
+   (* Transition segment: trans21 complete. *)
+
+   zz182 = (carSpeed >= 15.0);
+
+   zz210 = (false -> (pre zz209));
+
+   zz85 = 
+      (if 
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz147 >= 3) and 
+         (zz147 <= 6))
+         then zz79
+         else zz84);
+
+   zz84 = 
+      (if 
+         (* <In state> path: On.Active maps to field: __root and value range: [3, 6] *)
+         ((zz147 >= 3) and 
+         (zz147 <= 6))
+         then zz80
+         else zz83);
+
+   (* Exit action(s) for transition: On_Active_Increase -> On_Active_Maintain *)
+   zz49 = 
+      (if zz47
+         then zz8
+         else zz45);
+
+--  --%PROPERTY zz57;
+--   --%PROPERTY zz65;
+   --%PROPERTY OK;
+--   --%PROPERTY zz117;
+--   --%PROPERTY zz152;
+--   --%PROPERTY       VRP1;
+--   --%PROPERTY       VRP2;
+--   --%PROPERTY       CP8a;
+--   --%PROPERTY       VRP3;
+--   --%PROPERTY       VRP4;
+--   --%PROPERTY       SP4;
+--   --%PROPERTY       SP5;
+--   --%PROPERTY       SP6;
+--   --%PROPERTY       SP7;
+--   --%PROPERTY       SP3b;
+--   --%PROPERTY       SP3c;
+--   --%PROPERTY       SP3;
+--   --%PROPERTY       SP3a;
+--   --%PROPERTY       SP2;
+--   --%PROPERTY       SP1;
+--   --%PROPERTY       SP8;
+--   --%PROPERTY       SP9;
+--   --%PROPERTY       SP10;
+--   --%PROPERTY       SP11;
+
+--   check zz57; 
+
+--   check zz65; 
+
+--   check OK; 
+
+--   check zz117; 
+
+--   check zz152;
+
+tel;
+
+

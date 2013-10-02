@@ -1,0 +1,12 @@
+*.cmx
+*.cmo
+*.cmi
+*.annot
+*.tgz
+*.output
+lexer.ml
+parser.mli
+parser.ml
+preludec.opt
+preludec
+prelude-*
