@@ -72,7 +72,7 @@ let keyword_table =
   "pre", PRE;
   "div", DIV;
   "const", CONST;
-  "include", INCLUDE;
+  "open", OPEN;
   "assert", ASSERT;
 ]
 

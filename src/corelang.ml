@@ -136,7 +136,7 @@ type top_decl_desc =
   | Consts of const_desc list
   | ImportedNode of imported_node_desc
   | ImportedFun of imported_fun_desc
-  | Include of string
+  | Open of string
 
 type top_decl =
     {top_decl_desc: top_decl_desc;
@@ -493,7 +493,7 @@ let get_consts prog =
     fun consts decl ->
       match decl.top_decl_desc with
 	| Consts clist -> clist@consts
-	| Node _ | ImportedNode _ | ImportedFun _ | Include _ -> consts  
+	| Node _ | ImportedNode _ | ImportedFun _ | Open _ -> consts  
   ) [] prog
 
 
@@ -502,7 +502,7 @@ let get_nodes prog =
     fun nodes decl ->
       match decl.top_decl_desc with
 	| Node nd -> nd::nodes
-	| Consts _ | ImportedNode _ | ImportedFun _ | Include _ -> nodes  
+	| Consts _ | ImportedNode _ | ImportedFun _ | Open _ -> nodes  
   ) [] prog
 
 let prog_unfold_consts prog =
@@ -587,7 +587,7 @@ let pp_decl_type fmt tdecl =
     fprintf fmt "%s: " ind.fun_id;
     Utils.reset_names ();
     fprintf fmt "%a@ " Types.print_ty ind.fun_type
-  | Consts _ | Include _ -> ()
+  | Consts _ | Open _ -> ()
 
 let pp_prog_type fmt tdecl_list =
   Utils.fprintf_list ~sep:"" pp_decl_type fmt tdecl_list
@@ -600,9 +600,9 @@ let pp_decl_clock fmt cdecl =
     fprintf fmt "%a@ " Clocks.print_ck nd.node_clock
   | ImportedNode ind ->
     fprintf fmt "%s: " ind.nodei_id;
-      Utils.reset_names ();
-      fprintf fmt "%a@ " Clocks.print_ck ind.nodei_clock
-      | ImportedFun _ | Consts _ | Include _ -> ()
+    Utils.reset_names ();
+    fprintf fmt "%a@ " Clocks.print_ck ind.nodei_clock
+  | ImportedFun _ | Consts _ | Open _ -> ()
 
 let pp_prog_clock fmt prog =
   Utils.fprintf_list ~sep:"" pp_decl_clock fmt prog

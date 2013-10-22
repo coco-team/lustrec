@@ -331,13 +331,17 @@ and type_expr env in_main const expr =
     expr.expr_type <- ty;
     ty
   | Expr_appl (id, args, r) ->
-    (* application of non internal function is not legal in a constant expression *)
+    (* application of non internal function is not legal in a constant
+       expression *)
     (match r with
     | None        -> ()
-    | Some (x, l) -> check_constant expr.expr_loc const false;
-                     let expr_x = expr_of_ident x expr.expr_loc in	
-		     let typ_l = Type_predef.type_clock (type_const expr.expr_loc (Const_tag l)) in
-		     type_subtyping_arg env in_main ~sub:false const expr_x typ_l);
+    | Some (x, l) -> 
+      check_constant expr.expr_loc const false;
+      let expr_x = expr_of_ident x expr.expr_loc in	
+      let typ_l = 
+	Type_predef.type_clock 
+	  (type_const expr.expr_loc (Const_tag l)) in
+      type_subtyping_arg env in_main ~sub:false const expr_x typ_l);
     let touts = type_appl env in_main expr.expr_loc const id args in
     expr.expr_type <- touts;
     touts
@@ -583,11 +587,11 @@ let type_top_decl env decl =
       type_imported_fun env nd decl.top_decl_loc
   | Consts clist ->
       type_top_consts env clist
-  | Include _  -> env
+  | Open _  -> env
 
 let type_prog env decls =
 try
-  ignore(List.fold_left type_top_decl env decls)
+  List.fold_left type_top_decl env decls
 with Failure _ as exc -> raise exc
 
 (* Once the Lustre program is fully typed,
@@ -632,10 +636,17 @@ let uneval_top_generics decl =
   | ImportedFun nd ->
       ()
   | Consts clist -> ()
-  | Include _  -> ()
+  | Open _  -> ()
 
 let uneval_prog_generics prog =
  List.iter uneval_top_generics prog
+
+let check_env_compat declared computed =
+  Env.iter declared (fun k decl_type_k -> 
+    let computed_t = Env.lookup_value computed k in
+    try_unify decl_type_k computed_t Location.dummy_loc
+  ) 
+
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

@@ -432,6 +432,8 @@ let print_step_prototype self fmt (name, inputs, outputs) =
 (*                         Header Printing functions                                        *)
 (********************************************************************************************)
 
+(* Removed because of "open" constructs. No more extern functions *)
+(*
 let print_prototype fmt decl =
   match decl.top_decl_desc with
     | ImportedFun m -> (
@@ -455,7 +457,13 @@ let print_prototype fmt decl =
       )
     )
     | _ -> () (* We don't do anything here *)
+      *)
 
+let print_prototype fmt decl =
+  match decl.top_decl_desc with
+  | Open m -> fprintf fmt "#include \"%s.h\"@," m
+  | _ -> () (* We don't do anything here *)
+    
 let pp_registers_struct fmt m =
   if m.mmemory <> []
   then
@@ -762,11 +770,21 @@ let print_type_definitions fmt =
 	(pp_c_type_decl cpt_type var) def
     | _        -> ()) type_table
 
+let print_makefile basename nodename fmt =
+  fprintf fmt "GCC=gcc@.";
+  fprintf fmt "INC=/usr/local/include/lustrec@.";
+  fprintf fmt "@.";
+  fprintf fmt "main:@.";
+  fprintf fmt "\t${GCC} -I${INC} -I. -c %s.c@." basename;    
+  fprintf fmt "\t${GCC} -I${INC} -c ${INC}/io_frontend.c@.";    
+  fprintf fmt "\t${GCC} -I${INC} -c ${INC}/StdLibrary.c@.";
+  fprintf fmt "\t${GCC} -o %s_%s io_frontend.o StdLibrary.o -lm %s.o@." basename nodename basename
+
 (********************************************************************************************)
 (*                         Translation function                                             *)
 (********************************************************************************************)
     
-let translate_to_c header_fmt source_fmt spec_fmt_opt basename prog machines =
+let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog machines =
   (* Generating H file *)
 
   (* Include once: start *)
@@ -795,9 +813,9 @@ let translate_to_c header_fmt source_fmt spec_fmt_opt basename prog machines =
   (* Generating C file *)
   
   (* If a main node is identified, generate a main function for it *)
-  let main_include, main_print =
+  let main_include, main_print, main_makefile =
     match !Options.main_node with
-      | "" -> (fun _ -> ()), (fun _ -> ())
+      | "" -> (fun _ -> ()), (fun _ -> ()), (fun _ -> ())
       | main_node -> ( 
 	let main_node_opt = 
 	  List.fold_left 
@@ -808,8 +826,8 @@ let translate_to_c header_fmt source_fmt spec_fmt_opt basename prog machines =
 	  None machines
       in 
       match main_node_opt with
-	| None -> eprintf "Unable to find a main node named %s@.@?" main_node; (fun _ -> ()), (fun _ -> ())
-	| Some m -> print_main_header, print_main_fun machines m
+	| None -> eprintf "Unable to find a main node named %s@.@?" main_node; (fun _ -> ()), (fun _ -> ()), (fun _ -> ())
+	| Some m -> print_main_header, print_main_fun machines m, print_makefile basename !Options.main_node
     )
   in
   main_include source_fmt;
@@ -829,11 +847,10 @@ let translate_to_c header_fmt source_fmt spec_fmt_opt basename prog machines =
   pp_print_newline source_fmt ();
   (* Print nodes one by one (in the previous order) *)
   List.iter (print_machine source_fmt) machines;
-  main_print source_fmt
-  
+  main_print source_fmt;
 
-
-
+  (* Generating Makefile *)
+  main_makefile makefile_fmt    
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

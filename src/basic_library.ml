@@ -35,26 +35,29 @@ let static_op ty =
   type_static (mkdim_var ()) ty
 
 let type_env =
-  let init_env = TE.initial in
-  let env' = TE.add_value init_env "+" (static_op type_bin_poly_op) in
-  let env' = TE.add_value env' "uminus" (static_op type_unary_poly_op) in
-  let env' = TE.add_value env' "-" (static_op type_bin_poly_op) in
-  let env' = TE.add_value env' "*" (static_op type_bin_poly_op) in
-  let env' = TE.add_value env' "/" (static_op type_bin_poly_op) in
-  let env' = TE.add_value env' "mod" (static_op type_bin_int_op) in
-  let env' = TE.add_value env' "&&" (static_op type_bin_bool_op) in
-  let env' = TE.add_value env' "||" (static_op type_bin_bool_op) in
-  let env' = TE.add_value env' "xor" (static_op type_bin_bool_op) in
-  let env' = TE.add_value env' "impl" (static_op type_bin_bool_op) in
-  let env' = TE.add_value env' "<" (static_op type_bin_comp_op) in
-  let env' = TE.add_value env' "<=" (static_op type_bin_comp_op) in
-  let env' = TE.add_value env' ">" (static_op type_bin_comp_op) in
-  let env' = TE.add_value env' ">=" (static_op type_bin_comp_op) in
-  let env' = TE.add_value env' "!=" (static_op type_bin_comp_op) in
-  let env' = TE.add_value env' "=" (static_op type_bin_comp_op) in
-  let env' = TE.add_value env' "not" (static_op type_unary_bool_op) in
-  env'
-
+  List.fold_left 
+    (fun env (op, op_type) -> TE.add_value env op op_type)
+    TE.initial
+    [
+       "+", (static_op type_bin_poly_op);
+      "uminus", (static_op type_unary_poly_op); 
+      "-", (static_op type_bin_poly_op); 
+      "*", (static_op type_bin_poly_op);
+      "/", (static_op type_bin_poly_op);
+      "mod", (static_op type_bin_int_op);
+      "&&", (static_op type_bin_bool_op);
+      "||", (static_op type_bin_bool_op);
+      "xor", (static_op type_bin_bool_op);
+      "impl", (static_op type_bin_bool_op);
+      "<", (static_op type_bin_comp_op);
+      "<=", (static_op type_bin_comp_op);
+      ">", (static_op type_bin_comp_op);
+      ">=", (static_op type_bin_comp_op);
+      "!=", (static_op type_bin_comp_op);
+      "=", (static_op type_bin_comp_op);
+      "not", (static_op type_unary_bool_op)
+]
+ 
 module CE = Env
 
 let clock_env =
@@ -85,25 +88,30 @@ let delay_env =
 module VE = Env
 
 let eval_env =
-  let init_env = VE.initial in
-  let env' = VE.add_value init_env "uminus" (fun [Dint a] -> Dint (-a)) in
-  let env' = VE.add_value env' "not" (fun [Dbool b] -> Dbool (not b)) in
-  let env' = VE.add_value env' "+" (fun [Dint a; Dint b] -> Dint (a+b)) in
-  let env' = VE.add_value env' "-" (fun [Dint a; Dint b] -> Dint (a-b)) in
-  let env' = VE.add_value env' "*" (fun [Dint a; Dint b] -> Dint (a*b)) in
-  let env' = VE.add_value env' "/" (fun [Dint a; Dint b] -> Dint (a/b)) in
-  let env' = VE.add_value env' "mod" (fun [Dint a; Dint b] -> Dint (a mod b)) in
-  let env' = VE.add_value env' "&&" (fun [Dbool a; Dbool b] -> Dbool (a&&b)) in
-  let env' = VE.add_value env' "||" (fun [Dbool a; Dbool b] -> Dbool (a||b)) in
-  let env' = VE.add_value env' "xor" (fun [Dbool a; Dbool b] -> Dbool (a<>b)) in
-  let env' = VE.add_value env' "impl" (fun [Dbool a; Dbool b] -> Dbool (a<=b)) in
-  let env' = VE.add_value env' "<" (fun [Dint a; Dint b] -> Dbool (a<b)) in
-  let env' = VE.add_value env' ">" (fun [Dint a; Dint b] -> Dbool (a>b)) in
-  let env' = VE.add_value env' "<=" (fun [Dint a; Dint b] -> Dbool (a<=b)) in
-  let env' = VE.add_value env' ">=" (fun [Dint a; Dint b] -> Dbool (a>=b)) in
-  let env' = VE.add_value env' "!=" (fun [a; b] -> Dbool (a<>b)) in
-  let env' = VE.add_value env' "=" (fun [a; b] -> Dbool (a=b)) in
-  env'
+  let defs = [ 
+    "uminus", (function [Dint a] -> Dint (-a)           | _ -> assert false);
+    "not", (function [Dbool b] -> Dbool (not b)         | _ -> assert false);
+    "+", (function [Dint a; Dint b] -> Dint (a+b)       | _ -> assert false);
+    "-", (function [Dint a; Dint b] -> Dint (a-b)       | _ -> assert false);
+    "*", (function [Dint a; Dint b] -> Dint (a*b)       | _ -> assert false);
+    "/", (function [Dint a; Dint b] -> Dint (a/b)       | _ -> assert false);
+    "mod", (function [Dint a; Dint b] -> Dint (a mod b) | _ -> assert false);
+    "&&", (function [Dbool a; Dbool b] -> Dbool (a&&b)  | _ -> assert false);
+    "||", (function [Dbool a; Dbool b] -> Dbool (a||b)  | _ -> assert false);
+    "xor", (function [Dbool a; Dbool b] -> Dbool (a<>b) | _ -> assert false);
+    "impl", (function [Dbool a; Dbool b] -> Dbool (a<=b)| _ -> assert false);
+    "<", (function [Dint a; Dint b] -> Dbool (a<b)      | _ -> assert false);
+    ">", (function [Dint a; Dint b] -> Dbool (a>b)      | _ -> assert false);
+    "<=", (function [Dint a; Dint b] -> Dbool (a<=b)    | _ -> assert false);
+    ">=", (function [Dint a; Dint b] -> Dbool (a>=b)    | _ -> assert false);
+    "!=", (function [a; b] -> Dbool (a<>b)              | _ -> assert false);
+    "=", (function [a; b] -> Dbool (a=b)                | _ -> assert false);
+  ]
+  in
+  List.fold_left 
+    (fun env (op, op_eval) -> VE.add_value env op op_eval)
+    VE.initial
+    defs
 
 let internal_funs = ["+";"-";"*";"/";"mod";"&&";"||";"xor";"impl";"<";">";"<=";">=";"!=";"=";"uminus";"not"]
 
