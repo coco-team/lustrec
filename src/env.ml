@@ -36,6 +36,8 @@ let lookup_value env ident =
 let exists_value env ident =
   IMap.mem ident env
 
+let iter env f = IMap.iter f env
+ 
 let overwrite x y =
   IMap.merge (
     fun k _old _new -> match _new with

@@ -133,7 +133,7 @@ type top_decl_desc =
   | ImportedFun of imported_fun_desc
   (* | SensorDecl of sensor_desc *)
   (* | ActuatorDecl of actuator_desc *)
-  | Include of string
+  | Open of string
 
 type top_decl =
     {top_decl_desc: top_decl_desc;

@@ -769,13 +769,17 @@ let clock_top_decl env decl =
     clock_function env decl.top_decl_loc fcn
   | Consts clist ->
     clock_top_consts env clist
-  | Include _ ->
+  | Open _ ->
     env
 
 let clock_prog env decls =
-  ignore(List.fold_left (fun e decl -> clock_top_decl e decl) env decls)
+  List.fold_left (fun e decl -> clock_top_decl e decl) env decls
 
-
+let check_env_compat declared computed =
+  Env.iter declared (fun k decl_clock_k -> 
+    let computed_c = Env.lookup_value computed k in
+    try_unify decl_clock_k computed_c Location.dummy_loc
+  ) 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 NOW=`date "+%y%m%d%H%M"`
-
+LUSTREC="../../_build/src/lustrec"
 mkdir -p build
 cd build
 
@@ -11,9 +11,9 @@ do
 #   echo main:$main
 #   echo opts:$opts
     if [ "$main" != "" ]; then
-	lustrec -d build -verbose 0 $opts -node $main ../$file;
+	$LUSTREC -d build -verbose 0 $opts -node $main ../$file;
     else
-	lustrec -d build -verbose 0 $opts ../$file
+	$LUSTREC -d build -verbose 0 $opts ../$file
     fi
     if [ $? -ne 0 ]; then 
       rlustrec="INVALID"; 

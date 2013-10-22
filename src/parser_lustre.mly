@@ -48,7 +48,7 @@ let mkdim_ite i t e = mkdim_ite (Location.symbol_rloc ()) i t e
 %token <string> REAL
 %token <float> FLOAT
 %token AUTOMATON STATE UNTIL UNLESS RESTART RESUME LAST
-%token STATELESS ASSERT INCLUDE QUOTE FUNCTION
+%token STATELESS ASSERT OPEN QUOTE FUNCTION
 %token <string> IDENT
 %token <LustreSpec.expr_annot> ANNOT
 %token <LustreSpec.node_annot> NODESPEC
@@ -91,28 +91,88 @@ let mkdim_ite i t e = mkdim_ite (Location.symbol_rloc ()) i t e
 
 %start prog
 %type <Corelang.top_decl list> prog
+%start header
+%type <Corelang.top_decl list> header
 
 %%
 
 prog:
     typ_def_list top_decl_list EOF {$1;(List.rev $2)}
 
+header:
+    typ_def_list top_decl_header_list EOF {$1;(List.rev $2)}
+
 top_decl_list:
   top_decl {[$1]}
 | top_decl_list top_decl {$2::$1}
 
+
+top_decl_header_list:
+  top_decl_header {[$1]}
+| top_decl_header_list top_decl_header {$2::$1}
+
+
+top_decl_header:
+| NODE IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR stateless_opt SCOL
+    {let nd = mktop_decl (ImportedNode
+                            {nodei_id = $2;
+                             nodei_type = Types.new_var ();
+                             nodei_clock = Clocks.new_var true;
+                             nodei_inputs = List.rev $4;
+                             nodei_outputs = List.rev $9;
+			     nodei_stateless = $12;
+			     nodei_spec = None})
+    in
+    Hashtbl.add node_table $2 nd; nd}
+
+| nodespec_list NODE IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR stateless_opt SCOL
+    {let nd = mktop_decl (ImportedNode
+                            {nodei_id = $3;
+                             nodei_type = Types.new_var ();
+                             nodei_clock = Clocks.new_var true;
+                             nodei_inputs = List.rev $5;
+                             nodei_outputs = List.rev $10;
+			     nodei_stateless = $13;
+			     nodei_spec = Some $1})
+    in
+    Hashtbl.add node_table $3 nd; nd}
+
+| FUNCTION IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL
+    {let nd = mktop_decl (ImportedNode
+                            {nodei_id = $2;
+                             nodei_type = Types.new_var ();
+			     nodei_clock = Clocks.new_var true;
+                             nodei_inputs = List.rev $4;
+                             nodei_outputs = List.rev $9;
+			     nodei_stateless = true;
+			     nodei_spec = None})
+     in
+     Hashtbl.add node_table $2 nd; nd}
+
+| nodespec_list FUNCTION IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL
+    {let nd = mktop_decl (ImportedNode
+                            {nodei_id = $3;
+                             nodei_type = Types.new_var ();
+			     nodei_clock = Clocks.new_var true;
+                             nodei_inputs = List.rev $5;
+                             nodei_outputs = List.rev $10;
+			     nodei_stateless = true;
+			     nodei_spec = Some $1})
+     in
+    Hashtbl.add node_table $3 nd; nd}
+
 top_decl:
 | CONST cdecl_list { mktop_decl (Consts (List.rev $2)) }
 
-| NODE IDENT LPAR vdecl_list RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET eq_list TEL 
-    {let eqs, asserts, annots = $14 in
+| NODE IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET eq_list TEL 
+    {let eqs, asserts, annots = $15 in
      let nd = mktop_decl (Node
                             {node_id = $2;
                              node_type = Types.new_var ();
                              node_clock = Clocks.new_var true;
                              node_inputs = List.rev $4;
-                             node_outputs = List.rev $8;
-                             node_locals = List.rev $12;
+                             node_outputs = List.rev $9;
+                             node_locals = List.rev $13;
 			     node_gencalls = [];
 			     node_checks = [];
 			     node_asserts = asserts; 
@@ -122,15 +182,15 @@ top_decl:
     in
     Hashtbl.add node_table $2 nd; nd}
 
-| nodespec_list NODE IDENT LPAR vdecl_list RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET eq_list TEL 
-    {let eqs, asserts, annots = $15 in
+| nodespec_list NODE IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET eq_list TEL 
+    {let eqs, asserts, annots = $16 in
      let nd = mktop_decl (Node
                             {node_id = $3;
                              node_type = Types.new_var ();
                              node_clock = Clocks.new_var true;
                              node_inputs = List.rev $5;
-                             node_outputs = List.rev $9;
-                             node_locals = List.rev $13;
+                             node_outputs = List.rev $10;
+                             node_locals = List.rev $14;
 			     node_gencalls = [];
 			     node_checks = [];
 			     node_asserts = asserts; 
@@ -140,55 +200,7 @@ top_decl:
     in
     Hashtbl.add node_table $3 nd; nd}
 
-| IMPORTED NODE IDENT LPAR vdecl_list RPAR RETURNS LPAR vdecl_list RPAR stateless_opt SCOL
-    {let nd = mktop_decl (ImportedNode
-                            {nodei_id = $3;
-                             nodei_type = Types.new_var ();
-                             nodei_clock = Clocks.new_var true;
-                             nodei_inputs = List.rev $5;
-                             nodei_outputs = List.rev $9;
-			     nodei_stateless = $11;
-			     nodei_spec = None})
-    in
-    Hashtbl.add node_table $3 nd; nd}
-
-| nodespec_list IMPORTED NODE IDENT LPAR vdecl_list RPAR RETURNS LPAR vdecl_list RPAR stateless_opt SCOL
-    {let nd = mktop_decl (ImportedNode
-                            {nodei_id = $4;
-                             nodei_type = Types.new_var ();
-                             nodei_clock = Clocks.new_var true;
-                             nodei_inputs = List.rev $6;
-                             nodei_outputs = List.rev $10;
-			     nodei_stateless = $12;
-			     nodei_spec = Some $1})
-    in
-    Hashtbl.add node_table $4 nd; nd}
-
-| FUNCTION IDENT LPAR vdecl_list RPAR RETURNS LPAR vdecl_list RPAR SCOL
-    {let nd = mktop_decl (ImportedNode
-                            {nodei_id = $2;
-                             nodei_type = Types.new_var ();
-			     nodei_clock = Clocks.new_var true;
-                             nodei_inputs = List.rev $4;
-                             nodei_outputs = List.rev $8;
-			     nodei_stateless = true;
-			     nodei_spec = None})
-     in
-     Hashtbl.add node_table $2 nd; nd}
-
-| nodespec_list FUNCTION IDENT LPAR vdecl_list RPAR RETURNS LPAR vdecl_list RPAR SCOL
-    {let nd = mktop_decl (ImportedNode
-                            {nodei_id = $3;
-                             nodei_type = Types.new_var ();
-			     nodei_clock = Clocks.new_var true;
-                             nodei_inputs = List.rev $5;
-                             nodei_outputs = List.rev $9;
-			     nodei_stateless = true;
-			     nodei_spec = Some $1})
-     in
-    Hashtbl.add node_table $3 nd; nd}
-
-| INCLUDE QUOTE IDENT QUOTE { mktop_decl (Include $3) }
+| OPEN QUOTE IDENT QUOTE { mktop_decl (Open $3) }
 
 nodespec_list:
 NODESPEC { $1 }
