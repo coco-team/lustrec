@@ -1,11 +1,7 @@
+#open "dummy_lib"
+
 const RelOpMatrix_Constant_Value = 1.1 ;
 
-function _Vect_Leqt_real (
-	const n : int ;
-	in : real^n ;
-	in2 : real^n)
-returns (
-	out : bool^n) ;
 
 node RelOpMatrix (
 	In1_Out1_11 : real^2)
