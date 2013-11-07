@@ -1,4 +1,4 @@
-imported node test(x:int) returns (t:int^2);
+#open "dummy_lib"
 
 node access(tab : int^3^4) returns (o:int)
 var tab2,x;

@@ -185,7 +185,7 @@ let rec unify t1 t2 =
       begin
 	unify t1' t2';
 	Dimension.eval Basic_library.eval_env (fun c -> None) e1;
-	Dimension.eval Basic_library.eval_env (fun c -> None) e1;
+	Dimension.eval Basic_library.eval_env (fun c -> None) e2;
 	Dimension.unify e1 e2;
       end
     | _,_ -> raise (Unify (t1, t2))

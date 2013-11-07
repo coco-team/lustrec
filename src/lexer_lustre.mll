@@ -72,7 +72,6 @@ let keyword_table =
   "pre", PRE;
   "div", DIV;
   "const", CONST;
-  "open", OPEN;
   "assert", ASSERT;
 ]
 
@@ -124,6 +123,7 @@ rule token = parse
 | ['0'-'9']+ '.' ['0'-'9']+ ('E'|'e') ('+'|'-') ['0'-'9'] ['0'-'9']* as s {REAL s}
 | "tel." {TEL}
 | "tel;" {TEL}
+| "#open" { OPEN }
 | ['_' 'a'-'z' 'A'-'Z'] [ '_' 'a'-'z' 'A'-'Z' '0'-'9']*
     {let s = Lexing.lexeme lexbuf in
     try
