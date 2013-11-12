@@ -136,7 +136,7 @@ let get_type_definition tname =
     type_coretype (fun d -> ()) (Hashtbl.find type_table (Tydec_const tname))
   with Not_found -> raise (Error (Location.dummy_loc, Unbound_type tname))
 
-(** [unify env t1 t2] unifies types [t1] and [t2]. Raises [Unify
+(** [unify t1 t2] unifies types [t1] and [t2]. Raises [Unify
     (t1,t2)] if the types are not unifiable.*)
 (* Standard destructive unification *)
 let rec unify t1 t2 =
@@ -187,6 +187,59 @@ let rec unify t1 t2 =
 	Dimension.eval Basic_library.eval_env (fun c -> None) e1;
 	Dimension.eval Basic_library.eval_env (fun c -> None) e2;
 	Dimension.unify e1 e2;
+      end
+    | _,_ -> raise (Unify (t1, t2))
+
+(** [semi_unify t1 t2] checks whether type [t1] is an instance of type [t2]. Raises [Unify
+    (t1,t2)] if the types are not semi-unifiable.*)
+(* Standard destructive semi-unification *)
+let rec semi_unify t1 t2 =
+  let t1 = repr t1 in
+  let t2 = repr t2 in
+  if t1=t2 then
+    ()
+  else
+    (* No type abbreviations resolution for now *)
+    match t1.tdesc,t2.tdesc with
+      (* This case is not mandory but will keep "older" types *)
+    | Tvar, Tvar ->
+        if t1.tid < t2.tid then
+          t2.tdesc <- Tlink t1
+        else
+          t1.tdesc <- Tlink t2
+    | (Tvar, _) -> raise (Unify (t1, t2))
+    | (_,Tvar) when (not (occurs t2 t1)) ->
+        t2.tdesc <- Tlink t1
+    | Tarrow (t1,t2), Tarrow (t1',t2') ->
+      begin
+        unify t1 t1';
+	unify t2 t2'
+      end
+    | Ttuple tlist1, Ttuple tlist2 ->
+        if (List.length tlist1) <> (List.length tlist2) then
+	  raise (Unify (t1, t2))
+	else
+          List.iter2 semi_unify tlist1 tlist2
+    | Tclock _, Tstatic _
+    | Tstatic _, Tclock _ -> raise (Unify (t1, t2))
+    | Tclock t1', _ -> semi_unify t1' t2
+    | _, Tclock t2' -> semi_unify t1 t2'
+    | Tint, Tint | Tbool, Tbool | Trat, Trat
+    | Tunivar, _ | _, Tunivar -> ()
+    | (Tconst t, _) ->
+      let def_t = get_type_definition t in
+      semi_unify def_t t2
+    | (_, Tconst t)  ->
+      let def_t = get_type_definition t in
+      semi_unify t1 def_t
+    | Tenum tl, Tenum tl' when tl == tl' -> ()
+    | Tstatic (e1, t1'), Tstatic (e2, t2')
+    | Tarray (e1, t1'), Tarray (e2, t2') ->
+      begin
+	semi_unify t1' t2';
+	Dimension.eval Basic_library.eval_env (fun c -> None) e1;
+	Dimension.eval Basic_library.eval_env (fun c -> None) e2;
+	Dimension.semi_unify e1 e2;
       end
     | _,_ -> raise (Unify (t1, t2))
 
