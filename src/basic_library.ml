@@ -155,6 +155,7 @@ let pp_c i pp_val fmt vl =
     | "impl", [v1; v2] -> Format.fprintf fmt "(!%a || %a)" pp_val v1 pp_val v2 
     | "=", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2 
     | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2 
+    | "xor", [v1; v2] -> Format.fprintf fmt "(%a ^ %a)" pp_val v1 pp_val v2
     | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2 
     | _ -> assert false
 
