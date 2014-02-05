@@ -1,0 +1,6 @@
+- lego_anti_windup.lus
+Original matlab controller translated into Lustre from Yorihisa Yamamoto
++ antiwind-up and some tricks for wheels to prevent rotation from Romain Jobredeaux
+
+- lego_lqr_pur.lus
+Another controller from Romain Jobredeaux without any antiwind-up.

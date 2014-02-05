@@ -1,0 +1,114 @@
+const k_f_1 = -0.870303;
+const k_f_2 = -31.9978;
+const k_f_3 = -1.1566;
+const k_f_4 = -2.78873;
+
+const k_i = -0.44721;   (* servo control integral gain *)
+const k_phidot = 25.0;  (* turn target speed gain *)
+const k_thetadot = 7.5; (* forward target speed gain *)
+
+const battery_gain = 0.001089;
+const battery_offset = 0.625;
+
+const cmd_max = 100.;
+const deg2rad = 0.01745329238;
+const exec_period = 0.00400000019;
+
+const a_d = 0.8; 
+const a_r = 0.996;   
+
+#open "conv" 
+
+node discrete_integrator(exec_period, in : real)
+returns (out: real);
+let
+  out = 0. -> pre (exec_period * in + out);
+tel
+
+node low_pass_filter(a, in: real) 
+returns (out : real);
+let 
+  out = (1.-a)*in -> (1.-a)*in + (pre out) * a;
+tel
+
+node sat(min, max, in : real)
+returns (out: real);
+let
+  out = if in <= min then min else (if in>= max then max else in);
+tel
+
+node cal_reference(cmd_forward, cmd_turn : real)
+returns (pwm_turn, theta_ref, x_11_ref,x_12_ref,x_13_ref,x_14_ref : real);
+var theta_dot_ref: real;
+let
+  theta_dot_ref = low_pass_filter(a_r,k_thetadot*cmd_forward/cmd_max);
+  theta_ref=x_11_ref;
+  x_11_ref = discrete_integrator(exec_period,theta_dot_ref);
+  x_12_ref = 0.;
+  x_13_ref = theta_dot_ref;
+  x_14_ref = 0.;
+  pwm_turn = cmd_turn*k_phidot/cmd_max;
+tel
+
+node cal_x1 (gyro, gyro_offset, theta_m_l, theta_m_r:real)
+returns(theta, x_11,x_12,x_13,x_14 : real);
+var psidot, psi, theta_l, theta_r: real;
+let
+  psidot = (gyro - gyro_offset)*deg2rad;
+  psi = discrete_integrator(exec_period,psidot);
+  theta_l= theta_m_l*deg2rad+ psi;
+  theta_r = theta_m_r*deg2rad + psi;
+  theta = (theta_l+theta_r)/2.;
+  x_11 = theta;
+  x_12 = psi;
+  x_13 = (low_pass_filter(a_d,theta) - (0. -> pre(low_pass_filter(a_d,theta))))/exec_period;
+  x_14 = psidot;
+tel;
+
+node cal_pwm(theta_m_l, theta_m_r, pwm_turn, err, battery : real)
+returns(pwm_l, pwm_r,  anti_windup : real);
+var fwd, theta_diff : real;
+let
+fwd = cmd_max * (err/(battery*battery_gain-battery_offset));
+pwm_l = sat(-100.,100.,fwd+pwm_turn);
+theta_diff = theta_m_l - theta_m_r;
+pwm_r = sat(-100.,100.,fwd-pwm_turn+12.0*theta_diff);
+anti_windup=  pwm_l - fwd+pwm_turn;
+tel;
+
+node top (in1, in2, in3, in4, cntA, cntB, cntC, battery_voltage : int; gyro_offset :  real)
+returns (speedA, speedB, speedC : int);
+var gyro, cmd_forward, cmd_turn, theta_m_l, theta_m_r,  pwm_turn,  theta_ref,  x_11_ref,  x_12_ref, x_13_ref, x_14_ref, theta, x_11, x_12, x_13, x_14,  errtheta, err, pwm_l, pwm_r,  anti_windup: real;
+let
+ cmd_forward = if in2 <= 25 then -100. else 0.;
+ cmd_turn = 0.;
+ gyro = int_to_real(in3);
+ theta_m_l = int_to_real(cntC);
+ theta_m_r = int_to_real(cntB);
+
+ (pwm_turn, theta_ref, x_11_ref,  x_12_ref, x_13_ref, x_14_ref) = cal_reference(cmd_forward, cmd_turn);
+
+ (theta, x_11,  x_12, x_13, x_14) = cal_x1(gyro, gyro_offset, theta_m_l, theta_m_r);
+ 
+ errtheta = discrete_integrator(exec_period, (theta_ref-theta)*k_i + 0. -> pre(anti_windup*0.1));
+ 
+ err = errtheta + k_f_1*(x_11_ref-x_11) + k_f_2*(x_12_ref-x_12)+ k_f_3*(x_13_ref-x_13) +k_f_4*(x_14_ref-x_14);
+ 
+ (pwm_l,pwm_r,  anti_windup) = cal_pwm(theta_m_l, theta_m_r, pwm_turn, err, int_to_real(battery_voltage));
+
+  speedA = 0;
+  speedB = real_to_int(pwm_r);
+  speedC = real_to_int(pwm_l);
+tel
+
+(*
+node automate(in1, in2, in3, in4, cntA, cntB, cntC, battery_voltage : int)
+returns (speedA, speedB, speedC : int);
+var 
+  cnt :  int;  gyro_offset :  real;
+let
+  cnt = 1 -> pre(cnt) +1;
+  gyro_offset = int_to_real(in3) -> int_to_real(in3)/int_to_real(cnt) + (int_to_real(cnt-1)/int_to_real(cnt))*pre(gyro_offset);
+  (speedA, speedB, speedC) = if cnt <= 250 then (0,  0,  0) else top(in1, in2, in3, in4, cntA, cntB, cntC, battery_voltage,  gyro_offset);
+tel
+*)
