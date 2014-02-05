@@ -1,0 +1,3 @@
+node real_to_int(in1 : real) returns (out: int) stateless;
+
+node int_to_real(in1 : int) returns (out: real) stateless;
