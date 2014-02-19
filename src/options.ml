@@ -30,7 +30,7 @@ let track_exceptions = ref true
 let ansi = ref false
 let check = ref false
 let c_spec = ref false
-let java = ref false
+let output = ref "C"
 let dest_dir = ref ""
 let verbose_level = ref 1
 
@@ -44,7 +44,8 @@ let options =
     "-check-access", Arg.Set check, "checks at runtime that array accesses always lie within bounds (default: no check)";
     "-c-spec", Arg.Set c_spec, 
     "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
-    "-java", Arg.Set java, "generates Java output instead of C";
+    "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C";
+    "-horn", Arg.Unit (fun () -> output := "horn"), "generates Horn clauses encoding output instead of C";
     "-print_types", Arg.Set print_types, "prints node types";
     "-print_clocks", Arg.Set print_clocks, "prints node clocks";
     "-verbose", Arg.Set_int verbose_level, " changes verbose level <default: 1>";

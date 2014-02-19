@@ -216,41 +216,49 @@ let rec compile basename extension =
 
   (* Printing code *)
   let basename    = Filename.basename basename in
-  if !Options.java then
-    failwith "Sorry, but not yet supported !"
+  let _ = match !Options.output with
+      "C" -> 
+	begin
+	  let header_file = basename ^ ".h" in (* Could be changed *)
+	  let source_file = basename ^ ".c" in (* Could be changed *)
+	  let makefile_file = basename ^ ".makefile" in (* Could be changed *)
+	  let spec_file_opt = if !Options.c_spec then 
+	      (
+		let spec_file = basename ^ "_spec.c" in
+		report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s, %s and %s@,@?" header_file source_file spec_file);
+		Some spec_file 
+	      ) else (
+		report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s and %s@,@?" header_file source_file);
+		None 
+	       )
+	  in 
+	  let header_out = open_out header_file in
+	  let header_fmt = formatter_of_out_channel header_out in
+	  let source_out = open_out source_file in
+	  let source_fmt = formatter_of_out_channel source_out in
+	  let makefile_out = open_out makefile_file in
+	  let makefile_fmt = formatter_of_out_channel makefile_out in
+	  let spec_fmt_opt = match spec_file_opt with
+	      None -> None
+	    | Some f -> Some (formatter_of_out_channel (open_out f))
+	  in
+	  report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,@?");
+	  C_backend.translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename normalized_prog machine_code;
+	end
+    | "java" -> begin
+      failwith "Sorry, but not yet supported !"
     (*let source_file = basename ^ ".java" in
       report ~level:1 (fun fmt -> fprintf fmt ".. opening file %s@,@?" source_file);
       let source_out = open_out source_file in
       let source_fmt = formatter_of_out_channel source_out in
       report ~level:1 (fun fmt -> fprintf fmt ".. java code generation@,@?");
       Java_backend.translate_to_java source_fmt basename normalized_prog machine_code;*)
-  else begin
-    let header_file = basename ^ ".h" in (* Could be changed *)
-    let source_file = basename ^ ".c" in (* Could be changed *)
-    let makefile_file = basename ^ ".makefile" in (* Could be changed *)
-    let spec_file_opt = if !Options.c_spec then 
-	(
-	  let spec_file = basename ^ "_spec.c" in
-	  report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s, %s and %s@,@?" header_file source_file spec_file);
-	  Some spec_file 
-	) else (
-	  report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s and %s@,@?" header_file source_file);
-	  None 
-	 )
-    in 
-    let header_out = open_out header_file in
-    let header_fmt = formatter_of_out_channel header_out in
-    let source_out = open_out source_file in
-    let source_fmt = formatter_of_out_channel source_out in
-    let makefile_out = open_out makefile_file in
-    let makefile_fmt = formatter_of_out_channel makefile_out in
-    let spec_fmt_opt = match spec_file_opt with
-	None -> None
-      | Some f -> Some (formatter_of_out_channel (open_out f))
-    in
-    report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,@?");
-    C_backend.translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename normalized_prog machine_code;
-  end;
+    end
+    | "horn" -> begin
+      let fmt = Format.std_formatter in
+      Horn_backend.translate fmt basename normalized_prog machine_code
+    end
+  in
   report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
   (* We stop the process here *)
   exit 0

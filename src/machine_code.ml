@@ -436,7 +436,15 @@ let translate_prog decls =
   let nodes = get_nodes decls in 
    (* What to do with Imported/Sensor/Actuators ? *)
    arrow_machine ::  List.map translate_decl nodes
- 
+
+let get_machine_opt name machines =  
+  List.fold_left 
+    (fun res m -> 
+      match res with 
+      | Some _ -> res 
+      | None -> if m.mname.node_id = name then Some m else None)
+    None machines
+    
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
