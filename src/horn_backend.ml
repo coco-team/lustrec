@@ -27,25 +27,47 @@ let pp_decl_var fmt id =
 
 let pp_var fmt id = Format.pp_print_string fmt id.var_id
 
-let pp_instr machine_name fmt i =
-  Format.fprintf fmt "(xxx)"
 
 let rename f = (fun v -> {v with var_id = f v.var_id } )
-let rename_current machine_name =  rename (fun n -> machine_name ^ "." ^ n ^ "_c")
-let rename_current_list machine_name = List.map (rename_current machine_name)
-let rename_next machine_name = rename (fun n -> machine_name ^ "." ^ n ^ "_x")
-let rename_next_list machine_name = List.map (rename_next machine_name)
-let rename_machine machine_name = rename (fun n -> machine_name ^ "." ^ n)
-let rename_machine_list machine_name = List.map (rename_machine machine_name)
+let rename_current prefix =  rename (fun n -> prefix ^ "." ^ n ^ "_c")
+let rename_current_list prefix = List.map (rename_current prefix)
+let rename_next prefix = rename (fun n -> prefix ^ "." ^ n ^ "_x")
+let rename_next_list prefix = List.map (rename_next prefix)
+let rename_machine prefix = rename (fun n -> prefix ^ "." ^ n)
+let rename_machine_list prefix = List.map (rename_machine prefix)
 
-let full_memory_vars machine instance =
-  (rename_current_list machine.mname.node_id machine.mmemory) @
-    (rename_next_list machine.mname.node_id machine.mmemory)
+let get_machine machines node_name = 
+  List.find (fun m  -> m.mname.node_id = node_name) machines 
 
-let machine_vars m = 
+let full_memory_vars machines prefix machine =
+  let rec aux prefix m =
+    let pref x = if prefix = "" then x else prefix ^ "." ^ x in 
+    (rename_machine_list (pref m.mname.node_id) m.mmemory) @
+      List.fold_left (fun accu (id, (n, _)) -> 
+	let name = node_name n in 
+	if name = "_arrow" then accu else
+	  let machine_n = get_machine machines name in
+	( aux (pref id) machine_n ) @ accu
+      ) [] (m.minstances) 
+  in
+  aux prefix machine
+
+let machine_vars machines m = 
     (rename_machine_list m.mname.node_id m.mstep.step_inputs)@
     (rename_machine_list m.mname.node_id m.mstep.step_outputs)@
-  full_memory_vars m ()
+    (rename_current_list m.mname.node_id (full_memory_vars machines "" m)) @ 
+    (rename_next_list m.mname.node_id (full_memory_vars machines "" m)) 
+
+let step_vars machines m = 
+    (rename_machine_list m.mname.node_id m.mstep.step_inputs)@
+    (rename_machine_list m.mname.node_id m.mstep.step_outputs)@
+    (rename_current_list m.mname.node_id (full_memory_vars machines "" m)) @ 
+    (rename_next_list m.mname.node_id (full_memory_vars machines "" m)) 
+
+let init_vars machines m = 
+    (rename_machine_list m.mname.node_id m.mstep.step_inputs)@
+    (rename_machine_list m.mname.node_id m.mstep.step_outputs)@
+    (rename_next_list m.mname.node_id (full_memory_vars machines "" m)) 
 
   
 (********************************************************************************************)
@@ -130,14 +152,28 @@ let pp_instance_call
       | name, _, _ ->  
 	begin
 	  let target_machine = List.find (fun m  -> m.mname.node_id = name) machines in
-	  Format.fprintf fmt "(%s_%s %a%t%a%t%a)"
+	  if init then
+	  Format.fprintf fmt "(%s_init %a%t%a%t%a)"
 	    (node_name n) 
-	    (if init then "init" else "step")
 	    (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) inputs
 	    (Utils.pp_final_char_if_non_empty " " inputs) 
 	    (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) (List.map (fun v -> LocalVar v) outputs)
-	       (Utils.pp_final_char_if_non_empty " " outputs)
-	    (Utils.fprintf_list ~sep:" " pp_var) (full_memory_vars target_machine i)
+	    (Utils.pp_final_char_if_non_empty " " outputs)
+	    (Utils.fprintf_list ~sep:" " pp_var) (
+  	      (rename_next_list m.mname.node_id (full_memory_vars machines i target_machine)) 
+	     )
+	  else
+	    Format.fprintf fmt "(%s_step %a%t%a%t%a)"
+	    (node_name n) 
+	      (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) inputs
+	      (Utils.pp_final_char_if_non_empty " " inputs) 
+	      (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) (List.map (fun v -> LocalVar v) outputs)
+	      (Utils.pp_final_char_if_non_empty " " outputs)
+	      (Utils.fprintf_list ~sep:" " pp_var) (
+
+	      (rename_current_list m.mname.node_id (full_memory_vars machines i target_machine)) @ 
+	      (rename_next_list m.mname.node_id (full_memory_vars machines i target_machine)) 
+	       )
 	    
 	     end
     end
@@ -209,36 +245,79 @@ let print_machine machines fmt m =
    Format.fprintf fmt "; %s@." m.mname.node_id;
    (* Printing variables *)
    Utils.fprintf_list ~sep:"@." pp_decl_var fmt 
-     ((machine_vars m)@(rename_machine_list m.mname.node_id m.mstep.step_locals));
+     ((machine_vars machines m)@(rename_machine_list m.mname.node_id m.mstep.step_locals));
    Format.pp_print_newline fmt ();
    (* Declaring predicate *)
    Format.fprintf fmt "(declare-rel %a (%a))@."
      pp_machine_reset_name m.mname.node_id
-     (Utils.fprintf_list ~sep:" " pp_type) (List.map (fun v -> v.var_type) m.mmemory);
+     (Utils.fprintf_list ~sep:" " pp_type) (List.map (fun v -> v.var_type) (init_vars machines m));
    
    Format.fprintf fmt "(declare-rel %a (%a))@."
      pp_machine_step_name m.mname.node_id
-     (Utils.fprintf_list ~sep:" " pp_type) (List.map (fun v -> v.var_type) (machine_vars m));
+     (Utils.fprintf_list ~sep:" " pp_type) (List.map (fun v -> v.var_type) (step_vars machines m));
    Format.pp_print_newline fmt ();
 
    Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>%a@]@ )@ (%s_init %a)@]@.))@.@."
      (Utils.fprintf_list ~sep:"@ " (pp_instr true m.mname.node_id)) m.mstep.step_instrs
      m.mname.node_id
-     (Utils.fprintf_list ~sep:" " pp_var) (rename_next_list m.mname.node_id m.mmemory);
+     (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m);
+
 
    Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>%a@]@ )@ (%s_step %a)@]@.))@.@."
      (Utils.fprintf_list ~sep:"@ " (pp_instr false m.mname.node_id)) m.mstep.step_instrs
      m.mname.node_id
-     (Utils.fprintf_list ~sep:" " pp_var) (machine_vars m);
+     (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
    
 ()
   )
 
-let main_print fmt = ()
+let main_print machines fmt = 
+if !Options.main_node <> "" then 
+  begin
+    let node = !Options.main_node in
+    let machine = get_machine machines node in
+    Format.fprintf fmt "; Collecting semantics with main node %s@.@." node;
+    (* We print the types of the main node "memory tree" TODO: add the output *)
+    let main_memory_next = 
+      (rename_next_list machine.mname.node_id (full_memory_vars machines "" machine)) 
+    in
+    let main_memory_current = 
+      (rename_current_list machine.mname.node_id (full_memory_vars machines "" machine)) 
+    in
+    Format.fprintf fmt "(declare-rel MAIN (%a Bool))@."
+      (Utils.fprintf_list ~sep:" " pp_type) 
+      (List.map (fun v -> v.var_type) main_memory_next);
+    
+    Format.fprintf fmt "; Initial set@.";
+    Format.fprintf fmt "(declare-rel INIT_STATE ())@.";
+    Format.fprintf fmt "(rule INIT_STATE)@.";
+    Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>INIT_STATE@ (@[<v 0>%s_init %a@])@]@ )@ (MAIN %a top.OK)@]@.))@.@."
+      node
+      (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines machine)
+      (Utils.fprintf_list ~sep:" " pp_var) main_memory_next;
+
+    Format.fprintf fmt "; Inductive def@.";
+    Format.fprintf fmt "(declare-var dummy Bool)@.";
+    Format.fprintf fmt 
+      "@[<v 2>(rule (=> @ (and @[<v 0>(MAIN %a dummy)@ (@[<v 0>%s_step %a@])@]@ )@ (MAIN %a top.OK)@]@.))@.@."
+      (Utils.fprintf_list ~sep:" " pp_var) main_memory_current
+      node
+      (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines machine)
+      (Utils.fprintf_list ~sep:" " pp_var) main_memory_next;
+
+    Format.fprintf fmt "; Property def@.";
+    Format.fprintf fmt "(declare-rel ERR ())@.";
+    Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>(not (= top.OK true))@ (MAIN %a)@])@ ERR))@."
+      (Utils.fprintf_list ~sep:" " pp_var) main_memory_current;
+    Format.fprintf fmt "(query ERR)@.";
+
+    ()
+end
+
 
 let translate fmt basename prog machines =
   List.iter (print_machine machines fmt) (List.rev machines);
-  main_print fmt 
+  main_print machines fmt 
 
 
 (* Local Variables: *)
