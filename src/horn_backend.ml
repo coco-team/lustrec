@@ -105,7 +105,7 @@ let rec pp_value_suffix self pp_value fmt value =
    - [pp_var]: printer for variables
 *)
 let pp_assign m self pp_var fmt var_type var_name value =
-  fprintf fmt "(%a = %a)" (pp_horn_val ~is_lhs:true self pp_var) var_name (pp_value_suffix self pp_var) value
+  fprintf fmt "(= %a %a)" (pp_horn_val ~is_lhs:true self pp_var) var_name (pp_value_suffix self pp_var) value
   
 let pp_instance_call 
     machines ?(init=false) m self fmt i (inputs: value_t list) (outputs: var_decl list) =
