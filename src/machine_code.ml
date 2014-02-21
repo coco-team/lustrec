@@ -291,7 +291,6 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
  | Expr_access (t, i)               -> Access (translate_expr node args t, translate_expr node args (expr_of_dimension i))
  | Expr_power  (e, n)               -> Power  (translate_expr node args e, translate_expr node args (expr_of_dimension n))
  | Expr_tuple _
- | Expr_ite _
  | Expr_arrow _ 
  | Expr_fby _
  | Expr_pre _                       -> (Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
@@ -302,6 +301,8 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
    (match e.expr_desc with
    | Expr_tuple el -> Fun (node_name nd, List.map (translate_expr node args) el)
    | _             -> Fun (node_name nd, [translate_expr node args e]))
+ | Expr_ite (g,t,e) -> Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
+
  | _                   -> raise NormalizationError
 
 let translate_guard node args expr =
@@ -367,6 +368,15 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
      d,
      reset_instance node args o r eq.eq_rhs.expr_clock @
        (control_on_clock node args eq.eq_rhs.expr_clock (MStep (var_p, o, vl))) :: s)
+  | [x], Expr_ite   (c, t, e) -> 
+    let var_x = node_var x node in
+    (m, 
+     si, 
+     j, 
+     d, 
+     (control_on_clock node args eq.eq_rhs.expr_clock 
+       (MLocalAssign (var_x, translate_expr node args eq.eq_rhs))::s)
+    )
   | [x], _                                       ->
     let var_x = node_var x node in
     (m, si, j, d, 
@@ -425,7 +435,7 @@ let translate_decl nd =
       step_outputs = nd.node_outputs;
       step_locals = ISet.elements (ISet.diff locals m);
       step_checks = List.map (fun d -> d.Dimension.dim_loc, translate_expr nd init_args (expr_of_dimension d)) nd.node_checks;
-      step_instrs = join_guards_list s;
+      step_instrs = (* join_guards_list *) s;
     };
     mspec = nd.node_spec;
     mannot = nd.node_annot;
