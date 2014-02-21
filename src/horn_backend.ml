@@ -4,7 +4,7 @@ open Corelang
 open Machine_code
 
 
-let pp_machine_reset_name fmt id = fprintf fmt "%s_reset" id
+let pp_machine_init_name fmt id = fprintf fmt "%s_init" id
 let pp_machine_step_name fmt id = fprintf fmt "%s_step" id
 
 let pp_type fmt t =
@@ -21,7 +21,7 @@ let pp_type fmt t =
     
 
 let pp_decl_var fmt id = 
-  Format.fprintf fmt "(declare_var %s %a)"
+  Format.fprintf fmt "(declare-var %s %a)"
     id.var_id
     pp_type id.var_type
 
@@ -186,10 +186,10 @@ let pp_instance_call
      (Utils.fprintf_list ~sep:" " (pp_horn_var m)) outputs 
     )
 
-let pp_machine_reset (m: machine_t) self fmt inst =
+let pp_machine_init (m: machine_t) self fmt inst =
   let (node, static) = List.assoc inst m.minstances in
   fprintf fmt "(%a %a%t%s->%s)"
-    pp_machine_reset_name (node_name node)
+    pp_machine_init_name (node_name node)
     (Utils.fprintf_list ~sep:" " Dimension.pp_dimension) static
     (Utils.pp_final_char_if_non_empty " " static)
     self inst
@@ -206,7 +206,7 @@ let rec pp_conditional machines ?(init=false)  (m: machine_t) self fmt c tl el =
 and pp_machine_instr machines ?(init=false) (m: machine_t) self fmt instr =
   match instr with 
   | MReset i ->
-    pp_machine_reset m self fmt i
+    pp_machine_init m self fmt i
   | MLocalAssign (i,v) ->
     pp_assign
       m self (pp_horn_var m) fmt
@@ -249,7 +249,7 @@ let print_machine machines fmt m =
    Format.pp_print_newline fmt ();
    (* Declaring predicate *)
    Format.fprintf fmt "(declare-rel %a (%a))@."
-     pp_machine_reset_name m.mname.node_id
+     pp_machine_init_name m.mname.node_id
      (Utils.fprintf_list ~sep:" " pp_type) (List.map (fun v -> v.var_type) (init_vars machines m));
    
    Format.fprintf fmt "(declare-rel %a (%a))@."
