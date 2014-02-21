@@ -38,13 +38,16 @@ let rename_next_list machine_name = List.map (rename_next machine_name)
 let rename_machine machine_name = rename (fun n -> machine_name ^ "." ^ n)
 let rename_machine_list machine_name = List.map (rename_machine machine_name)
 
+let full_memory_vars machine instance =
+  (rename_current_list machine.mname.node_id machine.mmemory) @
+    (rename_next_list machine.mname.node_id machine.mmemory)
+
 let machine_vars m = 
-  (rename_current_list m.mname.node_id m.mmemory)@
-    (rename_next_list m.mname.node_id m.mmemory)@
     (rename_machine_list m.mname.node_id m.mstep.step_inputs)@
-    (rename_machine_list m.mname.node_id m.mstep.step_outputs)
+    (rename_machine_list m.mname.node_id m.mstep.step_outputs)@
+  full_memory_vars m ()
 
-
+  
 (********************************************************************************************)
 (*                    Instruction Printing functions                                        *)
 (********************************************************************************************)
@@ -104,41 +107,48 @@ let rec pp_value_suffix self pp_value fmt value =
 let pp_assign m self pp_var fmt var_type var_name value =
   fprintf fmt "(%a = %a)" (pp_horn_val ~is_lhs:true self pp_var) var_name (pp_value_suffix self pp_var) value
   
-let pp_instance_call machines ?(init=false) m self fmt i (inputs: value_t list) (outputs: var_decl list) =
- try (* stateful node instance *) (
-   let (n,_) = List.assoc i m.minstances in
-   match node_name n, inputs, outputs with
-   | "_arrow", [i1; i2], [o] -> (
-     if init then
-       pp_assign
-	 m self (pp_horn_val self (pp_horn_var m) fmt o) fmt
-	 o.var_type (LocalVar o) i1
-     else
-       pp_assign
-	 m self (pp_horn_val self (pp_horn_var m) fmt o) fmt
-	 o.var_type (LocalVar o) i2
-       
-   )
-   | name, _, _ ->  (
-     let target_machine = List.find (fun m  -> m.mname.node_id = name) machines in
-     Format.fprintf fmt "(%s_%s %a%txxx%axxx%t%a)"
-       (node_name n) (if init then "init" else "step")
-       (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) inputs
-       (Utils.pp_final_char_if_non_empty " " inputs) 
-       (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) outputs
-       (Utils.pp_final_char_if_non_empty " " outputs)
-       
-       (Utils.fprintf_list ~sep:" " pp_var) (machine_vars target_machine)
-       
-   )
- )
- with Not_found -> (* stateless node instance *)
-   let (n,_) = List.assoc i m.mcalls in
+let pp_instance_call 
+    machines ?(init=false) m self fmt i (inputs: value_t list) (outputs: var_decl list) =
+  try (* stateful node instance *) 
+    begin
+      let (n,_) = List.assoc i m.minstances in
+      match node_name n, inputs, outputs with
+      | "_arrow", [i1; i2], [o] -> begin
+         if init then
+           pp_assign
+   	     m
+   	     self
+   	     (pp_horn_var m)
+	     (* (pp_horn_val self (pp_horn_var m) fmt o) *)  fmt
+   	     o.var_type (LocalVar o) i1
+         else
+           pp_assign
+   	     m self (pp_horn_var m) fmt
+   	     o.var_type (LocalVar o) i2
+	     
+      end
+      | name, _, _ ->  
+	begin
+	  let target_machine = List.find (fun m  -> m.mname.node_id = name) machines in
+	  Format.fprintf fmt "(%s_%s %a%t%a%t%a)"
+	    (node_name n) 
+	    (if init then "init" else "step")
+	    (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) inputs
+	    (Utils.pp_final_char_if_non_empty " " inputs) 
+	    (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) (List.map (fun v -> LocalVar v) outputs)
+	       (Utils.pp_final_char_if_non_empty " " outputs)
+	    (Utils.fprintf_list ~sep:" " pp_var) (full_memory_vars target_machine i)
+	    
+	     end
+    end
+    with Not_found -> ( (* stateless node instance *)
+      let (n,_) = List.assoc i m.mcalls in
    Format.fprintf fmt "(%s %a%t%a)"
      (node_name n)
      (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) inputs
      (Utils.pp_final_char_if_non_empty " " inputs) 
      (Utils.fprintf_list ~sep:" " (pp_horn_var m)) outputs 
+    )
 
 let pp_machine_reset (m: machine_t) self fmt inst =
   let (node, static) = List.assoc inst m.minstances in
