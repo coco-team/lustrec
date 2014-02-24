@@ -268,48 +268,65 @@ let print_machine machines fmt m =
      (Utils.fprintf_list ~sep:"@ " (pp_instr false m.mname.node_id)) m.mstep.step_instrs
      m.mname.node_id
      (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
-   
-()
-  )
+
+   match m.mspec with
+     None -> () (* No node spec; we do nothing *)
+   | Some {requires = []; ensures = [EnsuresExpr e]; behaviors = []} -> 
+     ( 
+       (* For the moment, we only deal with simple case: single ensures, no other parameters *)
+       ()
+	 
+     )
+   | _ -> () (* Other cases give nothing *)
+    )
+
+
 
 let main_print machines fmt = 
 if !Options.main_node <> "" then 
   begin
     let node = !Options.main_node in
     let machine = get_machine machines node in
-    Format.fprintf fmt "; Collecting semantics with main node %s@.@." node;
+
+    Format.fprintf fmt "; Collecting semantics for node %s@.@." node;
     (* We print the types of the main node "memory tree" TODO: add the output *)
+    let main_output =
+     rename_machine_list machine.mname.node_id machine.mstep.step_outputs
+    in
     let main_memory_next = 
-      (rename_next_list (* machine.mname.node_id *) (full_memory_vars machines machine)) 
+      (rename_next_list (* machine.mname.node_id *) (full_memory_vars machines machine)) @
+      main_output
     in
     let main_memory_current = 
-      (rename_current_list (* machine.mname.node_id *) (full_memory_vars machines machine)) 
+      (rename_current_list (* machine.mname.node_id *) (full_memory_vars machines machine)) @
+      main_output
     in
-    Format.fprintf fmt "(declare-rel MAIN (%a Bool))@."
+    Format.fprintf fmt "(declare-rel MAIN (%a))@."
       (Utils.fprintf_list ~sep:" " pp_type) 
       (List.map (fun v -> v.var_type) main_memory_next);
     
     Format.fprintf fmt "; Initial set@.";
     Format.fprintf fmt "(declare-rel INIT_STATE ())@.";
     Format.fprintf fmt "(rule INIT_STATE)@.";
-    Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>INIT_STATE@ (@[<v 0>%s_init %a@])@]@ )@ (MAIN %a top.OK)@]@.))@.@."
+    Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>INIT_STATE@ (@[<v 0>%s_init %a@])@]@ )@ (MAIN %a)@]@.))@.@."
       node
       (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines machine)
-      (Utils.fprintf_list ~sep:" " pp_var) main_memory_next;
+      (Utils.fprintf_list ~sep:" " pp_var) main_memory_next ;
 
     Format.fprintf fmt "; Inductive def@.";
     Format.fprintf fmt "(declare-var dummy Bool)@.";
     Format.fprintf fmt 
-      "@[<v 2>(rule (=> @ (and @[<v 0>(MAIN %a dummy)@ (@[<v 0>%s_step %a@])@]@ )@ (MAIN %a top.OK)@]@.))@.@."
+      "@[<v 2>(rule (=> @ (and @[<v 0>(MAIN %a dummy)@ (@[<v 0>%s_step %a@])@]@ )@ (MAIN %a)@]@.))@.@."
       (Utils.fprintf_list ~sep:" " pp_var) main_memory_current
       node
       (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines machine)
-      (Utils.fprintf_list ~sep:" " pp_var) main_memory_next;
+      (Utils.fprintf_list ~sep:" " pp_var) main_memory_next ;
 
     Format.fprintf fmt "; Property def@.";
     Format.fprintf fmt "(declare-rel ERR ())@.";
     Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>(not (= top.OK true))@ (MAIN %a)@])@ ERR))@."
-      (Utils.fprintf_list ~sep:" " pp_var) main_memory_current;
+      (Utils.fprintf_list ~sep:" " pp_var) main_memory_current
+    ;
     Format.fprintf fmt "(query ERR)@.";
 
     ()
@@ -318,6 +335,7 @@ end
 
 let translate fmt basename prog machines =
   List.iter (print_machine machines fmt) (List.rev machines);
+  
   main_print machines fmt 
 
 
