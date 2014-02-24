@@ -255,7 +255,9 @@ let rec compile basename extension =
       Java_backend.translate_to_java source_fmt basename normalized_prog machine_code;*)
     end
     | "horn" -> begin
-      let fmt = Format.std_formatter in
+      let source_file = basename ^ ".smt2" in (* Could be changed *)
+      let source_out = open_out source_file in
+      let fmt = formatter_of_out_channel source_out in
       Horn_backend.translate fmt basename normalized_prog machine_code
     end
     | _ -> assert false

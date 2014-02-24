@@ -11,6 +11,7 @@ let pp_type fmt t =
   match (Types.repr t).Types.tdesc with
   | Types.Tbool           -> Format.fprintf fmt "Bool"
   | Types.Tint            -> Format.fprintf fmt "Int"
+  | Types.Treal           -> Format.fprintf fmt "Real"
   | Types.Tclock _
   | Types.Tarray _
   | Types.Tstatic _
@@ -314,9 +315,8 @@ if !Options.main_node <> "" then
       (Utils.fprintf_list ~sep:" " pp_var) main_memory_next ;
 
     Format.fprintf fmt "; Inductive def@.";
-    Format.fprintf fmt "(declare-var dummy Bool)@.";
     Format.fprintf fmt 
-      "@[<v 2>(rule (=> @ (and @[<v 0>(MAIN %a dummy)@ (@[<v 0>%s_step %a@])@]@ )@ (MAIN %a)@]@.))@.@."
+      "@[<v 2>(rule (=> @ (and @[<v 0>(MAIN %a)@ (@[<v 0>%s_step %a@])@]@ )@ (MAIN %a)@]@.))@.@."
       (Utils.fprintf_list ~sep:" " pp_var) main_memory_current
       node
       (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines machine)

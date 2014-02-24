@@ -894,12 +894,3 @@
 ./src/kind_fmcad08/protocol/swimmingpool_2.lus,top
 ./src/kind_fmcad08/protocol/rtp_1.lus,top
 ./src/kind_fmcad08/protocol/swimmingpool_7.lus,top
-./src/arrays_arnaud/arrays.lus,,-check-access
-./src/arrays_arnaud/RelOpMatrix.lus
-./src/arrays_arnaud/access1.lus,,-check-access
-./src/arrays_arnaud/generic1.lus
-./src/arrays_arnaud/generic2.lus
-./src/arrays_arnaud/generic3.lus,top,-dynamic -check-access
-./src/clocks/clocks1.lus
-./src/clocks/clocks2.lus
-./src/clocks/oversampling0.lus

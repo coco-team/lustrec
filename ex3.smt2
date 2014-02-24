@@ -121,7 +121,7 @@
   (top_step top.beacon top.second top.OK top.__top_1_c top.ni_1.speed.__speed_3_c top.ni_1.speed.__speed_6_c top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_c top.__top_1_x top.ni_1.speed.__speed_3_x top.ni_1.speed.__speed_6_x top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_x)
 ))
 
-; Collecting semantics with main node top
+; Collecting semantics for node top
 
 (declare-rel MAIN (Bool Bool Bool Int Bool))
 ; Initial set
@@ -135,9 +135,8 @@
 ))
 
 ; Inductive def
-(declare-var dummy Bool)
 (rule (=> 
-  (and (MAIN top.__top_1_c top.ni_1.speed.__speed_3_c top.ni_1.speed.__speed_6_c top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_c dummy)
+  (and (MAIN top.__top_1_c top.ni_1.speed.__speed_3_c top.ni_1.speed.__speed_6_c top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_c top.OK)
        (top_step top.beacon top.second top.OK top.__top_1_c top.ni_1.speed.__speed_3_c top.ni_1.speed.__speed_6_c top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_c top.__top_1_x top.ni_1.speed.__speed_3_x top.ni_1.speed.__speed_6_x top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_x)
   )
   (MAIN top.__top_1_x top.ni_1.speed.__speed_3_x top.ni_1.speed.__speed_6_x top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_x top.OK)
@@ -147,6 +146,6 @@
 (declare-rel ERR ())
 (rule (=> 
   (and (not (= top.OK true))
-       (MAIN top.__top_1_c top.ni_1.speed.__speed_3_c top.ni_1.speed.__speed_6_c top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_c))
+       (MAIN top.__top_1_c top.ni_1.speed.__speed_3_c top.ni_1.speed.__speed_6_c top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_c top.OK))
   ERR))
 (query ERR)
