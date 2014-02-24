@@ -294,13 +294,16 @@ if !Options.main_node <> "" then
     let main_output =
      rename_machine_list machine.mname.node_id machine.mstep.step_outputs
     in
+    let main_output_dummy = 
+     rename_machine_list ("dummy" ^ machine.mname.node_id) machine.mstep.step_outputs
+    in
     let main_memory_next = 
       (rename_next_list (* machine.mname.node_id *) (full_memory_vars machines machine)) @
       main_output
     in
     let main_memory_current = 
       (rename_current_list (* machine.mname.node_id *) (full_memory_vars machines machine)) @
-      main_output
+      main_output_dummy
     in
     Format.fprintf fmt "(declare-rel MAIN (%a))@."
       (Utils.fprintf_list ~sep:" " pp_type) 
@@ -315,6 +318,7 @@ if !Options.main_node <> "" then
       (Utils.fprintf_list ~sep:" " pp_var) main_memory_next ;
 
     Format.fprintf fmt "; Inductive def@.";
+    (Utils.fprintf_list ~sep:" " (fun fmt v -> Format.fprintf fmt "%a@." pp_decl_var v)) fmt main_output_dummy;
     Format.fprintf fmt 
       "@[<v 2>(rule (=> @ (and @[<v 0>(MAIN %a)@ (@[<v 0>%s_step %a@])@]@ )@ (MAIN %a)@]@.))@.@."
       (Utils.fprintf_list ~sep:" " pp_var) main_memory_current
@@ -324,8 +328,9 @@ if !Options.main_node <> "" then
 
     Format.fprintf fmt "; Property def@.";
     Format.fprintf fmt "(declare-rel ERR ())@.";
-    Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>(not (= top.OK true))@ (MAIN %a)@])@ ERR))@."
-      (Utils.fprintf_list ~sep:" " pp_var) main_memory_current
+    Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>(not (and %a))@ (MAIN %a)@])@ ERR))@."
+      (Utils.fprintf_list ~sep:" " pp_var) main_output
+      (Utils.fprintf_list ~sep:" " pp_var) main_memory_next
     ;
     Format.fprintf fmt "(query ERR)@.";
 
