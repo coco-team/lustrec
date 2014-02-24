@@ -21,7 +21,7 @@ do
       rlustrec="VALID" 
     fi
     echo z3 `basename $file .lus`.smt2 | grep unsat 
-    z3 `basename $file .lus`.smt2 | grep unsat > /dev/null
+    z3 -T:10 `basename $file .lus`.smt2 | grep unsat > /dev/null
     if [ $? -ne 0 ]; then
       rz3="INVALID";
     else
