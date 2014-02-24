@@ -28,47 +28,48 @@ let pp_decl_var fmt id =
 let pp_var fmt id = Format.pp_print_string fmt id.var_id
 
 
+let prefix prefix x = if prefix = "" then x else prefix ^ "." ^ x 
+let rename_machine p = rename (fun n -> prefix p n)
+let rename_machine_list p = List.map (rename_machine p)
+    
 let rename f = (fun v -> {v with var_id = f v.var_id } )
-let rename_current prefix =  rename (fun n -> prefix ^ "." ^ n ^ "_c")
-let rename_current_list prefix = List.map (rename_current prefix)
-let rename_next prefix = rename (fun n -> prefix ^ "." ^ n ^ "_x")
-let rename_next_list prefix = List.map (rename_next prefix)
-let rename_machine prefix = rename (fun n -> prefix ^ "." ^ n)
-let rename_machine_list prefix = List.map (rename_machine prefix)
+let rename_current =  rename (fun n -> n ^ "_c")
+let rename_current_list = List.map rename_current
+let rename_next = rename (fun n -> n ^ "_x")
+let rename_next_list = List.map rename_next
+
 
 let get_machine machines node_name = 
   List.find (fun m  -> m.mname.node_id = node_name) machines 
 
-let full_memory_vars machines prefix machine =
-  let rec aux prefix m =
-    let pref x = if prefix = "" then x else prefix ^ "." ^ x in 
-    (rename_machine_list (pref m.mname.node_id) m.mmemory) @
+let full_memory_vars machines machine =
+  let rec aux fst prefix_s m =
+    (rename_machine_list (if fst then prefix else prefix ^ "." ^ m.mname.node_id) m.mmemory) @
       List.fold_left (fun accu (id, (n, _)) -> 
 	let name = node_name n in 
 	if name = "_arrow" then accu else
 	  let machine_n = get_machine machines name in
-	( aux (pref id) machine_n ) @ accu
+	( aux false (prefix_s ^ "." ^ id) machine_n ) @ accu
       ) [] (m.minstances) 
   in
-  aux prefix machine
+  aux true machine.mname.node_id machine
 
 let machine_vars machines m = 
     (rename_machine_list m.mname.node_id m.mstep.step_inputs)@
     (rename_machine_list m.mname.node_id m.mstep.step_outputs)@
-    (rename_current_list m.mname.node_id (full_memory_vars machines "" m)) @ 
-    (rename_next_list m.mname.node_id (full_memory_vars machines "" m)) 
+    (rename_current_list (full_memory_vars machines m)) @ 
+    (rename_next_list (full_memory_vars machines m)) 
 
 let step_vars machines m = 
     (rename_machine_list m.mname.node_id m.mstep.step_inputs)@
     (rename_machine_list m.mname.node_id m.mstep.step_outputs)@
-    (rename_current_list m.mname.node_id (full_memory_vars machines "" m)) @ 
-    (rename_next_list m.mname.node_id (full_memory_vars machines "" m)) 
+    (rename_current_list (full_memory_vars machines m)) @ 
+    (rename_next_list (full_memory_vars machines m)) 
 
 let init_vars machines m = 
     (rename_machine_list m.mname.node_id m.mstep.step_inputs)@
     (rename_machine_list m.mname.node_id m.mstep.step_outputs)@
-    (rename_next_list m.mname.node_id (full_memory_vars machines "" m)) 
-
+    (rename_next_list (full_memory_vars machines m)) 
   
 (********************************************************************************************)
 (*                    Instruction Printing functions                                        *)
@@ -110,7 +111,7 @@ let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
       if Types.is_array_type v.var_type
       then assert false 
       else pp_var fmt ((if is_lhs then rename_next else rename_current) self v)
-    | Fun (n, vl)   -> Format.fprintf fmt "(%a)" (Basic_library.pp_horn n (pp_horn_val self pp_var)) vl
+    | Fun (n, vl)   -> Format.fprintf fmt "%a" (Basic_library.pp_horn n (pp_horn_val self pp_var)) vl
 
 (* Prints a [value] indexed by the suffix list [loop_vars] *)
 let rec pp_value_suffix self pp_value fmt value =
