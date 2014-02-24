@@ -258,6 +258,7 @@ let rec compile basename extension =
       let fmt = Format.std_formatter in
       Horn_backend.translate fmt basename normalized_prog machine_code
     end
+    | _ -> assert false
   in
   report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
   (* We stop the process here *)

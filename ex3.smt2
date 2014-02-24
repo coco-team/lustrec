@@ -54,15 +54,15 @@
   (and (= speed.__speed_2 (and speed.second (not speed.beacon)))
        (= speed.__speed_1 (and speed.beacon (not speed.second)))
        (= speed.incr (ite speed.__speed_1 1 (ite speed.__speed_2 2 0)))
-       (COUNTER_init 0 speed.incr (or speed.beacon speed.second) 0 speed.diff speed.__COUNTER_1_x)
+       (COUNTER_init 0 speed.incr (or speed.beacon speed.second) false speed.diff speed.ni_4.COUNTER.__COUNTER_1_x)
        (= speed.__speed_7 speed.__speed_6_c)
        (= speed.__speed_8 (ite speed.__speed_7 (< speed.diff 0)
                              (<= speed.diff (- 10))))
-       (= speed.late 0)
+       (= speed.late false)
        (= speed.__speed_4 speed.__speed_3_c)
        (= speed.__speed_5 (ite speed.__speed_4 (> speed.diff 0)
                              (>= speed.diff 10)))
-       (= speed.early 0)
+       (= speed.early false)
        (= speed.__speed_6_x speed.late)
        (= speed.__speed_3_x speed.early)
   )
@@ -73,7 +73,7 @@
   (and (= speed.__speed_2 (and speed.second (not speed.beacon)))
        (= speed.__speed_1 (and speed.beacon (not speed.second)))
        (= speed.incr (ite speed.__speed_1 1 (ite speed.__speed_2 2 0)))
-       (COUNTER_step 0 speed.incr (or speed.beacon speed.second) 0 speed.diff speed.__COUNTER_1_c speed.__COUNTER_1_x)
+       (COUNTER_step 0 speed.incr (or speed.beacon speed.second) false speed.diff speed.ni_4.COUNTER.__COUNTER_1_c speed.ni_4.COUNTER.__COUNTER_1_x)
        (= speed.__speed_7 speed.__speed_6_c)
        (= speed.__speed_8 (ite speed.__speed_7 (< speed.diff 0)
                              (<= speed.diff (- 10))))
@@ -95,29 +95,58 @@
 (declare-var top.__top_1_c Bool)
 (declare-var top.ni_1.speed.__speed_3_c Bool)
 (declare-var top.ni_1.speed.__speed_6_c Bool)
-(declare-var top.ni_1.ni_4.COUNTER.__COUNTER_1_c Int)
+(declare-var top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_c Int)
 (declare-var top.__top_1_x Bool)
 (declare-var top.ni_1.speed.__speed_3_x Bool)
 (declare-var top.ni_1.speed.__speed_6_x Bool)
-(declare-var top.ni_1.ni_4.COUNTER.__COUNTER_1_x Int)
+(declare-var top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_x Int)
 (declare-var top.early Bool)
 (declare-var top.late Bool)
 (declare-rel top_init (Bool Bool Bool Bool Bool Bool Int))
 (declare-rel top_step (Bool Bool Bool Bool Bool Bool Int Bool Bool Bool Int))
 
 (rule (=> 
-  (and (speed_init top.beacon top.second top.late top.early top.__speed_3_x top.__speed_6_x top.ni_1.ni_4.COUNTER.__COUNTER_1_x)
-       (= top.OK 1)
+  (and (speed_init top.beacon top.second top.late top.early top.ni_1.speed.__speed_3_x top.ni_1.speed.__speed_6_x top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_x)
+       (= top.OK true)
        (= top.__top_1_x top.early)
   )
-  (top_init top.beacon top.second top.OK top.__top_1_x top.ni_1.speed.__speed_3_x top.ni_1.speed.__speed_6_x top.ni_1.ni_4.COUNTER.__COUNTER_1_x)
+  (top_init top.beacon top.second top.OK top.__top_1_x top.ni_1.speed.__speed_3_x top.ni_1.speed.__speed_6_x top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_x)
 ))
 
 (rule (=> 
-  (and (speed_step top.beacon top.second top.late top.early top.__speed_3_c top.__speed_6_c top.ni_1.ni_4.COUNTER.__COUNTER_1_c top.__speed_3_x top.__speed_6_x top.ni_1.ni_4.COUNTER.__COUNTER_1_x)
+  (and (speed_step top.beacon top.second top.late top.early top.ni_1.speed.__speed_3_c top.ni_1.speed.__speed_6_c top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_c top.ni_1.speed.__speed_3_x top.ni_1.speed.__speed_6_x top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_x)
        (= top.OK (or (not top.__top_1_c) (not top.late)))
        (= top.__top_1_x top.early)
   )
-  (top_step top.beacon top.second top.OK top.__top_1_c top.ni_1.speed.__speed_3_c top.ni_1.speed.__speed_6_c top.ni_1.ni_4.COUNTER.__COUNTER_1_c top.__top_1_x top.ni_1.speed.__speed_3_x top.ni_1.speed.__speed_6_x top.ni_1.ni_4.COUNTER.__COUNTER_1_x)
+  (top_step top.beacon top.second top.OK top.__top_1_c top.ni_1.speed.__speed_3_c top.ni_1.speed.__speed_6_c top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_c top.__top_1_x top.ni_1.speed.__speed_3_x top.ni_1.speed.__speed_6_x top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_x)
 ))
 
+; Collecting semantics with main node top
+
+(declare-rel MAIN (Bool Bool Bool Int Bool))
+; Initial set
+(declare-rel INIT_STATE ())
+(rule INIT_STATE)
+(rule (=> 
+  (and INIT_STATE
+       (top_init top.beacon top.second top.OK top.__top_1_x top.ni_1.speed.__speed_3_x top.ni_1.speed.__speed_6_x top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_x)
+  )
+  (MAIN top.__top_1_x top.ni_1.speed.__speed_3_x top.ni_1.speed.__speed_6_x top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_x top.OK)
+))
+
+; Inductive def
+(declare-var dummy Bool)
+(rule (=> 
+  (and (MAIN top.__top_1_c top.ni_1.speed.__speed_3_c top.ni_1.speed.__speed_6_c top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_c dummy)
+       (top_step top.beacon top.second top.OK top.__top_1_c top.ni_1.speed.__speed_3_c top.ni_1.speed.__speed_6_c top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_c top.__top_1_x top.ni_1.speed.__speed_3_x top.ni_1.speed.__speed_6_x top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_x)
+  )
+  (MAIN top.__top_1_x top.ni_1.speed.__speed_3_x top.ni_1.speed.__speed_6_x top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_x top.OK)
+))
+
+; Property def
+(declare-rel ERR ())
+(rule (=> 
+  (and (not (= top.OK true))
+       (MAIN top.__top_1_c top.ni_1.speed.__speed_3_c top.ni_1.speed.__speed_6_c top.ni_1.speed.ni_4.COUNTER.__COUNTER_1_c))
+  ERR))
+(query ERR)

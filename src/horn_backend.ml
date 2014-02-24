@@ -28,11 +28,11 @@ let pp_decl_var fmt id =
 let pp_var fmt id = Format.pp_print_string fmt id.var_id
 
 
-let prefix prefix x = if prefix = "" then x else prefix ^ "." ^ x 
-let rename_machine p = rename (fun n -> prefix p n)
+let concat prefix x = if prefix = "" then x else prefix ^ "." ^ x 
+let rename f = (fun v -> {v with var_id = f v.var_id } )
+let rename_machine p = rename (fun n -> concat p n)
 let rename_machine_list p = List.map (rename_machine p)
     
-let rename f = (fun v -> {v with var_id = f v.var_id } )
 let rename_current =  rename (fun n -> n ^ "_c")
 let rename_current_list = List.map rename_current
 let rename_next = rename (fun n -> n ^ "_x")
@@ -43,13 +43,13 @@ let get_machine machines node_name =
   List.find (fun m  -> m.mname.node_id = node_name) machines 
 
 let full_memory_vars machines machine =
-  let rec aux fst prefix_s m =
-    (rename_machine_list (if fst then prefix else prefix ^ "." ^ m.mname.node_id) m.mmemory) @
+  let rec aux fst prefix m =
+    (rename_machine_list (if fst then prefix else concat prefix m.mname.node_id) m.mmemory) @
       List.fold_left (fun accu (id, (n, _)) -> 
 	let name = node_name n in 
 	if name = "_arrow" then accu else
 	  let machine_n = get_machine machines name in
-	( aux false (prefix_s ^ "." ^ id) machine_n ) @ accu
+	( aux false (concat prefix (if fst then id else concat m.mname.node_id id)) machine_n ) @ accu
       ) [] (m.minstances) 
   in
   aux true machine.mname.node_id machine
@@ -85,7 +85,7 @@ let pp_horn_var m fmt id =
 
 (* Used to print boolean constants *)
 let pp_horn_tag fmt t =
-  pp_print_string fmt (if t = tag_true then "1" else if t = tag_false then "0" else t)
+  pp_print_string fmt (if t = tag_true then "true" else if t = tag_false then "false" else t)
 
 (* Prints a constant value *)
 let rec pp_horn_const fmt c =
@@ -110,7 +110,7 @@ let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
     | StateVar v    ->
       if Types.is_array_type v.var_type
       then assert false 
-      else pp_var fmt ((if is_lhs then rename_next else rename_current) self v)
+      else pp_var fmt (rename_machine self ((if is_lhs then rename_next else rename_current) (* self *) v))
     | Fun (n, vl)   -> Format.fprintf fmt "%a" (Basic_library.pp_horn n (pp_horn_val self pp_var)) vl
 
 (* Prints a [value] indexed by the suffix list [loop_vars] *)
@@ -161,7 +161,7 @@ let pp_instance_call
 	    (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) (List.map (fun v -> LocalVar v) outputs)
 	    (Utils.pp_final_char_if_non_empty " " outputs)
 	    (Utils.fprintf_list ~sep:" " pp_var) (
-  	      (rename_next_list m.mname.node_id (full_memory_vars machines i target_machine)) 
+  	      rename_machine_list (concat m.mname.node_id i) (rename_next_list (* concat m.mname.node_id i *) (full_memory_vars machines target_machine)) 
 	     )
 	  else
 	    Format.fprintf fmt "(%s_step %a%t%a%t%a)"
@@ -172,8 +172,8 @@ let pp_instance_call
 	      (Utils.pp_final_char_if_non_empty " " outputs)
 	      (Utils.fprintf_list ~sep:" " pp_var) (
 
-	      (rename_current_list m.mname.node_id (full_memory_vars machines i target_machine)) @ 
-	      (rename_next_list m.mname.node_id (full_memory_vars machines i target_machine)) 
+	      (rename_machine_list (concat m.mname.node_id i) (rename_current_list (* concat m.mname.node_id i *) (full_memory_vars machines target_machine))) @ 
+		(rename_machine_list (concat m.mname.node_id i) (rename_next_list (* concat m.mname.node_id i *) (full_memory_vars machines target_machine))) 
 	       )
 	    
 	     end
@@ -280,10 +280,10 @@ if !Options.main_node <> "" then
     Format.fprintf fmt "; Collecting semantics with main node %s@.@." node;
     (* We print the types of the main node "memory tree" TODO: add the output *)
     let main_memory_next = 
-      (rename_next_list machine.mname.node_id (full_memory_vars machines "" machine)) 
+      (rename_next_list (* machine.mname.node_id *) (full_memory_vars machines machine)) 
     in
     let main_memory_current = 
-      (rename_current_list machine.mname.node_id (full_memory_vars machines "" machine)) 
+      (rename_current_list (* machine.mname.node_id *) (full_memory_vars machines machine)) 
     in
     Format.fprintf fmt "(declare-rel MAIN (%a Bool))@."
       (Utils.fprintf_list ~sep:" " pp_type) 
