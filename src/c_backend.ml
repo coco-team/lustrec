@@ -28,7 +28,6 @@ open LustreSpec
 open Corelang
 open Machine_code
 
-
 (********************************************************************************************)
 (*                     Basic      Printing functions                                        *)
 (********************************************************************************************)
@@ -772,14 +771,19 @@ let print_type_definitions fmt =
 
 let print_makefile basename nodename fmt =
   fprintf fmt "GCC=gcc@.";
-  fprintf fmt "INC=/usr/local/include/lustrec@.";
+  fprintf fmt "LUSTREC=%s@." Sys.executable_name;
+  fprintf fmt "LUSTREC_BASE=%s@." (Filename.dirname (Filename.dirname Sys.executable_name));
+  fprintf fmt "INC=${LUSTREC_BASE}/include/lustrec@.";
   fprintf fmt "@.";
   fprintf fmt "%s_%s:@." basename nodename;
   fprintf fmt "\t${GCC} -I${INC} -I. -c %s.c@." basename;    
   fprintf fmt "\t${GCC} -I${INC} -c ${INC}/io_frontend.c@.";    
 (*  fprintf fmt "\t${GCC} -I${INC} -c ${INC}/StdLibrary.c@."; *)
 (*  fprintf fmt "\t${GCC} -o %s_%s io_frontend.o StdLibrary.o -lm %s.o@." basename nodename basename*)
- fprintf fmt "\t${GCC} -o %s_%s io_frontend.o -lm %s.o@." basename nodename basename
+ fprintf fmt "\t${GCC} -o %s_%s io_frontend.o -lm %s.o@." basename nodename basename;
+ fprintf fmt "@.";
+ fprintf fmt "clean:@.";
+ fprintf fmt "\t\\rm -f *.o %s_%s@." basename nodename
 
 
 
