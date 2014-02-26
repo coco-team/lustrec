@@ -309,9 +309,9 @@ and type_subtyping_arg env in_main ?(sub=true) const real_arg formal_type =
 (*Format.eprintf "subtyping const %B real %a:%a vs formal %a@." const Printers.pp_expr real_arg Types.print_ty real_type Types.print_ty formal_type;*)
   let real_types   = type_list_of_type real_type in
   let formal_types = type_list_of_type formal_type in
-  try
-    List.iter2 (type_subtyping loc sub) real_types formal_types
-  with _ -> raise (Unify (real_type, formal_type))
+  if (List.length real_types) <> (List.length formal_types)
+  then raise (Unify (real_type, formal_type))
+  else List.iter2 (type_subtyping loc sub) real_types formal_types
 
 and type_subtyping loc sub real_type formal_type =
   match (repr real_type).tdesc, (repr formal_type).tdesc with
