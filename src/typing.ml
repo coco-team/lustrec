@@ -306,7 +306,7 @@ and type_subtyping_arg env in_main ?(sub=true) const real_arg formal_type =
 	 | Some d' -> try_unify real_type real_static_type loc);
 	 real_static_type
     else real_type in
-(*Format.eprintf "subtyping const %B real %a:%a vs formal %a@." const Printers.pp_expr real_arg Types.print_ty real_type Types.print_ty formal_type;*)
+Format.eprintf "subtyping const %B real %a:%a vs formal %a@." const Printers.pp_expr real_arg Types.print_ty real_type Types.print_ty formal_type;
   match (repr real_type).tdesc, (repr formal_type).tdesc with
   | Tstatic _          , Tstatic _ when sub -> try_unify formal_type real_type loc
   | Tstatic (r_d, r_ty), _         when sub -> try_unify formal_type r_ty loc
@@ -486,7 +486,9 @@ let type_eq env in_main undefined_vars eq =
     List.fold_left (fun uvars v -> define_var v uvars) undefined_vars eq.eq_lhs in
   (* Type rhs wrt to lhs type with subtyping, i.e. a constant rhs value may be assigned
      to a (always non-constant) lhs variable *)
-  type_subtyping_arg env in_main true eq.eq_rhs ty_lhs;
+  let tins = type_list_of_type ty_lhs in
+  let args = expr_list_of_expr eq.eq_rhs in
+  List.iter2 (type_subtyping_arg env in_main false) args tins;
   undefined_vars
 
 
