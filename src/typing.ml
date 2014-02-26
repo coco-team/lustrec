@@ -287,7 +287,7 @@ let rec type_standard_args env in_main const expr_list =
   ty_res
 
 (* emulates a subtyping relation between types t and (d : t),
-   used during node application only *)
+   used during node applications and assignments *)
 and type_subtyping_arg env in_main ?(sub=true) const real_arg formal_type =
   let loc = real_arg.expr_loc in
   let const = const || (Types.get_static_value formal_type <> None) in
@@ -486,7 +486,7 @@ let type_eq env in_main undefined_vars eq =
     List.fold_left (fun uvars v -> define_var v uvars) undefined_vars eq.eq_lhs in
   (* Type rhs wrt to lhs type with subtyping, i.e. a constant rhs value may be assigned
      to a (always non-constant) lhs variable *)
-  type_subtyping_arg env in_main false eq.eq_rhs ty_lhs;
+  type_subtyping_arg env in_main true eq.eq_rhs ty_lhs;
   undefined_vars
 
 
