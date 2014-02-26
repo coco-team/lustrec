@@ -1,7 +1,8 @@
 #!/bin/bash
 
 NOW=`date "+%y%m%d%H%M"`
-LUSTREC="../../_build/src/lustrec"
+#LUSTREC="../../_build/src/lustrec"
+LUSTREC=lustrec
 mkdir -p build
 cd build
 
