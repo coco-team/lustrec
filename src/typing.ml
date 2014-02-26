@@ -306,7 +306,7 @@ and type_subtyping_arg env in_main ?(sub=true) const real_arg formal_type =
 	 | Some d' -> try_unify real_type real_static_type loc);
 	 real_static_type
     else real_type in
-Format.eprintf "subtyping const %B real %a:%a vs formal %a@." const Printers.pp_expr real_arg Types.print_ty real_type Types.print_ty formal_type;
+(*Format.eprintf "subtyping const %B real %a:%a vs formal %a@." const Printers.pp_expr real_arg Types.print_ty real_type Types.print_ty formal_type;*)
   match (repr real_type).tdesc, (repr formal_type).tdesc with
   | Tstatic _          , Tstatic _ when sub -> try_unify formal_type real_type loc
   | Tstatic (r_d, r_ty), _         when sub -> try_unify formal_type r_ty loc
