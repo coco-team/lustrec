@@ -47,18 +47,40 @@ do
 	lustreh -horn -node check witness.lus 2>/dev/null
     	z3="`z3 -t:10 witness.smt2 | xargs`"
     	if [ "x`echo $z3 | grep unsat`" == "xunsat" ]; then
-	  rz3="VALID";
+	  rinlining="VALID";
 	elif [ "x`echo $z3 | xargs | grep -o error`" == "xerror" ]; then
-	  rz3="ERROR";
+	  rinlining="ERROR";
 	elif [ "x`echo $z3 | xargs | grep -o unknown`" == "xunknown" ]; then
-	 rz3="UNKNOWN";
+	 rinlining="UNKNOWN";
 	else
-	 rz3="INVALID"
+	 rinlining="INVALID"
 	 exit 1
         fi  
-	echo "lustrec ($rlustrec1),gcc($rgcc1),lustrec inline ($rlustrec2), gcc inline ($rgcc2), inlining valid ($rz3),`dirname $file`,`basename $file`,node $main" | column -t -s',' | tee -a ../report-$NOW | grep "INVALID\|ERROR\|UNKNOWN"
+	# Checking horn backend
+	$LUSTREC -horn -d build -verbose 0 $opts -node $main ../$file;
+	echo z3 `basename $file .lus`.smt2 | grep unsat
+	# TODO: This part of the script has to be optimized
+	z3 -t:10 `basename $file .lus`.smt2 | grep unsat > /dev/null
+	if [ $? -ne 0 ]; then
+         rhorn="INVALID";
+        else
+         rhorn="VALID"
+        fi
+	echo "lustrec ($rlustrec1),gcc($rgcc1),lustrec inline ($rlustrec2), gcc inline ($rgcc2), inlining valid ($rinlining),horn ($rhorn),`dirname $file`,`basename $file`,node $main" | column -t -s',' | tee -a ../report-$NOW | grep "INVALID\|ERROR\|UNKNOWN"
     else
-	$LUSTREC -d build -verbose 0 $opts ../$file
-	echo "lustrec ($rlustrec), gcc($rgcc), `dirname $file`,`basename $file`,node $main" | column -t -s',' | tee -a ../report-$NOW | grep "INVALID\|ERROR\|UNKNOWN"
+	$LUSTREC -d build -verbose 0 $opts ../$file;
+        if [ $? -ne 0 ]; then
+          rlustrec1="INVALID";
+        else
+          rlustrec1="VALID"
+        fi
+        gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ `basename $file .lus`.c > /dev/null
+        if [ $? -ne 0 ]; then
+          rgcc1="INVALID";
+        else
+          rgcc1="VALID"
+        fi
+	$LUSTREC -horn -d build -verbose 0 $opts ../$file 
+	echo "lustrec ($rlustrec1), gcc($rgcc1), horn($rhorn), `dirname $file`,`basename $file`,node $main" | column -t -s',' | tee -a ../report-$NOW | grep "INVALID\|ERROR\|UNKNOWN"
     fi
 done < ../tests_ok.list

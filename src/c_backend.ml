@@ -912,19 +912,11 @@ let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog
   let main_include, main_print, main_makefile =
     match !Options.main_node with
       | "" -> (fun _ -> ()), (fun _ -> ()), (fun _ -> ())
-      | main_node -> ( 
-	let main_node_opt = 
-	  List.fold_left 
-	  (fun res m -> 
-	    match res with 
-	      | Some _ -> res 
-	      | None -> if m.mname.node_id = main_node then Some m else None)
-	  None machines
-      in 
-      match main_node_opt with
+      | main_node -> (
+	match Machine_code.get_machine_opt main_node machines with
 	| None -> eprintf "Unable to find a main node named %s@.@?" main_node; (fun _ -> ()), (fun _ -> ()), (fun _ -> ())
 	| Some m -> print_main_header, print_main_fun machines m, print_makefile basename !Options.main_node
-    )
+      )
   in
   main_include source_fmt;
   fprintf source_fmt "#include <stdlib.h>@.#include <assert.h>@.#include \"%s\"@.@." (basename^".h");
