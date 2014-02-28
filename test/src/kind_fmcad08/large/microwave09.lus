@@ -1,4 +1,5 @@
 
+--@ ensures OK;
 node top(KP_START: bool; 
       KP_CLEAR: bool; 
       KP_0: bool; 

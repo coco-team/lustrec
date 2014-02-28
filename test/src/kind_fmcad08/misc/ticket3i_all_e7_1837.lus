@@ -67,6 +67,7 @@ let
    if(e7) then if(g7) then pre t else pre a3 else 
    pre a3;
 tel
+--@ ensures OK;
 node top( e1, e2, e3, e4, e5, e6, e7, e8, e9 : bool;
          init_a1, init_a2, init_a3, init_t : int )
 returns ( OK : bool );

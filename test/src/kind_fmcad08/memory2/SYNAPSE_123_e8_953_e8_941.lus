@@ -35,6 +35,7 @@ let
 	if(e_s3) then if(garde_s3) then 1 else pre dirty_s else 
 	pre dirty_s;
 tel
+--@ ensures OK;
 node top(e_s1, e_s2, e_s3 : bool; init_invalid_s : int)
 returns( OK : bool );
     var invalid_s, valid_s, dirty_s : int; mem_init_s : int;

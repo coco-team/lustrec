@@ -18,6 +18,7 @@ tel
 -- (p -k-> q and r -k-> t) => (p and r) -k-> (q and t)
 
 -- Not provable in luke-*
+--@ ensures OK;
 node top (k0: int; p, q, r, t : bool) returns (OK: bool);
 var k: int;
     env : bool;

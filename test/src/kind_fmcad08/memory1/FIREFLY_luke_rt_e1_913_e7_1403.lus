@@ -62,6 +62,7 @@ let
 	if(e8) then if(garde8) then pre shared + pre exclusive + 1 else pre shared else
 	pre shared;
 tel
+--@ ensures OK;
 node top(e1, e2, e3, e4, e5, e6, e7, e8 : bool; i_invalid : int) 
 	returns( OK : bool );
     var invalid, dirty, exclusive, shared : int;

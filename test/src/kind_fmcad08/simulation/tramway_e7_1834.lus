@@ -76,6 +76,7 @@ let
                  edge(not in_station),
                  jafter(door_is_open));
 tel
+--@ ensures OK;
 node top(request_door, warning_start, in_station, door_is_open: bool)
 returns (OK: bool);
 var

@@ -100,6 +100,7 @@ let
    pre invalid;
 tel
 
+--@ ensures OK;
 node top( e01, e02, e03, e04, e05, e06, e07, e08, e09, e10, e11, e12 : bool;
              init_invalid : int )
 returns ( OK: bool );

@@ -1,3 +1,4 @@
+--@ ensures OK;
 node top (x:bool) returns (OK:bool);
 var a,b,c:bool;
 let

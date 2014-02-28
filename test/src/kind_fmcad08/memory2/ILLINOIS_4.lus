@@ -72,6 +72,7 @@ let
 tel
 
 -- Not provable in luke-bitvec
+--@ ensures OK;
 node top(e1, e2, e3, e4, e5, e6, e7, e8, e9 : bool; init_invalid : int)
 returns( OK : bool);
     var invalid, dirty, exclusive, shared : int;

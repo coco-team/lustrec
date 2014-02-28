@@ -20,6 +20,7 @@ let
      else Prev;
 tel
 
+--@ ensures OK;
 node top( Delta : int ) returns ( OK : bool );
 var Total : int;
 let

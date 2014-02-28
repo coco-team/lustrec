@@ -7,6 +7,7 @@ node Age (p: bool) returns (age_of_p: int);
 let
  age_of_p = 0 -> if pre(p) then pre(age_of_p) +1+ 1 else 0;
 tel
+--@ ensures OK;
 node top (k0: int; p, q, r, t : bool) returns (OK: bool);
 var k: int;
     env : bool;

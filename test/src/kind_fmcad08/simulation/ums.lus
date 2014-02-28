@@ -53,6 +53,7 @@ let
    only_on_B = on_B and not(on_A or on_C);
 tel
 
+--@ ensures OK;
 node top(on_A, on_B, on_C, ack_AB, ack_BC: bool)
 returns(OK: bool);
 var

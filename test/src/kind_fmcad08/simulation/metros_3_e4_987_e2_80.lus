@@ -38,6 +38,7 @@ let
   (diff1,avance1,retard1) = controleur(nB1,nS);
   ast = H0 and H1;
 tel
+--@ ensures OK;
 node top(B0, B1 : bool; S : bool) 
 returns (OK:bool);
 var nB0,nB1 : int;

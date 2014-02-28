@@ -11,6 +11,7 @@ let
      else if Delta > 0 and Prev < 10 then Prev+Delta
      else Prev;
 tel
+--@ ensures OK;
 node top( Delta : int ) returns ( OK : bool );
 var Total : int;
 let

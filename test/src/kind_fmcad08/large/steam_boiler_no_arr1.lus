@@ -756,6 +756,7 @@ tel
 
  
 
+--@ ensures OK;
 node top( 
   stop, 
   steam_boiler_waiting, 

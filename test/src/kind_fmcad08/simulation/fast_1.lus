@@ -124,6 +124,7 @@ let
            else pre(cca);
 tel
 
+--@ ensures OK;
 node top (igsw, ccd, cconoff, bpa, cccanc, battok, gearok,
          qfok, sdok, accok, ccseti, ccsetd, ccr: bool; vs: int)
          returns (OK : bool);

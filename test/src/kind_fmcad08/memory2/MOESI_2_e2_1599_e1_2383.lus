@@ -48,6 +48,7 @@ let
    if(etat_mo4) then if(garde_mo4) then 0 else pre owned_mo else 
    pre owned_mo;
 tel
+--@ ensures OK;
 node top( init_invalid_mo : int; etat_mo1, etat_mo2, etat_mo3, etat_mo4 : bool )
 returns ( OK : bool );
     var modified_mo, exclusive_mo, shared_mo, invalid_mo, owned_mo: int;

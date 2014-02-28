@@ -37,6 +37,7 @@ tel
 
 
 -- Can't prove in luke-bitvec, luke-hybrid, nbac
+--@ ensures OK;
 node top(m, s : bool) returns (OK : bool);
 var toofast, stop, bump: bool;
     dist, speed, time: int;

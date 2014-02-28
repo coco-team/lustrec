@@ -1,6 +1,7 @@
 -- a simple 0 to 5 boolean counter (A is LSB, C is MSB)
 -- property is that it should never reach 6 or 7
 
+--@ ensures OK;
 node top (x:bool) returns (OK:bool);
 var a,b,c:bool;
 let

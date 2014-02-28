@@ -12,6 +12,7 @@ let
                      else pre(level);
 tel
 
+--@ ensures OK;
 node top(set, treset, initial:bool) returns (OK:bool);
 var level,level1:bool;
 let
