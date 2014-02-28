@@ -33,6 +33,8 @@ let c_spec = ref false
 let java = ref false
 let dest_dir = ref ""
 let verbose_level = ref 1
+let global_inline = ref false
+let witnesses = ref false
 
 let options =
   [ "-d", Arg.Set_string dest_dir,
@@ -45,6 +47,8 @@ let options =
     "-c-spec", Arg.Set c_spec, 
     "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
     "-java", Arg.Set java, "generates Java output instead of C";
+    "-inline", Arg.Set global_inline, "inline all node calls (require a main node)";
+    "-witnesses", Arg.Set witnesses, "enable production of witnesses during compilation";
     "-print_types", Arg.Set print_types, "prints node types";
     "-print_clocks", Arg.Set print_clocks, "prints node clocks";
     "-verbose", Arg.Set_int verbose_level, " changes verbose level <default: 1>";
