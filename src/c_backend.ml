@@ -859,7 +859,7 @@ let print_type_definitions fmt =
 	(pp_c_type_decl cpt_type var) def
     | _        -> ()) type_table
 
-let print_makefile basename nodename fmt =
+let print_makefile basename nodename dependencies fmt =
   fprintf fmt "GCC=gcc@.";
   fprintf fmt "LUSTREC=%s@." Sys.executable_name;
   fprintf fmt "LUSTREC_BASE=%s@." (Filename.dirname (Filename.dirname Sys.executable_name));
@@ -867,13 +867,17 @@ let print_makefile basename nodename fmt =
   fprintf fmt "@.";
   fprintf fmt "%s_%s:@." basename nodename;
   fprintf fmt "\t${GCC} -I${INC} -I. -c %s.c@." basename;    
-  fprintf fmt "\t${GCC} -I${INC} -c ${INC}/io_frontend.c@.";    
+  List.iter (fun s -> (* Format.eprintf "Adding dependency: %s@." s;  *)
+    fprintf fmt "\t${GCC} -I${INC} -c %s@." s)
+    (("${INC}/io_frontend.c")::(List.map (fun s -> s ^ ".c") dependencies));    
 (*  fprintf fmt "\t${GCC} -I${INC} -c ${INC}/StdLibrary.c@."; *)
 (*  fprintf fmt "\t${GCC} -o %s_%s io_frontend.o StdLibrary.o -lm %s.o@." basename nodename basename*)
- fprintf fmt "\t${GCC} -o %s_%s io_frontend.o -lm %s.o@." basename nodename basename;
+  fprintf fmt "\t${GCC} -o %s_%s io_frontend.o %a -lm %s.o@." basename nodename 
+    (Utils.fprintf_list ~sep:" " (fun fmt s -> Format.fprintf fmt "%s.o" s)) dependencies basename;
  fprintf fmt "@.";
  fprintf fmt "clean:@.";
  fprintf fmt "\t\\rm -f *.o %s_%s@." basename nodename
+
 
 
 
@@ -881,7 +885,7 @@ let print_makefile basename nodename fmt =
 (*                         Translation function                                             *)
 (********************************************************************************************)
     
-let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog machines =
+let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog machines dependencies =
   (* Generating H file *)
 
   (* Include once: start *)
@@ -911,7 +915,7 @@ let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog
       | main_node -> (
 	match Machine_code.get_machine_opt main_node machines with
 	| None -> eprintf "Unable to find a main node named %s@.@?" main_node; (fun _ -> ()), (fun _ -> ()), (fun _ -> ())
-	| Some m -> print_main_header, print_main_fun machines m, print_makefile basename !Options.main_node
+	| Some m -> print_main_header, print_main_fun machines m, print_makefile basename !Options.main_node dependencies
       )
   in
   main_include source_fmt;

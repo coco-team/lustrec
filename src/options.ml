@@ -55,6 +55,17 @@ let options =
     "-verbose", Arg.Set_int verbose_level, " changes verbose level <default: 1>";
     "-version", Arg.Unit (fun () -> print_endline version), " displays the version";]
 
+let get_witness_dir filename =
+  (* Make sure the directory exists *)
+  let dir = !dest_dir ^ "/" ^ (Filename.basename filename) ^ "_witnesses" in
+  let _ = try
+	    if not (Sys.is_directory dir) then (
+	      Format.eprintf "File of name %s exists. It should be a directory.@." dir;
+	      exit 1
+	    )
+    with Sys_error _ -> Unix.mkdir dir 0o750
+  in
+  dir 
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

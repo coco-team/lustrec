@@ -600,10 +600,12 @@ let prog_unfold_consts prog =
    | _ -> assert false
 
  let rename_node_annot f_node f_var f_const expr  =
-   assert false
+   expr
+ (* TODO assert false *)
 
  let rename_expr_annot f_node f_var f_const annot =
-   assert false
+   annot
+ (* TODO assert false *)
 
 let rename_node f_node f_var f_const nd =
   let rename_var v = { v with var_id = f_var v.var_id } in

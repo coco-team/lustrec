@@ -139,7 +139,7 @@ let rec compile basename extension =
   let prog =
     if !Options.global_inline && 
       (match !Options.main_node with | "" -> false | _ -> true) then
-      Inliner.global_inline prog type_env clock_env
+      Inliner.global_inline basename prog type_env clock_env
     else
       prog
   in
@@ -254,7 +254,7 @@ let rec compile basename extension =
 	    | Some f -> Some (formatter_of_out_channel (open_out f))
 	  in
 	  report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,@?");
-	  C_backend.translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename normalized_prog machine_code
+	  C_backend.translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename normalized_prog machine_code dependencies
 	end
     | "java" ->
       begin
@@ -268,7 +268,8 @@ let rec compile basename extension =
       end
     | "horn" ->
       begin
-	let source_file = basename ^ ".smt2" in (* Could be changed *)
+	let destname = !Options.dest_dir ^ "/" ^ basename in
+	let source_file = destname ^ ".smt2" in (* Could be changed *)
 	let source_out = open_out source_file in
 	let fmt = formatter_of_out_channel source_out in
 	Horn_backend.translate fmt basename normalized_prog machine_code
