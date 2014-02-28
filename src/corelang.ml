@@ -75,11 +75,11 @@ and expr_desc =
   | Expr_pre of expr
   | Expr_when of expr * ident * label
   | Expr_merge of ident * (label * expr) list
-  | Expr_appl of ident * expr * (ident * label) option
+  | Expr_appl of call_t
   | Expr_uclock of expr * int
   | Expr_dclock of expr * int
   | Expr_phclock of expr * rat
-
+ and call_t = ident * expr * (ident * label) option (* The third part denotes the reseting clock label and value *)
 
 type eq =
     {eq_lhs: ident list;
@@ -513,6 +513,11 @@ let prog_unfold_consts prog =
 	| _       -> decl
     ) prog 
 
+
+
+(************************************************************************)
+(*        Renaming                                                      *)
+
 (* applies the renaming function [fvar] to all variables of expression [expr] *)
  let rec expr_replace_var fvar expr =
   { expr with expr_desc = expr_desc_replace_var fvar expr.expr_desc }
@@ -571,6 +576,98 @@ let prog_unfold_consts prog =
        | _                    -> assert false)
    in { eq with eq_rhs = replace eq.eq_lhs eq.eq_rhs }
 
+
+ let rec rename_expr  f_node f_var f_const expr =
+   { expr with expr_desc = rename_expr_desc f_node f_var f_const expr.expr_desc }
+ and rename_expr_desc f_node f_var f_const expr_desc =
+   let re = rename_expr  f_node f_var f_const in
+   match expr_desc with
+   | Expr_const _ -> expr_desc
+   | Expr_ident i -> Expr_ident (f_var i)
+   | Expr_array el -> Expr_array (List.map re el)
+   | Expr_access (e1, d) -> Expr_access (re e1, d)
+   | Expr_power (e1, d) -> Expr_power (re e1, d)
+   | Expr_tuple el -> Expr_tuple (List.map re el)
+   | Expr_ite (c, t, e) -> Expr_ite (re c, re t, re e)
+   | Expr_arrow (e1, e2)-> Expr_arrow (re e1, re e2) 
+   | Expr_fby (e1, e2) -> Expr_fby (re e1, re e2)
+   | Expr_pre e' -> Expr_pre (re e')
+   | Expr_when (e', i, l)-> Expr_when (re e', f_var i, l)
+   | Expr_merge (i, hl) -> 
+     Expr_merge (f_var i, List.map (fun (t, h) -> (t, re h)) hl)
+   | Expr_appl (i, e', i') -> 
+     Expr_appl (f_node i, re e', Utils.option_map (fun (x, l) -> f_var x, l) i')
+   | _ -> assert false
+
+ let rename_node_annot f_node f_var f_const expr  =
+   assert false
+
+ let rename_expr_annot f_node f_var f_const annot =
+   assert false
+
+let rename_node f_node f_var f_const nd =
+  let rename_var v = { v with var_id = f_var v.var_id } in
+  let inputs = List.map rename_var nd.node_inputs in
+  let outputs = List.map rename_var nd.node_outputs in
+  let locals = List.map rename_var nd.node_locals in
+  let gen_calls = List.map (rename_expr f_node f_var f_const) nd.node_gencalls in
+  let node_checks = List.map (Dimension.expr_replace_var f_var)  nd.node_checks in
+  let node_asserts = List.map 
+    (fun a -> 
+      { a with assert_expr = rename_expr f_node f_var f_const a.assert_expr } 
+    ) nd.node_asserts
+  in
+  let eqs = List.map 
+    (fun eq -> { eq with
+      eq_lhs = List.map f_var eq.eq_lhs; 
+      eq_rhs = rename_expr f_node f_var f_const eq.eq_rhs
+    } ) nd.node_eqs
+  in
+  let spec = 
+    Utils.option_map 
+      (fun s -> rename_node_annot f_node f_var f_const s) 
+      nd.node_spec 
+  in
+  let annot =
+    Utils.option_map
+      (fun s -> rename_expr_annot f_node f_var f_const s) 
+      nd.node_annot
+  in
+  {
+    node_id = f_node nd.node_id;
+    node_type = nd.node_type;
+    node_clock = nd.node_clock;
+    node_inputs = inputs;
+    node_outputs = outputs;
+    node_locals = locals;
+    node_gencalls = gen_calls;
+    node_checks = node_checks;
+    node_asserts = node_asserts;
+    node_eqs = eqs;
+    node_spec = spec;
+    node_annot = annot;
+  }
+
+
+let rename_const f_const c =
+  { c with const_id = f_const c.const_id }
+    
+let rename_prog f_node f_var f_const prog =
+  List.rev (
+    List.fold_left (fun accu top ->
+      (match top.top_decl_desc with
+      | Node nd -> 
+	{ top with top_decl_desc = Node (rename_node f_node f_var f_const nd) }
+      | Consts c -> 
+	{ top with top_decl_desc = Consts (List.map (rename_const f_const) c) }
+      | ImportedNode _
+      | ImportedFun _
+      | Open _ -> top)
+      ::accu
+) [] prog
+  )
+
+(**********************************************************************)
 (* Pretty printers *)
 
 let pp_decl_type fmt tdecl =
