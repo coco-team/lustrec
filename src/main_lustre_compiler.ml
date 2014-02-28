@@ -36,7 +36,6 @@ let type_decls env decls =
     begin
       try
 	Typing.type_prog env decls
-    (*Typing.uneval_prog_generics prog*)
       with (Types.Error (loc,err)) as exc ->
 	Format.eprintf "Typing error at loc %a: %a@]@."
 	  Location.pp_loc loc
@@ -72,17 +71,16 @@ let load_lusi filename =
   Location.init lexbuf filename;
   (* Parsing *)
   report ~level:1 (fun fmt -> fprintf fmt "@[<v>.. parsing header file %s@,@?" filename);
-  let header = 
-    try
-      Parse.prog Parser_lustre.header Lexer_lustre.token lexbuf
-    with (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
-      Parse.report_error err;
-      raise exc
-  in
+  try
+    Parse.prog Parser_lustre.header Lexer_lustre.token lexbuf
+  with (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
+    Parse.report_error err;
+    raise exc
+
+let check_lusi header =
   let new_tenv = type_decls Basic_library.type_env header in   (* Typing *)
   let new_cenv: Clocks.clock_expr Utils.IMap.t = clock_decls Basic_library.clock_env header in   (* Clock calculus *)
   header, new_tenv, new_cenv
-  
     
 let rec compile basename extension =
   (* Loading the input file *)
@@ -114,7 +112,7 @@ let rec compile basename extension =
       try
 	let basename = s ^ ".lusi" in 
 	report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>Library %s@ " s);
-	let _, lusi_type_env, lusi_clock_env = load_lusi basename in 
+	let _, lusi_type_env, lusi_clock_env = check_lusi (load_lusi basename) in 
 	report ~level:1 (fun fmt -> fprintf fmt "@]@,@?");
 	Env.overwrite type_env lusi_type_env,
 	Env.overwrite clock_env lusi_clock_env      
@@ -172,6 +170,36 @@ let rec compile basename extension =
     raise exc
     end;
   *)
+
+  (* Checking the existence of a lusi (Lustre Interface file) *)
+  let lusi_name = basename ^ ".lusi" in
+  let _ = 
+    try 
+      let _ = open_in lusi_name in
+      let header = load_lusi lusi_name in
+      let _, declared_types_env, declared_clocks_env = check_lusi header in
+      (* checking type compatibility with computed types*)
+      Typing.check_env_compat header declared_types_env computed_types_env;
+      (* checking clocks compatibilty with computed clocks*)
+      Clock_calculus.check_env_compat header declared_clocks_env computed_clocks_env;
+      Typing.uneval_prog_generics prog
+    with Sys_error _ -> ( 
+      (* Printing lusi file is necessary *)
+      report ~level:1 
+	(fun fmt -> 
+	  fprintf fmt 
+	    ".. generating lustre interface file %s@,@?" lusi_name);
+      let lusi_out = open_out lusi_name in
+      let lusi_fmt = formatter_of_out_channel lusi_out in
+      Typing.uneval_prog_generics prog;
+      Printers.pp_lusi_header lusi_fmt source_name prog
+    )
+    | (Types.Error (loc,err)) as exc ->
+      Format.eprintf "Type mismatch between computed type and declared type in lustre interface file: %a@]@."
+	Types.pp_error err;
+      raise exc
+  in
+
   (* Computes and stores generic calls for each node,
      only useful for ANSI C90 compliant generic node compilation *)
   if !Options.ansi then Causality.NodeDep.compute_generic_calls prog;
@@ -180,7 +208,7 @@ let rec compile basename extension =
   (* Normalization phase *)
   report ~level:1 (fun fmt -> fprintf fmt ".. normalization@,@?");
   let normalized_prog = Normalization.normalize_prog prog in
-  Typing.uneval_prog_generics normalized_prog;
+  (*Typing.uneval_prog_generics normalized_prog;*)
   report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,@?" Printers.pp_prog normalized_prog);
   (* Checking array accesses *)
   if !Options.check then
@@ -196,41 +224,15 @@ let rec compile basename extension =
     (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
     machine_code);
 
-  (* Checking the existence of a lusi (Lustre Interface file) *)
-  let lusi_name = basename ^ ".lusi" in
-  let _ = 
-    try 
-      let _ = open_in lusi_name in
-      let _, declared_types_env, declared_clocks_env = load_lusi lusi_name in
-      (* checking type compatibilty with computed types*)
-      Typing.check_env_compat declared_types_env computed_types_env;
-      (* checking clocks compatibilty with computed clocks*)
-      Clock_calculus.check_env_compat declared_clocks_env computed_clocks_env;
-      
-    with Sys_error _ -> ( 
-      (* Printing lusi file is necessary *)
-      report ~level:1 
-	(fun fmt -> 
-	  fprintf fmt 
-	    ".. generating lustre interface file %s@,@?" lusi_name);
-      let lusi_out = open_out lusi_name in
-      let lusi_fmt = formatter_of_out_channel lusi_out in
-      Printers.pp_lusi_header lusi_fmt source_name normalized_prog
-    )
-    | (Types.Error (loc,err)) as exc ->
-      Format.eprintf "Type mismatch between computed type and declared type in lustre interface file: %a@]@."
-	Types.pp_error err;
-      raise exc
-  in
-
   (* Printing code *)
-  let basename    = Filename.basename basename in
+  let basename    =  Filename.basename basename in
   let _ = match !Options.output with
       "C" -> 
 	begin
-	  let header_file = basename ^ ".h" in (* Could be changed *)
-	  let source_file = basename ^ ".c" in (* Could be changed *)
-	  let makefile_file = basename ^ ".makefile" in (* Could be changed *)
+	  let destname = !Options.dest_dir ^ "/" ^ basename in
+	  let header_file = destname ^ ".h" in (* Could be changed *)
+	  let source_file = destname ^ ".c" in (* Could be changed *)
+	  let makefile_file = destname ^ ".makefile" in (* Could be changed *)
 	  let spec_file_opt = if !Options.c_spec then 
 	      (
 		let spec_file = basename ^ "_spec.c" in
@@ -252,23 +254,25 @@ let rec compile basename extension =
 	    | Some f -> Some (formatter_of_out_channel (open_out f))
 	  in
 	  report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,@?");
-	  C_backend.translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename normalized_prog machine_code;
+	  C_backend.translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename normalized_prog machine_code
 	end
-    | "java" -> begin
-      failwith "Sorry, but not yet supported !"
+    | "java" ->
+      begin
+	failwith "Sorry, but not yet supported !"
     (*let source_file = basename ^ ".java" in
       report ~level:1 (fun fmt -> fprintf fmt ".. opening file %s@,@?" source_file);
       let source_out = open_out source_file in
       let source_fmt = formatter_of_out_channel source_out in
       report ~level:1 (fun fmt -> fprintf fmt ".. java code generation@,@?");
       Java_backend.translate_to_java source_fmt basename normalized_prog machine_code;*)
-    end
-    | "horn" -> begin
-      let source_file = basename ^ ".smt2" in (* Could be changed *)
-      let source_out = open_out source_file in
-      let fmt = formatter_of_out_channel source_out in
-      Horn_backend.translate fmt basename normalized_prog machine_code
-    end
+      end
+    | "horn" ->
+      begin
+	let source_file = basename ^ ".smt2" in (* Could be changed *)
+	let source_out = open_out source_file in
+	let fmt = formatter_of_out_channel source_out in
+	Horn_backend.translate fmt basename normalized_prog machine_code
+      end
     | _ -> assert false
   in
   report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");

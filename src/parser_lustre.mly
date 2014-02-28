@@ -97,10 +97,17 @@ let mkdim_ite i t e = mkdim_ite (Location.symbol_rloc ()) i t e
 %%
 
 prog:
-    typ_def_list top_decl_list EOF {$1;(List.rev $2)}
+ open_list typ_def_list top_decl_list EOF { $1 @ (List.rev $3) }
 
 header:
-    typ_def_list top_decl_header_list EOF {$1;(List.rev $2)}
+ open_list typ_def_list top_decl_header_list EOF { $1 @ (List.rev $3) }
+
+open_list:
+  { [] }
+| open_lusi open_list { $1 :: $2 }
+
+open_lusi:
+  OPEN QUOTE IDENT QUOTE { mktop_decl (Open $3) }
 
 top_decl_list:
   top_decl {[$1]}
@@ -199,8 +206,6 @@ top_decl:
 			     node_annot = match annots with [] -> None | _ -> Some annots})
     in
     Hashtbl.add node_table $3 nd; nd}
-
-| OPEN QUOTE IDENT QUOTE { mktop_decl (Open $3) }
 
 nodespec_list:
 NODESPEC { $1 }

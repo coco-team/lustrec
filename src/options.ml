@@ -31,18 +31,18 @@ let ansi = ref false
 let check = ref false
 let c_spec = ref false
 let output = ref "C"
-let dest_dir = ref ""
+let dest_dir = ref "."
 let verbose_level = ref 1
 let global_inline = ref false
 let witnesses = ref false
 
 let options =
   [ "-d", Arg.Set_string dest_dir,
-    "produces code in the specified directory";
+    "produces code in the specified directory (default: .)";
     "-node", Arg.Set_string main_node, "specifies the main node";
     "-init", Arg.Set delay_calculus, "performs an initialisation analysis for Lustre nodes";
     "-dynamic", Arg.Clear static_mem, "specifies a dynamic allocation scheme for main Lustre node (default: static)";
-    "-ansi", Arg.Set ansi, "specifies that generated C code is ansi C90 compliant (default is C99)";
+    "-ansi", Arg.Set ansi, "specifies that generated C code is ansi C90 compliant (default: C99)";
     "-check-access", Arg.Set check, "checks at runtime that array accesses always lie within bounds (default: no check)";
     "-c-spec", Arg.Set c_spec, 
     "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";

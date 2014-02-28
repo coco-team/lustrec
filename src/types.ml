@@ -96,6 +96,38 @@ let rec print_ty fmt ty =
   | Tunivar ->
     fprintf fmt "'%s" (name_of_type ty.tid)
 
+let rec print_node_ty fmt ty =
+  match ty.tdesc with
+  | Tint ->
+    fprintf fmt "int"
+  | Treal ->
+    fprintf fmt "real"
+  | Tbool ->
+    fprintf fmt "bool"
+  | Tclock t ->
+    fprintf fmt "%a clock" print_ty t
+  | Tstatic (_, t) ->
+    fprintf fmt "%a" print_node_ty t
+  | Tconst t ->
+    fprintf fmt "%s" t
+  | Trat ->
+    fprintf fmt "rat"
+  | Tarrow (ty1,ty2) ->
+    fprintf fmt "%a->%a" print_ty ty1 print_ty ty2
+  | Ttuple tylist ->
+    fprintf fmt "(%a)"
+      (Utils.fprintf_list ~sep:"*" print_ty) tylist
+  | Tenum taglist ->
+    fprintf fmt "(%a)"
+      (Utils.fprintf_list ~sep:" + " pp_print_string) taglist
+  | Tarray (e, ty) ->
+    fprintf fmt "%a^%a" print_ty ty Dimension.pp_dimension e
+  | Tlink ty ->
+      print_ty fmt ty
+  | Tunivar ->
+    fprintf fmt "'%s" (name_of_type ty.tid)
+  | _   -> assert false
+
 let pp_error fmt = function
   | Unbound_value id ->
     fprintf fmt "Unknown value %s@." id

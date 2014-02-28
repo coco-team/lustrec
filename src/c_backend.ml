@@ -567,7 +567,8 @@ let print_machine_struct fmt m =
     pp_machine_memtype_name m.mname.node_id
     pp_registers_struct m
     (Utils.fprintf_list ~sep:"; " pp_c_decl_instance_var) m.minstances
-    (Utils.pp_final_char_if_non_empty "; " m.minstances) 
+    (Utils.pp_final_char_if_non_empty "; " m.minstances)
+
 (*
 let pp_static_array_instance fmt m (v, m) =
  fprintf fmt "%s" (mk_addr_var m v)
@@ -889,15 +890,10 @@ let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog
   (* Print the svn version number and the supported C standard (C90 or C99) *)
   print_version header_fmt;
   fprintf header_fmt "#ifndef _%s@.#define _%s@." baseNAME baseNAME;
-(*
-  let machine_iter = compute_dep_machines machines in
-*)
-  (* Print the struct of all machines. This need to be done following the good
-     order. *)
+  (* Print the struct declarations of all machines. *)
   fprintf header_fmt "/* Struct declarations */@.";
   List.iter (print_machine_struct header_fmt) machines;
   pp_print_newline header_fmt ();
-
   (* Print the prototypes of all machines *)
   fprintf header_fmt "/* Nodes declarations */@.";
   List.iter (print_machine_decl header_fmt) machines;

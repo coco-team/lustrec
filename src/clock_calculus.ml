@@ -100,7 +100,7 @@ let try_generalize ck_node loc =
     raise (Error (loc, Clock_extrusion (ck_node, ck)))
 
 (* Clocks instanciation *)
-let instanciate_carrier cr inst_cr_vars =
+let instantiate_carrier cr inst_cr_vars =
   let cr = carrier_repr cr in
   match cr.carrier_desc with
   | Carry_const _
@@ -119,31 +119,31 @@ let instanciate_carrier cr inst_cr_vars =
 (* inst_ck_vars ensures that a polymorphic variable is instanciated with
    the same monomorphic variable if it occurs several times in the same
    type. inst_cr_vars is the same for carriers. *)
-let rec instanciate inst_ck_vars inst_cr_vars ck =
+let rec instantiate inst_ck_vars inst_cr_vars ck =
   match ck.cdesc with
   | Carrow (ck1,ck2) ->
       {ck with cdesc =
-       Carrow ((instanciate inst_ck_vars inst_cr_vars ck1),
-               (instanciate inst_ck_vars inst_cr_vars ck2))}
+       Carrow ((instantiate inst_ck_vars inst_cr_vars ck1),
+               (instantiate inst_ck_vars inst_cr_vars ck2))}
   | Ctuple cklist ->
       {ck with cdesc = Ctuple 
-         (List.map (instanciate inst_ck_vars inst_cr_vars) cklist)}
+         (List.map (instantiate inst_ck_vars inst_cr_vars) cklist)}
   | Con (ck',c,l) ->
-      let c' = instanciate_carrier c inst_cr_vars in
-      {ck with cdesc = Con ((instanciate inst_ck_vars inst_cr_vars ck'),c',l)}
+      let c' = instantiate_carrier c inst_cr_vars in
+      {ck with cdesc = Con ((instantiate inst_ck_vars inst_cr_vars ck'),c',l)}
   | Cvar _ | Pck_const (_,_) -> ck
   | Pck_up (ck',k) ->
-      {ck with cdesc = Pck_up ((instanciate inst_ck_vars inst_cr_vars ck'),k)}
+      {ck with cdesc = Pck_up ((instantiate inst_ck_vars inst_cr_vars ck'),k)}
   | Pck_down (ck',k) ->
-      {ck with cdesc = Pck_down ((instanciate inst_ck_vars inst_cr_vars ck'),k)}
+      {ck with cdesc = Pck_down ((instantiate inst_ck_vars inst_cr_vars ck'),k)}
   | Pck_phase (ck',q) ->
-      {ck with cdesc = Pck_phase ((instanciate inst_ck_vars inst_cr_vars ck'),q)}
+      {ck with cdesc = Pck_phase ((instantiate inst_ck_vars inst_cr_vars ck'),q)}
   | Clink ck' ->
-      {ck with cdesc = Clink (instanciate inst_ck_vars inst_cr_vars ck')}
+      {ck with cdesc = Clink (instantiate inst_ck_vars inst_cr_vars ck')}
   | Ccarrying (cr,ck') ->
-      let cr' = instanciate_carrier cr inst_cr_vars in
+      let cr' = instantiate_carrier cr inst_cr_vars in
         {ck with cdesc =
-         Ccarrying (cr',instanciate inst_ck_vars inst_cr_vars ck')}
+         Ccarrying (cr',instantiate inst_ck_vars inst_cr_vars ck')}
   | Cunivar cset ->
       try
         List.assoc ck.cid !inst_ck_vars
@@ -512,7 +512,7 @@ and clock_expr ?(nocarrier=true) env expr =
         with Not_found -> 
 	  failwith ("Internal error, variable \""^v^"\" not found")
       in
-      let ck = instanciate (ref []) (ref []) ckv in
+      let ck = instantiate (ref []) (ref []) ckv in
       expr.expr_clock <- ck;
       ck
   | Expr_array elist ->
@@ -775,9 +775,9 @@ let clock_top_decl env decl =
 let clock_prog env decls =
   List.fold_left (fun e decl -> clock_top_decl e decl) env decls
 
-let check_env_compat declared computed =
+let check_env_compat header declared computed =
   Env.iter declared (fun k decl_clock_k -> 
-    let computed_c = Env.lookup_value computed k in
+    let computed_c = instantiate (ref []) (ref []) (Env.lookup_value computed k) in
     try_unify decl_clock_k computed_c Location.dummy_loc
   ) 
 (* Local Variables: *)
