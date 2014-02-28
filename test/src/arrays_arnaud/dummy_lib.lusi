@@ -1,0 +1,19 @@
+node test(x:int) returns (t:int^2);
+
+function _MatMul_real (
+	const n, m, p : int ;
+	in1 : real^n^m ;
+	in2 : real^m^p)
+returns (
+	out : real^n^p) ;
+
+function _Vect_Leqt_real (
+	const n : int ;
+	in : real^n ;
+	in2 : real^n)
+returns (
+	out : bool^n) ;
+
+node imp1(const m:int; a:int^(3*m)) returns (c:int^m);
+
+node imp2(const n:int; a:int^n) returns (d:int^n);
