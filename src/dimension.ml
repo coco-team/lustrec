@@ -198,7 +198,14 @@ let rec terms dim =
 
 let rec normalize dim =
  dim
-
+(*
+let rec unnormalize loc l =
+  let l = List.sort (fun (k, l) (k', l') -> compare l l') (List.map (fun (k, l) -> (k, List.sort compare l)) l) in
+  match l with
+  | []   -> mkdim_int loc 0
+  | t::q -> 
+ List.fold_left (fun res (k, l) -> mkdim_appl loc "+" res (mkdim_appl loc "*" (mkdim_int loc k) l)) t q
+*)
 let copy copy_dim_vars dim =
   let rec cp dim =
   match dim.dim_desc with
@@ -252,7 +259,7 @@ let rec eval eval_op eval_const dim =
   | Dvar -> ()
   | Dunivar -> assert false
 
-let rec uneval const univar =
+let uneval const univar =
   let univar = repr univar in
   match univar.dim_desc with
   | Dunivar -> univar.dim_desc <- Dident const

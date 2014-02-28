@@ -48,7 +48,9 @@ let rec pp_const fmt c =
     | Const_tag  t -> pp_print_string fmt t
     | Const_array ca -> Format.fprintf fmt "[%a]" (Utils.fprintf_list ~sep:"," pp_const) ca
 
-and pp_var fmt id = fprintf fmt "%s: %a" id.var_id Types.print_ty id.var_type
+and pp_var fmt id = fprintf fmt "%s%s: %a" (if id.var_dec_const then "const " else "") id.var_id Types.print_ty id.var_type
+
+and pp_node_var fmt id = fprintf fmt "%s%s: %a" (if id.var_dec_const then "const " else "") id.var_id Types.print_node_ty id.var_type
 
 and pp_expr fmt expr =
   match expr.expr_desc with
@@ -113,7 +115,7 @@ let pp_node_eq fmt eq =
 
 let pp_node_eqs = fprintf_list ~sep:"@ " pp_node_eq 
 
-let pp_node_args = fprintf_list ~sep:"; " pp_var 
+let pp_node_args = fprintf_list ~sep:"; " pp_node_var 
 
 let pp_var_type_dec fmt ty =
   let rec pp_var_type_dec_desc fmt tdesc =
@@ -226,7 +228,7 @@ fprintf fmt "@[<v 0>%a%tnode %s (%a) returns (%a)@.%a%alet@.@[<h 2>   @ @[%a@]@ 
   match locals with [] -> () | _ ->
     fprintf fmt "@[<v 4>var %a@]@ " 
       (fprintf_list ~sep:"@ " 
-	 (fun fmt v -> fprintf fmt "%a;" pp_var v))
+	 (fun fmt v -> fprintf fmt "%a;" pp_node_var v))
       locals
   ) nd.node_locals
   (fun fmt checks ->

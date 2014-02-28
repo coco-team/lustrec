@@ -212,8 +212,8 @@ let rec semi_unify t1 t2 =
         t2.tdesc <- Tlink t1
     | Tarrow (t1,t2), Tarrow (t1',t2') ->
       begin
-        unify t1 t1';
-	unify t2 t2'
+        semi_unify t1 t1';
+	semi_unify t2 t2'
       end
     | Ttuple tlist1, Ttuple tlist2 ->
         if (List.length tlist1) <> (List.length tlist2) then
@@ -237,8 +237,8 @@ let rec semi_unify t1 t2 =
     | Tarray (e1, t1'), Tarray (e2, t2') ->
       begin
 	semi_unify t1' t2';
-	Dimension.eval Basic_library.eval_env (fun c -> None) e1;
-	Dimension.eval Basic_library.eval_env (fun c -> None) e2;
+	Dimension.eval Basic_library.eval_env (fun c -> Some (Dimension.mkdim_ident Location.dummy_loc c)) e1;
+	Dimension.eval Basic_library.eval_env (fun c -> Some (Dimension.mkdim_ident Location.dummy_loc c)) e2;
 	Dimension.semi_unify e1 e2;
       end
     | _,_ -> raise (Unify (t1, t2))
@@ -246,6 +246,15 @@ let rec semi_unify t1 t2 =
 let try_unify ty1 ty2 loc =
   try
     unify ty1 ty2
+  with
+  | Unify _ ->
+    raise (Error (loc, Type_clash (ty1,ty2)))
+  | Dimension.Unify _ ->
+    raise (Error (loc, Type_clash (ty1,ty2)))
+
+let try_semi_unify ty1 ty2 loc =
+  try
+    semi_unify ty1 ty2
   with
   | Unify _ ->
     raise (Error (loc, Type_clash (ty1,ty2)))
@@ -516,7 +525,6 @@ let type_coreclock env ck id loc =
 		 expr_annot = None})
           dummy_id_expr cl
       in
-Format.eprintf "yiihii@.";
       ignore (type_expr env false false when_expr)
 
 let rec check_type_declaration loc cty =
@@ -709,10 +717,15 @@ let uneval_top_generics decl =
 let uneval_prog_generics prog =
  List.iter uneval_top_generics prog
 
-let check_env_compat declared computed =
+let check_env_compat header declared computed =
+  (try 
+     uneval_prog_generics header
+   with e -> raise e);
   Env.iter declared (fun k decl_type_k -> 
-    let computed_t = Env.lookup_value computed k in
-    try_unify decl_type_k computed_t Location.dummy_loc
+    let computed_t = instantiate (ref []) (ref []) (Env.lookup_value computed k) in
+    (*Types.print_ty Format.std_formatter decl_type_k;
+    Types.print_ty Format.std_formatter computed_t;*)
+    try_semi_unify decl_type_k computed_t Location.dummy_loc
   ) 
 
 (* Local Variables: *)
