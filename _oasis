@@ -7,7 +7,7 @@ License:     LGPL-2.1
 Plugins:     DevFiles (0.2)
 # , Custom (0.2)
 PreBuildCommand: ./svn_version.sh 
-PostInstallCommand: mkdir -p /usr/local/include/lustrec; cp include/* /usr/local/include/lustrec/ 
+PostInstallCommand: mkdir -p $(prefix)/include; cp -rf include $(prefix)/include/lustrec
 
 Executable lustrec
   Path:       src

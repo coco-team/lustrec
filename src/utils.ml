@@ -44,6 +44,8 @@ module IMap = Map.Make(IdentModule)
 
 module ISet = Set.Make(IdentModule)
 
+let desome x = match x with Some x -> x | None -> failwith "desome"
+
 let option_map f o =
   match o with
   | None   -> None

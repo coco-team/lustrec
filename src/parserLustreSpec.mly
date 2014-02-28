@@ -102,14 +102,8 @@ expr:
     {mkeexpr (EExpr_arrow ($1,$3))}
 | expr FBY expr 
     {mkeexpr (EExpr_fby ($1,$3))}
-| expr COLCOL expr 
-    {mkeexpr (EExpr_concat ($1,$3))} 
-| TAIL LPAR expr RPAR
-    {mkeexpr (EExpr_tail $3)}
 | expr WHEN IDENT 
     {mkeexpr (EExpr_when ($1,$3))}
-| expr WHENNOT IDENT
-    {mkeexpr (EExpr_whennot ($1,$3))}
 | MERGE LPAR IDENT COMMA expr COMMA expr RPAR
     {mkeexpr (EExpr_merge ($3,$5,$7))}
 | IDENT LPAR expr RPAR

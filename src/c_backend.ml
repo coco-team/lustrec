@@ -28,7 +28,6 @@ open LustreSpec
 open Corelang
 open Machine_code
 
-
 (********************************************************************************************)
 (*                     Basic      Printing functions                                        *)
 (********************************************************************************************)
@@ -92,16 +91,16 @@ let pp_c_type var fmt t =
   let rec aux t pp_suffix =
   match (Types.repr t).Types.tdesc with
   | Types.Tclock t'       -> aux t' pp_suffix
-  | Types.Tbool           -> Format.fprintf fmt "_Bool %s%a" var pp_suffix ()
-  | Types.Treal           -> Format.fprintf fmt "double %s%a" var pp_suffix ()
-  | Types.Tint            -> Format.fprintf fmt "int %s%a" var pp_suffix ()
+  | Types.Tbool           -> fprintf fmt "_Bool %s%a" var pp_suffix ()
+  | Types.Treal           -> fprintf fmt "double %s%a" var pp_suffix ()
+  | Types.Tint            -> fprintf fmt "int %s%a" var pp_suffix ()
   | Types.Tarray (d, t')  ->
-    let pp_suffix' fmt () = Format.fprintf fmt "%a[%a]" pp_suffix () pp_c_dimension d in
+    let pp_suffix' fmt () = fprintf fmt "%a[%a]" pp_suffix () pp_c_dimension d in
     aux t' pp_suffix'
-  | Types.Tstatic (_, t') -> Format.fprintf fmt "const "; aux t' pp_suffix
-  | Types.Tconst ty       -> Format.fprintf fmt "%s %s" ty var
-  | Types.Tarrow (_, _)   -> Format.fprintf fmt "void (*%s)()" var
-  | _                     -> Format.eprintf "internal error: pp_c_type %a@." Types.print_ty t; assert false
+  | Types.Tstatic (_, t') -> fprintf fmt "const "; aux t' pp_suffix
+  | Types.Tconst ty       -> fprintf fmt "%s %s" ty var
+  | Types.Tarrow (_, _)   -> fprintf fmt "void (*%s)()" var
+  | _                     -> eprintf "internal error: pp_c_type %a@." Types.print_ty t; assert false
   in aux t (fun fmt () -> ())
 
 let rec pp_c_initialize fmt t = 
@@ -111,7 +110,7 @@ let rec pp_c_initialize fmt t =
   | Types.Tbool -> pp_print_string fmt "0" 
   | Types.Treal -> pp_print_string fmt "0."
   | Types.Tarray (d, t') when Dimension.is_dimension_const d ->
-    Format.fprintf fmt "{%a}"
+    fprintf fmt "{%a}"
       (Utils.fprintf_list ~sep:"," (fun fmt _ -> pp_c_initialize fmt t'))
       (Utils.duplicate 0 (Dimension.size_const_dimension d))
   | _ -> assert false
@@ -146,7 +145,7 @@ let pp_c_decl_local_var fmt id =
   pp_c_type id.var_id fmt id.var_type
 
 let pp_c_decl_array_mem self fmt id =
-  Format.fprintf fmt "%a = (%a) (%s->_reg.%s)"
+  fprintf fmt "%a = (%a) (%s->_reg.%s)"
     (pp_c_type (sprintf "(*%s)" id.var_id)) id.var_type
     (pp_c_type "(*)") id.var_type
     self
@@ -169,11 +168,11 @@ let pp_c_decl_struct_var fmt id =
 let pp_c_var_read m fmt id =
   if Types.is_array_type id.var_type
   then
-    Format.fprintf fmt "%s" id.var_id
+    fprintf fmt "%s" id.var_id
   else
     if List.exists (fun o -> o.var_id = id.var_id) m.mstep.step_outputs (* id is output *)
-    then Format.fprintf fmt "*%s" id.var_id
-    else Format.fprintf fmt "%s" id.var_id
+    then fprintf fmt "*%s" id.var_id
+    else fprintf fmt "%s" id.var_id
 
 (* Addressable value of a variable, the one that is passed around in calls:
    - if it's not a scalar non-output, then its name is enough
@@ -183,16 +182,16 @@ let pp_c_var_read m fmt id =
 let pp_c_var_write m fmt id =
   if Types.is_array_type id.var_type
   then
-    Format.fprintf fmt "%s" id.var_id
+    fprintf fmt "%s" id.var_id
   else
     if List.exists (fun o -> o.var_id = id.var_id) m.mstep.step_outputs (* id is output *)
     then
-      Format.fprintf fmt "%s" id.var_id
+      fprintf fmt "%s" id.var_id
     else
-      Format.fprintf fmt "&%s" id.var_id
+      fprintf fmt "&%s" id.var_id
 
 let pp_c_decl_instance_var fmt (name, (node, static)) = 
-  Format.fprintf fmt "%a *%s" pp_machine_memtype_name (node_name node) name
+  fprintf fmt "%a *%s" pp_machine_memtype_name (node_name node) name
 
 let pp_c_tag fmt t =
  pp_print_string fmt (if t = tag_true then "1" else if t = tag_false then "0" else t)
@@ -204,7 +203,7 @@ let rec pp_c_const fmt c =
     | Const_real r   -> pp_print_string fmt r
     | Const_float r  -> pp_print_float fmt r
     | Const_tag t    -> pp_c_tag fmt t
-    | Const_array ca -> Format.fprintf fmt "{%a}" (Utils.fprintf_list ~sep:"," pp_c_const) ca
+    | Const_array ca -> fprintf fmt "{%a}" (Utils.fprintf_list ~sep:"," pp_c_const) ca
 
 (* Prints a value expression [v], with internal function calls only.
    [pp_var] is a printer for variables (typically [pp_c_var_read]),
@@ -213,18 +212,18 @@ let rec pp_c_const fmt c =
 let rec pp_c_val self pp_var fmt v =
   match v with
     | Cst c         -> pp_c_const fmt c
-    | Array vl      -> Format.fprintf fmt "{%a}" (Utils.fprintf_list ~sep:", " (pp_c_val self pp_var)) vl
-    | Access (t, i) -> Format.fprintf fmt "%a[%a]" (pp_c_val self pp_var) t (pp_c_val self pp_var) i
+    | Array vl      -> fprintf fmt "{%a}" (Utils.fprintf_list ~sep:", " (pp_c_val self pp_var)) vl
+    | Access (t, i) -> fprintf fmt "%a[%a]" (pp_c_val self pp_var) t (pp_c_val self pp_var) i
     | Power (v, n)  -> assert false
     | LocalVar v    -> pp_var fmt v
     | StateVar v    ->
       if Types.is_array_type v.var_type
-      then Format.fprintf fmt "*%a" pp_var v
-      else Format.fprintf fmt "%s->_reg.%a" self pp_var v
+      then fprintf fmt "*%a" pp_var v
+      else fprintf fmt "%s->_reg.%a" self pp_var v
     | Fun (n, vl)   -> Basic_library.pp_c n (pp_c_val self pp_var) fmt vl
 
 let pp_c_checks self fmt m =
-  Utils.fprintf_list ~sep:"" (fun fmt (loc, check) -> Format.fprintf fmt "@[<v>%a@,assert (%a);@]@," Location.pp_c_loc loc (pp_c_val self (pp_c_var_read m)) check) fmt m.mstep.step_checks
+  Utils.fprintf_list ~sep:"" (fun fmt (loc, check) -> fprintf fmt "@[<v>%a@,assert (%a);@]@," Location.pp_c_loc loc (pp_c_val self (pp_c_var_read m)) check) fmt m.mstep.step_checks
 
 
 (********************************************************************************************)
@@ -269,8 +268,8 @@ let reorder_loop_variables loop_vars =
 (* Prints a one loop variable suffix for arrays *)
 let pp_loop_var fmt lv =
  match snd lv with
- | LVar v -> Format.fprintf fmt "[%s]" v
- | LInt r -> Format.fprintf fmt "[%d]" !r
+ | LVar v -> fprintf fmt "[%s]" v
+ | LInt r -> fprintf fmt "[%d]" !r
 
 (* Prints a suffix of loop variables for arrays *)
 let pp_suffix fmt loop_vars =
@@ -286,7 +285,7 @@ let rec pp_value_suffix self loop_vars pp_value fmt value =
  | _               , Fun (n, vl)  ->
    Basic_library.pp_c n (pp_value_suffix self loop_vars pp_value) fmt vl
  | _               , _            ->
-   let pp_var_suffix fmt v = Format.fprintf fmt "%a%a" pp_value v pp_suffix loop_vars in
+   let pp_var_suffix fmt v = fprintf fmt "%a%a" pp_value v pp_suffix loop_vars in
    pp_c_val self pp_var_suffix fmt value
 
 (* type_directed assignment: array vs. statically sized type
@@ -297,7 +296,7 @@ let rec pp_value_suffix self loop_vars pp_value fmt value =
 *)
 let pp_assign m self pp_var fmt var_type var_name value =
   let depth = expansion_depth value in
-(*Format.eprintf "pp_assign %a %a %d@." Types.print_ty var_type pp_val value depth;*)
+(*eprintf "pp_assign %a %a %d@." Types.print_ty var_type pp_val value depth;*)
   let loop_vars = mk_loop_variables m var_type depth in
   let reordered_loop_vars = reorder_loop_variables loop_vars in
   let rec aux fmt vars =
@@ -305,14 +304,14 @@ let pp_assign m self pp_var fmt var_type var_name value =
     | [] ->
       fprintf fmt "%a = %a;" (pp_value_suffix self loop_vars pp_var) var_name (pp_value_suffix self loop_vars pp_var) value
     | (d, LVar i) :: q ->
-(*Format.eprintf "pp_aux %a %s@." Dimension.pp_dimension d i;*)
-      Format.fprintf fmt "@[<v 2>{@,int %s;@,for(%s=0;%s<%a;%s++)@,%a @]@,}"
+(*eprintf "pp_aux %a %s@." Dimension.pp_dimension d i;*)
+      fprintf fmt "@[<v 2>{@,int %s;@,for(%s=0;%s<%a;%s++)@,%a @]@,}"
 	i i i Dimension.pp_dimension d i
 	aux q
     | (d, LInt r) :: q ->
-(*Format.eprintf "pp_aux %a %d@." Dimension.pp_dimension d (!r);*)
+(*eprintf "pp_aux %a %d@." Dimension.pp_dimension d (!r);*)
       let szl = Utils.enumerate (Dimension.size_const_dimension d) in
-      Format.fprintf fmt "@[<v 2>{@,%a@]@,}"
+      fprintf fmt "@[<v 2>{@,%a@]@,}"
 	(Utils.fprintf_list ~sep:"@," (fun fmt i -> r := i; aux fmt q)) szl
   in
   begin
@@ -324,7 +323,7 @@ let pp_assign m self pp_var fmt var_type var_name value =
 let pp_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list) =
  try (* stateful node instance *)
    let (n,_) = List.assoc i m.minstances in
-   Format.fprintf fmt "%s_step (%a%t%a%t%s->%s);"
+   fprintf fmt "%s_step (%a%t%a%t%s->%s);"
      (node_name n)
      (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
      (Utils.pp_final_char_if_non_empty ", " inputs) 
@@ -334,7 +333,7 @@ let pp_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list
      i
  with Not_found -> (* stateless node instance *)
    let (n,_) = List.assoc i m.mcalls in
-   Format.fprintf fmt "%s (%a%t%a);"
+   fprintf fmt "%s (%a%t%a);"
      (node_name n)
      (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
      (Utils.pp_final_char_if_non_empty ", " inputs) 
@@ -385,7 +384,96 @@ and pp_machine_instr (m: machine_t) self fmt instr =
 	(Utils.fprintf_list ~sep:"@," (pp_machine_branch m self)) hl
 
 and pp_machine_branch m self fmt (t, h) =
-  Format.fprintf fmt "@[<v 2>case %a:@,%a@,break;@]" pp_c_tag t (Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) h
+  fprintf fmt "@[<v 2>case %a:@,%a@,break;@]" pp_c_tag t (Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) h
+
+
+(**************************************************************************)
+(*     Printing spec for c *)
+
+(**************************************************************************)
+
+
+let pp_econst fmt c = 
+  match c with
+    | EConst_int i -> pp_print_int fmt i
+    | EConst_real r -> pp_print_string fmt r
+    | EConst_float r -> pp_print_float fmt r
+    | EConst_bool b -> pp_print_bool fmt b
+    | EConst_string s -> pp_print_string fmt ("\"" ^ s ^ "\"")
+
+let rec pp_eexpr is_output fmt eexpr = 
+  let pp_eexpr = pp_eexpr is_output in
+  match eexpr.eexpr_desc with
+    | EExpr_const c -> pp_econst fmt c
+    | EExpr_ident id -> 
+      if is_output id then pp_print_string fmt ("*" ^ id) else pp_print_string fmt id
+    | EExpr_tuple el -> Utils.fprintf_list ~sep:"," pp_eexpr fmt el
+    | EExpr_arrow (e1, e2) -> fprintf fmt "%a -> %a" pp_eexpr e1 pp_eexpr e2
+    | EExpr_fby (e1, e2) -> fprintf fmt "%a fby %a" pp_eexpr e1 pp_eexpr e2
+    (* | EExpr_concat (e1, e2) -> fprintf fmt "%a::%a" pp_eexpr e1 pp_eexpr e2 *)
+    (* | EExpr_tail e -> fprintf fmt "tail %a" pp_eexpr e *)
+    | EExpr_pre e -> fprintf fmt "pre %a" pp_eexpr e
+    | EExpr_when (e, id) -> fprintf fmt "%a when %s" pp_eexpr e id
+    | EExpr_merge (id, e1, e2) -> 
+      fprintf fmt "merge (%s, %a, %a)" id pp_eexpr e1 pp_eexpr e2
+    | EExpr_appl (id, e, r) -> pp_eapp is_output fmt id e r
+    | EExpr_forall (vars, e) -> fprintf fmt "forall %a; %a" Printers.pp_node_args vars pp_eexpr e 
+    | EExpr_exists (vars, e) -> fprintf fmt "exists %a; %a" Printers.pp_node_args vars pp_eexpr e 
+
+
+    (* | EExpr_whennot _ *)
+    (* | EExpr_uclock _ *)
+    (* | EExpr_dclock _ *)
+    (* | EExpr_phclock _ -> assert false *)
+and pp_eapp is_output fmt id e r =
+  let pp_eexpr = pp_eexpr is_output in
+  match r with
+  | None ->
+    (match id, e.eexpr_desc with
+    | "+", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a + %a)" pp_eexpr e1 pp_eexpr e2
+    | "uminus", _ -> fprintf fmt "(- %a)" pp_eexpr e
+    | "-", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a - %a)" pp_eexpr e1 pp_eexpr e2
+    | "*", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a * %a)" pp_eexpr e1 pp_eexpr e2
+    | "/", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a / %a)" pp_eexpr e1 pp_eexpr e2
+    | "mod", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a mod %a)" pp_eexpr e1 pp_eexpr e2
+    | "&&", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a && %a)" pp_eexpr e1 pp_eexpr e2
+    | "||", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a || %a)" pp_eexpr e1 pp_eexpr e2
+    | "xor", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a ^^ %a)" pp_eexpr e1 pp_eexpr e2
+    | "impl", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a ==> %a)" pp_eexpr e1 pp_eexpr e2
+    | "<", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a < %a)" pp_eexpr e1 pp_eexpr e2
+    | "<=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a <= %a)" pp_eexpr e1 pp_eexpr e2
+    | ">", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a > %a)" pp_eexpr e1 pp_eexpr e2
+    | ">=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a >= %a)" pp_eexpr e1 pp_eexpr e2
+    | "!=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a != %a)" pp_eexpr e1 pp_eexpr e2
+    | "=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a == %a)" pp_eexpr e1 pp_eexpr e2
+    | "not", _ -> fprintf fmt "(! %a)" pp_eexpr e
+    | "ite", EExpr_tuple([e1;e2;e3]) -> fprintf fmt "(if %a then %a else %a)" pp_eexpr e1 pp_eexpr e2 pp_eexpr e3
+    | _ -> fprintf fmt "%s (%a)" id pp_eexpr e)
+  | Some x -> fprintf fmt "%s (%a) every %s" id pp_eexpr e x 
+
+let pp_ensures is_output fmt e =
+  match e with
+    | EnsuresExpr e -> fprintf fmt "ensures %a;@ " (pp_eexpr is_output) e
+    | SpecObserverNode (name, args) -> fprintf fmt "observer %s (%a);@ " name (Utils.fprintf_list ~sep:", " (pp_eexpr is_output)) args
+
+let pp_acsl_spec outputs fmt spec =
+  let is_output = fun oid -> List.exists (fun v -> v.var_id = oid) outputs in
+  let pp_eexpr = pp_eexpr is_output in
+  fprintf fmt "@[<v 2>/*@@ ";
+  Utils.fprintf_list ~sep:"" (fun fmt r -> fprintf fmt "requires %a;@ " pp_eexpr r) fmt spec.requires;
+  Utils.fprintf_list ~sep:"" (pp_ensures is_output) fmt spec.ensures;
+  fprintf fmt "@ ";
+  (* fprintf fmt "assigns *self%t%a;@ "  *)
+  (*   (fun fmt -> if List.length outputs > 0 then fprintf fmt ", ") *)
+  (*   (fprintf_list ~sep:"," (fun fmt v -> fprintf fmt "*%s" v.var_id)) outputs; *)
+  Utils.fprintf_list ~sep:"@ " (fun fmt (name, assumes, requires) -> 
+    fprintf fmt "behavior %s:@[@ %a@ %a@]" 
+      name
+      (Utils.fprintf_list ~sep:"@ " (fun fmt r -> fprintf fmt "assumes %a;" pp_eexpr r)) assumes
+      (Utils.fprintf_list ~sep:"@ " (pp_ensures is_output)) requires
+  ) fmt spec.behaviors;
+  fprintf fmt "@]@ */@.";
+  ()
 
 (********************************************************************************************)
 (*                      Prototype Printing functions                                        *)
@@ -567,7 +655,7 @@ let print_machine_decl fmt m =
     (match m.mspec with
       | None -> ()
       | Some spec -> 
-	Printers.pp_acsl_spec m.mstep.step_outputs fmt spec
+	pp_acsl_spec m.mstep.step_outputs fmt spec
     );
     fprintf fmt "extern %a;@.@."
       (print_step_prototype self)
@@ -772,14 +860,19 @@ let print_type_definitions fmt =
 
 let print_makefile basename nodename fmt =
   fprintf fmt "GCC=gcc@.";
-  fprintf fmt "INC=/usr/local/include/lustrec@.";
+  fprintf fmt "LUSTREC=%s@." Sys.executable_name;
+  fprintf fmt "LUSTREC_BASE=%s@." (Filename.dirname (Filename.dirname Sys.executable_name));
+  fprintf fmt "INC=${LUSTREC_BASE}/include/lustrec@.";
   fprintf fmt "@.";
   fprintf fmt "%s_%s:@." basename nodename;
   fprintf fmt "\t${GCC} -I${INC} -I. -c %s.c@." basename;    
   fprintf fmt "\t${GCC} -I${INC} -c ${INC}/io_frontend.c@.";    
 (*  fprintf fmt "\t${GCC} -I${INC} -c ${INC}/StdLibrary.c@."; *)
 (*  fprintf fmt "\t${GCC} -o %s_%s io_frontend.o StdLibrary.o -lm %s.o@." basename nodename basename*)
- fprintf fmt "\t${GCC} -o %s_%s io_frontend.o -lm %s.o@." basename nodename basename
+ fprintf fmt "\t${GCC} -o %s_%s io_frontend.o -lm %s.o@." basename nodename basename;
+ fprintf fmt "@.";
+ fprintf fmt "clean:@.";
+ fprintf fmt "\t\\rm -f *.o %s_%s@." basename nodename
 
 
 
