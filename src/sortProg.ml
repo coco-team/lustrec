@@ -1,6 +1,6 @@
 open Graph
 open Corelang
-module TopologicalDepGraph = Topological.Make_stable(Causality.IdentDepGraph)
+module TopologicalDepGraph = Topological.Make(Causality.IdentDepGraph)
 
 let get_node nid prog =
   List.find (fun t -> match t.top_decl_desc with Node n -> n.node_id = nid | _ -> false) prog

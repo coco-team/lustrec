@@ -137,6 +137,15 @@ let rec compile basename extension =
   (* Clock calculus *)
   let computed_clocks_env = clock_decls clock_env prog in
 
+  (* Perform global inlining *)
+  let prog =
+    if !Options.global_inline && 
+      (match !Options.main_node with | "" -> false | _ -> true) then
+      Inliner.global_inline prog type_env clock_env
+    else
+      prog
+  in
+
   (* Delay calculus *)
   (*
     if(!Options.delay_calculus)

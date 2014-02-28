@@ -287,7 +287,7 @@ let rec type_standard_args env in_main const expr_list =
   ty_res
 
 (* emulates a subtyping relation between types t and (d : t),
-   used during node application only *)
+   used during node applications and assignments *)
 and type_subtyping_arg env in_main ?(sub=true) const real_arg formal_type =
   let loc = real_arg.expr_loc in
   let const = const || (Types.get_static_value formal_type <> None) in
@@ -307,6 +307,13 @@ and type_subtyping_arg env in_main ?(sub=true) const real_arg formal_type =
 	 real_static_type
     else real_type in
 (*Format.eprintf "subtyping const %B real %a:%a vs formal %a@." const Printers.pp_expr real_arg Types.print_ty real_type Types.print_ty formal_type;*)
+  let real_types   = type_list_of_type real_type in
+  let formal_types = type_list_of_type formal_type in
+  if (List.length real_types) <> (List.length formal_types)
+  then raise (Unify (real_type, formal_type))
+  else List.iter2 (type_subtyping loc sub) real_types formal_types
+
+and type_subtyping loc sub real_type formal_type =
   match (repr real_type).tdesc, (repr formal_type).tdesc with
   | Tstatic _          , Tstatic _ when sub -> try_unify formal_type real_type loc
   | Tstatic (r_d, r_ty), _         when sub -> try_unify formal_type r_ty loc
@@ -632,8 +639,16 @@ let type_top_consts env clist =
 
 let type_top_decl env decl =
   match decl.top_decl_desc with
-  | Node nd ->
-      type_node env nd decl.top_decl_loc
+  | Node nd -> (
+      try
+	type_node env nd decl.top_decl_loc
+      with Error (loc, err) as exc -> (
+	if !Options.global_inline then
+	  Format.eprintf "Type error: failing node@.%a@.@?"
+	    Printers.pp_node nd
+	;
+	raise exc)
+  )
   | ImportedNode nd ->
       type_imported_node env nd decl.top_decl_loc
   | ImportedFun nd ->
