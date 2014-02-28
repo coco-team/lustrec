@@ -159,7 +159,7 @@ let inline_all_calls node nodes =
 
 
 
-let witness main_name orig inlined type_env clock_env =
+let witness filename main_name orig inlined type_env clock_env =
   let loc = Location.dummy_loc in
   let rename_local_node nodes prefix id =
     if List.exists (check_node_name id) nodes then
@@ -222,7 +222,8 @@ let witness main_name orig inlined type_env clock_env =
   let _ = Typing.type_prog type_env new_prog in
   let _ = Clock_calculus.clock_prog clock_env new_prog in
 
-  let witness_file = "witness.lus" in
+   
+  let witness_file = (Options.get_witness_dir filename) ^ "/" ^ "inliner_witness.lus" in
   let witness_out = open_out witness_file in
   let witness_fmt = Format.formatter_of_out_channel witness_out in
   Format.fprintf witness_fmt
@@ -231,7 +232,7 @@ let witness main_name orig inlined type_env clock_env =
   Format.fprintf witness_fmt "@.";
   () (* xx *)
 
-let global_inline prog type_env clock_env =
+let global_inline basename prog type_env clock_env =
   (* We select the main node desc *)
   let main_node, other_nodes, other_tops = 
     List.fold_left 
@@ -247,6 +248,10 @@ let global_inline prog type_env clock_env =
   let main_node = Utils.desome main_node in
   let main_node' = inline_all_calls main_node other_nodes in
   let res = main_node'::other_tops in
-  if !Options.witnesses then
-    witness (match main_node.top_decl_desc  with Node nd -> nd.node_id | _ -> assert false) prog res type_env clock_env;
+  if !Options.witnesses then (
+    witness 
+      basename
+      (match main_node.top_decl_desc  with Node nd -> nd.node_id | _ -> assert false) 
+      prog res type_env clock_env
+  );
   res
