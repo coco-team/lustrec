@@ -45,31 +45,34 @@ val dummy_clock_dec: clock_dec
 type var_decl = LustreSpec.var_decl
 
 type expr =
-    {expr_tag: tag; (* Unique identifier *)
-     expr_desc: expr_desc;
-     mutable expr_type: Types.type_expr;
-     mutable expr_clock: Clocks.clock_expr;
-     mutable expr_delay: Delay.delay_expr;
-     mutable expr_annot: LustreSpec.expr_annot option;
-     expr_loc: Location.t}
+  {expr_tag: tag; (* Unique identifier *)
+   expr_desc: expr_desc;
+   mutable expr_type: Types.type_expr;
+   mutable expr_clock: Clocks.clock_expr;
+   mutable expr_delay: Delay.delay_expr; (* Used for the initialisation check *)
+   mutable expr_annot: LustreSpec.expr_annot option; (* Spec *)
+   expr_loc: Location.t}
 
 and expr_desc =
-  | Expr_const of constant
-  | Expr_ident of ident
-  | Expr_tuple of expr list
-  | Expr_ite   of expr * expr * expr
-  | Expr_arrow of expr * expr
-  | Expr_fby of expr * expr
-  | Expr_array of expr list
-  | Expr_access of expr * Dimension.dim_expr
-  | Expr_power of expr * Dimension.dim_expr
-  | Expr_pre of expr
-  | Expr_when of expr * ident * label
-  | Expr_merge of ident * (label * expr) list
-  | Expr_appl of ident * expr * (ident * label) option
-  | Expr_uclock of expr * int
-  | Expr_dclock of expr * int
-  | Expr_phclock of expr * rat
+| Expr_const of constant
+| Expr_ident of ident
+| Expr_tuple of expr list
+| Expr_ite   of expr * expr * expr
+| Expr_arrow of expr * expr
+| Expr_fby of expr * expr
+| Expr_array of expr list
+| Expr_access of expr * Dimension.dim_expr (* acces(e,i) is the i-th element 
+					      of array epxression e *)
+| Expr_power of expr * Dimension.dim_expr (* power(e,n) is the array of 
+					     size n filled with expression e *)
+| Expr_pre of expr
+| Expr_when of expr * ident * label
+| Expr_merge of ident * (label * expr) list
+| Expr_appl of call_t
+| Expr_uclock of expr * int
+| Expr_dclock of expr * int
+| Expr_phclock of expr * rat
+and call_t = ident * expr * (ident * label) option (* The third part denotes the reseting clock label and value *)
 
 type assert_t = 
     {
@@ -222,6 +225,9 @@ val get_consts : program -> const_desc list
 val prog_unfold_consts: program -> program
 val expr_replace_var: (ident -> ident) -> expr -> expr
 val eq_replace_rhs_var: (ident -> bool) -> (ident -> ident) -> eq -> eq
+
+(** rename_prog f_node f_var f_const prog *)
+val rename_prog: (ident -> ident) -> (ident -> ident) -> (ident -> ident) -> program -> program
 
 val update_expr_annot: expr -> LustreSpec.expr_annot -> expr
 
