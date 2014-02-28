@@ -291,7 +291,6 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
  | Expr_access (t, i)               -> Access (translate_expr node args t, translate_expr node args (expr_of_dimension i))
  | Expr_power  (e, n)               -> Power  (translate_expr node args e, translate_expr node args (expr_of_dimension n))
  | Expr_tuple _
- | Expr_ite _
  | Expr_arrow _ 
  | Expr_fby _
  | Expr_pre _                       -> (Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
@@ -302,28 +301,37 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
    (match e.expr_desc with
    | Expr_tuple el -> Fun (node_name nd, List.map (translate_expr node args) el)
    | _             -> Fun (node_name nd, [translate_expr node args e]))
+ | Expr_ite (g,t,e) -> (
+   (* special treatment depending on the active backend. For horn backend, ite
+      are preserved in expression. While they are removed for C or Java
+      backends. *)
+   match !Options.output with | "horn" -> 
+     Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
+   | "C" | "java" | _ -> 
+     (Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
+ )
  | _                   -> raise NormalizationError
 
 let translate_guard node args expr =
- match expr.expr_desc with
- | Expr_ident x  -> translate_ident node args x
- | _ -> assert false
+  match expr.expr_desc with
+  | Expr_ident x  -> translate_ident node args x
+  | _ -> assert false
 
 let rec translate_act node ((m, si, j, d, s) as args) (y, expr) =
- match expr.expr_desc with
- | Expr_ite   (c, t, e) -> let g = translate_guard node args c in
-			   conditional g [translate_act node args (y, t)]
-                                         [translate_act node args (y, e)]
- | Expr_merge (x, hl)   -> MBranch (translate_ident node args x, List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl)
- | _                    -> MLocalAssign (y, translate_expr node args expr)
+  match expr.expr_desc with
+  | Expr_ite   (c, t, e) -> let g = translate_guard node args c in
+			    conditional g [translate_act node args (y, t)]
+                              [translate_act node args (y, e)]
+  | Expr_merge (x, hl)   -> MBranch (translate_ident node args x, List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl)
+  | _                    -> MLocalAssign (y, translate_expr node args expr)
 
 let reset_instance node args i r c =
- match r with
- | None        -> []
- | Some (x, l) -> [control_on_clock node args c (MBranch (translate_ident node args x, [l, [MReset i]]))]
+  match r with
+  | None        -> []
+  | Some (x, l) -> [control_on_clock node args c (MBranch (translate_ident node args x, [l, [MReset i]]))]
 
 let translate_eq node ((m, si, j, d, s) as args) eq =
- (*Format.eprintf "translate_eq %a@." Printers.pp_node_eq eq;*)
+  (*Format.eprintf "translate_eq %a@." Printers.pp_node_eq eq;*)
   match eq.eq_lhs, eq.eq_rhs.expr_desc with
   | [x], Expr_arrow (e1, e2)                     ->
     let var_x = node_var x node in
@@ -367,10 +375,27 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
      d,
      reset_instance node args o r eq.eq_rhs.expr_clock @
        (control_on_clock node args eq.eq_rhs.expr_clock (MStep (var_p, o, vl))) :: s)
-  | [x], _                                       ->
+
+   (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
+      are preserved. While they are replaced as if g then x = t else x = e in  C or Java
+      backends. *)
+  | [x], Expr_ite   (c, t, e) 
+    when (match !Options.output with | "horn" -> true | "C" | "java" | _ -> false)
+      -> 
+    let var_x = node_var x node in
+    (m, 
+     si, 
+     j, 
+     d, 
+     (control_on_clock node args eq.eq_rhs.expr_clock 
+	(MLocalAssign (var_x, translate_expr node args eq.eq_rhs))::s)
+    )
+      
+  | [x], _                                       -> (
     let var_x = node_var x node in
     (m, si, j, d, 
      control_on_clock node args eq.eq_rhs.expr_clock (translate_act node args (var_x, eq.eq_rhs)) :: s)
+  )
   | _                                            ->
     begin
       Format.eprintf "unsupported equation: %a@?" Printers.pp_node_eq eq;
@@ -425,7 +450,14 @@ let translate_decl nd =
       step_outputs = nd.node_outputs;
       step_locals = ISet.elements (ISet.diff locals m);
       step_checks = List.map (fun d -> d.Dimension.dim_loc, translate_expr nd init_args (expr_of_dimension d)) nd.node_checks;
-      step_instrs = join_guards_list s;
+      step_instrs = (
+	(* special treatment depending on the active backend. For horn backend,
+	   common branches are not merged while they are in C or Java
+	   backends. *)
+	match !Options.output with
+	| "horn" -> s
+	| "C" | "java" | _ -> join_guards_list s
+      );
     };
     mspec = nd.node_spec;
     mannot = nd.node_annot;
@@ -436,7 +468,15 @@ let translate_prog decls =
   let nodes = get_nodes decls in 
    (* What to do with Imported/Sensor/Actuators ? *)
    arrow_machine ::  List.map translate_decl nodes
- 
+
+let get_machine_opt name machines =  
+  List.fold_left 
+    (fun res m -> 
+      match res with 
+      | Some _ -> res 
+      | None -> if m.mname.node_id = name then Some m else None)
+    None machines
+    
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
