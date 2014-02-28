@@ -179,6 +179,7 @@ let pp_horn i pp_val fmt vl =
   | "||", [v1; v2] -> Format.fprintf fmt "(or %a %a)" pp_val v1 pp_val v2 
   | "impl", [v1; v2] -> Format.fprintf fmt "(=> %a %a)" pp_val v1 pp_val v2 
   (* | "xor", [v1; v2] -> Format.fprintf fmt "(%a ^ %a)" pp_val v1 pp_val v2 *)
+  | "!=", [v1; v2] -> Format.fprintf fmt "(not (= %a %a))" pp_val v1 pp_val v2 
   | _, [v1; v2] -> Format.fprintf fmt "(%s %a %a)" i pp_val v1 pp_val v2 
   | _ -> assert false
 (*  | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2 
