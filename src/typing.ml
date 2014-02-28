@@ -639,8 +639,16 @@ let type_top_consts env clist =
 
 let type_top_decl env decl =
   match decl.top_decl_desc with
-  | Node nd ->
-      type_node env nd decl.top_decl_loc
+  | Node nd -> (
+      try
+	type_node env nd decl.top_decl_loc
+      with Error (loc, err) as exc -> (
+	if !Options.global_inline then
+	  Format.eprintf "Type error: failing node@.%a@.@?"
+	    Printers.pp_node nd
+	;
+	raise exc)
+  )
   | ImportedNode nd ->
       type_imported_node env nd decl.top_decl_loc
   | ImportedFun nd ->

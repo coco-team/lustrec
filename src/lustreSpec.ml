@@ -68,16 +68,16 @@ and eexpr_desc =
   | EExpr_tuple of eexpr list
   | EExpr_arrow of eexpr * eexpr
   | EExpr_fby of eexpr * eexpr
-  | EExpr_concat of eexpr * eexpr
-  | EExpr_tail of eexpr
+  (* | EExpr_concat of eexpr * eexpr *)
+  (* | EExpr_tail of eexpr *)
   | EExpr_pre of eexpr
   | EExpr_when of eexpr * ident
-  | EExpr_whennot of eexpr * ident
+  (* | EExpr_whennot of eexpr * ident *)
   | EExpr_merge of ident * eexpr * eexpr
   | EExpr_appl of ident * eexpr * ident option
-  | EExpr_uclock of eexpr * int
-  | EExpr_dclock of eexpr * int
-  | EExpr_phclock of eexpr * rat
+  (* | EExpr_uclock of eexpr * int *)
+  (* | EExpr_dclock of eexpr * int *)
+  (* | EExpr_phclock of eexpr * rat *)
   | EExpr_exists of var_decl list * eexpr
   | EExpr_forall of var_decl list * eexpr
 
