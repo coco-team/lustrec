@@ -37,6 +37,7 @@ let
 	if(etat3) then if(garde3) then pre o2+1 else pre o2 else
 	pre o2;
 tel
+--@ ensures OK;
 node top(etat1, etat2, etat3 : bool; a_init : int) returns ( OK : bool );
     var i, b, a, o1, o2 : int;
         env : bool;

@@ -22,6 +22,7 @@ let
                   else (diff <= -10);
 tel
 --subrange [0, 2] of int
+--@ ensures OK;
 node top(beacon,second:bool) returns (OK:bool);
 var late,early: bool;
 let

@@ -1,5 +1,6 @@
 
 
+--@ ensures OK;
 node top(onOff: bool; 
       decelSet: bool; 
       accelResume: bool; 

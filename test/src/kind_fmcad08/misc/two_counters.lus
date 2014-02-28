@@ -17,6 +17,7 @@ let
 tel
 
 
+--@ ensures OK;
 node top (x:bool) returns (OK:bool);
 var b,d:bool;
 let

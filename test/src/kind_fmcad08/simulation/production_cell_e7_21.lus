@@ -11,6 +11,7 @@ node sustain (on, off: bool) returns (s: bool);
 let
   s = on -> if on then true else if off then false else pre(s);
 tel
+--@ ensures OK;
 node top (MaySafelyMove, TryToMove1, TryToMove2: bool)
 returns (OK: bool);
 var

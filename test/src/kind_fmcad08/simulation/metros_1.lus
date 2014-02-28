@@ -44,6 +44,7 @@ let
   ast = H0 and H1;
 tel
 
+--@ ensures OK;
 node top(B0, B1 : bool; S : bool) 
 returns (OK:bool);
 var nB0, nB1 : int;

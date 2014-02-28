@@ -60,6 +60,7 @@ let
 tel
 
 -- Only provable in nbac
+--@ ensures OK;
 node top( etat_me1, etat_me2, etat_me3, etat_me4 : bool ) returns ( OK : bool );
     var modified_me, exclusive_me, shared_me, invalid_me : int;
         env : bool;

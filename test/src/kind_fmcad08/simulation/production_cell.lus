@@ -22,6 +22,7 @@ let
 tel
 
 
+--@ ensures OK;
 node top (MaySafelyMove, TryToMove1, TryToMove2: bool)
 returns (OK: bool);
 var

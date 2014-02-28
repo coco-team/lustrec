@@ -624,6 +624,7 @@ let
   (b2,b3)=
     SteamOutput(op_mode,steam_defect,steam_repaired); 
 tel
+--@ ensures OK;
 node top( 
   stop, 
   steam_boiler_waiting, 

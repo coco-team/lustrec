@@ -23,6 +23,7 @@ let
   cpt = 0 -> if acceptable then 0 else pre(cpt)+1;
   ok = true -> (pre cpt<=7);
 tel
+--@ ensures OK;
 node top(diff:int) returns (OK: bool);
 var speed: int; 
     plus,minus,realistic: bool;

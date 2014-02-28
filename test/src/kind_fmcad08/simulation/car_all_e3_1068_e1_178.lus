@@ -26,6 +26,7 @@ let
   stop = time >= 4;
   bump = dist = 10;
 tel
+--@ ensures OK;
 node top(m, s : bool) returns (OK : bool);
 var toofast, stop, bump: bool;
     dist, speed, time: int;

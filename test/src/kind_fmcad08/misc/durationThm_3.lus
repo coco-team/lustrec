@@ -18,6 +18,7 @@ tel
 -- ((p -k-> q and ([[q]] => length <= m))  => ([[p]] => length <= k+m)
 
 -- Not provable in luke-*
+--@ ensures OK;
 node top (k0, m0: int; p, q : bool) returns (OK: bool);
 var k,m: int;
     env : bool;

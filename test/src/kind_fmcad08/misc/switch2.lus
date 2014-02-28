@@ -13,6 +13,7 @@ let
 tel
 
 --requires assert to be true
+--@ ensures OK;
 node top(set, treset, initial:bool) returns (OK:bool);
 var level,level1:bool;
 let

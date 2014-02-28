@@ -751,6 +751,7 @@ let
 tel
 
 
+--@ ensures OK;
 node top(
   steam_boiler_waiting,physical_units_ready,stop_request:bool; 
   steam,level_defect,steam_defect:int; 
