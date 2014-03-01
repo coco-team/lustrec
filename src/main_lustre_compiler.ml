@@ -28,7 +28,7 @@ open Log
 
 let usage = "Usage: lustrec [options] <source-file>"
 
-let extensions = [".ec";".lus"]
+let extensions = [".ec"; ".lus"; ".lusi"]
 
 let type_decls env decls =  
   report ~level:1 (fun fmt -> fprintf fmt ".. typing@,@?");
@@ -79,7 +79,7 @@ let load_lusi filename =
 
 let check_lusi header =
   let new_tenv = type_decls Basic_library.type_env header in   (* Typing *)
-  let new_cenv: Clocks.clock_expr Utils.IMap.t = clock_decls Basic_library.clock_env header in   (* Clock calculus *)
+  let new_cenv = clock_decls Basic_library.clock_env header in   (* Clock calculus *)
   header, new_tenv, new_cenv
     
 let rec compile basename extension =
@@ -192,11 +192,16 @@ let rec compile basename extension =
       let lusi_out = open_out lusi_name in
       let lusi_fmt = formatter_of_out_channel lusi_out in
       Typing.uneval_prog_generics prog;
+      Clock_calculus.uneval_prog_generics prog;
       Printers.pp_lusi_header lusi_fmt source_name prog
     )
     | (Types.Error (loc,err)) as exc ->
       Format.eprintf "Type mismatch between computed type and declared type in lustre interface file: %a@]@."
 	Types.pp_error err;
+      raise exc
+    | Clocks.Error (loc, err) as exc ->
+      Format.eprintf "Clock mismatch between computed clock and declared clock in lustre interface file: %a@]@."
+	Clocks.pp_error err;
       raise exc
   in
 
@@ -226,10 +231,10 @@ let rec compile basename extension =
 
   (* Printing code *)
   let basename    =  Filename.basename basename in
+  let destname = !Options.dest_dir ^ "/" ^ basename in
   let _ = match !Options.output with
       "C" -> 
 	begin
-	  let destname = !Options.dest_dir ^ "/" ^ basename in
 	  let header_file = destname ^ ".h" in (* Could be changed *)
 	  let source_file = destname ^ ".c" in (* Could be changed *)
 	  let makefile_file = destname ^ ".makefile" in (* Could be changed *)
@@ -268,7 +273,6 @@ let rec compile basename extension =
       end
     | "horn" ->
       begin
-	let destname = !Options.dest_dir ^ "/" ^ basename in
 	let source_file = destname ^ ".smt2" in (* Could be changed *)
 	let source_out = open_out source_file in
 	let fmt = formatter_of_out_channel source_out in
@@ -286,7 +290,7 @@ let anonymous filename =
     let basename = Filename.chop_suffix filename ext in
     compile basename ext
   else
-    raise (Arg.Bad ("Can only compile *.lus or *.ec files"))
+    raise (Arg.Bad ("Can only compile *.lusi, *.lus or *.ec files"))
 
 let _ =
   Corelang.add_internal_funs ();

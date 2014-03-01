@@ -18,7 +18,7 @@ node main (x:int) returns (out :int; c:bool)
 var toto:int;
 let
   toto = 1 ;
-  c = true fby false fby c;
+  c = toto = 0 (*true fby false fby c*);
   out = g(x,toto=0);
 tel
 *)

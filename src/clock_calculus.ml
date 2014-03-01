@@ -251,7 +251,35 @@ let unify_carrier cr1 cr2 =
           cr1.carrier_desc <- Carry_link cr2;
           update_scope_carrier cr1.carrier_scoped cr2
         end
-    | _,_ -> (assert false)
+    | _,_ -> assert false
+
+(* Semi-unifies two clock carriers *)
+let semi_unify_carrier cr1 cr2 =
+  let cr1 = carrier_repr cr1 in
+  let cr2 = carrier_repr cr2 in
+  if cr1=cr2 then ()
+  else
+    match cr1.carrier_desc, cr2.carrier_desc with
+    | Carry_const id1, Carry_const id2 ->
+      if id1 <> id2 then raise (Mismatch (cr1, cr2))
+    | Carry_const _, Carry_name ->
+      begin
+	cr2.carrier_desc <- Carry_link cr1;
+	update_scope_carrier cr2.carrier_scoped cr1
+      end
+    | Carry_name, Carry_const _ -> raise (Mismatch (cr1, cr2))
+    | Carry_name, Carry_name ->
+      if cr1.carrier_id < cr2.carrier_id then
+        begin
+          cr2.carrier_desc <- Carry_link cr1;
+          update_scope_carrier cr2.carrier_scoped cr1
+        end
+      else
+        begin
+          cr1.carrier_desc <- Carry_link cr2;
+          update_scope_carrier cr1.carrier_scoped cr2
+        end
+    | _,_ -> assert false
 
 (** [unify ck1 ck2] unifies clocks [ck1] and [ck2]. Raises [Unify
     (ck1,ck2)] if the clocks are not unifiable.*)
@@ -355,12 +383,50 @@ let rec unify ck1 ck2 =
           subsume ck2 (CSet_pck (b,(a,b)));
           let ck2' = simplify (new_ck (Pck_phase (ck2,(-a,b))) true) in
           unify pck1' ck2'
-      (* Corner case for some functions like ite, need to unify guard clock
-	 with output clocks *)
-(*
-      | Ctuple ckl, (Cvar _) -> List.iter (unify ck2) ckl
-      | (Cvar _), Ctuple ckl ->	List.iter (unify ck1) ckl
-*)
+      | Cunivar _, _ | _, Cunivar _ -> ()
+      | _,_ -> raise (Unify (ck1,ck2))
+
+(** [unify ck1 ck2] semi-unifies clocks [ck1] and [ck2]. Raises [Unify
+    (ck1,ck2)] if the clocks are not semi-unifiable.*)
+let rec semi_unify ck1 ck2 =
+  let ck1 = repr ck1 in
+  let ck2 = repr ck2 in
+  if ck1=ck2 then
+    ()
+  else
+      match ck1.cdesc,ck2.cdesc with
+      | Cvar cset1,Cvar cset2->
+          if ck1.cid < ck2.cid then
+            begin
+              ck2.cdesc <- Clink (simplify ck1);
+              update_scope ck2.cscoped ck1
+            end
+          else
+            begin
+              ck1.cdesc <- Clink (simplify ck2);
+              update_scope ck1.cscoped ck2
+            end
+      | (Cvar cset,_) -> raise (Unify (ck1,ck2))
+      | (_, (Cvar cset)) when (not (occurs ck2 ck1)) ->
+          update_scope ck2.cscoped ck1;
+          ck2.cdesc <- Clink (simplify ck1)
+      | Ccarrying (cr1,ck1'),Ccarrying (cr2,ck2') ->
+          semi_unify_carrier cr1 cr2;
+          semi_unify ck1' ck2'
+      | Ccarrying (_,_),_ | _,Ccarrying (_,_) ->
+          raise (Unify (ck1,ck2))
+      | Carrow (c1,c2), Carrow (c1',c2') ->
+	begin
+          semi_unify c1 c1';
+	  semi_unify c2 c2'
+	end
+      | Ctuple ckl1, Ctuple ckl2 ->
+          if (List.length ckl1) <> (List.length ckl2) then
+            raise (Unify (ck1,ck2));
+          List.iter2 semi_unify ckl1 ckl2
+      | Con (ck',c1,l1), Con (ck'',c2,l2) when l1=l2 ->
+          semi_unify_carrier c1 c2;
+          semi_unify ck' ck''
       | Cunivar _, _ | _, Cunivar _ -> ()
       | _,_ -> raise (Unify (ck1,ck2))
 
@@ -434,6 +500,17 @@ let clock_uncarry ck =
 let try_unify ck1 ck2 loc =
   try
     unify ck1 ck2
+  with
+  | Unify (ck1',ck2') ->
+    raise (Error (loc, Clock_clash (ck1',ck2')))
+  | Subsume (ck,cset) ->
+    raise (Error (loc, Clock_set_mismatch (ck,cset)))
+  | Mismatch (cr1,cr2) ->
+    raise (Error (loc, Carrier_mismatch (cr1,cr2)))
+
+let try_semi_unify ck1 ck2 loc =
+  try
+    semi_unify ck1 ck2
   with
   | Unify (ck1',ck2') ->
     raise (Error (loc, Clock_clash (ck1',ck2')))
@@ -775,10 +852,43 @@ let clock_top_decl env decl =
 let clock_prog env decls =
   List.fold_left (fun e decl -> clock_top_decl e decl) env decls
 
+(* Once the Lustre program is fully clocked,
+   we must get back to the original description of clocks,
+   with constant parameters, instead of unifiable internal variables. *)
+
+(* The following functions aims at 'unevaluating' carriers occuring in clock expressions,
+   i.e. replacing unifiable second_order variables with the original carrier names.
+   Once restored in this formulation, clocks may be meaningfully printed.
+*)
+let uneval_vdecl_generics vdecl =
+ if Types.is_clock_type vdecl.var_type
+ then
+   match get_carrier_name vdecl.var_clock with
+   | None    -> (Format.eprintf "internal error: %a@." print_ck vdecl.var_clock; assert false)
+   | Some cr -> Clocks.uneval vdecl.var_id cr
+
+let uneval_node_generics vdecls =
+  List.iter uneval_vdecl_generics vdecls
+
+let uneval_top_generics decl =
+  match decl.top_decl_desc with
+  | Node nd ->
+      uneval_node_generics (nd.node_inputs @ nd.node_outputs)
+  | ImportedNode nd ->
+      uneval_node_generics (nd.nodei_inputs @ nd.nodei_outputs)
+  | ImportedFun nd ->
+      ()
+  | Consts clist -> ()
+  | Open _  -> ()
+
+let uneval_prog_generics prog =
+ List.iter uneval_top_generics prog
+
 let check_env_compat header declared computed =
+  uneval_prog_generics header;
   Env.iter declared (fun k decl_clock_k -> 
     let computed_c = instantiate (ref []) (ref []) (Env.lookup_value computed k) in
-    try_unify decl_clock_k computed_c Location.dummy_loc
+    try_semi_unify decl_clock_k computed_c Location.dummy_loc
   ) 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

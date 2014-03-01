@@ -678,21 +678,6 @@ with Failure _ as exc -> raise exc
    i.e. replacing unifiable second_order variables with the original static parameters.
    Once restored in this formulation, dimensions may be meaningfully printed.
 *)
-(*
-let uneval_vdecl_generics vdecl ty =
- if vdecl.var_dec_const
- then
-   match get_static_value ty with
-   | None   -> (Format.eprintf "internal error: %a@." Types.print_ty vdecl.var_type; assert false)
-   | Some d -> Dimension.unify d (Dimension.mkdim_ident vdecl.var_loc vdecl.var_id)
-
-let uneval_node_generics vdecls =
-  let inst_typ_vars = ref [] in
-  let inst_dim_vars = ref [] in
-  let inst_ty_list = List.map (fun v -> instantiate inst_typ_vars inst_dim_vars v.var_type) vdecls in
-  List.iter2 (fun v ty -> uneval_vdecl_generics v ty) vdecls inst_ty_list;
-  List.iter2 (fun v ty -> generalize ty; v.var_type <- ty) vdecls inst_ty_list
-*)
 let uneval_vdecl_generics vdecl =
  if vdecl.var_dec_const
  then
@@ -717,10 +702,8 @@ let uneval_top_generics decl =
 let uneval_prog_generics prog =
  List.iter uneval_top_generics prog
 
-let check_env_compat header declared computed =
-  (try 
-     uneval_prog_generics header
-   with e -> raise e);
+let check_env_compat header declared computed = 
+  uneval_prog_generics header;
   Env.iter declared (fun k decl_type_k -> 
     let computed_t = instantiate (ref []) (ref []) (Env.lookup_value computed k) in
     (*Types.print_ty Format.std_formatter decl_type_k;

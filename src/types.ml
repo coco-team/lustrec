@@ -176,6 +176,11 @@ let get_static_value ty =
  | Tstatic (d, _) -> Some d
  | _              -> None
 
+let is_clock_type ty =
+ match (repr ty).tdesc with
+ | Tclock _ -> true
+ | _        -> false
+
 let rec is_dimension_type ty =
  match (repr ty).tdesc with
  | Tint

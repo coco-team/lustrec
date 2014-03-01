@@ -347,6 +347,7 @@ let rec unify dim1 dim2 =
   | Dident id1, Dident id2 when id1 = id2 -> ()
   | _ -> raise (Unify (dim1, dim2))
 
+(* unification with the constraint that dim1 is an instance of dim2 *)
 let rec semi_unify dim1 dim2 =
   let dim1 = repr dim1 in
   let dim2 = repr dim2 in
