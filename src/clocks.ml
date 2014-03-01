@@ -121,10 +121,15 @@ let split_arrow ck =
        needs to be considered here *)
   | _ -> failwith "Internal error: not an arrow clock"
 
+let get_carrier_name ck =
+ match (repr ck).cdesc with
+ | Ccarrying (cr, _) -> Some cr
+ | _                 -> None
+
 let uncarrier ck =
  match ck.cdesc with
- | Ccarrying (cr, ck') -> ck'
- | _                   -> ck
+ | Ccarrying (_, ck') -> ck'
+ | _                  -> ck
 
 (* Removes all links in a clock. Only used for clocks
    simplification though. *)
@@ -268,11 +273,11 @@ let print_ckset fmt s =
 let rec print_carrier fmt cr =
  (* (if cr.carrier_scoped then fprintf fmt "[%t]" else fprintf fmt "%t") (fun fmt -> *)
   match cr.carrier_desc with
-  | Carry_const id -> fprintf fmt "'%s'" id
+  | Carry_const id -> fprintf fmt "%s" id
   | Carry_name ->
-      fprintf fmt "?%s" (name_of_carrier cr.carrier_id)
+      fprintf fmt "_%s" (name_of_carrier cr.carrier_id)
   | Carry_var ->
-    fprintf fmt "_%s" (name_of_carrier cr.carrier_id)
+    fprintf fmt "'%s" (name_of_carrier cr.carrier_id)
   | Carry_link cr' ->
     print_carrier fmt cr'
 
@@ -512,6 +517,22 @@ let print_ck fmt ck =
     fprintf fmt " (where %a)"
       (fprintf_list ~sep:", " print_cvar) cvars
 
+(* prints only the Con components of a clock, useful for printing nodes *)
+let rec print_ck_suffix fmt ck =
+  let ck = simplify ck in
+  match ck.cdesc with
+  | Carrow _
+  | Ctuple _
+  | Cvar _
+  | Cunivar _   -> ()
+  | Con (ck,c,l) ->
+    fprintf fmt "%a when %s(%a)" print_ck_suffix ck l print_carrier c
+  | Clink ck' ->
+    print_ck_suffix fmt ck'
+  | Ccarrying (cr,ck') ->
+    fprintf fmt "%a" print_ck_suffix ck'
+  | _ -> assert false
+
 let pp_error fmt = function
   | Clock_clash (ck1,ck2) ->
       reset_names ();
@@ -552,6 +573,12 @@ let pp_error fmt = function
       print_ck ck_node
       print_ck ck
 
+let uneval const cr =
+ (*Format.printf "uneval %s %a@." const print_carrier cr;*)
+  let cr = carrier_repr cr in
+  match cr.carrier_desc with
+  | Carry_var -> cr.carrier_desc <- Carry_const const
+  | _         -> assert false
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

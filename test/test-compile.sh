@@ -51,7 +51,7 @@ base_compile() {
         fi
     fi
     popd > /dev/null
-    echo "lustrec ($rlustrec1), gcc($rgcc1), `dirname $file`,`basename $file`,node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+    echo "lustrec ($rlustrec1), gcc($rgcc1), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
     done < $file_list
 }
 
@@ -78,7 +78,7 @@ inline_compile () {
     else
         rgcc2="VALID"
     fi	
-    echo "lustrec inlined ($rlustrec2), gcc ($rgcc2),`dirname $file`,`basename $file`,node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+    echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
     popd > /dev/null
 done < $file_list
 }
@@ -106,7 +106,7 @@ inline_compile_with_check () {
     fi	
 	# Cheching witness
     pushd $build > /dev/null
-    lustrec -horn -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus 2>/dev/null
+    $LUSTREC -horn -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus 2>/dev/null
     popd > /dev/null
     z3="`z3 -T:10 $build/${name}_witnesses/inliner_witness.smt2 | xargs`"
     if [ "x`echo $z3 | grep unsat`" == "xunsat" ]; then
@@ -119,7 +119,7 @@ inline_compile_with_check () {
 	rinlining="INVALID"
 	exit 1
     fi  
-    echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), inlining valid ($rinlining),`dirname $file`,`basename $file`,node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+    echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), inlining valid ($rinlining), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
     popd > /dev/null
 done < $file_list
 
@@ -146,7 +146,7 @@ check_prop () {
     else
         rhorn="VALID"
     fi
-    echo "horn-pdr ($rhorn), `dirname $file`,`basename $file`,node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+    echo "horn-pdr ($rhorn), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
     popd > /dev/null
 done < $file_list
 }

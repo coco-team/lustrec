@@ -50,7 +50,7 @@ let rec pp_const fmt c =
 
 and pp_var fmt id = fprintf fmt "%s%s: %a" (if id.var_dec_const then "const " else "") id.var_id Types.print_ty id.var_type
 
-and pp_node_var fmt id = fprintf fmt "%s%s: %a" (if id.var_dec_const then "const " else "") id.var_id Types.print_node_ty id.var_type
+and pp_node_var fmt id = fprintf fmt "%s%s: %a%a" (if id.var_dec_const then "const " else "") id.var_id Types.print_node_ty id.var_type Clocks.print_ck_suffix id.var_clock
 
 and pp_expr fmt expr =
   match expr.expr_desc with
