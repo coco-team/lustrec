@@ -668,8 +668,11 @@ let print_machine_decl fmt m =
 (*                         C file Printing functions                                        *)
 (********************************************************************************************)
 
-let print_const fmt cdecl =
+let print_const_def fmt cdecl =
   fprintf fmt "%a = %a;@." (pp_c_type cdecl.const_id) cdecl.const_type pp_c_const cdecl.const_value 
+
+let print_const_decl fmt cdecl =
+  fprintf fmt "extern %a;@." (pp_c_type cdecl.const_id) cdecl.const_type
 
 let print_alloc_instance fmt (i, (m, static)) =
   fprintf fmt "_alloc->%s = %a (%a);@,"
@@ -884,7 +887,7 @@ let print_makefile basename nodename dependencies fmt =
 (********************************************************************************************)
 (*                         Translation function                                             *)
 (********************************************************************************************)
-    
+
 let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog machines dependencies =
   (* Generating H file *)
 
@@ -894,6 +897,11 @@ let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog
   (* Print the svn version number and the supported C standard (C90 or C99) *)
   print_version header_fmt;
   fprintf header_fmt "#ifndef _%s@.#define _%s@." baseNAME baseNAME;
+  pp_print_newline header_fmt ();
+  (* Print the global constant declarations. *)
+  fprintf header_fmt "/* Global constant (declarations, definitions are in C file) */@.";
+  List.iter (fun c -> print_const_decl header_fmt c) (get_consts prog);
+  pp_print_newline header_fmt ();
   (* Print the struct declarations of all machines. *)
   fprintf header_fmt "/* Struct declarations */@.";
   List.iter (print_machine_struct header_fmt) machines;
@@ -907,7 +915,7 @@ let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog
   pp_print_newline header_fmt ();
 
   (* Generating C file *)
-  
+
   (* If a main node is identified, generate a main function for it *)
   let main_include, main_print, main_makefile =
     match !Options.main_node with
@@ -930,15 +938,15 @@ let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog
   (* Print the type definitions from the type table *)
   print_type_definitions source_fmt;
   (* Print consts *)
-  fprintf source_fmt "/* Global constants */@.";
-  List.iter (fun c -> print_const source_fmt c) (get_consts prog); 
+  fprintf source_fmt "/* Global constants (definitions) */@.";
+  List.iter (fun c -> print_const_def source_fmt c) (get_consts prog);
   pp_print_newline source_fmt ();
   (* Print nodes one by one (in the previous order) *)
   List.iter (print_machine source_fmt) machines;
   main_print source_fmt;
 
   (* Generating Makefile *)
-  main_makefile makefile_fmt    
+  main_makefile makefile_fmt
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
