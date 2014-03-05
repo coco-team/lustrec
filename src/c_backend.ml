@@ -547,6 +547,9 @@ let print_prototype fmt decl =
     | _ -> () (* We don't do anything here *)
       *)
 
+let print_import_standard fmt =
+  fprintf fmt "#include \"%s/include/lustrec/arrow.h\"@.@." Version.prefix
+
 let print_prototype fmt decl =
   match decl.top_decl_desc with
   | Open m -> fprintf fmt "#include \"%s.h\"@," m
@@ -562,12 +565,16 @@ let pp_registers_struct fmt m =
     ()
 
 let print_machine_struct fmt m =
-  (* Define struct *)
-  fprintf fmt "@[%a {@[%a%a%t@]};@]@."
-    pp_machine_memtype_name m.mname.node_id
-    pp_registers_struct m
-    (Utils.fprintf_list ~sep:"; " pp_c_decl_instance_var) m.minstances
-    (Utils.pp_final_char_if_non_empty "; " m.minstances)
+  if m.mname.node_id != arrow_id
+  then (
+    (* We don't print arrow function *)
+    (* Define struct *)
+    fprintf fmt "@[%a {@[%a%a%t@]};@]@."
+      pp_machine_memtype_name m.mname.node_id
+      pp_registers_struct m
+      (Utils.fprintf_list ~sep:"; " pp_c_decl_instance_var) m.minstances
+      (Utils.pp_final_char_if_non_empty "; " m.minstances)
+  )
 
 (*
 let pp_static_array_instance fmt m (v, m) =
@@ -631,24 +638,22 @@ let print_static_alloc_macro fmt m =
     pp_machine_static_link_name m.mname.node_id
 
 let print_machine_decl fmt m =
-  (* Static allocation *)
-  if !Options.static_mem then (
-  fprintf fmt "%a@.%a@.%a@."
-    print_static_declare_macro m
-    print_static_link_macro m
-    print_static_alloc_macro m;
-  )
-  else ( 
+  if m.mname.node_id <> arrow_id
+  then (
+    (* We don't print arrow function *)
+    (* Static allocation *)
+    if !Options.static_mem
+    then (
+      fprintf fmt "%a@.%a@.%a@."
+	print_static_declare_macro m
+	print_static_link_macro m
+	print_static_alloc_macro m
+    )
+    else ( 
     (* Dynamic allocation *)
-    fprintf fmt "extern %a;@.@."
-      print_alloc_prototype (m.mname.node_id, m.mstatic);
-  );
-  if m.mname.node_id = arrow_id then (
-  (* Arrow will be defined by a #define macro because of polymorphism *)
-    fprintf fmt "#define _arrow_step(x,y,output,self) ((self)->_reg._first?((self)->_reg._first=0,(*output = x)):(*output = y))@.@.";
-    fprintf fmt "#define _arrow_reset(self) {(self)->_reg._first = 1;}@.@."
-  )
-  else (
+      fprintf fmt "extern %a;@.@."
+	print_alloc_prototype (m.mname.node_id, m.mstatic)
+    );
     let self = mk_self m in
     fprintf fmt "extern %a;@.@."
       (print_reset_prototype self) (m.mname.node_id, m.mstatic);
@@ -736,14 +741,16 @@ let print_step_code fmt m self =
       (fun fmt -> fprintf fmt "return;")
 
 let print_machine fmt m =
+  if m.mname.node_id <> arrow_id
+  then (
+  (* We don't print arrow function *)
   (* Alloc function, only if non static mode *)
-  if (not !Options.static_mem) then  
-    (
-      fprintf fmt "@[<v 2>%a {@,%a@]@,}@.@."
-	print_alloc_prototype (m.mname.node_id, m.mstatic)
-	print_alloc_code m;
-    );
-  if m.mname.node_id = arrow_id then () else ( (* We don't print arrow function *)
+    if (not !Options.static_mem) then  
+      (
+	fprintf fmt "@[<v 2>%a {@,%a@]@,}@.@."
+	  print_alloc_prototype (m.mname.node_id, m.mstatic)
+	  print_alloc_code m;
+      );
     let self = mk_self m in
     (* Reset function *)
     fprintf fmt "@[<v 2>%a {@,%a%treturn;@]@,}@.@."
@@ -835,31 +842,31 @@ let print_main_fun machines m fmt =
   fprintf fmt "@]@ }@."       
 
 let print_main_header fmt =
-  fprintf fmt "#include <stdio.h>@.#include <unistd.h>@.#include \"io_frontend.h\"@."
+  fprintf fmt "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/include/lustrec/io_frontend.h\"@." Version.prefix
 
-let rec pp_c_type_decl cpt var fmt tdecl =
+let rec pp_c_type_decl filename cpt var fmt tdecl =
   match tdecl with
   | Tydec_any           -> assert false
   | Tydec_int           -> fprintf fmt "int %s" var
   | Tydec_real          -> fprintf fmt "double %s" var
   | Tydec_float         -> fprintf fmt "float %s" var
   | Tydec_bool          -> fprintf fmt "_Bool %s" var
-  | Tydec_clock ty      -> pp_c_type_decl cpt var fmt ty
+  | Tydec_clock ty      -> pp_c_type_decl filename cpt var fmt ty
   | Tydec_const c       -> fprintf fmt "%s %s" c var
-  | Tydec_array (d, ty) -> fprintf fmt "%a[%a]" (pp_c_type_decl cpt var) ty pp_c_dimension d
+  | Tydec_array (d, ty) -> fprintf fmt "%a[%a]" (pp_c_type_decl filename cpt var) ty pp_c_dimension d
   | Tydec_enum tl ->
     begin
       incr cpt;
-      fprintf fmt "enum _enum_%d { %a } %s" !cpt (Utils.fprintf_list ~sep:", " pp_print_string) tl var
+      fprintf fmt "enum _enum_%s_%d { %a } %s" filename !cpt (Utils.fprintf_list ~sep:", " pp_print_string) tl var
     end
 
-let print_type_definitions fmt =
+let print_type_definitions fmt filename =
   let cpt_type = ref 0 in
   Hashtbl.iter (fun typ def ->
     match typ with
     | Tydec_const var ->
       fprintf fmt "typedef %a;@.@."
-	(pp_c_type_decl cpt_type var) def
+	(pp_c_type_decl filename cpt_type var) def
     | _        -> ()) type_table
 
 let print_makefile basename nodename dependencies fmt =
@@ -898,9 +905,14 @@ let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog
   print_version header_fmt;
   fprintf header_fmt "#ifndef _%s@.#define _%s@." baseNAME baseNAME;
   pp_print_newline header_fmt ();
+  fprintf header_fmt "/* Imports standard library */@.";
+  (* imports standard library definitions (arrow) *)
+  print_import_standard header_fmt;
+  pp_print_newline header_fmt ();
   fprintf header_fmt "/* Types definitions */@.";
   (* Print the type definitions from the type table *)
-  print_type_definitions header_fmt;
+  print_type_definitions header_fmt basename;
+  pp_print_newline header_fmt ();
   (* Print the global constant declarations. *)
   fprintf header_fmt "/* Global constant (declarations, definitions are in C file) */@.";
   List.iter (fun c -> print_const_decl header_fmt c) (get_consts prog);
