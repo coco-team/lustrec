@@ -4,6 +4,8 @@ type entier = int;
 
 const PI = 3;
 
+const choix = one;
+
 node toto (x:int) returns (a:int;y:int)
 var c : choice;b1, b2:entier;
 let

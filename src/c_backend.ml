@@ -898,6 +898,9 @@ let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog
   print_version header_fmt;
   fprintf header_fmt "#ifndef _%s@.#define _%s@." baseNAME baseNAME;
   pp_print_newline header_fmt ();
+  fprintf header_fmt "/* Types definitions */@.";
+  (* Print the type definitions from the type table *)
+  print_type_definitions header_fmt;
   (* Print the global constant declarations. *)
   fprintf header_fmt "/* Global constant (declarations, definitions are in C file) */@.";
   List.iter (fun c -> print_const_decl header_fmt c) (get_consts prog);
@@ -935,8 +938,6 @@ let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog
   fprintf source_fmt "@[<v>";
   List.iter (print_prototype source_fmt) prog;
   fprintf source_fmt "@]@.";
-  (* Print the type definitions from the type table *)
-  print_type_definitions source_fmt;
   (* Print consts *)
   fprintf source_fmt "/* Global constants (definitions) */@.";
   List.iter (fun c -> print_const_def source_fmt c) (get_consts prog);
