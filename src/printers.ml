@@ -118,7 +118,9 @@ let pp_node_eqs = fprintf_list ~sep:"@ " pp_node_eq
 let pp_node_args = fprintf_list ~sep:"; " pp_node_var 
 
 let pp_var_type_dec fmt ty =
-  let rec pp_var_type_dec_desc fmt tdesc =
+  let rec pp_var_struct_type_field fmt (label, tdesc) =
+    fprintf fmt "%a : %a" pp_var_type_dec_desc tdesc pp_print_string label
+  and pp_var_type_dec_desc fmt tdesc =
   match tdesc with 
     | Tydec_any -> fprintf fmt "<any>"
     | Tydec_int -> fprintf fmt "int"
@@ -128,6 +130,7 @@ let pp_var_type_dec fmt ty =
     | Tydec_clock t -> fprintf fmt "%a clock" pp_var_type_dec_desc t
     | Tydec_const t -> fprintf fmt "%s" t
     | Tydec_enum id_list -> fprintf fmt "enum {%a }" (fprintf_list ~sep:", " pp_print_string) id_list
+    | Tydec_struct f_list -> fprintf fmt "struct {%a }" (fprintf_list ~sep:"; " pp_var_struct_type_field) f_list
     | Tydec_array (s, t) -> fprintf fmt "%a^%a" pp_var_type_dec_desc t Dimension.pp_dimension s
 in pp_var_type_dec_desc fmt ty.ty_dec_desc
 

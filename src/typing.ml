@@ -111,6 +111,7 @@ let rec type_coretype type_dim cty =
   | Tydec_clock ty -> Type_predef.type_clock (type_coretype type_dim ty)
   | Tydec_const c -> Type_predef.type_const c
   | Tydec_enum tl -> Type_predef.type_enum tl
+  | Tydec_struct fl -> assert false (*Type_predef.type_struct fl*)
   | Tydec_array (d, ty) ->
     begin
       type_dim d;
