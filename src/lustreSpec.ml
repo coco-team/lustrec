@@ -33,6 +33,7 @@ and type_dec_desc =
   | Tydec_clock of type_dec_desc
   | Tydec_const of ident
   | Tydec_enum of ident list
+(*  | Tydec_struct of (ident * type_dec_desc) list *)
   | Tydec_array of Dimension.dim_expr * type_dec_desc
 
 type clock_dec =
