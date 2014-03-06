@@ -225,7 +225,7 @@ typ_def:
       Hashtbl.add type_table (Tydec_const $2) (Corelang.get_repr_type $4)
     with Not_found-> raise (Corelang.Unbound_type ($4, Location.symbol_rloc())) }
 | TYPE IDENT EQ ENUM LCUR tag_list RCUR { Hashtbl.add type_table (Tydec_const $2) (Tydec_enum ($6 (Tydec_const $2))) }
-| TYPE IDENT EQ STRUCT LCUR field_list RCUR { Hashtbl.add type_table (Tydec_const $2) Tydec_any }
+| TYPE IDENT EQ STRUCT LCUR field_list RCUR { Hashtbl.add type_table (Tydec_const $2) (Tydec_struct ($6 (Tydec_const $2))) }
 
 array_typ_decl:
                             { fun typ -> typ }
@@ -243,16 +243,19 @@ typeconst:
 tag_list:
   IDENT
   { (fun t -> if Hashtbl.mem tag_table $1
-             then raise (Corelang.Already_bound_label ($1, t, Location.symbol_rloc ()))
-             else (Hashtbl.add tag_table $1 t; $1 :: [])) }
+              then raise (Corelang.Already_bound_label ($1, t, Location.symbol_rloc ()))
+              else (Hashtbl.add tag_table $1 t; $1 :: [])) }
 | tag_list COMMA IDENT
   { (fun t -> if Hashtbl.mem tag_table $3
-             then raise (Corelang.Already_bound_label ($3, t, Location.symbol_rloc ()))
-             else (Hashtbl.add tag_table $3 t; $3 :: ($1 t))) }
+              then raise (Corelang.Already_bound_label ($3, t, Location.symbol_rloc ()))
+              else (Hashtbl.add tag_table $3 t; $3 :: ($1 t))) }
 
 field_list:
-   { [] }
-| IDENT COL typeconst SCOL field_list { ($1, $3) :: $5 }
+  { (fun t -> []) }
+| field_list IDENT COL typeconst SCOL
+  { (fun t -> if Hashtbl.mem field_table $2
+              then raise (Corelang.Already_bound_label ($2, t, Location.symbol_rloc ()))
+              else (Hashtbl.add field_table $2 t; ($2, $4) :: ($1 t))) }
 
 eq_list:
   { [], [], [] }

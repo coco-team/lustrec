@@ -348,14 +348,14 @@ let get_enum_type_tags cty =
                      | Tydec_enum tl -> tl
                      | _             -> assert false)
  | _            -> assert false
-(*
+
 let get_struct_type_fields cty =
  match cty with
  | Tydec_const _ -> (match Hashtbl.find type_table cty with
                      | Tydec_struct fl -> fl
                      | _               -> assert false)
  | _            -> assert false
- *)
+
 let const_of_bool b =
  Const_tag (if b then tag_true else tag_false)
 

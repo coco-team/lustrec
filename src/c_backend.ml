@@ -601,13 +601,15 @@ let print_static_declare_macro fmt m =
   let array_mem = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
   let inst = mk_instance m in
   let attr = mk_attribute m in
-  fprintf fmt "@[<v 2>#define %a(%s, %a%tinst)\\@,%s %a inst;\\@,%a%t%a;@,@]"
+  fprintf fmt "@[<v 2>#define %a(%s, %a%t%s)\\@,%s %a %s;\\@,%a%t%a;@,@]"
     pp_machine_static_declare_name m.mname.node_id
     attr
     (Utils.fprintf_list ~sep:", " (pp_c_var_read m)) m.mstatic
     (Utils.pp_final_char_if_non_empty ", " m.mstatic)
+    inst
     attr
     pp_machine_memtype_name m.mname.node_id
+    inst
     (Utils.fprintf_list ~sep:";\\@," pp_c_decl_local_var) array_mem
     (Utils.pp_final_char_if_non_empty ";\\@," array_mem)
     (Utils.fprintf_list ~sep:";\\@,"
@@ -858,7 +860,9 @@ let print_main_fun machines m fmt =
 let print_main_header fmt =
   fprintf fmt "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/include/lustrec/io_frontend.h\"@." Version.prefix
 
-let rec pp_c_type_decl filename cpt var fmt tdecl =
+let rec pp_c_struct_type_field filename cpt var fmt (label, tdesc) =
+  fprintf fmt "%a %a" (pp_c_type_decl filename cpt var) tdesc pp_print_string label
+and pp_c_type_decl filename cpt var fmt tdecl =
   match tdecl with
   | Tydec_any           -> assert false
   | Tydec_int           -> fprintf fmt "int %s" var
@@ -872,6 +876,11 @@ let rec pp_c_type_decl filename cpt var fmt tdecl =
     begin
       incr cpt;
       fprintf fmt "enum _enum_%s_%d { %a } %s" filename !cpt (Utils.fprintf_list ~sep:", " pp_print_string) tl var
+    end
+  | Tydec_struct fl ->
+    begin
+      incr cpt;
+      fprintf fmt "struct _struct_%s_%d { %a } %s" filename !cpt (Utils.fprintf_list ~sep:"; " (pp_c_struct_type_field filename cpt var)) fl var
     end
 
 let print_type_definitions fmt filename =
