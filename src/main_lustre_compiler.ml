@@ -228,7 +228,16 @@ let rec compile basename extension =
   report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,@?"
     (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
     machine_code);
-
+  
+  (* Creating destination directory if needed *)
+  if not (Sys.file_exists !Options.dest_dir) then (
+    report ~level:1 (fun fmt -> fprintf fmt ".. creating destination directory@,@?");
+    Unix.mkdir !Options.dest_dir (Unix.stat ".").Unix.st_perm
+  );
+  if (Unix.stat !Options.dest_dir).Unix.st_kind <> Unix.S_DIR then (
+    Format.eprintf "Failure: destination %s is not a directory.@.@." !Options.dest_dir;
+    exit 1
+  );
   (* Printing code *)
   let basename    =  Filename.basename basename in
   let destname = !Options.dest_dir ^ "/" ^ basename in
