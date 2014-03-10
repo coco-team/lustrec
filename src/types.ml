@@ -216,10 +216,16 @@ let map_tuple_type f ty =
   match ty.tdesc with
   | (Ttuple ty_list) -> { ty with tdesc = Ttuple (List.map f ty_list) }
   | _                -> f ty
+
+let rec is_struct_type ty =
+ match (repr ty).tdesc with
+ | Tstruct _        -> true
+ | _                -> false
+
 let rec is_array_type ty =
  match (repr ty).tdesc with
  | Tarray _         -> true
- | Tstatic (_, ty') -> is_array_type ty'
+ | Tstatic (_, ty') -> is_array_type ty' (* looks strange !? *)
  | _                -> false
 
 let array_type_dimension ty =
@@ -243,6 +249,9 @@ let rec array_base_type ty =
   | Tarray (_, ty')
   | Tstatic (_, ty') -> array_base_type ty'
   | _                -> ty
+
+let is_address_type ty =
+  is_array_type ty || is_struct_type ty
 
 let rec is_generic_type ty =
  match (dynamic_type ty).tdesc with

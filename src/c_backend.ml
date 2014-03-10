@@ -130,18 +130,18 @@ let rec pp_c_initialize fmt t =
      as it is the case for generics
 *)
 let pp_c_decl_input_var fmt id =
-  if !Options.ansi && Types.is_array_type id.var_type
+  if !Options.ansi && Types.is_address_type id.var_type
   then pp_c_type (sprintf "(*%s)" id.var_id) fmt (Types.array_base_type id.var_type)
   else pp_c_type id.var_id fmt id.var_type
 
 (* Declaration of an output variable:
    - if its type is scalar, then pass its address
-   - if its type is array/matrix/etc, then declare it as a mere pointer,
+   - if its type is array/matrix/struct/etc, then declare it as a mere pointer,
      in order to cope with unknown/parametric array dimensions, 
      as it is the case for generics
 *)
 let pp_c_decl_output_var fmt id =
-  if (not !Options.ansi) && Types.is_array_type id.var_type
+  if (not !Options.ansi) && Types.is_address_type id.var_type
   then pp_c_type                  id.var_id  fmt id.var_type
   else pp_c_type (sprintf "(*%s)" id.var_id) fmt (Types.array_base_type id.var_type)
 
@@ -175,7 +175,7 @@ let pp_c_decl_struct_var fmt id =
    - moreover, cast arrays variables into their original array type.
 *)
 let pp_c_var_read m fmt id =
-  if Types.is_array_type id.var_type
+  if Types.is_address_type id.var_type
   then
     fprintf fmt "%s" id.var_id
   else
@@ -189,7 +189,7 @@ let pp_c_var_read m fmt id =
      despite its scalar Lustre type)
 *)
 let pp_c_var_write m fmt id =
-  if Types.is_array_type id.var_type
+  if Types.is_address_type id.var_type
   then
     fprintf fmt "%s" id.var_id
   else
@@ -861,8 +861,8 @@ let print_main_fun machines m fmt =
 let print_main_header fmt =
   fprintf fmt "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/include/lustrec/io_frontend.h\"@." Version.prefix
 
-let rec pp_c_struct_type_field filename cpt var fmt (label, tdesc) =
-  fprintf fmt "%a %a" (pp_c_type_decl filename cpt var) tdesc pp_print_string label
+let rec pp_c_struct_type_field filename cpt fmt (label, tdesc) =
+  fprintf fmt "%a;" (pp_c_type_decl filename cpt label) tdesc
 and pp_c_type_decl filename cpt var fmt tdecl =
   match tdecl with
   | Tydec_any           -> assert false
@@ -881,7 +881,7 @@ and pp_c_type_decl filename cpt var fmt tdecl =
   | Tydec_struct fl ->
     begin
       incr cpt;
-      fprintf fmt "struct _struct_%s_%d { %a } %s" filename !cpt (Utils.fprintf_list ~sep:"; " (pp_c_struct_type_field filename cpt var)) fl var
+      fprintf fmt "struct _struct_%s_%d { %a } %s" filename !cpt (Utils.fprintf_list ~sep:" " (pp_c_struct_type_field filename cpt)) fl var
     end
 
 let print_type_definitions fmt filename =
