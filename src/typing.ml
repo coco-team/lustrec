@@ -187,6 +187,7 @@ let rec unify t1 t2 =
       let def_t = get_type_definition t in
       unify t1 def_t
     | Tenum tl, Tenum tl' when tl == tl' -> ()
+    | Tstruct fl, Tstruct fl' when fl == fl' -> ()
     | Tstatic (e1, t1'), Tstatic (e2, t2')
     | Tarray (e1, t1'), Tarray (e2, t2') ->
       begin

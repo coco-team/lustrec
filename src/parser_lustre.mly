@@ -255,7 +255,7 @@ field_list:
 | field_list IDENT COL typeconst SCOL
   { (fun t -> if Hashtbl.mem field_table $2
               then raise (Corelang.Already_bound_label ($2, t, Location.symbol_rloc ()))
-              else (Hashtbl.add field_table $2 t; ($2, $4) :: ($1 t))) }
+              else (Hashtbl.add field_table $2 t; ($1 t) @ [ ($2, $4) ])) }
 
 eq_list:
   { [], [], [] }
