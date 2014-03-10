@@ -95,7 +95,7 @@ let rec pp_horn_const fmt c =
     | Const_real r   -> pp_print_string fmt r
     | Const_float r  -> pp_print_float fmt r
     | Const_tag t    -> pp_horn_tag fmt t
-    | Const_array ca -> assert false
+    | _              -> assert false
 
 (* Prints a value expression [v], with internal function calls only.
    [pp_var] is a printer for variables (typically [pp_c_var_read]),

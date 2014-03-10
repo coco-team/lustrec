@@ -29,6 +29,7 @@ let type_bool = new_ty Tbool
 let type_clock ty = new_ty (Tclock ty)
 let type_const tname = new_ty (Tconst tname)
 let type_enum taglist = new_ty (Tenum taglist)
+let type_struct fieldlist = new_ty (Tstruct fieldlist)
 let type_tuple tl = new_ty (Ttuple tl)
 let type_arrow ty1 ty2 = new_ty (Tarrow (ty1, ty2))
 let type_array d ty = new_ty (Tarray (d, ty))
