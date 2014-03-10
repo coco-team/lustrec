@@ -39,6 +39,7 @@ type constant =
   | Const_float of float
   | Const_array of constant list
   | Const_tag of label
+  | Const_struct of (label * constant) list
 
 type type_dec = LustreSpec.type_dec
 

@@ -40,13 +40,16 @@ let pp_var_name fmt id = fprintf fmt "%s" id.var_id
 
 let pp_eq_lhs = fprintf_list ~sep:", " pp_print_string
 
-let rec pp_const fmt c = 
+let rec pp_struct_const_field fmt (label, c) =
+  fprintf fmt "%a = %a;" pp_print_string label pp_const c
+and pp_const fmt c = 
   match c with
     | Const_int i -> pp_print_int fmt i
     | Const_real r -> pp_print_string fmt r
     | Const_float r -> pp_print_float fmt r
     | Const_tag  t -> pp_print_string fmt t
     | Const_array ca -> Format.fprintf fmt "[%a]" (Utils.fprintf_list ~sep:"," pp_const) ca
+    | Const_struct fl -> Format.fprintf fmt "{%a }" (Utils.fprintf_list ~sep:" " pp_struct_const_field) fl
 
 and pp_var fmt id = fprintf fmt "%s%s: %a" (if id.var_dec_const then "const " else "") id.var_id Types.print_ty id.var_type
 

@@ -180,7 +180,7 @@ let rec compile basename extension =
       let _, declared_types_env, declared_clocks_env = check_lusi header in
       (* checking type compatibility with computed types*)
       Typing.check_env_compat header declared_types_env computed_types_env;
-      (* checking clocks compatibilty with computed clocks*)
+      (* checking clocks compatibility with computed clocks*)
       Clock_calculus.check_env_compat header declared_clocks_env computed_clocks_env;
       Typing.uneval_prog_generics prog
     with Sys_error _ -> ( 

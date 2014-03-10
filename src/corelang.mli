@@ -34,6 +34,7 @@ type constant =
   | Const_float of float
   | Const_array of constant list
   | Const_tag  of label
+  | Const_struct of (label * constant) list
 
 val dummy_type_dec: type_dec
 

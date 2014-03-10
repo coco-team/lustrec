@@ -39,6 +39,7 @@ and type_desc =
   | Tarrow of type_expr * type_expr
   | Ttuple of type_expr list
   | Tenum of ident list
+  | Tstruct of (ident * type_expr) list
   | Tarray of dim_expr * type_expr
   | Tstatic of dim_expr * type_expr (* a type carried by a dimension expression *)
   | Tlink of type_expr (* During unification, make links instead of substitutions *)
@@ -62,8 +63,10 @@ exception Error of Location.t * error
 
 (* Pretty-print*)
 open Format
-  
-let rec print_ty fmt ty =
+
+let rec print_struct_ty_field fmt (label, ty) =
+  fprintf fmt "%a : %a" pp_print_string label print_ty ty
+and print_ty fmt ty =
   match ty.tdesc with
   | Tvar ->
     fprintf fmt "_%s" (name_of_type ty.tid)
@@ -87,8 +90,11 @@ let rec print_ty fmt ty =
     fprintf fmt "(%a)"
       (Utils.fprintf_list ~sep:"*" print_ty) tylist
   | Tenum taglist ->
-    fprintf fmt "(%a)"
-      (Utils.fprintf_list ~sep:" + " pp_print_string) taglist
+    fprintf fmt "enum {%a }"
+      (Utils.fprintf_list ~sep:", " pp_print_string) taglist
+  | Tstruct fieldlist ->
+    fprintf fmt "struct {%a }"
+      (Utils.fprintf_list ~sep:"; " print_struct_ty_field) fieldlist
   | Tarray (e, ty) ->
     fprintf fmt "%a^%a" print_ty ty Dimension.pp_dimension e
   | Tlink ty ->
@@ -96,7 +102,9 @@ let rec print_ty fmt ty =
   | Tunivar ->
     fprintf fmt "'%s" (name_of_type ty.tid)
 
-let rec print_node_ty fmt ty =
+let rec print_node_struct_ty_field fmt (label, ty) =
+  fprintf fmt "%a : %a" pp_print_string label print_node_ty ty
+and print_node_ty fmt ty =
   match ty.tdesc with
   | Tint ->
     fprintf fmt "int"
@@ -118,8 +126,11 @@ let rec print_node_ty fmt ty =
     fprintf fmt "(%a)"
       (Utils.fprintf_list ~sep:"*" print_ty) tylist
   | Tenum taglist ->
-    fprintf fmt "(%a)"
-      (Utils.fprintf_list ~sep:" + " pp_print_string) taglist
+    fprintf fmt "enum {%a }"
+      (Utils.fprintf_list ~sep:", " pp_print_string) taglist
+  | Tstruct fieldlist ->
+    fprintf fmt "struct {%a }"
+      (Utils.fprintf_list ~sep:"; " print_node_struct_ty_field) fieldlist
   | Tarray (e, ty) ->
     fprintf fmt "%a^%a" print_ty ty Dimension.pp_dimension e
   | Tlink ty ->
@@ -172,9 +183,14 @@ let rec repr =
   | t -> t
 
 let get_static_value ty =
- match (repr ty).tdesc with
- | Tstatic (d, _) -> Some d
- | _              -> None
+  match (repr ty).tdesc with
+  | Tstatic (d, _) -> Some d
+  | _              -> None
+
+let get_field_type ty label =
+  match (repr ty).tdesc with
+  | Tstruct fl -> (try Some (List.assoc label fl) with Not_found -> None)
+  | _          -> None
 
 let is_clock_type ty =
  match (repr ty).tdesc with
@@ -263,6 +279,7 @@ let rec is_polymorphic ty =
   | Tclock ty -> is_polymorphic ty
   | Tarrow (ty1,ty2) -> (is_polymorphic ty1) || (is_polymorphic ty2)
   | Ttuple tl -> List.exists (fun t -> is_polymorphic t) tl
+  | Tstruct fl -> List.exists (fun (_, t) -> is_polymorphic t) fl
   | Tlink t' -> is_polymorphic t'
   | Tarray (d, ty)
   | Tstatic (d, ty) -> Dimension.is_polymorphic d || is_polymorphic ty

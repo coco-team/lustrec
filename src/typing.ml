@@ -48,7 +48,9 @@ let rec occurs tvar ty =
   | Tarrow (t1, t2) ->
       (occurs tvar t1) || (occurs tvar t2)
   | Ttuple tl ->
-      List.exists (occurs tvar) tl
+     List.exists (occurs tvar) tl
+  | Tstruct fl ->
+     List.exists (fun (f, t) -> occurs tvar t) fl
   | Tarray (_, t)
   | Tstatic (_, t)
   | Tclock t
@@ -64,8 +66,10 @@ let rec generalize ty =
       ty.tdesc <- Tunivar
   | Tarrow (t1,t2) ->
       generalize t1; generalize t2
-  | Ttuple tlist ->
-      List.iter generalize tlist
+  | Ttuple tl ->
+     List.iter generalize tl
+  | Tstruct fl ->
+     List.iter (fun (f, t) -> generalize t) fl
   | Tstatic (d, t)
   | Tarray (d, t) -> Dimension.generalize d; generalize t
   | Tclock t
@@ -83,6 +87,8 @@ let rec instantiate inst_vars inst_dim_vars ty =
        Tarrow ((instantiate inst_vars inst_dim_vars t1), (instantiate inst_vars inst_dim_vars t2))}
   | Ttuple tlist ->
       {ty with tdesc = Ttuple (List.map (instantiate inst_vars inst_dim_vars) tlist)}
+  | Tstruct flist ->
+      {ty with tdesc = Tstruct (List.map (fun (f, t) -> (f, instantiate inst_vars inst_dim_vars t)) flist)}
   | Tclock t ->
 	{ty with tdesc = Tclock (instantiate inst_vars inst_dim_vars t)}
   | Tstatic (d, t) ->
@@ -111,7 +117,7 @@ let rec type_coretype type_dim cty =
   | Tydec_clock ty -> Type_predef.type_clock (type_coretype type_dim ty)
   | Tydec_const c -> Type_predef.type_const c
   | Tydec_enum tl -> Type_predef.type_enum tl
-  | Tydec_struct fl -> assert false (*Type_predef.type_struct fl*)
+  | Tydec_struct fl -> Type_predef.type_struct (List.map (fun (f, ty) -> (f, type_coretype type_dim ty)) fl)
   | Tydec_array (d, ty) ->
     begin
       type_dim d;
@@ -128,6 +134,7 @@ let rec coretype_type ty =
  | Tconst c       -> Tydec_const c
  | Tclock t       -> Tydec_clock (coretype_type t)
  | Tenum tl       -> Tydec_enum tl
+ | Tstruct fl     -> Tydec_struct (List.map (fun (f, t) -> (f, coretype_type t)) fl)
  | Tarray (d, t)  -> Tydec_array (d, coretype_type t)
  | Tstatic (_, t) -> coretype_type t
  | _         -> assert false
@@ -163,11 +170,10 @@ let rec unify t1 t2 =
         unify t1 t1';
 	unify t2 t2'
       end
-    | Ttuple tlist1, Ttuple tlist2 ->
-        if (List.length tlist1) <> (List.length tlist2) then
-	  raise (Unify (t1, t2))
-	else
-          List.iter2 unify tlist1 tlist2
+    | Ttuple tl, Ttuple tl' when List.length tl = List.length tl' ->
+      List.iter2 unify tl tl'
+    | Tstruct fl, Tstruct fl' when List.map fst fl = List.map fst fl' ->
+      List.iter2 (fun (_, t) (_, t') -> unify t t') fl fl'
     | Tclock _, Tstatic _
     | Tstatic _, Tclock _ -> raise (Unify (t1, t2))
     | Tclock t1', _ -> unify t1' t2
@@ -216,11 +222,10 @@ let rec semi_unify t1 t2 =
         semi_unify t1 t1';
 	semi_unify t2 t2'
       end
-    | Ttuple tlist1, Ttuple tlist2 ->
-        if (List.length tlist1) <> (List.length tlist2) then
-	  raise (Unify (t1, t2))
-	else
-          List.iter2 semi_unify tlist1 tlist2
+    | Ttuple tl, Ttuple tl' when List.length tl = List.length tl' ->
+      List.iter2 semi_unify tl tl'
+    | Tstruct fl, Tstruct fl' when List.map fst fl = List.map fst fl' ->
+      List.iter2 (fun (_, t) (_, t') -> semi_unify t t') fl fl'
     | Tclock _, Tstatic _
     | Tstatic _, Tclock _ -> raise (Unify (t1, t2))
     | Tclock t1', _ -> semi_unify t1' t2
@@ -234,6 +239,7 @@ let rec semi_unify t1 t2 =
       let def_t = get_type_definition t in
       semi_unify t1 def_t
     | Tenum tl, Tenum tl' when tl == tl' -> ()
+
     | Tstatic (e1, t1'), Tstatic (e2, t2')
     | Tarray (e1, t1'), Tarray (e2, t2') ->
       begin
@@ -244,6 +250,7 @@ let rec semi_unify t1 t2 =
       end
     | _,_ -> raise (Unify (t1, t2))
 
+(* Expected type ty1, got type ty2 *)
 let try_unify ty1 ty2 loc =
   try
     unify ty1 ty2
@@ -262,19 +269,69 @@ let try_semi_unify ty1 ty2 loc =
   | Dimension.Unify _ ->
     raise (Error (loc, Type_clash (ty1,ty2)))
 
+(* ty1 is a subtype of ty2 *)
+let rec sub_unify sub ty1 ty2 =
+  match (repr ty1).tdesc, (repr ty2).tdesc with
+  | Ttuple [t1]        , Ttuple [t2]        -> sub_unify sub t1 t2
+  | Ttuple tl1         , Ttuple tl2         ->
+    if List.length tl1 <> List.length tl2
+    then raise (Unify (ty1, ty2))
+    else List.iter2 (sub_unify sub) tl1 tl2
+  | Ttuple [t1]        , _                  -> sub_unify sub t1 ty2
+  | _                  , Ttuple [t2]        -> sub_unify sub ty1 t2
+  | Tstruct tl1        , Tstruct tl2        ->
+    if List.map fst tl1 <> List.map fst tl2
+    then raise (Unify (ty1, ty2))
+    else List.iter2 (fun (_, t1) (_, t2) -> sub_unify sub t1 t2) tl1 tl2
+  | Tstatic (d1, t1)   , Tstatic (d2, t2)   ->
+    begin
+      sub_unify sub t1 t2;
+      Dimension.eval Basic_library.eval_env (fun c -> None) d1;
+      Dimension.eval Basic_library.eval_env (fun c -> None) d2;
+      Dimension.unify d1 d2
+    end
+  | Tstatic (r_d, t1)  , _         when sub -> sub_unify sub ty2 t1
+  | _                                       -> unify ty2 ty1
+
+let try_sub_unify sub ty1 ty2 loc =
+  try
+    sub_unify sub ty1 ty2
+  with
+  | Unify _ ->
+    raise (Error (loc, Type_clash (ty1,ty2)))
+  | Dimension.Unify _ ->
+    raise (Error (loc, Type_clash (ty1,ty2)))
+
+let type_struct_field loc ftyp (label, f) =
+  if Hashtbl.mem field_table label
+  then let tydec = Hashtbl.find field_table label in
+       let tydec_struct = get_struct_type_fields tydec in
+       let ty_label = type_coretype (fun d -> ()) (List.assoc label tydec_struct) in
+       begin
+	 try_unify ty_label (ftyp loc f) loc;
+	 type_coretype (fun d -> ()) tydec
+       end
+  else raise (Error (loc, Unbound_value ("struct field " ^ label)))
+
 let rec type_const loc c = 
   match c with
-  | Const_int _ -> Type_predef.type_int
-  | Const_real _ -> Type_predef.type_real
-  | Const_float _ -> Type_predef.type_real
-  | Const_array ca -> let d = Dimension.mkdim_int loc (List.length ca) in
+  | Const_int _     -> Type_predef.type_int
+  | Const_real _    -> Type_predef.type_real
+  | Const_float _   -> Type_predef.type_real
+  | Const_array ca  -> let d = Dimension.mkdim_int loc (List.length ca) in
 		      let ty = new_var () in
-		      List.iter (fun e -> try_unify (type_const loc e) ty loc) ca;
+		      List.iter (fun e -> try_unify ty (type_const loc e) loc) ca;
 		      Type_predef.type_array d ty
-  | Const_tag t  ->
+  | Const_tag t     ->
     if Hashtbl.mem tag_table t
     then type_coretype (fun d -> ()) (Hashtbl.find tag_table t)
     else raise (Error (loc, Unbound_value ("enum tag " ^ t)))
+  | Const_struct fl ->
+    let ty_struct = new_var () in
+    begin
+      List.iter (fun f -> try_unify ty_struct (type_struct_field loc type_const f) loc) fl;
+      ty_struct
+    end
 
 (* The following typing functions take as parameter an environment [env]
    and whether the element being typed is expected to be constant [const]. 
@@ -317,6 +374,9 @@ and type_subtyping_arg env in_main ?(sub=true) const real_arg formal_type =
 	 real_static_type
     else real_type in
 (*Format.eprintf "subtyping const %B real %a:%a vs formal %a@." const Printers.pp_expr real_arg Types.print_ty real_type Types.print_ty formal_type;*)
+  try_sub_unify sub real_type formal_type loc
+(*
+and type_subtyping_tuple loc real_type formal_type =
   let real_types   = type_list_of_type real_type in
   let formal_types = type_list_of_type formal_type in
   if (List.length real_types) <> (List.length formal_types)
@@ -328,7 +388,7 @@ and type_subtyping loc sub real_type formal_type =
   | Tstatic _          , Tstatic _ when sub -> try_unify formal_type real_type loc
   | Tstatic (r_d, r_ty), _         when sub -> try_unify formal_type r_ty loc
   | _                                       -> try_unify formal_type real_type loc
-
+*)
 and type_ident env in_main loc const id =
   type_expr env in_main const (expr_of_ident id loc)
 

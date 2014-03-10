@@ -422,6 +422,10 @@ signed_const_array:
 | signed_const { [$1] }
 | signed_const COMMA signed_const_array { $1 :: $3 }
 
+signed_const_struct:
+| IDENT EQ signed_const { [ ($1, $3) ] }
+| IDENT EQ signed_const COMMA signed_const_struct { ($1, $3) :: $5 }
+
 signed_const:
   INT {Const_int $1}
 | REAL {Const_real $1}
@@ -430,6 +434,7 @@ signed_const:
 | MINUS INT {Const_int (-1 * $2)}
 | MINUS REAL {Const_real ("-" ^ $2)}
 | MINUS FLOAT {Const_float (-1. *. $2)}
+| LCUR signed_const_struct RCUR { Const_struct $2 }
 | LBRACKET signed_const_array RBRACKET { Const_array $2 }
 
 dim:
