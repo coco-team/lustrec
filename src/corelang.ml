@@ -149,7 +149,10 @@ type error =
     Main_not_found
   | Main_wrong_kind
   | No_main_specified
+  | Unbound_symbol of ident
+  | Already_bound_symbol of ident
 
+exception Error of error * Location.t
 
 module VDeclModule =
 struct (* Node module *)
@@ -230,10 +233,6 @@ let mkpredef_unary_call loc funname arg =
 
 
 (***********************************************************)
-exception Error of error
-exception Unbound_type of type_dec_desc*Location.t
-exception Already_bound_label of label*type_dec_desc*Location.t
-
 (* Fast access to nodes, by name *)
 let (node_table : (ident, top_decl) Hashtbl.t) = Hashtbl.create 30
 let consts_table = Hashtbl.create 30
@@ -729,6 +728,14 @@ let pp_error fmt = function
       !Options.main_node
   | No_main_specified ->
     fprintf fmt "No main node specified@."
+  | Unbound_symbol sym ->
+    fprintf fmt
+      "%s is undefined.@."
+      sym
+  | Already_bound_symbol sym -> 
+    fprintf fmt
+      "%s is already defined.@."
+      sym
 
 (* filling node table with internal functions *)
 let vdecls_of_typ_ck cpt ty =

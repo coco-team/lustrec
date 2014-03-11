@@ -34,9 +34,9 @@ let wrap parsing_fun token_fun lexbuf =
     Parsing.clear_parser ();
     ast
   with
-    Parsing.Parse_error ->
-      let loc = Location.curr lexbuf in
-      raise (Syntax_err loc)
+  | Parsing.Parse_error ->
+    let loc = Location.curr lexbuf in
+    raise (Syntax_err loc)
 
 let prog parse lex = wrap parse lex
 

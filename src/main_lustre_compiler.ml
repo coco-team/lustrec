@@ -63,7 +63,7 @@ let clock_decls env decls =
     report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,@?" Corelang.pp_prog_clock decls);
   new_env
 
-(* Loading Lusi file and filing type tables with parsed
+(* Loading Lusi file and filling type tables with parsed
    functions/nodes *)
 let load_lusi filename =
   Location.input_name := filename;
@@ -94,8 +94,14 @@ let rec compile basename extension =
   let prog =
     try
       Parse.prog Parser_lustre.prog Lexer_lustre.token lexbuf
-    with (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
+    with
+    | (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
       Parse.report_error err;
+      raise exc
+    | Corelang.Error (err, loc) as exc ->
+      Format.eprintf "Parsing error at loc %a: %a@]@."
+	Location.pp_loc loc
+	Corelang.pp_error err;
       raise exc
   in
   (* Extracting dependencies *)
