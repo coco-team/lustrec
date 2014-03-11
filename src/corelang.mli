@@ -149,10 +149,10 @@ type error =
     Main_not_found
   | Main_wrong_kind
   | No_main_specified
+  | Unbound_symbol of ident
+  | Already_bound_symbol of ident
 
-exception Error of error
-exception Unbound_type of type_dec_desc*Location.t
-exception Already_bound_label of label*type_dec_desc*Location.t
+exception Error of error * Location.t
 
 val mktyp: Location.t -> type_dec_desc -> type_dec
 val mkclock: Location.t -> clock_dec_desc -> clock_dec

@@ -42,6 +42,16 @@ let mkdim_ident id = mkdim_ident (Location.symbol_rloc ()) id
 let mkdim_appl f args = mkdim_appl (Location.symbol_rloc ()) f args
 let mkdim_ite i t e = mkdim_ite (Location.symbol_rloc ()) i t e
 
+let add_symbol msg hashtbl name value =
+ if Hashtbl.mem hashtbl name
+ then raise (Corelang.Error (Corelang.Already_bound_symbol msg, Location.symbol_rloc ()))
+ else Hashtbl.add hashtbl name value
+
+let check_symbol msg hashtbl name =
+ if not (Hashtbl.mem hashtbl name)
+ then raise (Corelang.Error (Corelang.Unbound_symbol msg, Location.symbol_rloc ()))
+ else ()
+
 %}
 
 %token <int> INT
@@ -130,7 +140,7 @@ top_decl_header:
 			     nodei_stateless = $12;
 			     nodei_spec = None})
     in
-    Hashtbl.add node_table $2 nd; nd}
+    add_symbol ("node " ^ $2) node_table $2 nd; nd}
 
 | nodespec_list NODE IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR stateless_opt SCOL
     {let nd = mktop_decl (ImportedNode
@@ -142,7 +152,7 @@ top_decl_header:
 			     nodei_stateless = $13;
 			     nodei_spec = Some $1})
     in
-    Hashtbl.add node_table $3 nd; nd}
+    add_symbol ("node " ^ $3) node_table $3 nd; nd}
 
 | FUNCTION IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL
     {let nd = mktop_decl (ImportedNode
@@ -154,7 +164,7 @@ top_decl_header:
 			     nodei_stateless = true;
 			     nodei_spec = None})
      in
-     Hashtbl.add node_table $2 nd; nd}
+     add_symbol ("function " ^ $2) node_table $2 nd; nd}
 
 | nodespec_list FUNCTION IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL
     {let nd = mktop_decl (ImportedNode
@@ -166,7 +176,7 @@ top_decl_header:
 			     nodei_stateless = true;
 			     nodei_spec = Some $1})
      in
-    Hashtbl.add node_table $3 nd; nd}
+    add_symbol ("function " ^ $3) node_table $3 nd; nd}
 
 top_decl:
 | CONST cdecl_list { mktop_decl (Consts (List.rev $2)) }
@@ -187,7 +197,7 @@ top_decl:
 			     node_spec = None;
 			     node_annot = match annots with [] -> None | _ -> Some annots})
     in
-    Hashtbl.add node_table $2 nd; nd}
+    add_symbol ("node " ^ $2) node_table $2 nd; nd}
 
 | nodespec_list NODE IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET eq_list TEL 
     {let eqs, asserts, annots = $16 in
@@ -205,7 +215,7 @@ top_decl:
 			     node_spec = Some $1;
 			     node_annot = match annots with [] -> None | _ -> Some annots})
     in
-    Hashtbl.add node_table $3 nd; nd}
+    add_symbol ("node " ^ $3) node_table $3 nd; nd}
 
 nodespec_list:
 NODESPEC { $1 }
@@ -222,8 +232,8 @@ typ_def_list:
 typ_def:
   TYPE IDENT EQ typeconst {
     try
-      Hashtbl.add type_table (Tydec_const $2) (Corelang.get_repr_type $4)
-    with Not_found-> raise (Corelang.Unbound_type ($4, Location.symbol_rloc())) }
+      add_symbol ("type " ^ $2) type_table (Tydec_const $2) (Corelang.get_repr_type $4)
+    with Not_found-> assert false }
 | TYPE IDENT EQ ENUM LCUR tag_list RCUR { Hashtbl.add type_table (Tydec_const $2) (Tydec_enum ($6 (Tydec_const $2))) }
 | TYPE IDENT EQ STRUCT LCUR field_list RCUR { Hashtbl.add type_table (Tydec_const $2) (Tydec_struct ($6 (Tydec_const $2))) }
 
@@ -236,26 +246,20 @@ typeconst:
 | TBOOL array_typ_decl { $2 Tydec_bool  }
 | TREAL array_typ_decl { $2 Tydec_real  }
 | TFLOAT array_typ_decl { $2 Tydec_float }
-| IDENT array_typ_decl { $2 (Tydec_const $1) }
+| IDENT array_typ_decl { check_symbol ("type " ^ $1) type_table (Tydec_const $1); $2 (Tydec_const $1) }
 | TBOOL TCLOCK  { Tydec_clock Tydec_bool }
 | IDENT TCLOCK  { Tydec_clock (Tydec_const $1) }
 
 tag_list:
   IDENT
-  { (fun t -> if Hashtbl.mem tag_table $1
-              then raise (Corelang.Already_bound_label ($1, t, Location.symbol_rloc ()))
-              else (Hashtbl.add tag_table $1 t; $1 :: [])) }
+  { (fun t -> add_symbol ("tag " ^ $1) tag_table $1 t; $1 :: []) }
 | tag_list COMMA IDENT
-  { (fun t -> if Hashtbl.mem tag_table $3
-              then raise (Corelang.Already_bound_label ($3, t, Location.symbol_rloc ()))
-              else (Hashtbl.add tag_table $3 t; $3 :: ($1 t))) }
+  { (fun t -> add_symbol ("tag " ^ $3)tag_table $3 t; $3 :: ($1 t)) }
 
 field_list:
   { (fun t -> []) }
 | field_list IDENT COL typeconst SCOL
-  { (fun t -> if Hashtbl.mem field_table $2
-              then raise (Corelang.Already_bound_label ($2, t, Location.symbol_rloc ()))
-              else (Hashtbl.add field_table $2 t; ($1 t) @ [ ($2, $4) ])) }
+  { (fun t -> add_symbol ("field " ^ $2) field_table $2 t; ($1 t) @ [ ($2, $4) ]) }
 
 eq_list:
   { [], [], [] }

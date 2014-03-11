@@ -124,7 +124,7 @@ let rec type_coretype type_dim cty =
       Type_predef.type_array d (type_coretype type_dim ty)
     end
 
-(* [coretype_type is the reciprocal of [type_typecore] *)
+(* [coretype_type] is the reciprocal of [type_typecore] *)
 let rec coretype_type ty =
  match (repr ty).tdesc with
  | Tvar           -> Tydec_any
@@ -303,18 +303,18 @@ let try_sub_unify sub ty1 ty2 loc =
   | Dimension.Unify _ ->
     raise (Error (loc, Type_clash (ty1,ty2)))
 
-let type_struct_field loc ftyp (label, f) =
+let rec type_struct_const_field loc (label, c) =
   if Hashtbl.mem field_table label
   then let tydec = Hashtbl.find field_table label in
        let tydec_struct = get_struct_type_fields tydec in
        let ty_label = type_coretype (fun d -> ()) (List.assoc label tydec_struct) in
        begin
-	 try_unify ty_label (ftyp loc f) loc;
+	 try_unify ty_label (type_const loc c) loc;
 	 type_coretype (fun d -> ()) tydec
        end
   else raise (Error (loc, Unbound_value ("struct field " ^ label)))
 
-let rec type_const loc c = 
+and type_const loc c = 
   match c with
   | Const_int _     -> Type_predef.type_int
   | Const_real _    -> Type_predef.type_real
@@ -330,8 +330,21 @@ let rec type_const loc c =
   | Const_struct fl ->
     let ty_struct = new_var () in
     begin
-      List.iter (fun f -> try_unify ty_struct (type_struct_field loc type_const f) loc) fl;
-      ty_struct
+      let used =
+	List.fold_left
+	  (fun acc (l, c) ->
+	    if List.mem l acc
+	    then raise (Error (loc, Already_bound ("struct field " ^ l)))
+	    else try_unify ty_struct (type_struct_const_field loc (l, c)) loc; l::acc)
+	  [] fl in
+      try
+	let total = List.map fst (get_struct_type_fields (coretype_type ty_struct)) in
+(*	List.iter (fun l -> Format.eprintf "total: %s@." l) total;
+	List.iter (fun l -> Format.eprintf "used: %s@." l) used; *)
+	let undef = List.find (fun l -> not (List.mem l used)) total
+	in raise (Error (loc, Unbound_value ("struct field " ^ undef)))
+      with Not_found -> 
+	ty_struct
     end
 
 (* The following typing functions take as parameter an environment [env]
