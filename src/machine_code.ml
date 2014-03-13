@@ -240,7 +240,7 @@ let translate_ident node (m, si, j, d, s) id =
     LocalVar (Corelang.var_decl_of_const (Hashtbl.find Corelang.consts_table id))
 
 let rec control_on_clock node ((m, si, j, d, s) as args) ck inst =
- match ck.cdesc with
+ match (Clocks.repr ck).cdesc with
  | Con    (ck1, cr, l) ->
    let id  = const_of_carrier cr in
    control_on_clock node args ck1 (MBranch (translate_ident node args id,
@@ -331,7 +331,7 @@ let reset_instance node args i r c =
   | Some (x, l) -> [control_on_clock node args c (MBranch (translate_ident node args x, [l, [MReset i]]))]
 
 let translate_eq node ((m, si, j, d, s) as args) eq =
-  (*Format.eprintf "translate_eq %a@." Printers.pp_node_eq eq;*)
+  (*Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock;*)
   match eq.eq_lhs, eq.eq_rhs.expr_desc with
   | [x], Expr_arrow (e1, e2)                     ->
     let var_x = node_var x node in

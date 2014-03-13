@@ -65,17 +65,23 @@ let clock_decls env decls =
 
 (* Loading Lusi file and filling type tables with parsed
    functions/nodes *)
-let load_lusi filename =
+let load_lusi own filename =
   Location.input_name := filename;
   let lexbuf = Lexing.from_channel (open_in filename) in
   Location.init lexbuf filename;
   (* Parsing *)
   report ~level:1 (fun fmt -> fprintf fmt "@[<v>.. parsing header file %s@,@?" filename);
   try
-    Parse.prog Parser_lustre.header Lexer_lustre.token lexbuf
-  with (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
+    Parse.header own Parser_lustre.header Lexer_lustre.token lexbuf
+  with
+  | (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
     Parse.report_error err;
     raise exc
+  | Corelang.Error (err, loc) as exc ->
+     Format.eprintf "Parsing error at loc %a: %a@]@."
+       Location.pp_loc loc
+       Corelang.pp_error err;
+     raise exc
 
 let check_lusi header =
   let new_tenv = type_decls Basic_library.type_env header in   (* Typing *)
@@ -118,7 +124,7 @@ let rec compile basename extension =
       try
 	let basename = s ^ ".lusi" in 
 	report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>Library %s@ " s);
-	let _, lusi_type_env, lusi_clock_env = check_lusi (load_lusi basename) in 
+	let _, lusi_type_env, lusi_clock_env = check_lusi (load_lusi false basename) in 
 	report ~level:1 (fun fmt -> fprintf fmt "@]@,@?");
 	Env.overwrite type_env lusi_type_env,
 	Env.overwrite clock_env lusi_clock_env      
@@ -182,13 +188,14 @@ let rec compile basename extension =
   let _ = 
     try 
       let _ = open_in lusi_name in
-      let header = load_lusi lusi_name in
+      let header = load_lusi true lusi_name in
       let _, declared_types_env, declared_clocks_env = check_lusi header in
       (* checking type compatibility with computed types*)
       Typing.check_env_compat header declared_types_env computed_types_env;
       (* checking clocks compatibility with computed clocks*)
       Clock_calculus.check_env_compat header declared_clocks_env computed_clocks_env;
-      Typing.uneval_prog_generics prog
+      Typing.uneval_prog_generics prog;
+      Clock_calculus.uneval_prog_generics prog
     with Sys_error _ -> ( 
       (* Printing lusi file is necessary *)
       report ~level:1 
@@ -219,7 +226,6 @@ let rec compile basename extension =
   (* Normalization phase *)
   report ~level:1 (fun fmt -> fprintf fmt ".. normalization@,@?");
   let normalized_prog = Normalization.normalize_prog prog in
-  (*Typing.uneval_prog_generics normalized_prog;*)
   report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,@?" Printers.pp_prog normalized_prog);
   (* Checking array accesses *)
   if !Options.check then
