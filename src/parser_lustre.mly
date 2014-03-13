@@ -42,6 +42,21 @@ let mkdim_ident id = mkdim_ident (Location.symbol_rloc ()) id
 let mkdim_appl f args = mkdim_appl (Location.symbol_rloc ()) f args
 let mkdim_ite i t e = mkdim_ite (Location.symbol_rloc ()) i t e
 
+let add_node own msg hashtbl name value =
+  try
+    match (Hashtbl.find hashtbl name).top_decl_desc, value.top_decl_desc with
+    | Node _        , ImportedNode _ when own
+                        ->
+       Hashtbl.add hashtbl name value
+    | ImportedNode _, _ ->
+       Hashtbl.add hashtbl name value
+    | Node _        , _ -> 
+       raise (Corelang.Error (Corelang.Already_bound_symbol msg, Location.symbol_rloc ()))
+    | _                 -> assert false
+  with
+    Not_found ->
+       Hashtbl.add hashtbl name value
+
 let add_symbol msg hashtbl name value =
  if Hashtbl.mem hashtbl name
  then raise (Corelang.Error (Corelang.Already_bound_symbol msg, Location.symbol_rloc ()))
@@ -102,7 +117,7 @@ let check_symbol msg hashtbl name =
 %start prog
 %type <Corelang.top_decl list> prog
 %start header
-%type <Corelang.top_decl list> header
+%type <bool -> Corelang.top_decl list> header
 
 %%
 
@@ -110,7 +125,7 @@ prog:
  open_list typ_def_list top_decl_list EOF { $1 @ (List.rev $3) }
 
 header:
- open_list typ_def_list top_decl_header_list EOF { $1 @ (List.rev $3) }
+ open_list typ_def_list top_decl_header_list EOF { (fun own -> ($1 @ (List.rev ($3 own)))) }
 
 open_list:
   { [] }
@@ -125,8 +140,8 @@ top_decl_list:
 
 
 top_decl_header_list:
-  top_decl_header {[$1]}
-| top_decl_header_list top_decl_header {$2::$1}
+  top_decl_header {(fun own -> [$1 own]) }
+| top_decl_header_list top_decl_header {(fun own -> ($2 own)::($1 own)) }
 
 
 top_decl_header:
@@ -140,7 +155,7 @@ top_decl_header:
 			     nodei_stateless = $12;
 			     nodei_spec = None})
     in
-    add_symbol ("node " ^ $2) node_table $2 nd; nd}
+    (fun own -> add_node own ("node " ^ $2) node_table $2 nd; nd) }
 
 | nodespec_list NODE IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR stateless_opt SCOL
     {let nd = mktop_decl (ImportedNode
@@ -152,7 +167,7 @@ top_decl_header:
 			     nodei_stateless = $13;
 			     nodei_spec = Some $1})
     in
-    add_symbol ("node " ^ $3) node_table $3 nd; nd}
+    (fun own -> add_node own ("node " ^ $3) node_table $3 nd; nd) }
 
 | FUNCTION IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL
     {let nd = mktop_decl (ImportedNode
@@ -164,7 +179,7 @@ top_decl_header:
 			     nodei_stateless = true;
 			     nodei_spec = None})
      in
-     add_symbol ("function " ^ $2) node_table $2 nd; nd}
+     (fun own -> add_node own ("function " ^ $2) node_table $2 nd; nd) }
 
 | nodespec_list FUNCTION IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL
     {let nd = mktop_decl (ImportedNode
@@ -176,7 +191,7 @@ top_decl_header:
 			     nodei_stateless = true;
 			     nodei_spec = Some $1})
      in
-    add_symbol ("function " ^ $3) node_table $3 nd; nd}
+    (fun own -> add_node own ("function " ^ $3) node_table $3 nd; nd) }
 
 top_decl:
 | CONST cdecl_list { mktop_decl (Consts (List.rev $2)) }
@@ -197,7 +212,7 @@ top_decl:
 			     node_spec = None;
 			     node_annot = match annots with [] -> None | _ -> Some annots})
     in
-    add_symbol ("node " ^ $2) node_table $2 nd; nd}
+    add_node true ("node " ^ $2) node_table $2 nd; nd}
 
 | nodespec_list NODE IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET eq_list TEL 
     {let eqs, asserts, annots = $16 in
@@ -215,7 +230,7 @@ top_decl:
 			     node_spec = Some $1;
 			     node_annot = match annots with [] -> None | _ -> Some annots})
     in
-    add_symbol ("node " ^ $3) node_table $3 nd; nd}
+    add_node true ("node " ^ $3) node_table $3 nd; nd}
 
 nodespec_list:
 NODESPEC { $1 }

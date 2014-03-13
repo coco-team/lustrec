@@ -27,8 +27,28 @@ open Format
 let report_error loc =
   Location.print loc;
   print_string "Syntax error\n"
+(*
+let wrap own parsing_fun token_fun lexbuf =
+  try
+    let ast = parsing_fun token_fun lexbuf own in
+    Parsing.clear_parser ();
+    ast
+  with
+  | Parsing.Parse_error ->
+    let loc = Location.curr lexbuf in
+    raise (Syntax_err loc)
+ *)
+let header own parsing_fun token_fun lexbuf =
+  try
+    let ast = parsing_fun token_fun lexbuf own in
+    Parsing.clear_parser ();
+    ast
+  with
+  | Parsing.Parse_error ->
+    let loc = Location.curr lexbuf in
+    raise (Syntax_err loc)
 
-let wrap parsing_fun token_fun lexbuf =
+let prog parsing_fun token_fun lexbuf =
   try
     let ast = parsing_fun token_fun lexbuf in
     Parsing.clear_parser ();
@@ -37,8 +57,6 @@ let wrap parsing_fun token_fun lexbuf =
   | Parsing.Parse_error ->
     let loc = Location.curr lexbuf in
     raise (Syntax_err loc)
-
-let prog parse lex = wrap parse lex
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

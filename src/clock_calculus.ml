@@ -743,14 +743,16 @@ let clock_coreclock env cck id loc scoped =
 (* Clocks a variable declaration *)
 let clock_var_decl scoped env vdecl =
   let ck = clock_coreclock env vdecl.var_dec_clock vdecl.var_id vdecl.var_loc scoped in
-  let ck = 
+  let ck =
+(* WTF ????
     if vdecl.var_dec_const
     then
       (try_generalize ck vdecl.var_loc; ck)
     else
-      match vdecl.var_type.Types.tdesc with
-      | Types.Tclock _ -> new_ck (Ccarrying ((new_carrier Carry_name scoped),ck)) scoped
-      | _              -> ck in
+ *)
+      if Types.is_clock_type vdecl.var_type
+      then new_ck (Ccarrying ((new_carrier Carry_name scoped),ck)) scoped
+      else ck in
   vdecl.var_clock <- ck;
   Env.add_value env vdecl.var_id ck
 
@@ -759,19 +761,30 @@ let clock_var_decl_list env scoped l =
   List.fold_left (clock_var_decl scoped) env l
 
 (** [clock_node env nd] performs the clock-calculus for node [nd] in
-    environment [env]. *)
+    environment [env].
+    Generalization of clocks wrt scopes follows this rule:
+    - generalize inputs (unscoped).
+    - generalize outputs. As they are scoped, only clocks coming from inputs
+      are allowed to be generalized.
+    - generalize locals. As outputs don't depend on them (checked the step before),
+      they can be generalized. 
+ *)
 let clock_node env loc nd =
   (* let is_main = nd.node_id = !Options.main_node in *)
   let new_env = clock_var_decl_list env false nd.node_inputs in
   let new_env = clock_var_decl_list new_env true nd.node_outputs in
-  let new_env = clock_var_decl_list new_env true nd.node_locals in
+  let new_env = clock_var_decl_list new_env false nd.node_locals in
   List.iter (clock_eq new_env) nd.node_eqs;
   let ck_ins = clock_of_vlist nd.node_inputs in
   let ck_outs = clock_of_vlist nd.node_outputs in
   let ck_node = new_ck (Carrow (ck_ins,ck_outs)) false in
   unify_imported_clock None ck_node;
   (*Log.report ~level:3 (fun fmt -> print_ck fmt ck_node);*)
-  try_generalize ck_node loc;
+  (* Local variables may contain first-order carrier variables that should be generalized.
+     That's not the case for types. *)
+  List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_inputs;
+  List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_outputs;
+  List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_locals;
   (* TODO : Xavier pourquoi ai je cette erreur ? *)
 (*  if (is_main && is_polymorphic ck_node) then
     raise (Error (loc,(Cannot_be_polymorphic ck_node)));
@@ -861,6 +874,7 @@ let clock_prog env decls =
    Once restored in this formulation, clocks may be meaningfully printed.
 *)
 let uneval_vdecl_generics vdecl =
+ (*Format.eprintf "Clock_calculus.uneval_vdecl_generics %a@." Printers.pp_node_var vdecl;*)
  if Types.is_clock_type vdecl.var_type
  then
    match get_carrier_name vdecl.var_clock with
@@ -873,7 +887,8 @@ let uneval_node_generics vdecls =
 let uneval_top_generics decl =
   match decl.top_decl_desc with
   | Node nd ->
-      uneval_node_generics (nd.node_inputs @ nd.node_outputs)
+      (* A node could contain first-order carrier variable in local vars. This is not the case for types. *)
+      uneval_node_generics (nd.node_inputs @ nd.node_locals @ nd.node_outputs)
   | ImportedNode nd ->
       uneval_node_generics (nd.nodei_inputs @ nd.nodei_outputs)
   | ImportedFun nd ->
