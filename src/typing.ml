@@ -284,6 +284,8 @@ let rec sub_unify sub ty1 ty2 =
     if List.map fst tl1 <> List.map fst tl2
     then raise (Unify (ty1, ty2))
     else List.iter2 (fun (_, t1) (_, t2) -> sub_unify sub t1 t2) tl1 tl2
+  | Tclock t1          , Tclock t2          -> sub_unify sub t1 t2
+  | Tclock t1          , _   when sub       -> sub_unify sub t1 ty2
   | Tstatic (d1, t1)   , Tstatic (d2, t2)   ->
     begin
       sub_unify sub t1 t2;
@@ -291,8 +293,8 @@ let rec sub_unify sub ty1 ty2 =
       Dimension.eval Basic_library.eval_env (fun c -> None) d2;
       Dimension.unify d1 d2
     end
-  | Tstatic (r_d, t1)  , _         when sub -> sub_unify sub ty2 t1
-  | _                                       -> unify ty2 ty1
+  | Tstatic (r_d, t1)  , _         when sub -> sub_unify sub t1 ty2
+  | _                                       -> unify ty1 ty2
 
 let try_sub_unify sub ty1 ty2 loc =
   try
@@ -387,22 +389,9 @@ and type_subtyping_arg env in_main ?(sub=true) const real_arg formal_type =
 	 | Some d' -> try_unify real_type real_static_type loc);
 	 real_static_type
     else real_type in
-(*Format.eprintf "subtyping const %B real %a:%a vs formal %a@." const Printers.pp_expr real_arg Types.print_ty real_type Types.print_ty formal_type;*)
+  (*Format.eprintf "subtyping const %B real %a:%a vs formal %a@." const Printers.pp_expr real_arg Types.print_ty real_type Types.print_ty formal_type;*)
   try_sub_unify sub real_type formal_type loc
-(*
-and type_subtyping_tuple loc real_type formal_type =
-  let real_types   = type_list_of_type real_type in
-  let formal_types = type_list_of_type formal_type in
-  if (List.length real_types) <> (List.length formal_types)
-  then raise (Unify (real_type, formal_type))
-  else List.iter2 (type_subtyping loc sub) real_types formal_types
 
-and type_subtyping loc sub real_type formal_type =
-  match (repr real_type).tdesc, (repr formal_type).tdesc with
-  | Tstatic _          , Tstatic _ when sub -> try_unify formal_type real_type loc
-  | Tstatic (r_d, r_ty), _         when sub -> try_unify formal_type r_ty loc
-  | _                                       -> try_unify formal_type real_type loc
-*)
 and type_ident env in_main loc const id =
   type_expr env in_main const (expr_of_ident id loc)
 
@@ -691,23 +680,6 @@ let type_imported_node env nd loc =
   nd.nodei_type <- ty_node;
   new_env
 
-let type_imported_fun env nd loc =
-  let new_env = type_var_decl_list nd.fun_inputs env nd.fun_inputs in
-  let vd_env =  nd.fun_inputs@nd.fun_outputs in
-  check_vd_env vd_env;
-  ignore(type_var_decl_list vd_env new_env nd.fun_outputs);
-  let ty_ins = type_of_vlist nd.fun_inputs in
-  let ty_outs = type_of_vlist nd.fun_outputs in
-  let ty_node = new_ty (Tarrow (ty_ins,ty_outs)) in
-  generalize ty_node;
-(*
-  if (is_polymorphic ty_node) then
-    raise (Error (loc, Poly_imported_node nd.fun_id));
-*)
-  let new_env = Env.add_value env nd.fun_id ty_node in
-  nd.fun_type <- ty_node;
-  new_env
-
 let type_top_consts env clist =
   List.fold_left (fun env cdecl ->
     let ty = type_const cdecl.const_loc cdecl.const_value in
@@ -734,8 +706,6 @@ let type_top_decl env decl =
   )
   | ImportedNode nd ->
       type_imported_node env nd decl.top_decl_loc
-  | ImportedFun nd ->
-      type_imported_fun env nd decl.top_decl_loc
   | Consts clist ->
       type_top_consts env clist
   | Open _  -> env
@@ -769,8 +739,6 @@ let uneval_top_generics decl =
       uneval_node_generics (nd.node_inputs @ nd.node_outputs)
   | ImportedNode nd ->
       uneval_node_generics (nd.nodei_inputs @ nd.nodei_outputs)
-  | ImportedFun nd ->
-      ()
   | Consts clist -> ()
   | Open _  -> ()
 

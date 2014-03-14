@@ -51,7 +51,7 @@ let add_node own msg hashtbl name value =
     | ImportedNode _, _ ->
        Hashtbl.add hashtbl name value
     | Node _        , _ -> 
-       raise (Corelang.Error (Corelang.Already_bound_symbol msg, Location.symbol_rloc ()))
+       raise (Corelang.Error (Location.symbol_rloc (), Corelang.Already_bound_symbol msg))
     | _                 -> assert false
   with
     Not_found ->
@@ -59,12 +59,12 @@ let add_node own msg hashtbl name value =
 
 let add_symbol msg hashtbl name value =
  if Hashtbl.mem hashtbl name
- then raise (Corelang.Error (Corelang.Already_bound_symbol msg, Location.symbol_rloc ()))
+ then raise (Corelang.Error (Location.symbol_rloc (), Corelang.Already_bound_symbol msg))
  else Hashtbl.add hashtbl name value
 
 let check_symbol msg hashtbl name =
  if not (Hashtbl.mem hashtbl name)
- then raise (Corelang.Error (Corelang.Unbound_symbol msg, Location.symbol_rloc ()))
+ then raise (Corelang.Error (Location.symbol_rloc (), Corelang.Unbound_symbol msg))
  else ()
 
 %}
@@ -143,78 +143,26 @@ top_decl_header_list:
   top_decl_header {(fun own -> [$1 own]) }
 | top_decl_header_list top_decl_header {(fun own -> ($2 own)::($1 own)) }
 
+state_annot:
+  FUNCTION { true }
+| NODE { false }
 
 top_decl_header:
-| NODE IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR stateless_opt SCOL
-    {let nd = mktop_decl (ImportedNode
-                            {nodei_id = $2;
-                             nodei_type = Types.new_var ();
-                             nodei_clock = Clocks.new_var true;
-                             nodei_inputs = List.rev $4;
-                             nodei_outputs = List.rev $9;
-			     nodei_stateless = $12;
-			     nodei_spec = None})
-    in
-    (fun own -> add_node own ("node " ^ $2) node_table $2 nd; nd) }
-
-| nodespec_list NODE IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR stateless_opt SCOL
+  nodespec_list state_annot IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL
     {let nd = mktop_decl (ImportedNode
                             {nodei_id = $3;
                              nodei_type = Types.new_var ();
                              nodei_clock = Clocks.new_var true;
                              nodei_inputs = List.rev $5;
                              nodei_outputs = List.rev $10;
-			     nodei_stateless = $13;
-			     nodei_spec = Some $1})
+			     nodei_stateless = $2;
+			     nodei_spec = $1})
     in
     (fun own -> add_node own ("node " ^ $3) node_table $3 nd; nd) }
 
-| FUNCTION IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL
-    {let nd = mktop_decl (ImportedNode
-                            {nodei_id = $2;
-                             nodei_type = Types.new_var ();
-			     nodei_clock = Clocks.new_var true;
-                             nodei_inputs = List.rev $4;
-                             nodei_outputs = List.rev $9;
-			     nodei_stateless = true;
-			     nodei_spec = None})
-     in
-     (fun own -> add_node own ("function " ^ $2) node_table $2 nd; nd) }
-
-| nodespec_list FUNCTION IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL
-    {let nd = mktop_decl (ImportedNode
-                            {nodei_id = $3;
-                             nodei_type = Types.new_var ();
-			     nodei_clock = Clocks.new_var true;
-                             nodei_inputs = List.rev $5;
-                             nodei_outputs = List.rev $10;
-			     nodei_stateless = true;
-			     nodei_spec = Some $1})
-     in
-    (fun own -> add_node own ("function " ^ $3) node_table $3 nd; nd) }
-
 top_decl:
 | CONST cdecl_list { mktop_decl (Consts (List.rev $2)) }
-
-| NODE IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET eq_list TEL 
-    {let eqs, asserts, annots = $15 in
-     let nd = mktop_decl (Node
-                            {node_id = $2;
-                             node_type = Types.new_var ();
-                             node_clock = Clocks.new_var true;
-                             node_inputs = List.rev $4;
-                             node_outputs = List.rev $9;
-                             node_locals = List.rev $13;
-			     node_gencalls = [];
-			     node_checks = [];
-			     node_asserts = asserts; 
-                             node_eqs = eqs;
-			     node_spec = None;
-			     node_annot = match annots with [] -> None | _ -> Some annots})
-    in
-    add_node true ("node " ^ $2) node_table $2 nd; nd}
-
-| nodespec_list NODE IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET eq_list TEL 
+| nodespec_list state_annot IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET eq_list TEL 
     {let eqs, asserts, annots = $16 in
      let nd = mktop_decl (Node
                             {node_id = $3;
@@ -227,18 +175,16 @@ top_decl:
 			     node_checks = [];
 			     node_asserts = asserts; 
                              node_eqs = eqs;
-			     node_spec = Some $1;
+			     node_dec_stateless = $2;
+			     node_stateless = None;
+			     node_spec = $1;
 			     node_annot = match annots with [] -> None | _ -> Some annots})
     in
     add_node true ("node " ^ $3) node_table $3 nd; nd}
 
 nodespec_list:
-NODESPEC { $1 }
-| NODESPEC nodespec_list { LustreSpec.merge_node_annot $1 $2 }
-
-stateless_opt:
-   { false }
-| STATELESS {true}
+ { None }
+| NODESPEC nodespec_list { (function None -> (fun s1 -> Some s1) | Some s2 -> (fun s1 -> Some (LustreSpec.merge_node_annot s1 s2))) $2 $1 }
 
 typ_def_list:
     /* empty */ {}

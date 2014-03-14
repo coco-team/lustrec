@@ -519,12 +519,39 @@ let try_semi_unify ck1 ck2 loc =
   | Mismatch (cr1,cr2) ->
     raise (Error (loc, Carrier_mismatch (cr1,cr2)))
 
-(* Checks whether ck1 is a subtype of ck2 *)
-let rec clock_subtyping ck1 ck2 =
+(* ck1 is a subtype of ck2 *)
+let rec sub_unify sub ck1 ck2 =
   match (repr ck1).cdesc, (repr ck2).cdesc with
-  | Ccarrying _         , Ccarrying _ -> unify ck1 ck2
-  | Ccarrying (cr', ck'), _           -> unify ck' ck2
-  | _                                 -> unify ck1 ck2
+  | Ctuple [c1]        , Ctuple [c2]        -> sub_unify sub c1 c2
+  | Ctuple cl1         , Ctuple cl2         ->
+    if List.length cl1 <> List.length cl2
+    then raise (Unify (ck1, ck2))
+    else List.iter2 (sub_unify sub) cl1 cl2
+  | Ctuple [c1]        , _                  -> sub_unify sub c1 ck2
+  | _                  , Ctuple [c2]        -> sub_unify sub ck1 c2
+  | Con (c1, cr1, t1)  , Con (c2, cr2, t2) when t1=t2 ->
+    begin
+      unify_carrier cr1 cr2;
+      sub_unify sub c1 c2
+    end
+  | Ccarrying (cr1, c1), Ccarrying (cr2, c2)->
+    begin
+      unify_carrier cr1 cr2;
+      sub_unify sub c1 c2
+    end
+  | Ccarrying (_, c1)  , _         when sub -> sub_unify sub c1 ck2
+  | _                                       -> unify ck1 ck2
+
+let try_sub_unify sub ck1 ck2 loc =
+  try
+    sub_unify sub ck1 ck2
+  with
+  | Unify (ck1',ck2') ->
+    raise (Error (loc, Clock_clash (ck1',ck2')))
+  | Subsume (ck,cset) ->
+    raise (Error (loc, Clock_set_mismatch (ck,cset)))
+  | Mismatch (cr1,cr2) ->
+    raise (Error (loc, Carrier_mismatch (cr1,cr2)))
 
 (* Clocks a list of arguments of Lustre builtin operators:
    - type each expression, remove carriers of clocks as
@@ -539,18 +566,10 @@ let rec clock_standard_args env expr_list =
 
 (* emulates a subtyping relation between clocks c and (cr : c),
    used during node application only *)
-and clock_subtyping_arg env real_arg formal_clock =
+and clock_subtyping_arg env ?(sub=true) real_arg formal_clock =
   let loc = real_arg.expr_loc in
   let real_clock = clock_expr env real_arg in
-  try
-    clock_subtyping real_clock formal_clock
-  with
-  | Unify (ck1',ck2') ->
-    raise (Error (loc, Clock_clash (real_clock, formal_clock)))
-  | Subsume (ck,cset) ->
-    raise (Error (loc, Clock_set_mismatch (ck, cset)))
-  | Mismatch (cr1,cr2) ->
-    raise (Error (loc, Carrier_mismatch (cr1, cr2)))
+  try_sub_unify sub real_clock formal_clock loc
 
 (* computes clocks for node application *)
 and clock_appl env f args clock_reset loc =
@@ -779,7 +798,7 @@ let clock_node env loc nd =
   let ck_outs = clock_of_vlist nd.node_outputs in
   let ck_node = new_ck (Carrow (ck_ins,ck_outs)) false in
   unify_imported_clock None ck_node;
-  (*Log.report ~level:3 (fun fmt -> print_ck fmt ck_node);*)
+  Log.report ~level:3 (fun fmt -> print_ck fmt ck_node);
   (* Local variables may contain first-order carrier variables that should be generalized.
      That's not the case for types. *)
   List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_inputs;
@@ -789,6 +808,7 @@ let clock_node env loc nd =
 (*  if (is_main && is_polymorphic ck_node) then
     raise (Error (loc,(Cannot_be_polymorphic ck_node)));
 *)
+  Log.report ~level:3 (fun fmt -> print_ck fmt ck_node);
   nd.node_clock <- ck_node;
   Env.add_value env nd.node_id ck_node
 
@@ -832,17 +852,6 @@ let clock_imported_node env loc nd =
   nd.nodei_clock <- ck_node;
   Env.add_value env nd.nodei_id ck_node
 
-let clock_function env loc fcn =
-  let new_env = clock_var_decl_list env false fcn.fun_inputs in
-  ignore(clock_var_decl_list new_env false fcn.fun_outputs);
-  let ck_ins = clock_of_vlist fcn.fun_inputs in
-  let ck_outs = clock_of_vlist fcn.fun_outputs in
-  let ck_node = new_ck (Carrow (ck_ins,ck_outs)) false in
-  unify_imported_clock None ck_node;
-  check_imported_pclocks loc ck_node;
-  try_generalize ck_node loc;
-  Env.add_value env fcn.fun_id ck_node
-
 let clock_top_consts env clist =
   List.fold_left (fun env cdecl ->
     let ck = new_var false in
@@ -855,8 +864,6 @@ let clock_top_decl env decl =
     clock_node env decl.top_decl_loc nd
   | ImportedNode nd ->
     clock_imported_node env decl.top_decl_loc nd
-  | ImportedFun fcn ->
-    clock_function env decl.top_decl_loc fcn
   | Consts clist ->
     clock_top_consts env clist
   | Open _ ->
@@ -891,8 +898,6 @@ let uneval_top_generics decl =
       uneval_node_generics (nd.node_inputs @ nd.node_locals @ nd.node_outputs)
   | ImportedNode nd ->
       uneval_node_generics (nd.nodei_inputs @ nd.nodei_outputs)
-  | ImportedFun nd ->
-      ()
   | Consts clist -> ()
   | Open _  -> ()
 

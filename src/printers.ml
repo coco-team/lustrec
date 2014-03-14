@@ -224,9 +224,10 @@ let pp_spec fmt spec =
   ()
 
 let pp_node fmt nd = 
-fprintf fmt "@[<v 0>%a%tnode %s (%a) returns (%a)@.%a%alet@.@[<h 2>   @ @[%a@]@ @]@.tel@]@."
+fprintf fmt "@[<v 0>%a%t%s %s (%a) returns (%a)@.%a%alet@.@[<h 2>   @ @[%a@]@ @]@.tel@]@."
   (fun fmt s -> match s with Some s -> pp_spec fmt s | _ -> ()) nd.node_spec
-  (fun fmt -> match nd.node_spec with None -> () | Some _ -> Format.fprintf fmt "@.") 
+  (fun fmt -> match nd.node_spec with None -> () | Some _ -> Format.fprintf fmt "@.")
+  (if nd.node_dec_stateless then "function" else "node")
   nd.node_id
   pp_node_args nd.node_inputs
   pp_node_args nd.node_outputs
@@ -248,25 +249,18 @@ fprintf fmt "@[<v 0>%a%tnode %s (%a) returns (%a)@.%a%alet@.@[<h 2>   @ @[%a@]@ 
 (*fprintf fmt "@ /* Scheduling: %a */ @ " (fprintf_list ~sep:", " pp_print_string) (Scheduling.schedule_node nd)*)
 
 let pp_imported_node fmt ind = 
-  fprintf fmt "@[<v>node %s (%a) returns (%a) %t@]"
+  fprintf fmt "@[<v>%s %s (%a) returns (%a) %t@]"
+    (if ind.nodei_stateless then "function" else "node")
     ind.nodei_id
     pp_node_args ind.nodei_inputs
     pp_node_args ind.nodei_outputs
     (fun fmt -> if ind.nodei_stateless then Format.fprintf fmt "stateless") 
-
-let pp_imported_fun fmt ind = 
-  fprintf fmt "@[<v>function %s (%a) returns (%a)@]"
-    ind.fun_id
-    pp_node_args ind.fun_inputs
-    pp_node_args ind.fun_outputs
 
 let pp_decl fmt decl =
   match decl.top_decl_desc with
   | Node nd -> fprintf fmt "%a@ " pp_node nd
   | ImportedNode ind ->
     fprintf fmt "imported %a;@ " pp_imported_node ind
-  | ImportedFun ind ->
-    fprintf fmt "%a;@ " pp_imported_fun ind
   | Consts clist -> (
     fprintf fmt "const %a@ " 
       (fprintf_list ~sep:"@ " (fun fmt cdecl ->
@@ -282,7 +276,6 @@ let pp_short_decl fmt decl =
   match decl.top_decl_desc with
   | Node nd -> fprintf fmt "node %s@ " nd.node_id
   | ImportedNode ind -> fprintf fmt "imported node %s" ind.nodei_id
-  | ImportedFun ind -> fprintf fmt "function %s" ind.fun_id
   | Consts clist -> (
     fprintf fmt "const %a@ " 
       (fprintf_list ~sep:"@ " (fun fmt cdecl ->
@@ -297,7 +290,7 @@ let pp_lusi fmt decl =
       nd.node_id
       pp_node_args nd.node_inputs
       pp_node_args nd.node_outputs
-  | ImportedNode _ | ImportedFun _ | Consts _ | Open _ -> ()
+  | ImportedNode _ | Consts _ | Open _ -> ()
 
 
 

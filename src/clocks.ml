@@ -447,12 +447,12 @@ let print_cvar fmt cvar =
  (*
       if cvar.cscoped
       then
-	fprintf fmt "['_%s%a]"
+	fprintf fmt "[_%s%a]"
 	  (name_of_type cvar.cid)
 	  print_ckset cset
       else
  *)
-	fprintf fmt "'_%s%a"
+	fprintf fmt "_%s%a"
 	  (name_of_type cvar.cid)
 	  print_ckset cset
   | Cunivar cset ->
@@ -494,10 +494,10 @@ let print_ck fmt ck =
 (*
       if ck.cscoped
       then
-        fprintf fmt "['_%s]" (name_of_type ck.cid)
+        fprintf fmt "[_%s]" (name_of_type ck.cid)
       else
 *)
-	fprintf fmt "'_%s" (name_of_type ck.cid)
+	fprintf fmt "_%s" (name_of_type ck.cid)
     | Cunivar cset ->
 (*
       if ck.cscoped

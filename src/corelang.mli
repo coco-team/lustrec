@@ -97,6 +97,8 @@ type node_desc =
      mutable node_checks: Dimension.dim_expr list;
      node_asserts: assert_t list; 
      node_eqs: eq list;
+     node_dec_stateless: bool;
+     mutable node_stateless: bool option;
      node_spec: LustreSpec.node_annot option;
      node_annot: LustreSpec.expr_annot option;}
 
@@ -108,14 +110,14 @@ type imported_node_desc =
      nodei_outputs: var_decl list;
      nodei_stateless: bool;
      nodei_spec: LustreSpec.node_annot option;}
-
+(*
 type imported_fun_desc =
     {fun_id: ident;
      mutable fun_type: Types.type_expr;
      fun_inputs: var_decl list;
      fun_outputs: var_decl list;
      fun_spec: LustreSpec.node_annot option;}
-
+*)
 type const_desc = 
     {const_id: ident; 
      const_loc: Location.t; 
@@ -134,7 +136,7 @@ type top_decl_desc =
   | Node of node_desc
   | Consts of const_desc list
   | ImportedNode of imported_node_desc
-  | ImportedFun of imported_fun_desc
+  (* | ImportedFun of imported_fun_desc *)
   (* | SensorDecl of sensor_desc *)
   (* | ActuatorDecl of actuator_desc *)
   | Open of string
@@ -151,8 +153,9 @@ type error =
   | No_main_specified
   | Unbound_symbol of ident
   | Already_bound_symbol of ident
+  | Stateful of ident
 
-exception Error of error * Location.t
+exception Error of Location.t * error
 
 val mktyp: Location.t -> type_dec_desc -> type_dec
 val mkclock: Location.t -> clock_dec_desc -> clock_dec
@@ -172,6 +175,7 @@ val node_name: top_decl -> ident
 val node_inputs: top_decl -> var_decl list
 val node_from_name: ident -> top_decl
 val is_generic_node: top_decl -> bool
+val check_stateless_node: top_decl -> bool
 val is_imported_node: top_decl -> bool
 
 val consts_table: (ident, const_desc) Hashtbl.t
@@ -203,6 +207,7 @@ val node_eq: ident -> node_desc -> eq
 
 val sort_handlers : (label * 'a) list -> (label * 'a) list
 
+val is_stateless_expr: expr -> bool
 val is_eq_expr: expr -> expr -> bool
 
 val pp_error :  Format.formatter -> error -> unit

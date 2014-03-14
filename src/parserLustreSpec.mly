@@ -189,7 +189,7 @@ typ:
 | IDENT {
   try 
     mktyp (Hashtbl.find Corelang.type_table (Tydec_const $1))
-  with Not_found -> raise (Corelang.Error (Corelang.Unbound_symbol ("type " ^ $1), Location.symbol_rloc()))
+  with Not_found -> raise (Corelang.Error (Location.symbol_rloc(), Corelang.Unbound_symbol ("type " ^ $1)))
 }
 | TFLOAT {mktyp Tydec_float}
 | TREAL {mktyp Tydec_real}
