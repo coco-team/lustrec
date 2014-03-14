@@ -196,7 +196,14 @@ let rec normalize_expr ?(alias=true) node offsets defvars expr =
   | Expr_uclock _
   | Expr_dclock _ 
   | Expr_phclock _ -> assert false (* Not handled yet *)
-
+(* Creates a conditional with a merge construct, which is more lazy *)
+(*
+let norm_conditional_as_merge alias node norm_expr offsets defvars expr =
+ match expr.expr_desc with
+ | Expr_ite (c, t, e) ->
+   let defvars, norm_t = norm_expr (alias node offsets defvars t in
+ | _ -> assert false
+*)
 and normalize_branches node offsets defvars hl =
  List.fold_right
    (fun (t, h) (defvars, norm_q) ->
@@ -308,7 +315,7 @@ let normalize_decl decl =
   match decl.top_decl_desc with
   | Node nd ->
     {decl with top_decl_desc = Node (normalize_node nd)}
-  | Open _ | ImportedNode _ | ImportedFun _ | Consts _ -> decl
+  | Open _ | ImportedNode _ | Consts _ -> decl
   
 let normalize_prog decls = 
   List.map normalize_decl decls

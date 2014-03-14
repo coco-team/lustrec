@@ -157,6 +157,8 @@ let arrow_desc =
     node_checks = [];
     node_asserts = [];
     node_eqs= [];
+    node_dec_stateless = false;
+    node_stateless = Some false;
     node_spec = None;
     node_annot = None;  }
 
@@ -193,20 +195,12 @@ let arrow_machine =
     mannot = None;
   }
 
-let is_stateless_node node =
-  (node_name node <> arrow_id) &&
-    match node.top_decl_desc with
-    | Node id -> false (* TODO: add a check after the machines are produced. Start from the main node and do a DFS to compute the stateless/statefull property of nodes. Stateless nodes should not be reset *)
-    | ImportedNode id -> id.nodei_stateless
-    | ImportedFun _ -> true
-    | _       -> assert false
-
 let new_instance =
   let cpt = ref (-1) in
   fun caller callee tag ->
     begin
       let o =
-	if is_stateless_node callee then
+	if Corelang.check_stateless_node callee then
 	  node_name callee
 	else
 	  Printf.sprintf "ni_%d" (incr cpt; !cpt) in
@@ -220,9 +214,9 @@ let new_instance =
 let const_of_carrier cr =
  match (carrier_repr cr).carrier_desc with
  | Carry_const id -> id
- | Carry_name -> assert false
- | Carry_var -> assert false
- | Carry_link _ -> assert false (* TODO check this Xavier *)
+ | Carry_name
+ | Carry_var
+ | Carry_link _ -> (Format.eprintf "internal error: const_of_carrier %a@." print_carrier cr; assert false) (* TODO check this Xavier *)
 
 (* translate_<foo> : node -> context -> <foo> -> machine code/expression *)
 (* the context contains  m : state aka memory variables  *)
@@ -370,7 +364,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       NodeDep.filter_static_inputs (node_inputs node_f) el in 
     let o = new_instance node node_f eq.eq_rhs.expr_tag in
     (m,
-     (if is_stateless_node node_f then si else MReset o :: si),
+     (if check_stateless_node node_f then si else MReset o :: si),
      (if Basic_library.is_internal_fun f then j else Utils.IMap.add o call_f j),
      d,
      reset_instance node args o r eq.eq_rhs.expr_clock @
@@ -442,7 +436,7 @@ let translate_decl nd =
     mname = nd;
     mmemory = ISet.elements m;
     mcalls = mmap;
-    minstances = List.filter (fun (_, (n,_)) -> not (is_stateless_node n)) mmap;
+    minstances = List.filter (fun (_, (n,_)) -> not (check_stateless_node n)) mmap;
     minit = init;
     mstatic = List.filter (fun v -> v.var_dec_const) nd.node_inputs;
     mstep = {

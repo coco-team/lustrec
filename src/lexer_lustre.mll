@@ -40,7 +40,6 @@ let keyword_table =
   "last", LAST;
   "resume", RESUME;
   "restart", RESTART;
-  "stateless", STATELESS;
   "if", IF;
   "then", THEN;
   "else", ELSE;

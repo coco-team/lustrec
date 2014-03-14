@@ -209,6 +209,8 @@ let witness filename main_name orig inlined type_env clock_env =
 	  let args = mkexpr loc (Expr_tuple [call_orig; call_inlined]) in 
 	  mkexpr loc (Expr_appl ("=", args, None))
       }];
+    node_dec_stateless = true;
+    node_stateless = None;
     node_spec = Some 
       {requires = []; 
        ensures = [EnsuresExpr (mkeexpr loc (EExpr_ident ok_ident))];

@@ -30,6 +30,16 @@ let usage = "Usage: lustrec [options] <source-file>"
 
 let extensions = [".ec"; ".lus"; ".lusi"]
 
+let check_stateless_decls decls =
+  report ~level:1 (fun fmt -> fprintf fmt ".. checking stateless/stateful status@,@?");
+  try
+    List.iter (fun td -> ignore (Corelang.check_stateless_node td)) decls
+  with (Corelang.Error (loc, err)) as exc ->
+    Format.eprintf "Stateless status error at loc %a: %a@]@."
+      Location.pp_loc loc
+      Corelang.pp_error err;
+    raise exc
+
 let type_decls env decls =  
   report ~level:1 (fun fmt -> fprintf fmt ".. typing@,@?");
   let new_env = 
@@ -77,7 +87,7 @@ let load_lusi own filename =
   | (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
     Parse.report_error err;
     raise exc
-  | Corelang.Error (err, loc) as exc ->
+  | Corelang.Error (loc, err) as exc ->
      Format.eprintf "Parsing error at loc %a: %a@]@."
        Location.pp_loc loc
        Corelang.pp_error err;
@@ -104,7 +114,7 @@ let rec compile basename extension =
     | (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
       Parse.report_error err;
       raise exc
-    | Corelang.Error (err, loc) as exc ->
+    | Corelang.Error (loc, err) as exc ->
       Format.eprintf "Parsing error at loc %a: %a@]@."
 	Location.pp_loc loc
 	Corelang.pp_error err;
@@ -141,6 +151,9 @@ let rec compile basename extension =
   (* Sorting nodes *)
   let prog = SortProg.sort prog in
   
+  (* Checking stateless/stateful status *)
+  check_stateless_decls prog;
+
   (* Typing *)
   let computed_types_env = type_decls type_env prog in
   
@@ -192,9 +205,9 @@ let rec compile basename extension =
       let _, declared_types_env, declared_clocks_env = check_lusi header in
       (* checking type compatibility with computed types*)
       Typing.check_env_compat header declared_types_env computed_types_env;
+      Typing.uneval_prog_generics prog;
       (* checking clocks compatibility with computed clocks*)
       Clock_calculus.check_env_compat header declared_clocks_env computed_clocks_env;
-      Typing.uneval_prog_generics prog;
       Clock_calculus.uneval_prog_generics prog
     with Sys_error _ -> ( 
       (* Printing lusi file is necessary *)

@@ -104,6 +104,8 @@ type node_desc =
      mutable node_checks: Dimension.dim_expr list;
      node_asserts: assert_t list; 
      node_eqs: eq list;
+     node_dec_stateless: bool;
+     mutable node_stateless: bool option;
      node_spec: LustreSpec.node_annot option;
      node_annot: LustreSpec.expr_annot option;
     }
@@ -118,13 +120,6 @@ type imported_node_desc =
      nodei_spec: LustreSpec.node_annot option;
     }
 
-type imported_fun_desc =
-    {fun_id: ident;
-     mutable fun_type: Types.type_expr;
-     fun_inputs: var_decl list;
-     fun_outputs: var_decl list;
-     fun_spec: LustreSpec.node_annot option;}
-
 type const_desc = 
     {const_id: ident; 
      const_loc: Location.t; 
@@ -136,7 +131,6 @@ type top_decl_desc =
   | Node of node_desc
   | Consts of const_desc list
   | ImportedNode of imported_node_desc
-  | ImportedFun of imported_fun_desc
   | Open of string
 
 type top_decl =
@@ -151,8 +145,9 @@ type error =
   | No_main_specified
   | Unbound_symbol of ident
   | Already_bound_symbol of ident
+  | Stateful of ident
 
-exception Error of error * Location.t
+exception Error of Location.t * error
 
 module VDeclModule =
 struct (* Node module *)
@@ -266,6 +261,44 @@ let is_imported_node td =
   | Node nd         -> false
   | ImportedNode nd -> true
   | _ -> assert false
+
+let rec is_stateless_expr expr =
+  match expr.expr_desc with
+  | Expr_const _ 
+  | Expr_ident _ -> true
+  | Expr_tuple el
+  | Expr_array el -> List.for_all is_stateless_expr el
+  | Expr_access (e1, _)
+  | Expr_power (e1, _) -> is_stateless_expr e1
+  | Expr_ite (c, t, e) -> is_stateless_expr c && is_stateless_expr t && is_stateless_expr e
+  | Expr_arrow (e1, e2)
+  | Expr_fby (e1, e2) -> is_stateless_expr e1 && is_stateless_expr e2
+  | Expr_pre e' -> is_stateless_expr e'
+  | Expr_when (e', i, l)-> is_stateless_expr e'
+  | Expr_merge (i, hl) -> List.for_all (fun (t, h) -> is_stateless_expr h) hl 
+  | Expr_appl (i, e', i') ->
+    is_stateless_expr e' &&
+      (Basic_library.is_internal_fun i || check_stateless_node (node_from_name i))
+  | Expr_uclock _
+  | Expr_dclock _
+  | Expr_phclock _ -> assert false
+and compute_stateless_node nd =
+ List.for_all (fun eq -> is_stateless_expr eq.eq_rhs) nd.node_eqs
+and check_stateless_node td =
+  match td.top_decl_desc with 
+  | Node nd         -> (
+    match nd.node_stateless with
+    | None     -> 
+      begin
+	let stateless = compute_stateless_node nd in
+	nd.node_stateless <- Some (false && stateless);
+	if nd.node_dec_stateless && (not stateless)
+	then raise (Error (td.top_decl_loc, Stateful nd.node_id))
+	else stateless
+      end
+    | Some stl -> stl)
+  | ImportedNode nd -> nd.nodei_stateless
+  | _ -> true
 
 (* alias and type definition table *)
 let type_table =
@@ -505,7 +538,7 @@ let get_consts prog =
     fun consts decl ->
       match decl.top_decl_desc with
 	| Consts clist -> clist@consts
-	| Node _ | ImportedNode _ | ImportedFun _ | Open _ -> consts  
+	| Node _ | ImportedNode _ | Open _ -> consts  
   ) [] prog
 
 
@@ -514,7 +547,7 @@ let get_nodes prog =
     fun nodes decl ->
       match decl.top_decl_desc with
 	| Node nd -> nd::nodes
-	| Consts _ | ImportedNode _ | ImportedFun _ | Open _ -> nodes  
+	| Consts _ | ImportedNode _ | Open _ -> nodes  
   ) [] prog
 
 let prog_unfold_consts prog =
@@ -658,6 +691,8 @@ let rename_node f_node f_var f_const nd =
     node_checks = node_checks;
     node_asserts = node_asserts;
     node_eqs = eqs;
+    node_dec_stateless = nd.node_dec_stateless;
+    node_stateless = nd.node_stateless;
     node_spec = spec;
     node_annot = annot;
   }
@@ -675,7 +710,6 @@ let rename_prog f_node f_var f_const prog =
       | Consts c -> 
 	{ top with top_decl_desc = Consts (List.map (rename_const f_const) c) }
       | ImportedNode _
-      | ImportedFun _
       | Open _ -> top)
       ::accu
 ) [] prog
@@ -694,10 +728,6 @@ let pp_decl_type fmt tdecl =
     fprintf fmt "%s: " ind.nodei_id;
     Utils.reset_names ();
     fprintf fmt "%a@ " Types.print_ty ind.nodei_type
-  | ImportedFun ind ->
-    fprintf fmt "%s: " ind.fun_id;
-    Utils.reset_names ();
-    fprintf fmt "%a@ " Types.print_ty ind.fun_type
   | Consts _ | Open _ -> ()
 
 let pp_prog_type fmt tdecl_list =
@@ -713,7 +743,7 @@ let pp_decl_clock fmt cdecl =
     fprintf fmt "%s: " ind.nodei_id;
     Utils.reset_names ();
     fprintf fmt "%a@ " Clocks.print_ck ind.nodei_clock
-  | ImportedFun _ | Consts _ | Open _ -> ()
+  | Consts _ | Open _ -> ()
 
 let pp_prog_clock fmt prog =
   Utils.fprintf_list ~sep:"" pp_decl_clock fmt prog
@@ -736,6 +766,10 @@ let pp_error fmt = function
     fprintf fmt
       "%s is already defined.@."
       sym
+  | Stateful nd ->
+    fprintf fmt
+      "node %s is declared stateless, but it is stateful.@."
+      nd
 
 (* filling node table with internal functions *)
 let vdecls_of_typ_ck cpt ty =
