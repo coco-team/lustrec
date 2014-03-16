@@ -504,13 +504,7 @@ let print_reset_prototype self fmt (name, static) =
     self
 
 let print_stateless_prototype fmt (name, inputs, outputs) =
-match outputs with
-(* DOESN'T WORK FOR ARRAYS
-  | [o] -> fprintf fmt "%a (@[<v>%a@])"
-    (pp_c_type name) o.var_type
-    (Utils.fprintf_list ~sep:",@ " pp_c_var) inputs
-*)  
-  | _ -> fprintf fmt "void %s (@[<v>@[%a%t@]@,@[%a@]@,@])"
+  fprintf fmt "void %s (@[<v>@[%a%t@]@,@[%a@]@,@])"
     name
     (Utils.fprintf_list ~sep:",@ " pp_c_decl_input_var) inputs
     (Utils.pp_final_char_if_non_empty ",@ " inputs) 
@@ -530,37 +524,11 @@ let print_step_prototype self fmt (name, inputs, outputs) =
 (*                         Header Printing functions                                        *)
 (********************************************************************************************)
 
-(* Removed because of "open" constructs. No more extern functions *)
-(*
-let print_prototype fmt decl =
-  match decl.top_decl_desc with
-    | ImportedFun m -> (
-        fprintf fmt "extern %a;@,"
-	  print_stateless_prototype 
-	  (m.fun_id, m.fun_inputs, m.fun_outputs)
-    )
-    | ImportedNode m -> (
-      if m.nodei_stateless then (* It's a function not a node *)
-        fprintf fmt "extern %a;@,"
-	  print_stateless_prototype 
-	  (m.nodei_id, m.nodei_inputs, m.nodei_outputs)
-      else (
-	let static = List.filter (fun v -> v.var_dec_const) m.nodei_inputs in
-        fprintf fmt "extern %a;@,"
-	  print_alloc_prototype (m.nodei_id, static);
-	fprintf fmt "extern %a;@,"
-	  (print_reset_prototype "self") (m.nodei_id, static);
-	fprintf fmt "extern %a;@,"
-	  (print_step_prototype "self") (m.nodei_id, m.nodei_inputs, m.nodei_outputs);
-      )
-    )
-    | _ -> () (* We don't do anything here *)
-      *)
 
 let print_import_standard fmt =
   fprintf fmt "#include \"%s/include/lustrec/arrow.h\"@.@." Version.prefix
 
-let print_prototype fmt decl =
+let print_import_prototype fmt decl =
   match decl.top_decl_desc with
   | Open m -> fprintf fmt "#include \"%s.h\"@," m
   | _ -> () (* We don't do anything here *)
@@ -575,21 +543,19 @@ let pp_registers_struct fmt m =
     ()
 
 let print_machine_struct fmt m =
-  if m.mname.node_id != arrow_id
-  then (
-    (* We don't print arrow function *)
-    (* Define struct *)
-    fprintf fmt "@[%a {@[%a%a%t@]};@]@."
-      pp_machine_memtype_name m.mname.node_id
-      pp_registers_struct m
-      (Utils.fprintf_list ~sep:"; " pp_c_decl_instance_var) m.minstances
-      (Utils.pp_final_char_if_non_empty "; " m.minstances)
-  )
+  if fst (get_stateless_status m) then
+    begin
+    end
+  else
+    begin
+      (* Define struct *)
+      fprintf fmt "@[%a {@[%a%a%t@]};@]@."
+	pp_machine_memtype_name m.mname.node_id
+	pp_registers_struct m
+	(Utils.fprintf_list ~sep:"; " pp_c_decl_instance_var) m.minstances
+	(Utils.pp_final_char_if_non_empty "; " m.minstances)
+    end
 
-(*
-let pp_static_array_instance fmt m (v, m) =
- fprintf fmt "%s" (mk_addr_var m v)
-*)
 let print_static_declare_instance attr fmt (i, (m, static)) =
   fprintf fmt "%a(%s, %a%t%s)"
     pp_machine_static_declare_name (node_name m)
@@ -655,35 +621,46 @@ let print_static_alloc_macro fmt m =
     pp_machine_static_link_name m.mname.node_id
 
 let print_machine_decl fmt m =
-  if m.mname.node_id <> arrow_id
-  then (
-    (* We don't print arrow function *)
-    (* Static allocation *)
-    if !Options.static_mem
-    then (
-      fprintf fmt "%a@.%a@.%a@."
-	print_static_declare_macro m
-	print_static_link_macro m
-	print_static_alloc_macro m
-    )
-    else ( 
-    (* Dynamic allocation *)
-      fprintf fmt "extern %a;@.@."
-	print_alloc_prototype (m.mname.node_id, m.mstatic)
-    );
-    let self = mk_self m in
-    fprintf fmt "extern %a;@.@."
-      (print_reset_prototype self) (m.mname.node_id, m.mstatic);
-    (* Print specification if any *)
-    (match m.mspec with
+  if fst (get_stateless_status m) then
+    begin
+      (* Print specification if any *)
+      (match m.mspec with
       | None -> ()
       | Some spec -> 
 	pp_acsl_spec m.mstep.step_outputs fmt spec
-    );
-    fprintf fmt "extern %a;@.@."
-      (print_step_prototype self)
-      (m.mname.node_id, m.mstep.step_inputs, m.mstep.step_outputs)
-  )
+      );
+      fprintf fmt "extern %a;@.@."
+	print_stateless_prototype
+	(m.mname.node_id, m.mstep.step_inputs, m.mstep.step_outputs)
+    end
+  else
+    begin
+      (* Static allocation *)
+      if !Options.static_mem
+      then (
+	fprintf fmt "%a@.%a@.%a@."
+	  print_static_declare_macro m
+	  print_static_link_macro m
+	  print_static_alloc_macro m
+      )
+      else ( 
+        (* Dynamic allocation *)
+	fprintf fmt "extern %a;@.@."
+	  print_alloc_prototype (m.mname.node_id, m.mstatic)
+      );
+      let self = mk_self m in
+      fprintf fmt "extern %a;@.@."
+	(print_reset_prototype self) (m.mname.node_id, m.mstatic);
+      (* Print specification if any *)
+      (match m.mspec with
+      | None -> ()
+      | Some spec -> 
+	pp_acsl_spec m.mstep.step_outputs fmt spec
+      );
+      fprintf fmt "extern %a;@.@."
+	(print_step_prototype self)
+	(m.mname.node_id, m.mstep.step_inputs, m.mstep.step_outputs)
+    end
 
 
 (********************************************************************************************)
@@ -722,6 +699,38 @@ let print_alloc_code fmt m =
     (Utils.fprintf_list ~sep:"" print_alloc_array) array_mem
     (Utils.fprintf_list ~sep:"" print_alloc_instance) m.minstances
 
+let print_stateless_code fmt m =
+  let self = "__ERROR__" in
+  if not (!Options.ansi && is_generic_node { top_decl_desc = Node m.mname; top_decl_loc = Location.dummy_loc })
+  then
+    (* C99 code *)
+    fprintf fmt "@[<v 2>%a {@,%a%t@,%a%a%t%t@]@,}@.@."
+      print_stateless_prototype (m.mname.node_id, m.mstep.step_inputs, m.mstep.step_outputs)
+      (* locals *)
+      (Utils.fprintf_list ~sep:";@," pp_c_decl_local_var) m.mstep.step_locals
+      (Utils.pp_final_char_if_non_empty ";@," m.mstep.step_locals)
+      (* check assertions *)
+      (pp_c_checks self) m
+      (* instrs *)
+      (Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) m.mstep.step_instrs
+      (Utils.pp_newline_if_non_empty m.mstep.step_instrs)
+      (fun fmt -> fprintf fmt "return;")
+  else
+    (* C90 code *)
+    let (gen_locals, base_locals) = List.partition (fun v -> Types.is_generic_type v.var_type) m.mstep.step_locals in
+    let gen_calls = List.map (fun e -> let (id, _, _) = call_of_expr e in mk_call_var_decl e.expr_loc id) m.mname.node_gencalls in
+    fprintf fmt "@[<v 2>%a {@,%a%t@,%a%a%t%t@]@,}@.@."
+      print_stateless_prototype (m.mname.node_id, (m.mstep.step_inputs@gen_locals@gen_calls), m.mstep.step_outputs)
+      (* locals *)
+      (Utils.fprintf_list ~sep:";@," pp_c_decl_local_var) base_locals
+      (Utils.pp_final_char_if_non_empty ";" base_locals)
+      (* check assertions *)
+      (pp_c_checks self) m
+      (* instrs *)
+      (Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) m.mstep.step_instrs
+      (Utils.pp_newline_if_non_empty m.mstep.step_instrs)
+      (fun fmt -> fprintf fmt "return;")
+
 let print_step_code fmt m self =
   if not (!Options.ansi && is_generic_node { top_decl_desc = Node m.mname; top_decl_loc = Location.dummy_loc })
   then
@@ -758,25 +767,29 @@ let print_step_code fmt m self =
       (fun fmt -> fprintf fmt "return;")
 
 let print_machine fmt m =
-  if m.mname.node_id <> arrow_id
-  then (
-  (* We don't print arrow function *)
-  (* Alloc function, only if non static mode *)
-    if (not !Options.static_mem) then  
-      (
-	fprintf fmt "@[<v 2>%a {@,%a@]@,}@.@."
-	  print_alloc_prototype (m.mname.node_id, m.mstatic)
-	  print_alloc_code m;
-      );
-    let self = mk_self m in
-    (* Reset function *)
-    fprintf fmt "@[<v 2>%a {@,%a%treturn;@]@,}@.@."
-      (print_reset_prototype self) (m.mname.node_id, m.mstatic)
-      (Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) m.minit
-      (Utils.pp_newline_if_non_empty m.minit);
-    (* Step function *)
-    print_step_code fmt m self
-  )
+  if fst (get_stateless_status m) then
+    begin
+      (* Step function *)
+      print_stateless_code fmt m
+    end
+  else
+    begin
+      (* Alloc function, only if non static mode *)
+      if (not !Options.static_mem) then  
+	(
+	  fprintf fmt "@[<v 2>%a {@,%a@]@,}@.@."
+	    print_alloc_prototype (m.mname.node_id, m.mstatic)
+	    print_alloc_code m;
+	);
+      let self = mk_self m in
+      (* Reset function *)
+      fprintf fmt "@[<v 2>%a {@,%a%treturn;@]@,}@.@."
+	(print_reset_prototype self) (m.mname.node_id, m.mstatic)
+	(Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) m.minit
+	(Utils.pp_newline_if_non_empty m.minit);
+      (* Step function *)
+      print_step_code fmt m self
+    end
 
 (********************************************************************************************)
 (*                         Main related functions                                           *)
@@ -972,7 +985,7 @@ let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog
   (* Print the prototype of imported nodes *)
   fprintf source_fmt "/* Imported nodes declarations */@.";
   fprintf source_fmt "@[<v>";
-  List.iter (print_prototype source_fmt) prog;
+  List.iter (print_import_prototype source_fmt) prog;
   fprintf source_fmt "@]@.";
   (* Print consts *)
   fprintf source_fmt "/* Global constants (definitions) */@.";

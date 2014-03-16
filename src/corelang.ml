@@ -104,7 +104,7 @@ type node_desc =
      mutable node_checks: Dimension.dim_expr list;
      node_asserts: assert_t list; 
      node_eqs: eq list;
-     node_dec_stateless: bool;
+     mutable node_dec_stateless: bool;
      mutable node_stateless: bool option;
      node_spec: LustreSpec.node_annot option;
      node_annot: LustreSpec.expr_annot option;
@@ -145,7 +145,6 @@ type error =
   | No_main_specified
   | Unbound_symbol of ident
   | Already_bound_symbol of ident
-  | Stateful of ident
 
 exception Error of Location.t * error
 
@@ -262,43 +261,6 @@ let is_imported_node td =
   | ImportedNode nd -> true
   | _ -> assert false
 
-let rec is_stateless_expr expr =
-  match expr.expr_desc with
-  | Expr_const _ 
-  | Expr_ident _ -> true
-  | Expr_tuple el
-  | Expr_array el -> List.for_all is_stateless_expr el
-  | Expr_access (e1, _)
-  | Expr_power (e1, _) -> is_stateless_expr e1
-  | Expr_ite (c, t, e) -> is_stateless_expr c && is_stateless_expr t && is_stateless_expr e
-  | Expr_arrow (e1, e2)
-  | Expr_fby (e1, e2) -> is_stateless_expr e1 && is_stateless_expr e2
-  | Expr_pre e' -> is_stateless_expr e'
-  | Expr_when (e', i, l)-> is_stateless_expr e'
-  | Expr_merge (i, hl) -> List.for_all (fun (t, h) -> is_stateless_expr h) hl 
-  | Expr_appl (i, e', i') ->
-    is_stateless_expr e' &&
-      (Basic_library.is_internal_fun i || check_stateless_node (node_from_name i))
-  | Expr_uclock _
-  | Expr_dclock _
-  | Expr_phclock _ -> assert false
-and compute_stateless_node nd =
- List.for_all (fun eq -> is_stateless_expr eq.eq_rhs) nd.node_eqs
-and check_stateless_node td =
-  match td.top_decl_desc with 
-  | Node nd         -> (
-    match nd.node_stateless with
-    | None     -> 
-      begin
-	let stateless = compute_stateless_node nd in
-	nd.node_stateless <- Some (false && stateless);
-	if nd.node_dec_stateless && (not stateless)
-	then raise (Error (td.top_decl_loc, Stateful nd.node_id))
-	else stateless
-      end
-    | Some stl -> stl)
-  | ImportedNode nd -> nd.nodei_stateless
-  | _ -> true
 
 (* alias and type definition table *)
 let type_table =
@@ -766,10 +728,6 @@ let pp_error fmt = function
     fprintf fmt
       "%s is already defined.@."
       sym
-  | Stateful nd ->
-    fprintf fmt
-      "node %s is declared stateless, but it is stateful.@."
-      nd
 
 (* filling node table with internal functions *)
 let vdecls_of_typ_ck cpt ty =

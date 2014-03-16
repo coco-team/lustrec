@@ -33,11 +33,11 @@ let extensions = [".ec"; ".lus"; ".lusi"]
 let check_stateless_decls decls =
   report ~level:1 (fun fmt -> fprintf fmt ".. checking stateless/stateful status@,@?");
   try
-    List.iter (fun td -> ignore (Corelang.check_stateless_node td)) decls
-  with (Corelang.Error (loc, err)) as exc ->
+    Stateless.check_prog decls
+  with (Stateless.Error (loc, err)) as exc ->
     Format.eprintf "Stateless status error at loc %a: %a@]@."
       Location.pp_loc loc
-      Corelang.pp_error err;
+      Stateless.pp_error err;
     raise exc
 
 let type_decls env decls =  
@@ -208,7 +208,9 @@ let rec compile basename extension =
       Typing.uneval_prog_generics prog;
       (* checking clocks compatibility with computed clocks*)
       Clock_calculus.check_env_compat header declared_clocks_env computed_clocks_env;
-      Clock_calculus.uneval_prog_generics prog
+      Clock_calculus.uneval_prog_generics prog;
+      (* checking stateless status compatibility *)
+      Stateless.check_compat header
     with Sys_error _ -> ( 
       (* Printing lusi file is necessary *)
       report ~level:1 
@@ -228,6 +230,10 @@ let rec compile basename extension =
     | Clocks.Error (loc, err) as exc ->
       Format.eprintf "Clock mismatch between computed clock and declared clock in lustre interface file: %a@]@."
 	Clocks.pp_error err;
+      raise exc
+    | Stateless.Error (loc, err) as exc ->
+      Format.eprintf "Stateless status mismatch between defined status and declared status in lustre interface file: %a@]@."
+	Stateless.pp_error err;
       raise exc
   in
 
