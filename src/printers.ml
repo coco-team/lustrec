@@ -286,7 +286,8 @@ let pp_lusi fmt decl =
   match decl.top_decl_desc with
   | Node nd ->  
     fprintf fmt 
-      "@[<v>node %s (%a) returns (%a);@ @]@ "
+      "@[<v>%s %s (%a) returns (%a);@ @]@ "
+      (if Stateless.check_node decl then "function" else "node")
       nd.node_id
       pp_node_args nd.node_inputs
       pp_node_args nd.node_outputs

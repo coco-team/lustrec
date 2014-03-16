@@ -46,8 +46,7 @@ let add_node own msg hashtbl name value =
   try
     match (Hashtbl.find hashtbl name).top_decl_desc, value.top_decl_desc with
     | Node _        , ImportedNode _ when own
-                        ->
-       Hashtbl.add hashtbl name value
+                        -> ()
     | ImportedNode _, _ ->
        Hashtbl.add hashtbl name value
     | Node _        , _ -> 

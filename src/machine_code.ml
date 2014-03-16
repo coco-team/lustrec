@@ -124,6 +124,10 @@ let pp_machine fmt m =
     (Utils.fprintf_list ~sep:"@ " pp_instr) m.minit
     pp_step m.mstep
 
+(* Returns the declared stateless status and the computed one. *)
+let get_stateless_status m =
+ (m.mname.node_dec_stateless, Utils.desome m.mname.node_stateless)
+
 let is_output m id =
   List.exists (fun o -> o.var_id = id.var_id) m.mstep.step_outputs
 
@@ -200,7 +204,7 @@ let new_instance =
   fun caller callee tag ->
     begin
       let o =
-	if Corelang.check_stateless_node callee then
+	if Stateless.check_node callee then
 	  node_name callee
 	else
 	  Printf.sprintf "ni_%d" (incr cpt; !cpt) in
@@ -364,7 +368,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       NodeDep.filter_static_inputs (node_inputs node_f) el in 
     let o = new_instance node node_f eq.eq_rhs.expr_tag in
     (m,
-     (if check_stateless_node node_f then si else MReset o :: si),
+     (if Stateless.check_node node_f then si else MReset o :: si),
      (if Basic_library.is_internal_fun f then j else Utils.IMap.add o call_f j),
      d,
      reset_instance node args o r eq.eq_rhs.expr_clock @
@@ -436,7 +440,7 @@ let translate_decl nd =
     mname = nd;
     mmemory = ISet.elements m;
     mcalls = mmap;
-    minstances = List.filter (fun (_, (n,_)) -> not (check_stateless_node n)) mmap;
+    minstances = List.filter (fun (_, (n,_)) -> not (Stateless.check_node n)) mmap;
     minit = init;
     mstatic = List.filter (fun v -> v.var_dec_const) nd.node_inputs;
     mstep = {
@@ -461,7 +465,7 @@ let translate_decl nd =
 let translate_prog decls = 
   let nodes = get_nodes decls in 
    (* What to do with Imported/Sensor/Actuators ? *)
-   arrow_machine ::  List.map translate_decl nodes
+   (*arrow_machine ::*)  List.map translate_decl nodes
 
 let get_machine_opt name machines =  
   List.fold_left 
