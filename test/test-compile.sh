@@ -5,7 +5,7 @@ eval set -- $(getopt -n $0 -o "-aciwvh:" -- "$@")
 declare c i w h a v
 declare -a files
 
-SRC_PREFIX=`svn info | grep Working | sed "s/.*: //"`/lustre_compiler
+SRC_PREFIX=`svn info --xml | grep wcroot | sed "s/<[^>]*>//g"`/lustre_compiler
 NOW=`date "+%y%m%d%H%M"`
 report=`pwd`/report-$NOW
 #LUSTREC="../../_build/src/lustrec"
