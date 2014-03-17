@@ -30,6 +30,45 @@ open Corelang
 (* open Clocks *)
 open Format
 
+let expr_true loc ck =
+{ expr_tag = Utils.new_tag ();
+  expr_desc = Expr_const (Const_tag tag_true);
+  expr_type = Type_predef.type_bool;
+  expr_clock = ck;
+  expr_delay = Delay.new_var ();
+  expr_annot = None;
+  expr_loc = loc }
+
+let expr_false loc ck =
+{ expr_tag = Utils.new_tag ();
+  expr_desc = Expr_const (Const_tag tag_false);
+  expr_type = Type_predef.type_bool;
+  expr_clock = ck;
+  expr_delay = Delay.new_var ();
+  expr_annot = None;
+  expr_loc = loc }
+
+let expr_once loc ck =
+ { expr_tag = Utils.new_tag ();
+  expr_desc = Expr_arrow (expr_true loc ck, expr_false loc ck);
+  expr_type = Type_predef.type_bool;
+  expr_clock = ck;
+  expr_delay = Delay.new_var ();
+  expr_annot = None;
+  expr_loc = loc }
+
+let is_expr_once =
+  let dummy_expr_once = expr_once Location.dummy_loc (Clocks.new_var true) in
+  fun expr -> Corelang.is_eq_expr expr dummy_expr_once
+
+let unfold_arrow expr =
+ match expr.expr_desc with
+ | Expr_arrow (e1, e2) ->
+    let loc = expr.expr_loc in
+    let ck = expr.expr_clock in
+    { expr with expr_desc = Expr_ite (expr_once loc ck, e1, e2) }
+ | _                   -> assert false
+
 let cpt_fresh = ref 0
 
 (* Generate a new local [node] variable *)
@@ -166,7 +205,9 @@ let rec normalize_expr ?(alias=true) node offsets defvars expr =
       normalize_expr ~alias:alias node offsets defvars norm_expr
     else
       mk_expr_alias_opt (alias && not (Basic_library.is_internal_fun id)) node defvars norm_expr
-  | Expr_arrow (e1,e2) -> (* Here we differ from Colaco paper: arrows are pushed to the top *)
+  | Expr_arrow (e1,e2) when not (is_expr_once expr) -> (* Here we differ from Colaco paper: arrows are pushed to the top *)
+    normalize_expr ~alias:alias node offsets defvars (unfold_arrow expr)
+  | Expr_arrow (e1,e2) ->
     let defvars, norm_e1 = normalize_expr node offsets defvars e1 in
     let defvars, norm_e2 = normalize_expr node offsets defvars e2 in
     let norm_expr = mk_norm_expr offsets expr (Expr_arrow (norm_e1, norm_e2)) in
