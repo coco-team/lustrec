@@ -1,0 +1,309 @@
+-- y is true if the property x is true at least n succesive times.
+-- nb_times is a positive integer which increases by 1 each time x is true
+-- and decreases by 1 each time x is false.
+-- the idea was: x is the error output of a sensor and y has been true
+-- if nb_times equals 0 again, perhaps the sensor is fine again
+
+--@ requires n > 0;
+--@ ensures (not x) => (not y);
+--@ ensures nb_times >= 0;
+--@ ensures not x => ((pre nb_times > nb_times) or (pre nb_times = 0));
+--@ ensures x => (pre nb_times < nb_times);
+--@ ensures y => nb_times >= n;
+node check_validity (x: bool; n: int) returns (y: bool; nb_times: int);
+var
+compt: int;
+let
+  compt = (if x then 1 else 0) -> if x then pre compt + 1 else 0;
+  y = (compt >= n);
+  nb_times= (if x then 1 else 0) -> 
+    if x then pre nb_times + 1 else 
+      (if pre nb_times > 0 then pre nb_times - 1 else 0);
+tel
+
+
+-- at the beginning, y = x
+-- once x is true, y is true until reset is true
+-- if reset is true, y = x
+
+--@ ensures reset => y=x;
+--@ ensures x => y;
+--@ ensures pre y and not reset => y;
+node lock (x, reset: bool) returns (y: bool);
+let
+y = x -> if reset then x else x or pre y;
+tel
+
+
+-- combination of check_validity and lock
+
+--@ requires n > 0;
+--@ ensures x => y;
+--@ ensures (pre y and not y) => (not x);
+node check_validity_lock (x: bool; n: int) returns (y: bool);
+var
+  nb_times: int;
+  er: bool;
+let
+	(er, nb_times) = check_validity(x, n);
+	y = x or lock(er, (nb_times = 0));
+tel
+
+
+-- check if the input is not changing too fast
+
+--@ requires delta > 0.;
+--@ ensures abs(v - pre v) <= delta;
+node check_speed (s, delta: real) returns (v: real);
+let
+	v = s -> if s - pre v > delta 
+	      	 then 
+		      pre v + delta
+		 else 
+		      if pre v - s > delta
+		      then
+			  pre v - delta 
+		       else s;
+tel
+
+-- the classic absolute value function
+
+--@ ensures y >= 0.0;
+--@ ensures (x >= 0.0) => (x = y);
+--@ ensures (x <= 0.0) => (x = -y);
+node abs (x: real) returns (y: real);
+let
+  y= if x>0.0 then x else -x;
+tel
+
+-- ensures that the ranged_val output is between min and max.
+-- [min , max] is the legal interval where the value must be
+-- [min - delta , max + delta] is the interval the input value is allowed to be
+-- delta can match for instance with the uncertainty of measurement
+-- satmax => value > max
+-- satmin => value < min
+-- "error" occurs if the input value is out of [min - delta, max + delta]
+
+--@ requires delta > 0.0;
+--@ requires min <= max;
+--@ ensures min <= ranged_val and ranged_val <= max;
+--@ ensures ((min <= value) and (value <= max)) => (ranged_val = value);
+--@ ensures (value < min) => satmin;
+--@ ensures (max < value) => satmax;
+--@ ensures satmin => (value < min);
+--@ ensures satmax => (max <= value);
+--@ ensures value < min => ranged_val = min;
+--@ ensures value > value => ranged_val = max;
+--@ ensures error => satmin or satmax;
+--@ ensures delta + max < value => error;
+--@ ensures value < min - delta => error;
+
+
+node ranged_value (value, min, max, delta: real) returns (ranged_val:real; satmin, satmax, error: bool);
+let
+  satmin = value < min;
+  satmax = value > max;
+  error = (value > max + delta) or (value < min - delta);
+  ranged_val = if value > max then max else (if value < min then min else value);
+tel
+
+
+-- checks if the node "aberration" has valid outputs 
+
+node obs_aberration(s1,s2,s3,delta: real; ab1,ab2,ab3: bool) 
+returns (ok_ab1, ok_ab2, ok_ab3, ok_rev1, ok_rev2, ok_rev3: bool);
+var
+  diff12, diff13, diff23: real;
+let
+  diff12 = abs(s1 - s2);
+  diff13 = abs(s1 - s3);
+  diff23 = abs(s2 - s3);
+  ok_ab1 = (ab1 => (diff12 > delta and diff13 > delta));
+  ok_ab2 = (ab2 => (diff12 > delta and diff23 > delta));
+  ok_ab3 = (ab3 => (diff13 > delta and diff23 > delta));
+  ok_rev1 = ((diff12 > delta and diff13 > delta) => ab1 );
+  ok_rev2 = ((diff12 > delta and diff23 > delta) => ab2);
+  ok_rev3 = ((diff13 > delta and diff23 > delta) => ab3);
+tel 
+
+-- it checks to make sure that there is no aberrant input value
+-- i.e. here, if there isn't a value which is too remote from the other two.
+-- delta is a safe range
+
+--@ requires delta > 0.0;
+--@ ensures exists ok_ab1, ok_ab2, ok_ab3, ok_rev1, ok_rev2, ok_rev3: bool; (ok_ab1, ok_ab2, ok_ab3, ok_rev1, ok_rev2, ok_rev3) = (obs_aberration (s1,s2,s3,delta,ab1,ab2,ab3));
+node aberration (s1,s2,s3, delta: real) returns (ab1, ab2, ab3: bool);
+var
+  diff12, diff13, diff23: real;
+let
+  diff12 = abs(s1 - s2);
+  diff13 = abs(s1 - s3);
+  diff23 = abs(s2 - s3);
+
+  ab1 = (diff12 > delta) and (diff13 > delta);
+  ab2 = (diff12 > delta) and (diff23 > delta);
+  ab3 = (diff13 > delta) and (diff23 > delta);
+tel
+
+
+
+--@ ensures (nb_errors = 0) => not (e1 or e2 or e3);
+--@ ensures not (e1 or e2 or e3) => (nb_errors = 0);
+--@ ensures e1 or e2 or e3 => nb_errors >= 1;
+--@ ensures e1 and e2 and e3 => (nb_errors = 3);
+--@ ensures e1 and e2 and not e3 => (nb_errors = 2);
+--@ ensures e1 and not e2 and e3 => (nb_errors = 2);
+--@ ensures not e1 and e2 and e3 => (nb_errors = 2);
+--@ ensures not e1 and not e2 and e3 => (nb_errors = 1);
+--@ ensures not e1 and e2 and not e3 => (nb_errors = 1);
+--@ ensures e1 and not e2 and not e3 => (nb_errors = 1);
+--@ ensures nb_errors = 0 or nb_errors = 1 or nb_errors = 2 or nb_errors =3;
+node nb_err_calc( e1, e2, e3: bool) returns (nb_errors: int);
+let
+  nb_errors = if e1 and e2 and e3 
+          then 3
+          else if (e1 and e2) or (e2 and e3) or (e1 and e3)
+             then 2
+             else if e1 or e2 or e3
+                then 1
+                else 0;
+tel
+
+
+
+
+--@ requires nb_err = 0 or nb_err = 1 or nb_err = 2 or nb_err = 3;
+--@ requires nb_err = nb_err_calc(e1, e2, e3);
+--@ ensures nb_err = 2 => (v = s1 or v = s2 or v = s3);
+--@ ensures nb_err = 3 => (v = pre v);
+--@ ensures (nb_err = 1 and e1) => v = (s2 + s3) / 2.0;
+--@ ensures (nb_err = 1 and e2) => v = (s1 + s3) / 2.0;
+--@ ensures (nb_err = 1 and e3) => v = (s1 + s2) / 2.0;
+--@ ensures nb_err = 0 => v = (s1 + s2 + s3) / 3.0;
+node calc_value (nb_err: int; e1, e2, e3: bool; s1, s2, s3: real) returns (v: real);
+var
+  previous_good_value, v1, v2, v3, di: real;
+let
+  previous_good_value = 0.0 -> pre v;
+
+  di = if nb_err = 0
+	then 3.0
+	else 
+	     if nb_err = 1
+	     then 2.0
+	     else 1.0;
+	
+  v1 = if e1 then 0.0 else s1;
+  v2 = if e2 then 0.0 else s2;
+  v3 = if e3 then 0.0 else s3;
+
+  v = if nb_err = 3 
+	then  previous_good_value
+	else (v1 + v2 + v3) / di;
+tel
+
+
+--@ requires min <= max;
+--@ ensures min <= v and v <= max;
+--@ ensures s < min => v = min;
+--@ ensures s > max => v = max;
+--@ ensures (min <= s and s <= max) => v = s;
+node range(s, min, max: real) returns (v: real);
+let
+	v = if s < min then min else if s > max then max else s;
+tel
+
+
+ 
+    
+--@ requires min <= max;
+--@ requires delta > 0.0;
+--@ ensures min <= value and value <= max; 
+--@ ensures 0 <= nb_errors and nb_errors <= 3;
+--@ ensures nb_errors = 3 => value = pre value;
+--@ ensures exists ok_stMin, ok_stMax, ok_revMin, ok_revMax: bool; (ok_stMin, ok_stMax, ok_revMin, ok_revMax) = obs_simple_voter(s1, s2, s3, min, max, delta, value, warning_stMax, warning_stMin);
+
+node simple_voter (s1, s2, s3, min, max, delta: real) returns (value: real; warning_stMax, warning_stMin: bool; nb_errors:int);
+
+var 
+  sp_s1, sp_s2, sp_s3: real;
+--  sp_er1, sp_er2, sp_er3: bool;
+--  speed_error1, speed_error2, speed_error3: bool;
+
+  r_s1, r_s2, r_s3: real;
+  stmin1, stmin2, stmin3, stmax1, stmax2, stmax3: bool;
+  errorRange1, errorRange2, errorRange3: bool; 
+
+  error1, error2, error3: bool;
+
+  ab1, ab2, ab3: bool;
+  error_ab1, error_ab2, error_ab3: bool;
+let
+  sp_s1 = check_speed (s1, delta);
+--  speed_error1 = check_validity_lock(sp_er1, 20);
+  (r_s1, stmin1, stmax1, errorRange1) = ranged_value(sp_s1, min, max, delta);
+  error1 = errorRange1 or check_validity_lock (errorRange1, 12);
+
+  sp_s2 = check_speed (s2, delta);
+--  speed_error2 = check_validity_lock(sp_er2, 20);
+  (r_s2, stmin2, stmax2, errorRange2) = ranged_value(sp_s2, min, max, delta);
+  error2 = errorRange2 or check_validity_lock (errorRange2, 14);
+
+  sp_s3 = check_speed (s3, delta);
+--  speed_error3 = check_validity_lock(sp_er3, 20);
+  (r_s3, stmin3, stmax3, errorRange3) = ranged_value(sp_s3, min, max, delta);
+  error3 = errorRange3 or check_validity_lock (errorRange3, 16);   
+
+  warning_stMin = (stmin1 and stmin2) or (stmin1 and stmin3) or (stmin2 and stmin3);
+  warning_stMax = (stmax1 and stmax2) or (stmax1 and stmax3) or (stmax2 and stmax3);
+
+  (ab1, ab2, ab3) = if error1 or error2 or error3 
+            then
+              (error1, error2, error3)  
+            else 
+                aberration(r_s1, r_s2, r_s3, delta);
+
+  error_ab1 = check_validity_lock (ab1, 16);  
+
+  error_ab2 = check_validity_lock (ab2, 18);
+
+  error_ab3 = check_validity_lock (ab3, 22);
+
+  nb_errors = nb_err_calc(error_ab1, error_ab2, error_ab3);
+
+  value = calc_value(nb_errors, error_ab1, error_ab2, error_ab3, r_s1, r_s2, r_s3);
+
+tel
+
+-- it checks if the warnings are valid
+
+node obs_simple_voter(s1, s2, s3, min, max, delta, value: real; warning_stMax, warning_stMin: bool)
+returns (ok_stMin, ok_stMax, ok_revMin, ok_revMax : bool);
+var
+  stmin1, stmin2, stmin3 : bool;
+  stmax1, stmax2, stmax3 : bool;
+let
+  stmin1 = s1 < min - delta;
+  stmin2 = s2 < min - delta;
+  stmin3 = s3 < min - delta;
+
+  stmax1 = s1 > max + delta;
+  stmax2 = s2 > max + delta;
+  stmax3 = s3 > max + delta;
+
+  ok_stMin = (warning_stMin => ((stmin1 and stmin2) or (stmin2 and stmin3) or (stmin1 and stmin3)));  
+  ok_stMax = (warning_stMax => ((stmax1 and stmax2) or (stmax2 and stmax3) or (stmax1 and stmax3)));
+
+  ok_revMin = (((stmin1 and stmin2) or (stmin2 and stmin3) or (stmin1 and stmin3)) => warning_stMin); 
+  ok_revMax = (((stmax1 and stmax2) or (stmax2 and stmax3) or (stmax1 and stmax3)) => warning_stMax);
+tel
+
+node voter_temp (s1, s2, s3: real) returns (value: real; warningMax, warningMin: bool; nb_err: int);
+let
+  (value, warningMin, warningMax, nb_err) = simple_voter (s1, s2, s3, 200.0, 2000.0, 80.0);
+tel
+
+node voter_alt (s1, s2, s3: real) returns (value: real; warningMax, warningMin: bool; nb_err: int);
+let
+  (value, warningMax, warningMin, nb_err) = simple_voter (s1, s2, s3, 0.0, 15000.0, 120.0);
+tel
