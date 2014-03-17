@@ -1,10 +1,11 @@
 #!/bin/bash
 
-eval set -- $(getopt -n $0 -o "-ciwh:" -- "$@")
+eval set -- $(getopt -n $0 -o "-aciwvh:" -- "$@")
 
-declare c i w h
+declare c i w h a v
 declare -a files
 
+SRC_PREFIX=`svn info | grep Working | sed "s/.*: //"`/lustre_compiler
 NOW=`date "+%y%m%d%H%M"`
 report=`pwd`/report-$NOW
 #LUSTREC="../../_build/src/lustrec"
@@ -17,7 +18,7 @@ base_compile() {
     while IFS=, read -r file main opts
     do
 	name=`basename "$file" .lus`
-	dir=`dirname "$file"`
+	dir=${SRC_PREFIX}/`dirname "$file"`
 	pushd $dir > /dev/null
     if [ "$main" != "" ]; then
 	$LUSTREC -d $build -verbose 0 $opts -node $main "$name".lus;
@@ -51,7 +52,11 @@ base_compile() {
         fi
     fi
     popd > /dev/null
-    echo "lustrec ($rlustrec1), gcc($rgcc1), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+    if [ $verbose -gt 0 ]; then
+	echo "lustrec ($rlustrec1), gcc($rgcc1), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
+    else
+	echo "lustrec ($rlustrec1), gcc($rgcc1), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+    fi;
     done < $file_list
 }
 
@@ -59,7 +64,7 @@ inline_compile () {
     while IFS=, read -r file main opts
     do
 	name=`basename "$file" .lus`
-	dir=`dirname "$file"`
+	dir=${SRC_PREFIX}/`dirname "$file"`
 
 	pushd $dir > /dev/null
 
@@ -78,7 +83,11 @@ inline_compile () {
     else
         rgcc2="VALID"
     fi	
-    echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+    if [ $verbose -gt 0 ]; then
+	echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
+    else
+	echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+    fi;
     popd > /dev/null
 done < $file_list
 }
@@ -88,7 +97,7 @@ inline_compile_with_check () {
     while IFS=, read -r file main opts
     do
 	name=`basename "$file" .lus`
-	dir=`dirname "$file"`
+	dir=${SRC_PREFIX}/`dirname "$file"`
 	pushd $dir > /dev/null
     $LUSTREC -d $build -verbose 0 $opts -inline -witnesses -node $main "$name".lus;
     if [ $? -ne 0 ]; then
@@ -119,7 +128,11 @@ inline_compile_with_check () {
 	rinlining="INVALID"
 	exit 1
     fi  
-    echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), inlining valid ($rinlining), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+    if [ $verbose -gt 0 ]; then
+	echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), inlining valid ($rinlining), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
+    else
+	echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), inlining valid ($rinlining), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+    fi
     popd > /dev/null
 done < $file_list
 
@@ -129,7 +142,7 @@ check_prop () {
     while IFS=, read -r file main opts
     do
 	name=`basename "$file" .lus`
-	dir=`dirname "$file"`
+	dir=${SRC_PREFIX}/`dirname "$file"`
 	pushd $dir > /dev/null
 	
     # Checking horn backend
@@ -146,7 +159,11 @@ check_prop () {
     else
         rhorn="VALID"
     fi
-    echo "horn-pdr ($rhorn), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+    if [ $verbose -gt 0 ]; then
+	echo "horn-pdr ($rhorn), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
+    else
+	echo "horn-pdr ($rhorn), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+    fi
     popd > /dev/null
 done < $file_list
 }
@@ -158,8 +175,10 @@ echo "-c: basic compilation"
 echo "-i: compile with inline mode"
 echo "-w: compile with inline mode. Check the inlining with z3"
 echo "-h: check files with the horn-pdf backend (requires z3)"
+echo "-v <int>: verbose level"
 }
 
+verbose=0
 nobehavior=1
 
 while [ $# -gt 0 ] ; do
