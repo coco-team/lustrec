@@ -1,9 +1,0 @@
-#open "dummy_lib"
-
-node access(tab : int^3^4) returns (o:int)
-var tab2,x;
-let
-  tab2 = [ 1, 2 ];
-  x = 1^2^3[1];
-  o = (tab[0][1]^2+test(pre o)+ tab2)[1];
-tel
