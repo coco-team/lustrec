@@ -61,6 +61,11 @@ and expr_desc =
 | Expr_ite   of expr * expr * expr
 | Expr_arrow of expr * expr
 | Expr_fby of expr * expr
+(*
+| Expr_struct of (label * expr) list
+| Expr_field of expr * label
+| Expr_update of expr * (label * expr)
+*)
 | Expr_array of expr list
 | Expr_access of expr * Dimension.dim_expr (* acces(e,i) is the i-th element 
 					      of array epxression e *)
