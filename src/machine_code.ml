@@ -405,7 +405,7 @@ let translate_eqs node args eqs =
 
 let translate_decl nd =
   (*Log.report ~level:1 (fun fmt -> Printers.pp_node fmt nd);*)
-  let nd, sch = Scheduling.schedule_node nd in
+  let nd, sch, _ = Scheduling.schedule_node nd in
   let split_eqs = Splitting.tuple_split_eq_list nd.node_eqs in
   let eqs_rev, remainder = 
     List.fold_left 
