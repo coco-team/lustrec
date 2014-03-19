@@ -84,6 +84,7 @@ let remove_local_roots non_locals g =
    The death table is a mapping: ident -> Set(ident) such that:
    death x is the set of local variables which get dead (i.e. unused) 
    before x is evaluated, but were until live.
+   If death x is not defined, then x is useless.
 *)
 let death_table node g sort =
   let non_locals = node_non_locals node in
@@ -93,12 +94,13 @@ let death_table node g sort =
     while (!sort <> [])
     do
       let head = List.hd !sort in
-      let dead =
+      (* If current var is not already dead, i.e. useless *)
+      if IdentDepGraph.mem_vertex g head then
 	begin
 	  IdentDepGraph.iter_succ (IdentDepGraph.remove_edge g head) g head;
-	  remove_local_roots non_locals g
-	end in
-      Hashtbl.add death head dead;
+	  let dead = remove_local_roots non_locals g in
+	  Hashtbl.add death head dead
+	end;
       sort := List.tl !sort
     done;
     IdentDepGraph.clear g;
@@ -118,9 +120,10 @@ let replace_in_set s v v' =
 
 (* Replaces [v] by [v'] in death table [death] *)
 let replace_in_death_table death v v' =
- Hashtbl.iter (fun k dead -> Hashtbl.add death k (replace_in_set dead v v')) death
+ Hashtbl.iter (fun k dead -> Hashtbl.replace death k (replace_in_set dead v v')) death
 
 let find_compatible_local node var dead =
+ Format.eprintf "find_compatible_local %s %s@." node.node_id var;
   let typ = (Corelang.node_var var node).var_type in
   try
     Some ((List.find (fun v -> ISet.mem v.var_id dead && Typing.eq_ground typ v.var_type) node.node_locals).var_id)
@@ -133,7 +136,10 @@ let reuse_policy node sort death =
   while !sort <> []
   do
     let head = List.hd !sort in
-    dead := ISet.union (Hashtbl.find death head) !dead;
+    if Hashtbl.mem death head then
+      begin
+	dead := ISet.union (Hashtbl.find death head) !dead;
+      end;
     (match find_compatible_local node head !dead with
     | None   -> ()
     | Some l -> replace_in_death_table death head l; Hashtbl.add policy head l);
