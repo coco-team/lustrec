@@ -30,16 +30,6 @@ open Graph
 open Causality
 
 
-(* Tests whether [v] is a root of graph [g], i.e. a source *)
-let is_graph_root v g =
- IdentDepGraph.in_degree g v = 0
-
-(* Computes the set of graph roots, i.e. the sources of acyclic graph [g] *)
-let graph_roots g =
- IdentDepGraph.fold_vertex
-   (fun v roots -> if is_graph_root v g then v::roots else roots)
-   g []
-
 (* Topological sort with a priority for variables belonging in the same equation lhs.
    For variables still unrelated, standard compare is used to choose the minimal element.
    This priority is used since it helps a lot in factorizing generated code.
@@ -108,43 +98,6 @@ let topological_sort eq_equiv g =
     !sorted
   end
 
-(* Computes the last dependency
-*)
-
-(* Computes the death table of [node] wrt dep graph [g] and topological [sort].
-   The death table is a mapping: ident -> Set(ident) such that:
-   death x is the set of local variables which get dead (i.e. unused) 
-   after x is evaluated, but were until live.
-*)
-let death_table node g sort =
-  let death = Hashtbl.create 23 in
-  let sort  = ref (List.rev sort) in
-  let buried  = ref ISet.empty in
-  begin
-    buried := ExprDep.node_memory_variables node;
-    buried := List.fold_left (fun dead (v : var_decl) -> ISet.add v.var_id dead) !buried node.node_outputs;
-    (* We could also try to reuse input variables, due to C parameter copying semantics *)
-    buried := List.fold_left (fun dead (v : var_decl) -> ISet.add v.var_id dead) !buried node.node_inputs;
-    while (!sort <> [])
-    do
-      let head = List.hd !sort in
-      let dead = IdentDepGraph.fold_succ
-	(fun tgt dead -> if not (ExprDep.is_instance_var tgt || ISet.mem tgt !buried) then ISet.add tgt dead else dead)
-	g head ISet.empty in
-      buried := ISet.union !buried dead;
-      Hashtbl.add death head dead;
-      sort := List.tl !sort
-    done;
-    IdentDepGraph.clear g;
-    death
-  end
-
-let pp_death_table fmt death =
-  begin
-    Format.fprintf fmt "{ /* death table */@.";
-    Hashtbl.iter (fun s t -> Format.fprintf fmt "%s -> { %a }@." s (Utils.fprintf_list ~sep:", " Format.pp_print_string) (ISet.elements t)) death;
-    Format.fprintf fmt "}@."
-  end
 
 let schedule_node n  =
   try
@@ -155,11 +108,15 @@ let schedule_node n  =
       with Not_found -> false in
     let n', g = global_dependency n in
     Log.report ~level:5 (fun fmt -> Format.eprintf "dependency graph for node %s: %a" n'.node_id pp_dep_graph g);
-    let gg = IdentDepGraph.copy g in
+(*    let gg = IdentDepGraph.copy g in *)
     let sort = topological_sort eq_equiv g in
-    let death = death_table n gg sort in
-    Log.report ~level:5 (fun fmt -> Format.eprintf "death table for node %s: %a" n'.node_id pp_death_table death);
-    n', sort, death
+(*
+    let death = Liveness.death_table n gg sort in
+    Log.report ~level:5 (fun fmt -> Format.eprintf "death table for node %s: %a" n'.node_id Liveness.pp_death_table death);
+    let reuse = Liveness.reuse_policy n sort death in
+    Log.report ~level:5 (fun fmt -> Format.eprintf "reuse policy for node %s: %a" n'.node_id Liveness.pp_reuse_policy reuse);
+*)
+    n', sort
 (* let sorted = TopologicalDepGraph.fold (fun x res -> if ExprDep.is_instance_var x then res else x::res) g []*)
   with (Causality.Cycle v) as exc ->
     pp_error Format.err_formatter v;
