@@ -55,6 +55,16 @@ mem' = pre(no_mem, mem);
    - return g
 *)
 
+(* Tests whether [v] is a root of graph [g], i.e. a source *)
+let is_graph_root v g =
+ IdentDepGraph.in_degree g v = 0
+
+(* Computes the set of graph roots, i.e. the sources of acyclic graph [g] *)
+let graph_roots g =
+ IdentDepGraph.fold_vertex
+   (fun v roots -> if is_graph_root v g then v::roots else roots)
+   g []
+
 let add_edges src tgt g =
 (*List.iter (fun s -> List.iter (fun t -> Format.eprintf "add %s -> %s@." s t) tgt) src;*)
  List.iter

@@ -144,6 +144,27 @@ let get_type_definition tname =
     type_coretype (fun d -> ()) (Hashtbl.find type_table (Tydec_const tname))
   with Not_found -> raise (Error (Location.dummy_loc, Unbound_type tname))
 
+(* Equality on ground types only *)
+(* Should be used between local variables which must have a ground type *)
+let rec eq_ground t1 t2 =
+  match t1.tdesc, t2.tdesc with
+  | Tint, Tint | Tbool, Tbool | Trat, Trat -> true
+  | Tenum tl, Tenum tl' when tl == tl' -> true
+  | Ttuple tl, Ttuple tl' when List.length tl = List.length tl' -> List.for_all2 eq_ground tl tl'
+  | Tstruct fl, Tstruct fl' when List.map fst fl = List.map fst fl' -> List.for_all2 (fun (_, t) (_, t') -> eq_ground t t') fl fl'
+  | (Tconst t, _) ->
+    let def_t = get_type_definition t in
+    eq_ground def_t t2
+  | (_, Tconst t)  ->
+    let def_t = get_type_definition t in
+    eq_ground t1 def_t
+  | Tarrow (t1,t2), Tarrow (t1',t2') -> eq_ground t1 t1' && eq_ground t2 t2'
+  | Tclock t1', _ -> eq_ground t1' t2
+  | _, Tclock t2' -> eq_ground t1 t2'
+  | Tstatic (e1, t1'), Tstatic (e2, t2')
+  | Tarray (e1, t1'), Tarray (e2, t2') -> Dimension.is_eq_dimension e1 e2 && eq_ground t1' t2'
+  | _ -> false
+
 (** [unify t1 t2] unifies types [t1] and [t2]. Raises [Unify
     (t1,t2)] if the types are not unifiable.*)
 (* Standard destructive unification *)
@@ -187,7 +208,6 @@ let rec unify t1 t2 =
       let def_t = get_type_definition t in
       unify t1 def_t
     | Tenum tl, Tenum tl' when tl == tl' -> ()
-    | Tstruct fl, Tstruct fl' when fl == fl' -> ()
     | Tstatic (e1, t1'), Tstatic (e2, t2')
     | Tarray (e1, t1'), Tarray (e2, t2') ->
       begin
