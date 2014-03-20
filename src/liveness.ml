@@ -114,6 +114,25 @@ let pp_death_table fmt death =
     Format.fprintf fmt "}@."
   end
 
+
+(* Reuse policy:
+   - could reuse variables with the same type exactly only (simple).
+   - reusing variables with different types would involve:
+     - either dirty castings
+     - or complex inclusion expression (for instance: array <-> array cell, struct <-> struct field) to be able to reuse only some parts of structured data.
+     ... it seems too complex and potentially unsafe
+   - for node instance calls: output variables could NOT reuse input variables, 
+     even if inputs become dead, because the correctness would depend on the scheduling
+     of the callee (so, the compiling strategy could NOT be modular anymore).
+   - once a policy is set, we need to:
+     - replace each variable by its reuse alias.
+     - simplify resulting equations, as we may now have:
+        x = x;                     --> ;           for scalar vars
+       or:
+        x = &{ f1 = x->f1; f2 = t; } --> x->f2 = t;   for struct vars
+     - such simplifications are, until now, only expressible at the C source level...
+ *)
+
 (* Replaces [v] by [v'] in set [s] *)
 let replace_in_set s v v' =
   if ISet.mem v s then ISet.add v' (ISet.remove v s) else s
@@ -123,10 +142,19 @@ let replace_in_death_table death v v' =
  Hashtbl.iter (fun k dead -> Hashtbl.replace death k (replace_in_set dead v v')) death
 
 let find_compatible_local node var dead =
- Format.eprintf "find_compatible_local %s %s@." node.node_id var;
+ (*Format.eprintf "find_compatible_local %s %s@." node.node_id var;*)
   let typ = (Corelang.node_var var node).var_type in
+  let eq_var = node_eq var node in
+  let inputs =
+    match NodeDep.get_callee eq_var.eq_rhs with
+    | None           -> []
+    | Some (_, args) -> List.fold_right (fun e r -> match e.expr_desc with Expr_ident id -> id::r | _ -> r) args [] in
+  let filter v =
+       ISet.mem v.var_id dead
+    && Typing.eq_ground typ v.var_type
+    && not (List.mem v.var_id inputs) in
   try
-    Some ((List.find (fun v -> ISet.mem v.var_id dead && Typing.eq_ground typ v.var_type) node.node_locals).var_id)
+    Some ((List.find filter node.node_locals).var_id)
   with Not_found -> None
 
 let reuse_policy node sort death =

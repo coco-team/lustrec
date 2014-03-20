@@ -229,8 +229,8 @@ module NodeDep = struct
 
   let get_callee expr =
     match expr.expr_desc with
-    | Expr_appl (id, args, _) -> id, expr_list_of_expr args
-    | _ -> assert false
+    | Expr_appl (id, args, _) -> Some (id, expr_list_of_expr args)
+    | _ -> None
 
   let get_calls prednode eqs =
     let deps =
@@ -248,7 +248,7 @@ module NodeDep = struct
 	| Node nd ->
 	  (*Format.eprintf "Computing deps of node %s@.@?" nd.node_id; *)
 	  let accu = add_vertices [nd.node_id] accu in
-	  let deps = List.map (fun e -> fst (get_callee e)) (get_calls (fun _ -> true) nd.node_eqs) in
+	  let deps = List.map (fun e -> fst (desome (get_callee e))) (get_calls (fun _ -> true) nd.node_eqs) in
 	   (*Format.eprintf "%a@.@?" (Utils.fprintf_list ~sep:"@." Format.pp_print_string) deps; *)
 	  add_edges [nd.node_id] deps accu
 	| _ -> assert false (* should not happen *)
