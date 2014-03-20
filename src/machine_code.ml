@@ -414,14 +414,14 @@ let translate_decl nd =
 	  then
 	    (accu, node_eqs_remainder)
 	  else
-	    if   List.exists (fun vdecl -> vdecl.var_id = v) nd.node_locals
+	    (*if   List.exists (fun vdecl -> vdecl.var_id = v) nd.node_locals
 	      || List.exists (fun vdecl -> vdecl.var_id = v) nd.node_outputs
-	    then
+	    then*)
 	      let eq_v, remainder = find_eq v node_eqs_remainder in
 	      eq_v::accu, remainder
-	    (* else it is a constant value, checked during typing phase *)
+	    (* else it is a constant value, checked during typing phase
 	    else	 
-	      accu, node_eqs_remainder
+	      accu, node_eqs_remainder *)
       ) 
       ([], split_eqs) 
       sch 
@@ -462,7 +462,7 @@ let translate_decl nd =
   }
 
 
-let translate_prog decls = 
+let translate_prog decls =
   let nodes = get_nodes decls in 
    (* What to do with Imported/Sensor/Actuators ? *)
    (*arrow_machine ::*)  List.map translate_decl nodes
