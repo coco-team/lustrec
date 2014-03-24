@@ -215,13 +215,6 @@ let new_instance =
       o
     end
 
-let const_of_carrier cr =
- match (carrier_repr cr).carrier_desc with
- | Carry_const id -> id
- | Carry_name
- | Carry_var
- | Carry_link _ -> (Format.eprintf "internal error: const_of_carrier %a@." print_carrier cr; assert false) (* TODO check this Xavier *)
-
 (* translate_<foo> : node -> context -> <foo> -> machine code/expression *)
 (* the context contains  m : state aka memory variables  *)
 (*                      si : initialization instructions *)
@@ -240,7 +233,7 @@ let translate_ident node (m, si, j, d, s) id =
 let rec control_on_clock node ((m, si, j, d, s) as args) ck inst =
  match (Clocks.repr ck).cdesc with
  | Con    (ck1, cr, l) ->
-   let id  = const_of_carrier cr in
+   let id  = Clocks.const_of_carrier cr in
    control_on_clock node args ck1 (MBranch (translate_ident node args id,
 					    [l, [inst]] ))
  | _                   -> inst
@@ -313,7 +306,7 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
 let translate_guard node args expr =
   match expr.expr_desc with
   | Expr_ident x  -> translate_ident node args x
-  | _ -> assert false
+  | _ -> (Format.eprintf "internal error: translate_guard %s %a@." node.node_id Printers.pp_expr expr;assert false)
 
 let rec translate_act node ((m, si, j, d, s) as args) (y, expr) =
   match expr.expr_desc with
@@ -367,12 +360,14 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       node_f,
       NodeDep.filter_static_inputs (node_inputs node_f) el in 
     let o = new_instance node node_f eq.eq_rhs.expr_tag in
+    let call_ck = Clocks.new_var true in
+    Clock_calculus.unify_imported_clock (Some call_ck) eq.eq_rhs.expr_clock;
     (m,
      (if Stateless.check_node node_f then si else MReset o :: si),
      (if Basic_library.is_internal_fun f then j else Utils.IMap.add o call_f j),
      d,
      reset_instance node args o r eq.eq_rhs.expr_clock @
-       (control_on_clock node args eq.eq_rhs.expr_clock (MStep (var_p, o, vl))) :: s)
+       (control_on_clock node args call_ck (MStep (var_p, o, vl))) :: s)
 
    (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
       are preserved. While they are replaced as if g then x = t else x = e in  C or Java

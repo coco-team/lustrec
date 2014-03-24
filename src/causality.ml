@@ -113,6 +113,10 @@ let eq_memory_variables mems eq =
 let node_memory_variables nd =
  List.fold_left eq_memory_variables ISet.empty nd.node_eqs
 
+let node_non_input_variables nd =
+  let outputs = List.fold_left (fun outputs v -> ISet.add v.var_id outputs) ISet.empty nd.node_outputs in
+  List.fold_left (fun non_inputs v -> ISet.add v.var_id non_inputs) outputs nd.node_locals
+
 (* computes the equivalence relation relating variables 
    in the same equation lhs, under the form of a table 
    of class representatives *)
@@ -132,38 +136,47 @@ let adjust_tuple v expr =
  | Types.Ttuple tl -> duplicate v (List.length tl)
  | _         -> [v]
 
+
 (* Add dependencies from lhs to rhs in [g, g'], *)
 (* no-mem/no-mem and mem/no-mem in g            *)
 (* mem/mem in g'                                *)
 (* excluding all/[inputs]                       *)
-let add_eq_dependencies mems inputs eq (g, g') =
-  let rec add_dep lhs_is_mem lhs rhs g =
-    let add_var x (g, g') =
-      if ISet.mem x inputs then (g, g') else
+let add_eq_dependencies mems non_inputs eq (g, g') =
+  let add_var lhs_is_mem lhs x (g, g') =
+    if ISet.mem x non_inputs then
       match (lhs_is_mem, ISet.mem x mems) with
       | (false, true ) -> (add_edges [x] lhs g, g'                  )
       | (false, false) -> (add_edges lhs [x] g, g'                  )
       | (true , false) -> (add_edges lhs [x] g, g'                  )
-      | (true , true ) -> (g                  , add_edges [x] lhs g') in
+      | (true , true ) -> (g                  , add_edges [x] lhs g')
+    else (g, g') in
+(* Add dependencies from [lhs] to rhs clock [ck]. *)
+  let rec add_clock lhs_is_mem lhs ck g =
+    (*Format.eprintf "add_clock %a@." Clocks.print_ck ck;*)
+    match (Clocks.repr ck).Clocks.cdesc with
+    | Clocks.Con (ck', cr, _)   -> add_var lhs_is_mem lhs (Clocks.const_of_carrier cr) (add_clock lhs_is_mem lhs ck' g)
+    | Clocks.Ccarrying (_, ck') -> add_clock lhs_is_mem lhs ck' g
+    | _                         -> g in
+  let rec add_dep lhs_is_mem lhs rhs g =
 (* Add mashup dependencies for a user-defined node instance [lhs] = [f]([e]) *)
 (* i.e every input is connected to every output, through a ghost var *)
     let mashup_appl_dependencies f e g =
       let f_var = mk_instance_var (sprintf "%s_%d" f eq.eq_loc.Location.loc_start.Lexing.pos_lnum) in
       List.fold_right (fun rhs -> add_dep lhs_is_mem (adjust_tuple f_var rhs) rhs)
-	(expr_list_of_expr e) (add_var f_var g) in
+	(expr_list_of_expr e) (add_var lhs_is_mem lhs f_var g) in
     match rhs.expr_desc with
     | Expr_const _    -> g
     | Expr_fby (e1, e2)  -> add_dep true lhs e2 (add_dep false lhs e1 g)
     | Expr_pre e      -> add_dep true lhs e g
-    | Expr_ident x -> add_var x g
+    | Expr_ident x -> add_var lhs_is_mem lhs x (add_clock lhs_is_mem lhs rhs.expr_clock g)
     | Expr_access (e1, _)
     | Expr_power (e1, _) -> add_dep lhs_is_mem lhs e1 g
     | Expr_array a -> List.fold_right (add_dep lhs_is_mem lhs) a g
     | Expr_tuple t -> List.fold_right2 (fun l r -> add_dep lhs_is_mem [l] r) lhs t g
-    | Expr_merge (c, hl) -> add_var c (List.fold_right (fun (_, h) -> add_dep lhs_is_mem lhs h) hl g)
+    | Expr_merge (c, hl) -> add_var lhs_is_mem lhs c (List.fold_right (fun (_, h) -> add_dep lhs_is_mem lhs h) hl g)
     | Expr_ite   (c, t, e) -> add_dep lhs_is_mem lhs c (add_dep lhs_is_mem lhs t (add_dep lhs_is_mem lhs e g))
     | Expr_arrow (e1, e2)  -> add_dep lhs_is_mem lhs e2 (add_dep lhs_is_mem lhs e1 g)
-    | Expr_when  (e, c, _)  -> add_dep lhs_is_mem lhs e (add_var c g)
+    | Expr_when  (e, c, _)  -> add_dep lhs_is_mem lhs e (add_var lhs_is_mem lhs c g)
     | Expr_appl (f, e, None) ->
       if Basic_library.is_internal_fun f
     (* tuple component-wise dependency for internal operators *)
@@ -173,7 +186,7 @@ let add_eq_dependencies mems inputs eq (g, g') =
       else
 	mashup_appl_dependencies f e g
     | Expr_appl (f, e, Some (r, _)) ->
-      mashup_appl_dependencies f e (add_var r g)
+      mashup_appl_dependencies f e (add_var lhs_is_mem lhs r g)
     | Expr_uclock  (e, _)
     | Expr_dclock  (e, _)
     | Expr_phclock (e, _) -> add_dep lhs_is_mem lhs e g 
@@ -182,13 +195,12 @@ let add_eq_dependencies mems inputs eq (g, g') =
   
 
 (* Returns the dependence graph for node [n] *)
-let dependence_graph mems n =
+let dependence_graph mems non_inputs n =
   eq_var_cpt := 0;
   instance_var_cpt := 0;
   let g = new_graph (), new_graph () in
-  let inputs = List.fold_left (fun inputs v -> ISet.add v.var_id inputs) ISet.empty n.node_inputs in
   (* Basic dependencies *)
-  let g = List.fold_right (add_eq_dependencies mems inputs) n.node_eqs g in
+  let g = List.fold_right (add_eq_dependencies mems non_inputs) n.node_eqs g in
   g
 
 end
@@ -385,7 +397,8 @@ let pp_error fmt trace =
 
 let global_dependency node =
   let mems = ExprDep.node_memory_variables node in
-  let (g_non_mems, g_mems) = ExprDep.dependence_graph mems node in
+  let non_inputs = ExprDep.node_non_input_variables node in
+  let (g_non_mems, g_mems) = ExprDep.dependence_graph mems non_inputs node in
   (*Format.eprintf "g_non_mems: %a" pp_dep_graph g_non_mems;
   Format.eprintf "g_mems: %a" pp_dep_graph g_mems;*)
   CycleDetection.check_cycles g_non_mems;

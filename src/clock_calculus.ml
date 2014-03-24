@@ -522,7 +522,6 @@ let try_semi_unify ck1 ck2 loc =
 (* ck1 is a subtype of ck2 *)
 let rec sub_unify sub ck1 ck2 =
   match (repr ck1).cdesc, (repr ck2).cdesc with
-  | Ctuple [c1]        , Ctuple [c2]        -> sub_unify sub c1 c2
   | Ctuple cl1         , Ctuple cl2         ->
     if List.length cl1 <> List.length cl2
     then raise (Unify (ck1, ck2))
@@ -792,7 +791,7 @@ let clock_node env loc nd =
   (* let is_main = nd.node_id = !Options.main_node in *)
   let new_env = clock_var_decl_list env false nd.node_inputs in
   let new_env = clock_var_decl_list new_env true nd.node_outputs in
-  let new_env = clock_var_decl_list new_env false nd.node_locals in
+  let new_env = clock_var_decl_list new_env true nd.node_locals in
   List.iter (clock_eq new_env) nd.node_eqs;
   let ck_ins = clock_of_vlist nd.node_inputs in
   let ck_outs = clock_of_vlist nd.node_outputs in
@@ -803,7 +802,7 @@ let clock_node env loc nd =
      That's not the case for types. *)
   List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_inputs;
   List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_outputs;
-  List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_locals;
+  (*List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_locals;*)
   (* TODO : Xavier pourquoi ai je cette erreur ? *)
 (*  if (is_main && is_polymorphic ck_node) then
     raise (Error (loc,(Cannot_be_polymorphic ck_node)));

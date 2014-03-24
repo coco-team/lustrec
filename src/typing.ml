@@ -293,7 +293,6 @@ let try_semi_unify ty1 ty2 loc =
 (* ty1 is a subtype of ty2 *)
 let rec sub_unify sub ty1 ty2 =
   match (repr ty1).tdesc, (repr ty2).tdesc with
-  | Ttuple [t1]        , Ttuple [t2]        -> sub_unify sub t1 t2
   | Ttuple tl1         , Ttuple tl2         ->
     if List.length tl1 <> List.length tl2
     then raise (Unify (ty1, ty2))
