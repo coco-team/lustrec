@@ -573,11 +573,19 @@ let pp_error fmt = function
       print_ck ck_node
       print_ck ck
 
+let const_of_carrier cr =
+ match (carrier_repr cr).carrier_desc with
+ | Carry_const id -> id
+ | Carry_name
+ | Carry_var
+ | Carry_link _ -> (Format.eprintf "internal error: const_of_carrier %a@." print_carrier cr; assert false) (* TODO check this Xavier *)
+ 
 let uneval const cr =
   (*Format.printf "Clocks.uneval %s %a@." const print_carrier cr;*)
   let cr = carrier_repr cr in
   match cr.carrier_desc with
   | Carry_var -> cr.carrier_desc <- Carry_const const
+  | Carry_name -> cr.carrier_desc <- Carry_const const
   | _         -> assert false
 
 (* Local Variables: *)

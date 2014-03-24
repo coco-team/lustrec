@@ -142,13 +142,18 @@ let mk_expr_alias node (defs, vars) expr =
       mkeq expr.expr_loc (List.map (fun v -> v.var_id) new_aliases, expr)
     in (new_def::defs, new_aliases@vars), replace_expr new_aliases expr
 
-(* Create an alias for [expr], if [opt] *)
+(* Create an alias for [expr], if [expr] is not already an alias (i.e. an ident)
+   and [opt] is true *)
 let mk_expr_alias_opt opt node defvars expr =
- if opt
- then
-   mk_expr_alias node defvars expr
- else
-   defvars, expr
+  match expr.expr_desc with
+  | Expr_ident alias ->
+    defvars, expr
+  | _                -> 
+    if opt
+    then
+      mk_expr_alias node defvars expr
+    else
+      defvars, expr
 
 (* Create a (normalized) expression from [ref_e], 
    replacing description with [norm_d],
@@ -286,11 +291,8 @@ and normalize_cond_expr ?(alias=true) node offsets defvars expr =
   | _ -> normalize_expr ~alias:alias node offsets defvars expr
 
 and normalize_guard node defvars expr =
-  match expr.expr_desc with
-  | Expr_ident _ -> defvars, expr
-  | _ ->
-    let defvars, norm_expr = normalize_expr node [] defvars expr in
-    mk_expr_alias_opt true node defvars norm_expr
+  let defvars, norm_expr = normalize_expr node [] defvars expr in
+  mk_expr_alias_opt true node defvars norm_expr
 
 (* outputs cannot be memories as well. If so, introduce new local variable.
 *)

@@ -59,7 +59,6 @@ and pp_expr fmt expr =
   match expr.expr_desc with
     | Expr_const c -> pp_const fmt c
     | Expr_ident id -> Format.fprintf fmt "%s" id
-(*    | Expr_cst_array (c, e) -> fprintf fmt "%a^%a" pp_expr e pp_const c *)
     | Expr_array a -> fprintf fmt "[%a]" pp_tuple a
     | Expr_access (a, d) -> fprintf fmt "%a[%a]" pp_expr a Dimension.pp_dimension d
     | Expr_power (a, d) -> fprintf fmt "(%a^%a)" pp_expr a Dimension.pp_dimension d

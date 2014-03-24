@@ -98,13 +98,6 @@ let topological_sort eq_equiv g =
     !sorted
   end
 
-(* Removes global constants from [node] schedule [sch] *)
-let remove_consts node sch =
-  let filter v = 
-       List.exists (fun vdecl -> vdecl.var_id = v) node.node_locals
-    || List.exists (fun vdecl -> vdecl.var_id = v) node.node_outputs in
-  List.filter filter sch
-
 let schedule_node n =
   try
     let eq_equiv = ExprDep.node_eq_equiv n in
@@ -115,7 +108,7 @@ let schedule_node n =
     let n', g = global_dependency n in
     Log.report ~level:5 (fun fmt -> Format.eprintf "dependency graph for node %s: %a" n'.node_id pp_dep_graph g);
     let gg = IdentDepGraph.copy g in
-    let sort = remove_consts n (topological_sort eq_equiv g) in
+    let sort = topological_sort eq_equiv g in
 
     let death = Liveness.death_table n gg sort in
     Log.report ~level:5 (fun fmt -> Format.eprintf "death table for node %s: %a" n'.node_id Liveness.pp_death_table death);
