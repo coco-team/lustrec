@@ -51,6 +51,7 @@ type error =
   | Already_bound of ident
   | Already_defined of ident
   | Undefined_var of (unit IMap.t)
+  | Declared_but_undefined of ident
   | Unbound_type of ident
   | Not_a_dimension
   | Not_a_constant
@@ -106,6 +107,10 @@ let rec print_node_struct_ty_field fmt (label, ty) =
   fprintf fmt "%a : %a" pp_print_string label print_node_ty ty
 and print_node_ty fmt ty =
   match ty.tdesc with
+  | Tvar -> begin
+Format.eprintf "DEBUG:Types.print_node@.";
+    fprintf fmt "_%s" (name_of_type ty.tid)
+end
   | Tint ->
     fprintf fmt "int"
   | Treal ->
@@ -158,6 +163,8 @@ let pp_error fmt = function
     fprintf fmt "No definition provided for variable(s): %a@."
       (Utils.fprintf_list ~sep:"," pp_print_string)
       (fst (Utils.list_of_imap vmap))
+  | Declared_but_undefined id ->
+     fprintf fmt "Node %s is declared but not defined@." id
   | Type_clash (ty1,ty2) ->
       Utils.reset_names ();
     fprintf fmt "Expected type %a, got type %a@." print_ty ty1 print_ty ty2

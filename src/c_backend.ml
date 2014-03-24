@@ -333,8 +333,8 @@ let pp_assign m self pp_var fmt var_type var_name value =
 let pp_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list) =
  try (* stateful node instance *)
    let (n,_) = List.assoc i m.minstances in
-   fprintf fmt "%s_step (%a%t%a%t%s->%s);"
-     (node_name n)
+   fprintf fmt "%a (%a%t%a%t%s->%s);"
+     pp_machine_step_name (node_name n)
      (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
      (Utils.pp_final_char_if_non_empty ", " inputs) 
      (Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs
@@ -343,8 +343,8 @@ let pp_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list
      i
  with Not_found -> (* stateless node instance *)
    let (n,_) = List.assoc i m.mcalls in
-   fprintf fmt "%s (%a%t%a);"
-     (node_name n)
+   fprintf fmt "%a (%a%t%a);"
+     pp_machine_step_name (node_name n)
      (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
      (Utils.pp_final_char_if_non_empty ", " inputs) 
      (Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs 
@@ -504,8 +504,8 @@ let print_reset_prototype self fmt (name, static) =
     self
 
 let print_stateless_prototype fmt (name, inputs, outputs) =
-  fprintf fmt "void %s (@[<v>@[%a%t@]@,@[%a@]@,@])"
-    name
+  fprintf fmt "void %a (@[<v>@[%a%t@]@,@[%a@]@,@])"
+    pp_machine_step_name name
     (Utils.fprintf_list ~sep:",@ " pp_c_decl_input_var) inputs
     (Utils.pp_final_char_if_non_empty ",@ " inputs) 
     (Utils.fprintf_list ~sep:",@ " pp_c_decl_output_var) outputs

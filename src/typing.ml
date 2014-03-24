@@ -764,14 +764,26 @@ let uneval_top_generics decl =
 let uneval_prog_generics prog =
  List.iter uneval_top_generics prog
 
+let rec get_imported_node decls id =
+  match decls with
+  | [] -> assert false
+  | decl::q ->
+     (match decl.top_decl_desc with
+      | ImportedNode nd when id = nd.nodei_id -> decl
+      | _ -> get_imported_node q id)
+
 let check_env_compat header declared computed = 
   uneval_prog_generics header;
   Env.iter declared (fun k decl_type_k -> 
-    let computed_t = instantiate (ref []) (ref []) (Env.lookup_value computed k) in
+    let computed_t = instantiate (ref []) (ref []) 
+				 (try Env.lookup_value computed k
+				  with Not_found ->
+				    let loc = (get_imported_node header k).top_decl_loc in 
+				    raise (Error (loc, Declared_but_undefined k))) in
     (*Types.print_ty Format.std_formatter decl_type_k;
     Types.print_ty Format.std_formatter computed_t;*)
     try_semi_unify decl_type_k computed_t Location.dummy_loc
-  ) 
+		    )
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
