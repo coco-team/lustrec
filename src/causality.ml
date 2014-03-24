@@ -143,7 +143,7 @@ let adjust_tuple v expr =
 (* excluding all/[inputs]                       *)
 let add_eq_dependencies mems non_inputs eq (g, g') =
   let add_var lhs_is_mem lhs x (g, g') =
-    if ISet.mem x non_inputs then
+    if is_instance_var x || ISet.mem x non_inputs then
       match (lhs_is_mem, ISet.mem x mems) with
       | (false, true ) -> (add_edges [x] lhs g, g'                  )
       | (false, false) -> (add_edges lhs [x] g, g'                  )
