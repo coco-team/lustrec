@@ -108,7 +108,7 @@ let rec print_node_struct_ty_field fmt (label, ty) =
 and print_node_ty fmt ty =
   match ty.tdesc with
   | Tvar -> begin
-Format.eprintf "DEBUG:Types.print_node@.";
+(*Format.eprintf "DEBUG:Types.print_node@.";*)
     fprintf fmt "_%s" (name_of_type ty.tid)
 end
   | Tint ->
