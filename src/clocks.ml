@@ -355,13 +355,35 @@ let phase ck =
   let (a,b) = aux ck in
   simplify_rat (a,b)
     
-(* Returns the pck clock parent of a clock *)
-let rec pclock_parent ck =
+(* Returns the clock root of a clock *)
+let rec root ck =
   match (repr ck).cdesc with
   | Con (ck',_,_) | Clink ck' | Ccarrying (_,ck') ->
-      pclock_parent ck'
+      root ck'
   | Pck_up _ | Pck_down _ | Pck_phase _ | Pck_const _ | Cvar _ | Cunivar _ -> ck
   | Carrow _ | Ctuple _ -> failwith "Internal error pclock_parent"
+
+(* Returns the branch of clock [ck] in its clock tree *)
+let rec branch ck =
+  let rec branch ck acc =
+    match (repr ck).cdesc with
+    | Ccarrying (_, ck) -> branch ck acc
+    | Con (ck, cr, l)   -> branch ck ((cr, l) :: acc)
+    | Ctuple _
+    | Carrow _          -> assert false
+    | _                 -> acc
+  in branch ck [];;
+
+(* Tests whether clock branches [br1] nd [br2] are statically disjoint *)
+let rec disjoint_branches br1 br2 =
+ match br1, br2 with
+ | []          , _
+ | _           , []           -> false
+ | (cr1,l1)::q1, (cr2,l2)::q2 -> cr1 = cr2 && ((l1 <> l2) || disjoint_branches q1 q2);;
+
+(* Disjunction relation between variables based upon their static clocks. *)
+let disjoint ck1 ck2 =
+ root ck1 = root ck2 && disjoint_branches (branch ck1) (branch ck2);;
 
 (** [normalize pck] returns the normal form of clock [pck]. *)
 let normalize pck =

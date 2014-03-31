@@ -379,6 +379,30 @@ module CycleDetection = struct
 
 end
 
+(* Module used to compute static disjunction of variables based upon their clocks. *)
+module Disjunction =
+struct
+  (* map: var |-> list of disjoint vars, sorted in increasing branch length,
+     maybe removing shorter branches *)
+  type clock_map = (ident, ident list) Hashtbl.t
+
+  let rec add_vdecl map vdecls =
+    match vdecls with
+    | []         -> ()
+    | vdecl :: q -> begin
+		      Hashtbl.add map vdecl.var_id (List.fold_left (fun r v -> if Clocks.disjoint v.var_clock vdecl.var_clock then v::r else r) [] q);
+                      add_vdecl map q
+		    end
+
+  let build_clock_map vdecls =
+    let root_branch vdecl = Clocks.root vdecl.var_clock, Clocks.branch vdecl.var_clock in
+    let map = Hashtbl.create 23 in
+    begin
+      add_vdecl map (List.sort (fun v1 v2 -> compare (root_branch v1) (root_branch v2)) vdecls);
+      map
+    end
+end
+
 let pp_dep_graph fmt g =
   begin
     Format.fprintf fmt "{ /* graph */@.";
