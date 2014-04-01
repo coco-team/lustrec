@@ -390,16 +390,23 @@ struct
     match vdecls with
     | []         -> ()
     | vdecl :: q -> begin
-		      Hashtbl.add map vdecl.var_id (List.fold_left (fun r v -> if Clocks.disjoint v.var_clock vdecl.var_clock then v::r else r) [] q);
+		      Hashtbl.add map vdecl.var_id (List.fold_left (fun r v -> if Clocks.disjoint v.var_clock vdecl.var_clock then v.var_id::r else r) [] q);
                       add_vdecl map q
 		    end
 
-  let build_clock_map vdecls =
+  let clock_disjoint_map vdecls =
     let root_branch vdecl = Clocks.root vdecl.var_clock, Clocks.branch vdecl.var_clock in
     let map = Hashtbl.create 23 in
     begin
       add_vdecl map (List.sort (fun v1 v2 -> compare (root_branch v1) (root_branch v2)) vdecls);
       map
+    end
+
+  let pp_disjoint_map fmt map =
+    begin
+      Format.fprintf fmt "{ /* disjoint map */@.";
+      Hashtbl.iter (fun k v -> Format.fprintf fmt "%s # { %a }@." k (Utils.fprintf_list ~sep:", " Format.pp_print_string) v) map;
+      Format.fprintf fmt "}@."
     end
 end
 
@@ -415,7 +422,7 @@ let pp_error fmt trace =
     (fprintf_list ~sep:"->" pp_print_string) trace
 
 (* Merges elements of graph [g2] into graph [g1] *)
-  let merge_with g1 g2 =
+let merge_with g1 g2 =
     IdentDepGraph.iter_vertex (fun v -> IdentDepGraph.add_vertex g1 v) g2;
     IdentDepGraph.iter_edges (fun s t -> IdentDepGraph.add_edge g1 s t) g2
 

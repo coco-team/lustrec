@@ -354,7 +354,12 @@ let phase ck =
   in
   let (a,b) = aux ck in
   simplify_rat (a,b)
-    
+
+let eq_carrier cr1 cr2 =
+  match (carrier_repr cr1).carrier_desc, (carrier_repr cr2).carrier_desc with
+ | Carry_const id1, Carry_const id2 -> id1 = id2
+ | _                                -> cr1.carrier_id = cr2.carrier_id
+
 (* Returns the clock root of a clock *)
 let rec root ck =
   match (repr ck).cdesc with
@@ -379,7 +384,7 @@ let rec disjoint_branches br1 br2 =
  match br1, br2 with
  | []          , _
  | _           , []           -> false
- | (cr1,l1)::q1, (cr2,l2)::q2 -> cr1 = cr2 && ((l1 <> l2) || disjoint_branches q1 q2);;
+ | (cr1,l1)::q1, (cr2,l2)::q2 -> eq_carrier cr1 cr2 && ((l1 <> l2) || disjoint_branches q1 q2);;
 
 (* Disjunction relation between variables based upon their static clocks. *)
 let disjoint ck1 ck2 =
