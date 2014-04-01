@@ -113,6 +113,9 @@ let schedule_node n =
     let death = Liveness.death_table n gg sort in
     Log.report ~level:5 (fun fmt -> Format.eprintf "death table for node %s: %a" n'.node_id Liveness.pp_death_table death);
 
+    let disjoint = Disjunction.clock_disjoint_map (node_vars n) in
+    Log.report ~level:5 (fun fmt -> Format.eprintf "clock disjoint map for node %s: %a" n'.node_id Disjunction.pp_disjoint_map disjoint);
+
     let reuse = Liveness.reuse_policy n sort death in
     Log.report ~level:5 (fun fmt -> Format.eprintf "reuse policy for node %s: %a" n'.node_id Liveness.pp_reuse_policy reuse);
  
