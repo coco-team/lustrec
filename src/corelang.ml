@@ -118,6 +118,8 @@ type imported_node_desc =
      nodei_outputs: var_decl list;
      nodei_stateless: bool;
      nodei_spec: LustreSpec.node_annot option;
+     nodei_prototype: string option;
+     nodei_in_lib: string option;
     }
 
 type const_desc = 
@@ -128,10 +130,11 @@ type const_desc =
     }
 
 type top_decl_desc =
-  | Node of node_desc
-  | Consts of const_desc list
-  | ImportedNode of imported_node_desc
-  | Open of string
+| Node of node_desc
+| Consts of const_desc list
+| ImportedNode of imported_node_desc
+| Open of bool * string (* the boolean set to true denotes a local 
+			   lusi vs a lusi installed at system level *)
 
 type top_decl =
     {top_decl_desc: top_decl_desc;
@@ -753,7 +756,10 @@ let mk_internal_node id =
 	nodei_inputs = vdecls_of_typ_ck cpt tin;
 	nodei_outputs = vdecls_of_typ_ck cpt tout;
 	nodei_stateless = Types.get_static_value ty <> None;
-	nodei_spec = spec})
+	nodei_spec = spec;
+	nodei_prototype = None;
+       	nodei_in_lib = None;
+       })
 
 let add_internal_funs () =
   List.iter

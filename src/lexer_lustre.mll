@@ -72,6 +72,8 @@ let keyword_table =
   "div", DIV;
   "const", CONST;
   "assert", ASSERT;
+  "in", IN;
+  "prototype", PROTOTYPE;
 ]
 
 
