@@ -357,15 +357,40 @@ let pp_machine_reset (m: machine_t) self fmt inst =
     (Utils.pp_final_char_if_non_empty ", " static)
     self inst
 
-let rec pp_conditional (m: machine_t) self fmt c tl el =
+let has_c_prototype funname dependencies =
+  let imported_node_opt = (* We select the last imported node with the name funname.
+			       The order of evaluation of dependencies should be
+			       compatible with overloading. (Not checked yet) *) 
+      List.fold_left
+	(fun res (_, _, decls) -> 
+	  match res with
+	  | Some _ -> res
+	  | None -> 
+	    let matched = fun t -> match t.top_decl_desc with 
+	      | ImportedNode nd -> nd.nodei_id = funname 
+	      | _ -> false
+	    in
+	    if List.exists matched decls then (
+	      match (List.find matched decls).top_decl_desc with
+	      | ImportedNode nd -> Some nd
+	      | _ -> assert false
+	    )
+	    else
+	      None
+	) None dependencies in
+    match imported_node_opt with
+    | None -> false
+    | Some nd -> (match nd.nodei_prototype with Some "C" -> true | _ -> false)
+
+let rec pp_conditional dependencies (m: machine_t) self fmt c tl el =
   fprintf fmt "@[<v 2>if (%a) {%t%a@]@,@[<v 2>} else {%t%a@]@,}"
     (pp_c_val self (pp_c_var_read m)) c
     (Utils.pp_newline_if_non_empty tl)
-    (Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) tl
+    (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) tl
     (Utils.pp_newline_if_non_empty el)
-    (Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) el
+    (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) el
 
-and pp_machine_instr (m: machine_t) self fmt instr =
+and pp_machine_instr dependencies (m: machine_t) self fmt instr =
   match instr with 
   | MReset i ->
     pp_machine_reset m self fmt i
@@ -378,7 +403,12 @@ and pp_machine_instr (m: machine_t) self fmt instr =
       m self (pp_c_var_read m) fmt
       i.var_type (StateVar i) v
   | MStep ([i0], i, vl) when Basic_library.is_internal_fun i  ->
-    pp_machine_instr m self fmt (MLocalAssign (i0, Fun (i, vl)))
+    pp_machine_instr dependencies m self fmt (MLocalAssign (i0, Fun (i, vl)))
+  | MStep ([i0], i, vl) when has_c_prototype i dependencies -> 
+    fprintf fmt "%a = %s(%a);" 
+      (pp_c_val self (pp_c_var_read m)) (LocalVar i0) 
+      i
+      (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) vl
   | MStep (il, i, vl) ->
     pp_instance_call m self fmt i vl il
   | MBranch (g,hl) ->
@@ -387,14 +417,14 @@ and pp_machine_instr (m: machine_t) self fmt instr =
 	 (* may disappear if we optimize code by replacing last branch test with default *)
       let tl = try List.assoc tag_true  hl with Not_found -> [] in
       let el = try List.assoc tag_false hl with Not_found -> [] in
-      pp_conditional m self fmt g tl el
+      pp_conditional dependencies m self fmt g tl el
     else (* enum type case *)
       fprintf fmt "@[<v 2>switch(%a) {@,%a@,}@]"
 	(pp_c_val self (pp_c_var_read m)) g
-	(Utils.fprintf_list ~sep:"@," (pp_machine_branch m self)) hl
+	(Utils.fprintf_list ~sep:"@," (pp_machine_branch dependencies m self)) hl
 
-and pp_machine_branch m self fmt (t, h) =
-  fprintf fmt "@[<v 2>case %a:@,%a@,break;@]" pp_c_tag t (Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) h
+and pp_machine_branch dependencies m self fmt (t, h) =
+  fprintf fmt "@[<v 2>case %a:@,%a@,break;@]" pp_c_tag t (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) h
 
 
 (**************************************************************************)
@@ -528,10 +558,8 @@ let print_step_prototype self fmt (name, inputs, outputs) =
 let print_import_standard fmt =
   fprintf fmt "#include \"%s/include/lustrec/arrow.h\"@.@." Version.prefix
 
-let print_import_prototype fmt decl =
-  match decl.top_decl_desc with
-  | Open m -> fprintf fmt "#include \"%s.h\"@," m
-  | _ -> () (* We don't do anything here *)
+let print_import_prototype fmt (s, _, _) =
+  fprintf fmt "#include \"%s.h\"@," s
     
 let pp_registers_struct fmt m =
   if m.mmemory <> []
@@ -699,7 +727,7 @@ let print_alloc_code fmt m =
     (Utils.fprintf_list ~sep:"" print_alloc_array) array_mem
     (Utils.fprintf_list ~sep:"" print_alloc_instance) m.minstances
 
-let print_stateless_code fmt m =
+let print_stateless_code dependencies fmt m =
   let self = "__ERROR__" in
   if not (!Options.ansi && is_generic_node { top_decl_desc = Node m.mname; top_decl_loc = Location.dummy_loc })
   then
@@ -712,7 +740,7 @@ let print_stateless_code fmt m =
       (* check assertions *)
       (pp_c_checks self) m
       (* instrs *)
-      (Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) m.mstep.step_instrs
+      (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) m.mstep.step_instrs
       (Utils.pp_newline_if_non_empty m.mstep.step_instrs)
       (fun fmt -> fprintf fmt "return;")
   else
@@ -727,11 +755,17 @@ let print_stateless_code fmt m =
       (* check assertions *)
       (pp_c_checks self) m
       (* instrs *)
-      (Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) m.mstep.step_instrs
+      (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) m.mstep.step_instrs
       (Utils.pp_newline_if_non_empty m.mstep.step_instrs)
       (fun fmt -> fprintf fmt "return;")
 
-let print_step_code fmt m self =
+let print_reset_code dependencies fmt m self =
+  fprintf fmt "@[<v 2>%a {@,%a%treturn;@]@,}@.@."
+    (print_reset_prototype self) (m.mname.node_id, m.mstatic)
+    (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) m.minit
+    (Utils.pp_newline_if_non_empty m.minit)
+
+let print_step_code dependencies fmt m self =
   if not (!Options.ansi && is_generic_node { top_decl_desc = Node m.mname; top_decl_loc = Location.dummy_loc })
   then
     (* C99 code *)
@@ -747,7 +781,7 @@ let print_step_code fmt m self =
       (* check assertions *)
       (pp_c_checks self) m
       (* instrs *)
-      (Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) m.mstep.step_instrs
+      (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) m.mstep.step_instrs
       (Utils.pp_newline_if_non_empty m.mstep.step_instrs)
       (fun fmt -> fprintf fmt "return;")
   else
@@ -762,15 +796,15 @@ let print_step_code fmt m self =
       (* check assertions *)
       (pp_c_checks self) m
       (* instrs *)
-      (Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) m.mstep.step_instrs
+      (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) m.mstep.step_instrs
       (Utils.pp_newline_if_non_empty m.mstep.step_instrs)
       (fun fmt -> fprintf fmt "return;")
 
-let print_machine fmt m =
+let print_machine dependencies fmt m =
   if fst (get_stateless_status m) then
     begin
       (* Step function *)
-      print_stateless_code fmt m
+      print_stateless_code dependencies fmt m
     end
   else
     begin
@@ -783,12 +817,9 @@ let print_machine fmt m =
 	);
       let self = mk_self m in
       (* Reset function *)
-      fprintf fmt "@[<v 2>%a {@,%a%treturn;@]@,}@.@."
-	(print_reset_prototype self) (m.mname.node_id, m.mstatic)
-	(Utils.fprintf_list ~sep:"@," (pp_machine_instr m self)) m.minit
-	(Utils.pp_newline_if_non_empty m.minit);
+      print_reset_code dependencies fmt m self;
       (* Step function *)
-      print_step_code fmt m self
+      print_step_code dependencies fmt m self
     end
 
 (********************************************************************************************)
@@ -906,7 +937,34 @@ let print_type_definitions fmt filename =
 	(pp_c_type_decl filename cpt_type var) def
     | _        -> ()) type_table
 
+
+let header_has_code header =
+  List.exists 
+    (fun top -> 
+      match top.top_decl_desc with
+      | Consts _ -> true 
+      | ImportedNode nd -> nd.nodei_in_lib = None
+      | _ -> false
+    )
+    header
+
+let header_libs header =
+  List.fold_left (fun accu top ->
+    match top.top_decl_desc with
+      | ImportedNode nd -> (match nd.nodei_in_lib with 
+	| None -> accu 
+	| Some lib -> Utils.list_union [lib] accu)
+      | _ -> accu 
+  ) [] header 
+    
 let print_makefile basename nodename dependencies fmt =
+  let compiled_dependencies = 
+    List.filter (fun (_, _, header) -> header_has_code header) dependencies
+  in
+  let lib_dependencies = 
+    List.fold_left 
+      (fun accu (_, _, header) -> Utils.list_union (header_libs header) accu) [] dependencies 
+  in
   fprintf fmt "GCC=gcc@.";
   fprintf fmt "LUSTREC=%s@." Sys.executable_name;
   fprintf fmt "LUSTREC_BASE=%s@." (Filename.dirname (Filename.dirname Sys.executable_name));
@@ -916,11 +974,16 @@ let print_makefile basename nodename dependencies fmt =
   fprintf fmt "\t${GCC} -I${INC} -I. -c %s.c@." basename;    
   List.iter (fun s -> (* Format.eprintf "Adding dependency: %s@." s;  *)
     fprintf fmt "\t${GCC} -I${INC} -c %s@." s)
-    (("${INC}/io_frontend.c")::(List.map (fun s -> s ^ ".c") dependencies));    
-(*  fprintf fmt "\t${GCC} -I${INC} -c ${INC}/StdLibrary.c@."; *)
-(*  fprintf fmt "\t${GCC} -o %s_%s io_frontend.o StdLibrary.o -lm %s.o@." basename nodename basename*)
-  fprintf fmt "\t${GCC} -o %s_%s io_frontend.o %a -lm %s.o@." basename nodename 
-    (Utils.fprintf_list ~sep:" " (fun fmt s -> Format.fprintf fmt "%s.o" s)) dependencies basename;
+    (("${INC}/io_frontend.c"):: (* IO functions when a main function is computed *)
+	(List.map 
+	   (fun (s, local, _) -> 
+	     (if local then s else Version.prefix ^ "/include/lustrec/" ^ s) ^ ".c")
+	   compiled_dependencies));    
+  fprintf fmt "\t${GCC} -o %s_%s io_frontend.o %a %s.o %a@." basename nodename 
+    (Utils.fprintf_list ~sep:" " (fun fmt (s, _, _) -> Format.fprintf fmt "%s.o" s)) compiled_dependencies 
+    basename
+    (Utils.fprintf_list ~sep:" " (fun fmt lib -> fprintf fmt "-l%s" lib)) lib_dependencies
+    ;
  fprintf fmt "@.";
  fprintf fmt "clean:@.";
  fprintf fmt "\t\\rm -f *.o %s_%s@." basename nodename
@@ -985,14 +1048,14 @@ let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog
   (* Print the prototype of imported nodes *)
   fprintf source_fmt "/* Imported nodes declarations */@.";
   fprintf source_fmt "@[<v>";
-  List.iter (print_import_prototype source_fmt) prog;
+  List.iter (print_import_prototype source_fmt) dependencies;
   fprintf source_fmt "@]@.";
   (* Print consts *)
   fprintf source_fmt "/* Global constants (definitions) */@.";
   List.iter (fun c -> print_const_def source_fmt c) (get_consts prog);
   pp_print_newline source_fmt ();
   (* Print nodes one by one (in the previous order) *)
-  List.iter (print_machine source_fmt) machines;
+  List.iter (print_machine dependencies source_fmt) machines;
   main_print source_fmt;
 
   (* Generating Makefile *)

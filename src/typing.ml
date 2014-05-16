@@ -423,7 +423,10 @@ and type_appl env in_main loc const f args =
   let tins, touts = split_arrow tfun in
   let tins = type_list_of_type tins in
   let args = expr_list_of_expr args in
-  List.iter2 (type_subtyping_arg env in_main const) args tins;
+  if List.length args <> List.length tins then
+    raise (Error (loc, WrongArity (List.length args, List.length tins)))
+  else
+    List.iter2 (type_subtyping_arg env in_main const) args tins;
   touts
 
 (** [type_expr env in_main expr] types expression [expr] in environment

@@ -255,17 +255,18 @@ let pp_imported_node fmt ind =
     pp_node_args ind.nodei_outputs
     (fun fmt -> if ind.nodei_stateless then Format.fprintf fmt "stateless") 
 
+let pp_const_list fmt clist = 
+  fprintf_list ~sep:"@ " (fun fmt cdecl ->
+    fprintf fmt "%s = %a;"
+      cdecl.const_id pp_const cdecl.const_value) fmt clist
+
 let pp_decl fmt decl =
   match decl.top_decl_desc with
   | Node nd -> fprintf fmt "%a@ " pp_node nd
   | ImportedNode ind ->
     fprintf fmt "imported %a;@ " pp_imported_node ind
-  | Consts clist -> (
-    fprintf fmt "const %a@ " 
-      (fprintf_list ~sep:"@ " (fun fmt cdecl ->
-	fprintf fmt "%s = %a;"
-	  cdecl.const_id pp_const cdecl.const_value)) clist)
-  | Open s -> fprintf fmt "open \"%s\"" s
+  | Consts clist -> (fprintf fmt "const %a@ " pp_const_list clist)
+  | Open (local, s) -> if local then fprintf fmt "open \"%s\"" s else fprintf fmt "open <%s>" s
 
 
 let pp_prog fmt prog = 
@@ -275,11 +276,8 @@ let pp_short_decl fmt decl =
   match decl.top_decl_desc with
   | Node nd -> fprintf fmt "node %s@ " nd.node_id
   | ImportedNode ind -> fprintf fmt "imported node %s" ind.nodei_id
-  | Consts clist -> (
-    fprintf fmt "const %a@ " 
-      (fprintf_list ~sep:"@ " (fun fmt cdecl ->
-	pp_print_string fmt cdecl.const_id)) clist)
-  | Open s -> fprintf fmt "open \"%s\"" s
+  | Consts clist -> (fprintf fmt "const %a@ " pp_const_list clist)
+    | Open (local, s) -> if local then fprintf fmt "open \"%s\"" s else fprintf fmt "open <%s>" s
 
 let pp_lusi fmt decl = 
   match decl.top_decl_desc with
@@ -290,7 +288,8 @@ let pp_lusi fmt decl =
       nd.node_id
       pp_node_args nd.node_inputs
       pp_node_args nd.node_outputs
-  | ImportedNode _ | Consts _ | Open _ -> ()
+| Consts clist -> (fprintf fmt "const %a@ " pp_const_list clist)
+| ImportedNode _ | Open _ -> ()
 
 
 

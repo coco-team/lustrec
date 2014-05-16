@@ -114,7 +114,10 @@ type imported_node_desc =
      nodei_inputs: var_decl list;
      nodei_outputs: var_decl list;
      nodei_stateless: bool;
-     nodei_spec: LustreSpec.node_annot option;}
+     nodei_spec: LustreSpec.node_annot option;
+     nodei_prototype: string option;
+     nodei_in_lib: string option;
+}
 (*
 type imported_fun_desc =
     {fun_id: ident;
@@ -144,7 +147,7 @@ type top_decl_desc =
   (* | ImportedFun of imported_fun_desc *)
   (* | SensorDecl of sensor_desc *)
   (* | ActuatorDecl of actuator_desc *)
-  | Open of string
+  | Open of bool * string
 
 type top_decl =
     {top_decl_desc: top_decl_desc;

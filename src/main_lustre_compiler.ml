@@ -31,46 +31,46 @@ let usage = "Usage: lustrec [options] <source-file>"
 let extensions = [".ec"; ".lus"; ".lusi"]
 
 let check_stateless_decls decls =
-  report ~level:1 (fun fmt -> fprintf fmt ".. checking stateless/stateful status@,@?");
+  report ~level:1 (fun fmt -> fprintf fmt ".. checking stateless/stateful status@ ");
   try
     Stateless.check_prog decls
   with (Stateless.Error (loc, err)) as exc ->
-    Format.eprintf "Stateless status error at loc %a: %a@]@."
+    Format.eprintf "Stateless status error at loc %a: %a@."
       Location.pp_loc loc
       Stateless.pp_error err;
     raise exc
 
 let type_decls env decls =  
-  report ~level:1 (fun fmt -> fprintf fmt ".. typing@,@?");
+  report ~level:1 (fun fmt -> fprintf fmt ".. typing@ ");
   let new_env = 
     begin
       try
 	Typing.type_prog env decls
       with (Types.Error (loc,err)) as exc ->
-	Format.eprintf "Typing error at loc %a: %a@]@."
+	Format.eprintf "Typing error at loc %a: %a@."
 	  Location.pp_loc loc
 	  Types.pp_error err;
 	raise exc
     end 
   in
   if !Options.print_types then
-    report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,@?" Corelang.pp_prog_type decls);
+    report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>  %a@]@ " Corelang.pp_prog_type decls);
   new_env
       
 let clock_decls env decls = 
-  report ~level:1 (fun fmt -> fprintf fmt ".. clock calculus@,@?");
+  report ~level:1 (fun fmt -> fprintf fmt ".. clock calculus@ ");
   let new_env =
     begin
       try
 	Clock_calculus.clock_prog env decls
       with (Clocks.Error (loc,err)) as exc ->
 	Location.print loc;
-	eprintf "Clock calculus error at loc %a: %a@]@." Location.pp_loc loc Clocks.pp_error err;
+	eprintf "Clock calculus error at loc %a: %a@." Location.pp_loc loc Clocks.pp_error err;
 	raise exc
     end
   in
   if !Options.print_clocks then
-    report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,@?" Corelang.pp_prog_clock decls);
+    report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>  %a@]@ " Corelang.pp_prog_clock decls);
   new_env
 
 (* Loading Lusi file and filling type tables with parsed
@@ -80,23 +80,26 @@ let load_lusi own filename =
   let lexbuf = Lexing.from_channel (open_in filename) in
   Location.init lexbuf filename;
   (* Parsing *)
-  report ~level:1 (fun fmt -> fprintf fmt "@[<v>.. parsing header file %s@,@?" filename);
-  try
-    Parse.header own Parser_lustre.header Lexer_lustre.token lexbuf
-  with
-  | (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
-    Parse.report_error err;
-    raise exc
-  | Corelang.Error (loc, err) as exc ->
-     Format.eprintf "Parsing error at loc %a: %a@]@."
-       Location.pp_loc loc
+  report ~level:1 (fun fmt -> fprintf fmt ".. parsing header file %s@ " filename);
+    try
+      Parse.header own Parser_lustre.header Lexer_lustre.token lexbuf
+    with
+    | (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
+      Parse.report_error err;
+      raise exc
+    | Corelang.Error (loc, err) as exc -> (
+      Format.eprintf "Parsing error at loc %a: %a@."
+	Location.pp_loc loc
        Corelang.pp_error err;
-     raise exc
+      raise exc
+    )
+
 
 let check_lusi header =
   let new_tenv = type_decls Basic_library.type_env header in   (* Typing *)
   let new_cenv = clock_decls Basic_library.clock_env header in   (* Clock calculus *)
   header, new_tenv, new_cenv
+
     
 let rec compile basename extension =
   (* Loading the input file *)
@@ -106,7 +109,7 @@ let rec compile basename extension =
   Location.init lexbuf source_name;
   (* Parsing *)
   report ~level:1 
-    (fun fmt -> fprintf fmt "@[<v>.. parsing file %s@,@?" source_name);
+    (fun fmt -> fprintf fmt "@[<v>.. parsing file %s@," source_name);
   let prog =
     try
       Parse.prog Parser_lustre.prog Lexer_lustre.token lexbuf
@@ -115,35 +118,37 @@ let rec compile basename extension =
       Parse.report_error err;
       raise exc
     | Corelang.Error (loc, err) as exc ->
-      Format.eprintf "Parsing error at loc %a: %a@]@."
+      Format.eprintf "Parsing error at loc %a: %a@."
 	Location.pp_loc loc
 	Corelang.pp_error err;
       raise exc
   in
   (* Extracting dependencies *)
-  report ~level:1 (fun fmt -> fprintf fmt ".. extracting dependencies@,@?");
+  report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>.. extracting dependencies@,");
   let dependencies = 
     List.fold_right 
       (fun d accu -> match d.Corelang.top_decl_desc with 
-      | Corelang.Open s -> s::accu 
+      | Corelang.Open (local, s) -> (s, local)::accu 
       | _ -> accu) 
       prog [] 
   in
-  let type_env, clock_env =
-    List.fold_left (fun (type_env, clock_env) s -> 
+  let dependencies, type_env, clock_env =
+    List.fold_left (fun (compilation_dep, type_env, clock_env) (s, local) -> 
       try
-	let basename = s ^ ".lusi" in 
-	report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>Library %s@ " s);
-	let _, lusi_type_env, lusi_clock_env = check_lusi (load_lusi false basename) in 
-	report ~level:1 (fun fmt -> fprintf fmt "@]@,@?");
+	let basename = (if local then s else Version.prefix ^ "/include/lustrec/" ^ s ) ^ ".lusi" in 
+	report ~level:1 (fun fmt -> fprintf fmt "@[<v 0>Library %s@," basename);
+	let comp_dep, lusi_type_env, lusi_clock_env = check_lusi (load_lusi false basename) in 
+	report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
+	(s, local, comp_dep)::compilation_dep,
 	Env.overwrite type_env lusi_type_env,
 	Env.overwrite clock_env lusi_clock_env      
       with Sys_error msg -> (
 	Format.eprintf "Failure: impossible to load library %s.@.%s@." s msg;
 	exit 1
       )
-    )  (Basic_library.type_env, Basic_library.clock_env) dependencies
+    )  ([], Basic_library.type_env, Basic_library.clock_env) dependencies
   in
+  report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
   
   (* Unfold consts *)
   (*let prog = Corelang.prog_unfold_consts prog in*)
@@ -216,7 +221,7 @@ let rec compile basename extension =
       report ~level:1 
 	(fun fmt -> 
 	  fprintf fmt 
-	    ".. generating lustre interface file %s@,@?" lusi_name);
+	    ".. generating lustre interface file %s@," lusi_name);
       let lusi_out = open_out lusi_name in
       let lusi_fmt = formatter_of_out_channel lusi_out in
       Typing.uneval_prog_generics prog;
@@ -224,15 +229,15 @@ let rec compile basename extension =
       Printers.pp_lusi_header lusi_fmt source_name prog
     )
     | (Types.Error (loc,err)) as exc ->
-      Format.eprintf "Type mismatch between computed type and declared type in lustre interface file: %a@]@."
+      Format.eprintf "Type mismatch between computed type and declared type in lustre interface file: %a@."
 	Types.pp_error err;
       raise exc
     | Clocks.Error (loc, err) as exc ->
-      Format.eprintf "Clock mismatch between computed clock and declared clock in lustre interface file: %a@]@."
+      Format.eprintf "Clock mismatch between computed clock and declared clock in lustre interface file: %a@."
 	Clocks.pp_error err;
       raise exc
     | Stateless.Error (loc, err) as exc ->
-      Format.eprintf "Stateless status mismatch between defined status and declared status in lustre interface file: %a@]@."
+      Format.eprintf "Stateless status mismatch between defined status and declared status in lustre interface file: %a@."
 	Stateless.pp_error err;
       raise exc
   in
@@ -243,26 +248,26 @@ let rec compile basename extension =
   (*Hashtbl.iter (fun id td -> match td.Corelang.top_decl_desc with Corelang.Node nd -> Format.eprintf "%s calls %a" id Causality.NodeDep.pp_generic_calls nd | _ -> ()) Corelang.node_table;*)
 
   (* Normalization phase *)
-  report ~level:1 (fun fmt -> fprintf fmt ".. normalization@,@?");
+  report ~level:1 (fun fmt -> fprintf fmt ".. normalization@,");
   let normalized_prog = Normalization.normalize_prog prog in
-  report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,@?" Printers.pp_prog normalized_prog);
+  report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog normalized_prog);
   (* Checking array accesses *)
   if !Options.check then
     begin
-      report ~level:1 (fun fmt -> fprintf fmt ".. array access checks@,@?");
+      report ~level:1 (fun fmt -> fprintf fmt ".. array access checks@,");
       Access.check_prog normalized_prog;
     end;
 
   (* DFS with modular code generation *)
-  report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,@?");
+  report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,");
   let machine_code = Machine_code.translate_prog normalized_prog in
-  report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,@?"
+  report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
     (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
     machine_code);
   
   (* Creating destination directory if needed *)
   if not (Sys.file_exists !Options.dest_dir) then (
-    report ~level:1 (fun fmt -> fprintf fmt ".. creating destination directory@,@?");
+    report ~level:1 (fun fmt -> fprintf fmt ".. creating destination directory@,");
     Unix.mkdir !Options.dest_dir (Unix.stat ".").Unix.st_perm
   );
   if (Unix.stat !Options.dest_dir).Unix.st_kind <> Unix.S_DIR then (
@@ -281,10 +286,10 @@ let rec compile basename extension =
 	  let spec_file_opt = if !Options.c_spec then 
 	      (
 		let spec_file = basename ^ "_spec.c" in
-		report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s, %s and %s@,@?" header_file source_file spec_file);
+		report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s, %s and %s@," header_file source_file spec_file);
 		Some spec_file 
 	      ) else (
-		report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s and %s@,@?" header_file source_file);
+		report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s and %s@," header_file source_file);
 		None 
 	       )
 	  in 
@@ -298,7 +303,7 @@ let rec compile basename extension =
 	      None -> None
 	    | Some f -> Some (formatter_of_out_channel (open_out f))
 	  in
-	  report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,@?");
+	  report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,");
 	  C_backend.translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename normalized_prog machine_code dependencies
 	end
     | "java" ->

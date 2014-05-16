@@ -25,7 +25,7 @@
 
 let report ~level:level p =
 if !Options.verbose_level >= level then
-  Format.eprintf "%t@?" p
+  Format.eprintf "%t" p
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

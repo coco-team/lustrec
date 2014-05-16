@@ -90,7 +90,7 @@ let check_symbol msg hashtbl name =
 %token MULT DIV MOD
 %token MINUS PLUS UMINUS
 %token PRE ARROW
-
+%token PROTOTYPE IN
 %token EOF
 
 %nonassoc COMMA
@@ -131,7 +131,8 @@ open_list:
 | open_lusi open_list { $1 :: $2 }
 
 open_lusi:
-  OPEN QUOTE IDENT QUOTE { mktop_decl (Open $3) }
+| OPEN QUOTE IDENT QUOTE { mktop_decl (Open (true, $3))}
+| OPEN LT IDENT GT { mktop_decl (Open (false, $3)) }
 
 top_decl_list:
   top_decl {[$1]}
@@ -147,7 +148,8 @@ state_annot:
 | NODE { false }
 
 top_decl_header:
-  nodespec_list state_annot IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL
+| CONST cdecl_list { fun _ -> mktop_decl (Consts (List.rev $2)) }
+| nodespec_list state_annot IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR  prototype_opt in_lib_opt SCOL
     {let nd = mktop_decl (ImportedNode
                             {nodei_id = $3;
                              nodei_type = Types.new_var ();
@@ -155,9 +157,19 @@ top_decl_header:
                              nodei_inputs = List.rev $5;
                              nodei_outputs = List.rev $10;
 			     nodei_stateless = $2;
-			     nodei_spec = $1})
+			     nodei_spec = $1;
+			     nodei_prototype = $13;
+			     nodei_in_lib = $14;})
     in
     (fun own -> add_node own ("node " ^ $3) node_table $3 nd; nd) }
+
+prototype_opt:
+ { None }
+| PROTOTYPE IDENT { Some $2}
+
+in_lib_opt:
+{ None }
+| IN IDENT {Some $2} 
 
 top_decl:
 | CONST cdecl_list { mktop_decl (Consts (List.rev $2)) }
