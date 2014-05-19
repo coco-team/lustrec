@@ -116,7 +116,7 @@ inline_compile_with_check () {
     fi	
 	# Cheching witness
     pushd $build > /dev/null
-    $LUSTREC -horn -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus 2>/dev/null
+    $LUSTREC -horn -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus -verbose 0
     popd > /dev/null
     z3="`z3 -T:10 $build/${name}_witnesses/inliner_witness.smt2 | xargs`"
     if [ "x`echo $z3 | grep unsat`" == "xunsat" ]; then
