@@ -618,14 +618,18 @@ let print_static_declare_macro fmt m =
 let print_static_link_instance fmt (i, (m, _)) =
  fprintf fmt "%a(%s)" pp_machine_static_link_name (node_name m) i
 
+(* Allocation of a node struct:
+   - if node memory is an array/matrix/etc, we cast it to a pointer (see pp_registers_struct)
+*)
 let print_static_link_macro fmt m =
   let array_mem = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
   fprintf fmt "@[<v>@[<v 2>#define %a(inst) do {\\@,%a%t%a;\\@]@,} while (0)@.@]"
     pp_machine_static_link_name m.mname.node_id
     (Utils.fprintf_list ~sep:";\\@,"
        (fun fmt v ->
-	 fprintf fmt "inst._reg.%s = &%s"
+	 fprintf fmt "inst._reg.%s = (%a*) &%s"
 	   v.var_id
+           (fun fmt v -> pp_c_type "" fmt (Types.array_base_type v.var_type)) v
 	   v.var_id
        )) array_mem
     (Utils.pp_final_char_if_non_empty ";\\@," array_mem)
