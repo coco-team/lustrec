@@ -137,11 +137,12 @@ let rec compile basename extension =
       try
 	let basename = (if local then s else Version.prefix ^ "/include/lustrec/" ^ s ) ^ ".lusi" in 
 	report ~level:1 (fun fmt -> fprintf fmt "@[<v 0>Library %s@," basename);
-	let comp_dep, lusi_type_env, lusi_clock_env = check_lusi (load_lusi false basename) in 
+	  let comp_dep, lusi_type_env, lusi_clock_env = check_lusi (load_lusi false basename) in 
 	report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
-	(s, local, comp_dep)::compilation_dep,
-	Env.overwrite type_env lusi_type_env,
-	Env.overwrite clock_env lusi_clock_env      
+	
+	  (s, local, comp_dep)::compilation_dep,
+	  Env.overwrite type_env lusi_type_env,
+	  Env.overwrite clock_env lusi_clock_env      
       with Sys_error msg -> (
 	Format.eprintf "Failure: impossible to load library %s.@.%s@." s msg;
 	exit 1
@@ -149,7 +150,7 @@ let rec compile basename extension =
     )  ([], Basic_library.type_env, Basic_library.clock_env) dependencies
   in
   report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
-  
+
   (* Unfold consts *)
   (*let prog = Corelang.prog_unfold_consts prog in*)
 
@@ -208,12 +209,15 @@ let rec compile basename extension =
       let _ = open_in lusi_name in
       let header = load_lusi true lusi_name in
       let _, declared_types_env, declared_clocks_env = check_lusi header in
+
       (* checking type compatibility with computed types*)
       Typing.check_env_compat header declared_types_env computed_types_env;
       Typing.uneval_prog_generics prog;
+
       (* checking clocks compatibility with computed clocks*)
       Clock_calculus.check_env_compat header declared_clocks_env computed_clocks_env;
       Clock_calculus.uneval_prog_generics prog;
+
       (* checking stateless status compatibility *)
       Stateless.check_compat header
     with Sys_error _ -> ( 

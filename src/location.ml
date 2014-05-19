@@ -38,10 +38,12 @@ let init lexbuf fname =
     Lexing.pos_cnum = 0;
   }
       
-let symbol_rloc () = {
-  loc_start = Parsing.symbol_start_pos ();
-  loc_end = Parsing.symbol_end_pos ()
-}
+let symbol_rloc () = 
+  {
+    loc_start = Parsing.symbol_start_pos ();
+    loc_end = Parsing.symbol_end_pos ()
+  }
+    
 
 open Format
 

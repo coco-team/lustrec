@@ -42,28 +42,25 @@ let mkdim_ident id = mkdim_ident (Location.symbol_rloc ()) id
 let mkdim_appl f args = mkdim_appl (Location.symbol_rloc ()) f args
 let mkdim_ite i t e = mkdim_ite (Location.symbol_rloc ()) i t e
 
-let add_node own msg hashtbl name value =
+let add_node loc own msg hashtbl name value =
   try
     match (Hashtbl.find hashtbl name).top_decl_desc, value.top_decl_desc with
-    | Node _        , ImportedNode _ when own
-                        -> ()
-    | ImportedNode _, _ ->
-       Hashtbl.add hashtbl name value
-    | Node _        , _ -> 
-       raise (Corelang.Error (Location.symbol_rloc (), Corelang.Already_bound_symbol msg))
-    | _                 -> assert false
+    | Node _        , ImportedNode _ when own   -> ()
+    | ImportedNode _, _                         -> Hashtbl.add hashtbl name value
+    | Node _        , _                         -> raise (Corelang.Error (loc, Corelang.Already_bound_symbol msg))
+    | _                                         -> assert false
   with
-    Not_found ->
-       Hashtbl.add hashtbl name value
+    Not_found                                   -> Hashtbl.add hashtbl name value
 
-let add_symbol msg hashtbl name value =
+
+let add_symbol loc msg hashtbl name value =
  if Hashtbl.mem hashtbl name
- then raise (Corelang.Error (Location.symbol_rloc (), Corelang.Already_bound_symbol msg))
+ then raise (Corelang.Error (loc, Corelang.Already_bound_symbol msg))
  else Hashtbl.add hashtbl name value
 
-let check_symbol msg hashtbl name =
+let check_symbol loc msg hashtbl name =
  if not (Hashtbl.mem hashtbl name)
- then raise (Corelang.Error (Location.symbol_rloc (), Corelang.Unbound_symbol msg))
+ then raise (Corelang.Error (loc, Corelang.Unbound_symbol msg))
  else ()
 
 %}
@@ -90,7 +87,7 @@ let check_symbol msg hashtbl name =
 %token MULT DIV MOD
 %token MINUS PLUS UMINUS
 %token PRE ARROW
-%token PROTOTYPE IN
+%token PROTOTYPE LIB
 %token EOF
 
 %nonassoc COMMA
@@ -148,7 +145,7 @@ state_annot:
 | NODE { false }
 
 top_decl_header:
-| CONST cdecl_list { fun _ -> mktop_decl (Consts (List.rev $2)) }
+| CONST cdecl_list { let top = mktop_decl (Consts (List.rev $2)) in fun _ -> top }
 | nodespec_list state_annot IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR  prototype_opt in_lib_opt SCOL
     {let nd = mktop_decl (ImportedNode
                             {nodei_id = $3;
@@ -161,7 +158,8 @@ top_decl_header:
 			     nodei_prototype = $13;
 			     nodei_in_lib = $14;})
     in
-    (fun own -> add_node own ("node " ^ $3) node_table $3 nd; nd) }
+    (let loc = Location.symbol_rloc () in 
+     fun own -> add_node loc own ("node " ^ $3) node_table $3 nd; nd) }
 
 prototype_opt:
  { None }
@@ -169,7 +167,7 @@ prototype_opt:
 
 in_lib_opt:
 { None }
-| IN IDENT {Some $2} 
+| LIB IDENT {Some $2} 
 
 top_decl:
 | CONST cdecl_list { mktop_decl (Consts (List.rev $2)) }
@@ -190,8 +188,9 @@ top_decl:
 			     node_stateless = None;
 			     node_spec = $1;
 			     node_annot = match annots with [] -> None | _ -> Some annots})
-    in
-    add_node true ("node " ^ $3) node_table $3 nd; nd}
+     in
+     let loc = Location.symbol_rloc () in
+     add_node loc true ("node " ^ $3) node_table $3 nd; nd}
 
 nodespec_list:
  { None }
@@ -204,7 +203,8 @@ typ_def_list:
 typ_def:
   TYPE IDENT EQ typeconst {
     try
-      add_symbol ("type " ^ $2) type_table (Tydec_const $2) (Corelang.get_repr_type $4)
+      let loc = Location.symbol_rloc () in
+      add_symbol loc ("type " ^ $2) type_table (Tydec_const $2) (Corelang.get_repr_type $4)
     with Not_found-> assert false }
 | TYPE IDENT EQ ENUM LCUR tag_list RCUR { Hashtbl.add type_table (Tydec_const $2) (Tydec_enum ($6 (Tydec_const $2))) }
 | TYPE IDENT EQ STRUCT LCUR field_list RCUR { Hashtbl.add type_table (Tydec_const $2) (Tydec_struct ($6 (Tydec_const $2))) }
@@ -218,21 +218,30 @@ typeconst:
 | TBOOL array_typ_decl { $2 Tydec_bool  }
 | TREAL array_typ_decl { $2 Tydec_real  }
 | TFLOAT array_typ_decl { $2 Tydec_float }
-| IDENT array_typ_decl { check_symbol ("type " ^ $1) type_table (Tydec_const $1); $2 (Tydec_const $1) }
+| IDENT array_typ_decl { 
+        let loc = Location.symbol_rloc () in
+	check_symbol loc ("type " ^ $1) type_table (Tydec_const $1); $2 (Tydec_const $1) }
 | TBOOL TCLOCK  { Tydec_clock Tydec_bool }
 | IDENT TCLOCK  { Tydec_clock (Tydec_const $1) }
 
 tag_list:
   IDENT
-  { (fun t -> add_symbol ("tag " ^ $1) tag_table $1 t; $1 :: []) }
+  { let loc = Location.symbol_rloc () in 
+    (fun t -> 
+      add_symbol loc ("tag " ^ $1) tag_table $1 t; $1 :: []) }
 | tag_list COMMA IDENT
-  { (fun t -> add_symbol ("tag " ^ $3)tag_table $3 t; $3 :: ($1 t)) }
-
+      {       
+	let loc = Location.symbol_rloc () in
+	(fun t -> add_symbol loc ("tag " ^ $3)tag_table $3 t; $3 :: ($1 t)) 
+      }
+      
 field_list:
   { (fun t -> []) }
 | field_list IDENT COL typeconst SCOL
-  { (fun t -> add_symbol ("field " ^ $2) field_table $2 t; ($1 t) @ [ ($2, $4) ]) }
-
+      {
+	let loc = Location.symbol_rloc () in
+	(fun t -> add_symbol loc ("field " ^ $2) field_table $2 t; ($1 t) @ [ ($2, $4) ]) }
+      
 eq_list:
   { [], [], [] }
 | eq eq_list {let eql, assertl, annotl = $2 in ($1::eql), assertl, annotl}
