@@ -106,7 +106,11 @@ let eq_memory_variables mems eq =
     match rhs.expr_desc with
     | Expr_fby _
     | Expr_pre _    -> List.fold_right ISet.add lhs mems
-    | Expr_tuple tl -> List.fold_right2 match_mem (transpose_list [lhs]) tl mems
+    | Expr_tuple tl -> 
+      let lhs' = (transpose_list [lhs]) in
+      if List.length tl <> List.length lhs' then
+	assert false;
+      List.fold_right2 match_mem lhs' tl mems
     | _             -> mems in
   match_mem eq.eq_lhs eq.eq_rhs mems
 
@@ -156,14 +160,19 @@ let add_eq_dependencies mems non_inputs eq (g, g') =
     match (Clocks.repr ck).Clocks.cdesc with
     | Clocks.Con (ck', cr, _)   -> add_var lhs_is_mem lhs (Clocks.const_of_carrier cr) (add_clock lhs_is_mem lhs ck' g)
     | Clocks.Ccarrying (_, ck') -> add_clock lhs_is_mem lhs ck' g
-    | _                         -> g in
+    | _                         -> g 
+  in
+  
+
   let rec add_dep lhs_is_mem lhs rhs g =
-(* Add mashup dependencies for a user-defined node instance [lhs] = [f]([e]) *)
-(* i.e every input is connected to every output, through a ghost var *)
+    
+    (* Add mashup dependencies for a user-defined node instance [lhs] = [f]([e]) *)
+    (* i.e every input is connected to every output, through a ghost var *)
     let mashup_appl_dependencies f e g =
       let f_var = mk_instance_var (sprintf "%s_%d" f eq.eq_loc.Location.loc_start.Lexing.pos_lnum) in
       List.fold_right (fun rhs -> add_dep lhs_is_mem (adjust_tuple f_var rhs) rhs)
-	(expr_list_of_expr e) (add_var lhs_is_mem lhs f_var g) in
+	(expr_list_of_expr e) (add_var lhs_is_mem lhs f_var g) 
+    in
     match rhs.expr_desc with
     | Expr_const _    -> g
     | Expr_fby (e1, e2)  -> add_dep true lhs e2 (add_dep false lhs e1 g)
@@ -172,17 +181,31 @@ let add_eq_dependencies mems non_inputs eq (g, g') =
     | Expr_access (e1, _)
     | Expr_power (e1, _) -> add_dep lhs_is_mem lhs e1 g
     | Expr_array a -> List.fold_right (add_dep lhs_is_mem lhs) a g
-    | Expr_tuple t -> List.fold_right2 (fun l r -> add_dep lhs_is_mem [l] r) lhs t g
+    | Expr_tuple t ->       
+      if List.length t <> List.length lhs then ( 
+	match lhs with
+	| [l] -> List.fold_right (fun r -> add_dep lhs_is_mem [l] r) t g
+	| _ -> 
+	  Format.eprintf "Incompatible tuple assign: %a (%i) vs %a (%i)@.@?" 
+	    (Utils.fprintf_list ~sep:"," (Format.pp_print_string)) lhs 
+	    (List.length lhs)
+	    Printers.pp_expr rhs
+	    (List.length t)
+	  ;
+	  assert false
+      ) 
+      else
+	List.fold_right2 (fun l r -> add_dep lhs_is_mem [l] r) lhs t g
     | Expr_merge (c, hl) -> add_var lhs_is_mem lhs c (List.fold_right (fun (_, h) -> add_dep lhs_is_mem lhs h) hl g)
     | Expr_ite   (c, t, e) -> add_dep lhs_is_mem lhs c (add_dep lhs_is_mem lhs t (add_dep lhs_is_mem lhs e g))
     | Expr_arrow (e1, e2)  -> add_dep lhs_is_mem lhs e2 (add_dep lhs_is_mem lhs e1 g)
     | Expr_when  (e, c, _)  -> add_dep lhs_is_mem lhs e (add_var lhs_is_mem lhs c g)
     | Expr_appl (f, e, None) ->
       if Basic_library.is_internal_fun f
-    (* tuple component-wise dependency for internal operators *)
+      (* tuple component-wise dependency for internal operators *)
       then
 	List.fold_right (add_dep lhs_is_mem lhs) (expr_list_of_expr e) g
-    (* mashed up dependency for user-defined operators *)
+      (* mashed up dependency for user-defined operators *)
       else
 	mashup_appl_dependencies f e g
     | Expr_appl (f, e, Some (r, _)) ->
