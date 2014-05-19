@@ -142,7 +142,6 @@ end
       print_ty fmt ty
   | Tunivar ->
     fprintf fmt "'%s" (name_of_type ty.tid)
-  | _   -> assert false
 
 let pp_error fmt = function
   | Unbound_value id ->
