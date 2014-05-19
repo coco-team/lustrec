@@ -1,7 +1,7 @@
 TOPFILES=../sandbox
 
 test-compile:
-	@bash ./test-compile.sh
+	@bash ./test-compile.sh -a -v 2 tests_ok.list
 	@rm build/*.o
 
 clean:
