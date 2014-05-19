@@ -73,7 +73,12 @@ let rec transpose_list ll =
  match ll with
  | []   -> []
  | [l]  -> List.map (fun el -> [el]) l
- | l::q -> List.map2 (fun el eq -> el::eq) l (transpose_list q)
+ | l::q -> 
+   let length_l = List.length l in
+   if not (List.for_all (fun l' -> List.length l' = length_l) q) then
+     assert false
+   ;
+   List.map2 (fun el eq -> el::eq) l (transpose_list q)
 
 let rec filter_upto p n l =
  if n = 0 then [] else
