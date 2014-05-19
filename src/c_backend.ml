@@ -624,7 +624,7 @@ let print_static_link_macro fmt m =
     pp_machine_static_link_name m.mname.node_id
     (Utils.fprintf_list ~sep:";\\@,"
        (fun fmt v ->
-	 fprintf fmt "inst.%s = &%s"
+	 fprintf fmt "inst._reg.%s = &%s"
 	   v.var_id
 	   v.var_id
        )) array_mem
@@ -711,7 +711,7 @@ let print_alloc_array fmt vdecl =
   let base_type = Types.array_base_type vdecl.var_type in
   let size_types = Types.array_type_multi_dimension vdecl.var_type in
   let size_type = Dimension.multi_dimension_product vdecl.var_loc size_types in
-  fprintf fmt "_alloc->%s = (%a*) malloc((%a)*sizeof(%a));@,assert(_alloc->%s);@,"
+  fprintf fmt "_alloc->_reg.%s = (%a*) malloc((%a)*sizeof(%a));@,assert(_alloc->%s);@,"
     vdecl.var_id
     (pp_c_type "") base_type
     Dimension.pp_dimension size_type
