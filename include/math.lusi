@@ -1,0 +1,5 @@
+function pow (x:real; n: real) returns (y: real) prototype C lib m;
+function atan (x: real) returns (y: real) prototype C lib m;
+function sqrt (x: real) returns (y: real) prototype C lib m;
+function cos (x: real) returns (y: real) prototype C lib m;
+function sin (x: real) returns (y: real) prototype C lib m;
