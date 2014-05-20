@@ -35,9 +35,9 @@ let check_stateless_decls decls =
   try
     Stateless.check_prog decls
   with (Stateless.Error (loc, err)) as exc ->
-    Format.eprintf "Stateless status error at loc %a: %a@."
-      Location.pp_loc loc
-      Stateless.pp_error err;
+    eprintf "Stateless status error %a%a@."
+      Stateless.pp_error err
+      Location.pp_loc loc;
     raise exc
 
 let type_decls env decls =  
@@ -47,9 +47,9 @@ let type_decls env decls =
       try
 	Typing.type_prog env decls
       with (Types.Error (loc,err)) as exc ->
-	Format.eprintf "Typing error at loc %a: %a@."
-	  Location.pp_loc loc
-	  Types.pp_error err;
+	eprintf "Typing error %a%a@."
+	  Types.pp_error err
+	  Location.pp_loc loc;
 	raise exc
     end 
   in
@@ -64,8 +64,7 @@ let clock_decls env decls =
       try
 	Clock_calculus.clock_prog env decls
       with (Clocks.Error (loc,err)) as exc ->
-	Location.print loc;
-	eprintf "Clock calculus error at loc %a: %a@." Location.pp_loc loc Clocks.pp_error err;
+	eprintf "Clock calculus error %a%a@." Clocks.pp_error err Location.pp_loc loc;
 	raise exc
     end
   in
@@ -88,9 +87,9 @@ let load_lusi own filename =
       Parse.report_error err;
       raise exc
     | Corelang.Error (loc, err) as exc -> (
-      Format.eprintf "Parsing error at loc %a: %a@."
-	Location.pp_loc loc
-       Corelang.pp_error err;
+      eprintf "Parsing error %a%a@."
+	Corelang.pp_error err
+	Location.pp_loc loc;
       raise exc
     )
 
@@ -118,9 +117,9 @@ let rec compile basename extension =
       Parse.report_error err;
       raise exc
     | Corelang.Error (loc, err) as exc ->
-      Format.eprintf "Parsing error at loc %a: %a@."
-	Location.pp_loc loc
-	Corelang.pp_error err;
+      eprintf "Parsing error %a%a@."
+	Corelang.pp_error err
+	Location.pp_loc loc;
       raise exc
   in
   (* Extracting dependencies *)
@@ -144,7 +143,7 @@ let rec compile basename extension =
 	  Env.overwrite type_env lusi_type_env,
 	  Env.overwrite clock_env lusi_clock_env      
       with Sys_error msg -> (
-	Format.eprintf "Failure: impossible to load library %s.@.%s@." s msg;
+	eprintf "Failure: impossible to load library %s.@.%s@." s msg;
 	exit 1
       )
     )  ([], Basic_library.type_env, Basic_library.clock_env) dependencies
@@ -233,15 +232,15 @@ let rec compile basename extension =
       Printers.pp_lusi_header lusi_fmt source_name prog
     )
     | (Types.Error (loc,err)) as exc ->
-      Format.eprintf "Type mismatch between computed type and declared type in lustre interface file: %a@."
+      eprintf "Type mismatch between computed type and declared type in lustre interface file: %a@."
 	Types.pp_error err;
       raise exc
     | Clocks.Error (loc, err) as exc ->
-      Format.eprintf "Clock mismatch between computed clock and declared clock in lustre interface file: %a@."
+      eprintf "Clock mismatch between computed clock and declared clock in lustre interface file: %a@."
 	Clocks.pp_error err;
       raise exc
     | Stateless.Error (loc, err) as exc ->
-      Format.eprintf "Stateless status mismatch between defined status and declared status in lustre interface file: %a@."
+      eprintf "Stateless status mismatch between defined status and declared status in lustre interface file: %a@."
 	Stateless.pp_error err;
       raise exc
   in
@@ -275,7 +274,7 @@ let rec compile basename extension =
     Unix.mkdir !Options.dest_dir (Unix.stat ".").Unix.st_perm
   );
   if (Unix.stat !Options.dest_dir).Unix.st_kind <> Unix.S_DIR then (
-    Format.eprintf "Failure: destination %s is not a directory.@.@." !Options.dest_dir;
+    eprintf "Failure: destination %s is not a directory.@.@." !Options.dest_dir;
     exit 1
   );
   (* Printing code *)
