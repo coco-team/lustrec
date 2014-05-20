@@ -128,8 +128,14 @@ let pp_machine fmt m =
 let get_stateless_status m =
  (m.mname.node_dec_stateless, Utils.desome m.mname.node_stateless)
 
+let is_input m id =
+  List.exists (fun o -> o.var_id = id.var_id) m.mstep.step_inputs
+
 let is_output m id =
   List.exists (fun o -> o.var_id = id.var_id) m.mstep.step_outputs
+
+let is_memory m id =
+  List.exists (fun o -> o.var_id = id.var_id) m.mmemory
 
 let conditional c t e =
   MBranch(c, [ (tag_true, t); (tag_false, e) ])

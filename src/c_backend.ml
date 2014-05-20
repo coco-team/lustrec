@@ -172,14 +172,16 @@ let pp_c_decl_struct_var fmt id =
    - if it's not a scalar output, then its name is enough
    - otherwise, dereference it (it has been declared as a pointer,
      despite its scalar Lustre type)
-   - moreover, cast arrays variables into their original array type.
+   - moreover, dereference memory array variables.
 *)
 let pp_c_var_read m fmt id =
   if Types.is_address_type id.var_type
   then
-    fprintf fmt "%s" id.var_id
+    if is_memory m id
+    then fprintf fmt "(*%s)" id.var_id
+    else fprintf fmt "%s" id.var_id
   else
-    if List.exists (fun o -> o.var_id = id.var_id) m.mstep.step_outputs (* id is output *)
+    if is_output m id
     then fprintf fmt "*%s" id.var_id
     else fprintf fmt "%s" id.var_id
 
@@ -193,7 +195,7 @@ let pp_c_var_write m fmt id =
   then
     fprintf fmt "%s" id.var_id
   else
-    if List.exists (fun o -> o.var_id = id.var_id) m.mstep.step_outputs (* id is output *)
+    if is_output m id
     then
       fprintf fmt "%s" id.var_id
     else
@@ -227,8 +229,10 @@ let rec pp_c_val self pp_var fmt v =
     | Power (v, n)  -> assert false
     | LocalVar v    -> pp_var fmt v
     | StateVar v    ->
+    (* array memory vars are represented by an indirection to a local var with the right type,
+       in order to avoid casting everywhere. *)
       if Types.is_array_type v.var_type
-      then fprintf fmt "*%a" pp_var v
+      then fprintf fmt "%a" pp_var v
       else fprintf fmt "%s->_reg.%a" self pp_var v
     | Fun (n, vl)   -> Basic_library.pp_c n (pp_c_val self pp_var) fmt vl
 
