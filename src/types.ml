@@ -56,6 +56,7 @@ type error =
   | Not_a_dimension
   | Not_a_constant
   | WrongArity of int * int
+  | WrongMorphism of int * int
   | Type_clash of type_expr * type_expr
   | Poly_imported_node of ident
 
@@ -158,6 +159,8 @@ let pp_error fmt = function
     fprintf fmt "This expression is not a valid dimension@."
   | WrongArity (ar1, ar2) ->
     fprintf fmt "Expecting %d argument(s), found %d@." ar1 ar2
+  | WrongMorphism (ar1, ar2) ->
+    fprintf fmt "Expecting %d argument(s) for homomorphic extension, found %d@." ar1 ar2
   | Undefined_var vmap ->
     fprintf fmt "No definition provided for variable(s): %a@."
       (Utils.fprintf_list ~sep:"," pp_print_string)
@@ -211,11 +214,21 @@ let rec is_dimension_type ty =
  | Tstatic (_, ty') -> is_dimension_type ty'
  | _                -> false
 
-let rec dynamic_type ty =
+let dynamic_type ty =
   let ty = repr ty in
   match ty.tdesc with
   | Tstatic (_, ty') -> ty'
   | _                -> ty
+
+let is_tuple_type ty =
+ match (repr ty).tdesc with
+ | Ttuple _         -> true
+ | _                -> false
+
+let rec is_nested_tuple_type ty =
+ match (repr ty).tdesc with
+ | Ttuple tl        -> List.exists is_tuple_type tl
+ | _                -> false
 
 let map_tuple_type f ty =
   let ty = dynamic_type ty in
@@ -223,7 +236,7 @@ let map_tuple_type f ty =
   | (Ttuple ty_list) -> { ty with tdesc = Ttuple (List.map f ty_list) }
   | _                -> f ty
 
-let rec is_struct_type ty =
+let is_struct_type ty =
  match (repr ty).tdesc with
  | Tstruct _        -> true
  | _                -> false

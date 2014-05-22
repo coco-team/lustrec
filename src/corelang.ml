@@ -225,10 +225,6 @@ let mktop_decl loc d =
 let mkpredef_call loc funname args =
   mkexpr loc (Expr_appl (funname, mkexpr loc (Expr_tuple args), None))
 
-let mkpredef_unary_call loc funname arg =
-  mkexpr loc (Expr_appl (funname, arg, None))
-
-
 (***********************************************************)
 (* Fast access to nodes, by name *)
 let (node_table : (ident, top_decl) Hashtbl.t) = Hashtbl.create 30
@@ -368,6 +364,11 @@ let expr_of_ident id loc =
    expr_delay = Delay.new_var ();
    expr_loc = loc;
    expr_annot = None}
+
+let is_tuple_expr expr =
+ match expr.expr_desc with
+  | Expr_tuple _ -> true
+  | _            -> false
 
 let expr_list_of_expr expr =
   match expr.expr_desc with

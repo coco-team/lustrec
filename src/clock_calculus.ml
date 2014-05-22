@@ -572,10 +572,18 @@ and clock_subtyping_arg env ?(sub=true) real_arg formal_clock =
 
 (* computes clocks for node application *)
 and clock_appl env f args clock_reset loc =
+ let args = expr_list_of_expr args in
+  if Basic_library.is_internal_fun f && List.exists is_tuple_expr args
+  then
+      let args = Utils.transpose_list (List.map expr_list_of_expr args) in
+      Clocks.clock_of_clock_list (List.map (fun args -> clock_call env f args clock_reset loc) args)
+  else
+    clock_call env f args clock_reset loc
+
+and clock_call env f args clock_reset loc =
   let cfun = clock_ident false env f loc in
   let cins, couts = split_arrow cfun in
   let cins = clock_list_of_clock cins in
-  let args = expr_list_of_expr args in
   List.iter2 (clock_subtyping_arg env) args cins;
   unify_imported_clock (Some clock_reset) cfun;
   couts
@@ -716,7 +724,7 @@ and clock_expr ?(nocarrier=true) env expr =
       expr.expr_clock <- ck;
       ck
   in
-  Log.report ~level:3 (fun fmt -> Format.fprintf fmt "Clock of expr %a: %a@." Printers.pp_expr expr Clocks.print_ck resulting_ck);
+  Log.report ~level:4 (fun fmt -> Format.fprintf fmt "Clock of expr %a: %a@." Printers.pp_expr expr Clocks.print_ck resulting_ck);
   resulting_ck
 
 let clock_of_vlist vars =

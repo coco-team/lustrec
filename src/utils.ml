@@ -26,6 +26,8 @@ type ident = string
 type tag = int
 type longident = (string * tag) list
 
+exception TransposeError of int*int
+
 (** General utility functions. *)
 let create_hashtable size init =
   let tbl = Hashtbl.create size in
@@ -69,16 +71,18 @@ let enumerate n =
 let rec repeat n f x =
  if n <= 0 then x else repeat (n-1) f (f x)
 
-let rec transpose_list ll =
- match ll with
- | []   -> []
- | [l]  -> List.map (fun el -> [el]) l
- | l::q -> 
-   let length_l = List.length l in
-   if not (List.for_all (fun l' -> List.length l' = length_l) q) then
-     assert false
-   ;
-   List.map2 (fun el eq -> el::eq) l (transpose_list q)
+let transpose_list ll =
+  let rec transpose ll =
+    match ll with
+    | []   -> []
+    | [l]  -> List.map (fun el -> [el]) l
+    | l::q -> List.map2 (fun el eq -> el::eq) l (transpose q)
+  in match ll with
+  | []   -> []
+  | l::q -> let length_l = List.length l in
+	    List.iter (fun l' -> let length_l' = List.length l'
+				 in if length_l <> length_l' then raise (TransposeError (length_l, length_l'))) q;
+	    transpose ll
 
 let rec filter_upto p n l =
  if n = 0 then [] else
