@@ -34,7 +34,6 @@ let mkeq x = mkeq (Location.symbol_rloc ()) x
 let mkassert x = mkassert (Location.symbol_rloc ()) x
 let mktop_decl x = mktop_decl (Location.symbol_rloc ()) x
 let mkpredef_call x = mkpredef_call (Location.symbol_rloc ()) x
-let mkpredef_unary_call x = mkpredef_unary_call (Location.symbol_rloc ()) x
 
 let mkdim_int i = mkdim_int (Location.symbol_rloc ()) i
 let mkdim_bool b = mkdim_bool (Location.symbol_rloc ()) b
@@ -360,7 +359,7 @@ expr:
 | expr XOR expr 
     {mkpredef_call "xor" [$1;$3]}
 | NOT expr 
-    {mkpredef_unary_call "not" $2}
+    {mkpredef_call "not" [$2]}
 | expr IMPL expr 
     {mkpredef_call "impl" [$1;$3]}
 
@@ -388,7 +387,7 @@ expr:
 | expr DIV expr 
     {mkpredef_call "/" [$1;$3]}
 | MINUS expr %prec UMINUS
-  {mkpredef_unary_call "uminus" $2}
+  {mkpredef_call "uminus" [$2]}
 | expr MOD expr 
     {mkpredef_call "mod" [$1;$3]}
 

@@ -417,12 +417,26 @@ and type_ident env in_main loc const id =
 (* typing an application implies:
    - checking that const formal parameters match real const (maybe symbolic) arguments
    - checking type adequation between formal and real arguments
+   An application may embed an homomorphic/internal function, in which case we need to split
+   it in many calls
 *)
 and type_appl env in_main loc const f args =
+  let args = expr_list_of_expr args in
+  if Basic_library.is_internal_fun f && List.exists is_tuple_expr args
+  then
+    try
+      let args = Utils.transpose_list (List.map expr_list_of_expr args) in
+      Types.type_of_type_list (List.map (type_call env in_main loc const f) args)
+    with
+      Utils.TransposeError (l, l') -> raise (Error (loc, WrongMorphism (l, l')))
+  else
+    type_call env in_main loc const f args
+
+(* type a (single) call. [args] is here a list of arguments. *)
+and type_call env in_main loc const f args =
   let tfun = type_ident env in_main loc const f in
   let tins, touts = split_arrow tfun in
   let tins = type_list_of_type tins in
-  let args = expr_list_of_expr args in
   if List.length args <> List.length tins then
     raise (Error (loc, WrongArity (List.length args, List.length tins)))
   else
@@ -432,7 +446,7 @@ and type_appl env in_main loc const f args =
 (** [type_expr env in_main expr] types expression [expr] in environment
     [env], expecting it to be [const] or not. *)
 and type_expr env in_main const expr =
-  let res = 
+  let resulting_ty = 
   match expr.expr_desc with
   | Expr_const c ->
     let ty = type_const expr.expr_loc c in
@@ -541,7 +555,9 @@ and type_expr env in_main const expr =
       let ty = type_expr env in_main const e in
       expr.expr_type <- ty;
       ty
-  in (*Format.eprintf "typing %B %a at %a = %a@." const Printers.pp_expr expr Location.pp_loc expr.expr_loc Types.print_ty res;*) res
+  in 
+  Log.report ~level:3 (fun fmt -> Format.fprintf fmt "Type of expr %a: %a@." Printers.pp_expr expr Types.print_ty resulting_ty);
+  resulting_ty
 
 and type_branches env in_main loc const hl =
   let typ_in = new_var () in

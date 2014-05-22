@@ -173,7 +173,6 @@ val mkeq: Location.t -> ident list * expr -> eq
 val mkassert: Location.t -> expr -> assert_t
 val mktop_decl: Location.t -> top_decl_desc -> top_decl
 val mkpredef_call: Location.t -> ident -> expr list -> expr
-val mkpredef_unary_call: Location.t -> ident -> expr -> expr
 val mk_new_name: var_decl list -> ident -> ident
 
 
@@ -218,6 +217,7 @@ val is_eq_expr: expr -> expr -> bool
 val pp_error :  Format.formatter -> error -> unit
 
 (* Caution, returns an untyped, unclocked, etc, expression *)
+val is_tuple_expr : expr -> bool
 val expr_of_ident : ident -> Location.t -> expr
 val expr_list_of_expr : expr -> expr list
 val expr_of_expr_list : Location.t -> expr list -> expr

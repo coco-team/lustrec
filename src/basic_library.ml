@@ -118,35 +118,7 @@ let internal_funs = ["+";"-";"*";"/";"mod";"&&";"||";"xor";"impl";"<";">";"<=";"
 let is_internal_fun x =
   List.mem x internal_funs
 
-(*
-let imported_node name inputs outputs sl spec =
-  mktop_decl Location.dummy_loc
-    (
-      ImportedNode
-	{nodei_id = name;
-	 nodei_type = Types.new_var ();
-	 nodei_clock = Clocks.new_var true;
-	 nodei_inputs = inputs;
-	 nodei_outputs = outputs;
-	 nodei_stateless = sl;
-	nodei_spec = spec})
-    
-let mk_new_var id =
-  let loc = Location.dummy_loc in
-  mkvar_decl loc (id, mktyp loc Tydec_any, mkclock loc Ckdec_any, false)
 
-let _ = 
-  let binary_fun id = id, [mk_new_var "x"; mk_new_var "y"], [mk_new_var "z"] in
-  let unary_fun id = id, [mk_new_var "x"], [mk_new_var "y"] in
-  (* All following functions are stateless *)
-  let st = true in
-  List.iter (fun (n,i,o) -> Hashtbl.add node_table n (imported_node n i o st None))
-    (
-(*("ite", [mk_new_var "g"; mk_new_var "x"; mk_new_var "y"], [mk_new_var "z"])::*)
-    (List.map binary_fun
-	["+";"-";"*";"/";"mod";"&&";"||";"xor";"impl";"<";">";"<=";">=";"!=";"="])
-     @(List.map unary_fun ["uminus";"not"]))
-*)  
 let pp_c i pp_val fmt vl =
   match i, vl with
   (*  | "ite", [v1; v2; v3] -> Format.fprintf fmt "(%a?(%a):(%a))" pp_val v1 pp_val v2 pp_val v3 *)
