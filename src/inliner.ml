@@ -179,6 +179,19 @@ let witness filename main_name orig inlined type_env clock_env =
   let nodes_origs, others = List.partition is_node orig in
   let nodes_inlined, _ = List.partition is_node inlined in
 
+  (* One ok_i boolean variable  per output var *)
+  let nb_outputs = List.length main_orig_node.node_outputs in
+  let ok_i = List.map (fun id ->
+    mkvar_decl 
+      loc 
+      ("OK" ^ string_of_int id,
+       {ty_dec_desc=Tydec_bool; ty_dec_loc=loc},
+       {ck_dec_desc=Ckdec_any; ck_dec_loc=loc},
+       false)
+  ) (Utils.enumerate nb_outputs) 
+  in
+
+  (* OK = ok_1 and ok_2 and ... ok_n-1 *)
   let ok_ident = "OK" in
   let ok_output = mkvar_decl 
     loc 
@@ -187,6 +200,19 @@ let witness filename main_name orig inlined type_env clock_env =
      {ck_dec_desc=Ckdec_any; ck_dec_loc=loc},
      false)
   in
+  let main_ok_expr =
+    let mkv x = mkexpr loc (Expr_ident x) in
+    match ok_i with
+    | [] -> assert false
+    | [x] -> mkv x.var_id 
+    | hd::tl -> 
+      List.fold_left (fun accu elem -> 
+	mkpredef_call loc "&&" [mkv elem.var_id; accu]
+      ) (mkv hd.var_id) tl
+  in
+
+  (* Building main node *)
+
   let main_node = {
     node_id = "check";
     node_type = Types.new_var ();
@@ -199,7 +225,7 @@ let witness filename main_name orig inlined type_env clock_env =
     node_asserts = [];
     node_eqs = [
       { eq_loc = loc;
-	eq_lhs = [ok_ident];
+	eq_lhs = List.map (fun v -> v.var_id) ok_i;
 	eq_rhs = 
 	  let inputs = expr_of_expr_list  loc (List.map (fun v -> mkexpr loc (Expr_ident v.var_id)) main_orig_node.node_inputs) in
 	  let call_orig = 
@@ -208,7 +234,12 @@ let witness filename main_name orig inlined type_env clock_env =
 	    mkexpr loc (Expr_appl ("inlined_" ^ main_name, inputs, None)) in
 	  let args = mkexpr loc (Expr_tuple [call_orig; call_inlined]) in 
 	  mkexpr loc (Expr_appl ("=", args, None))
-      }];
+      };
+      { eq_loc = loc;
+	eq_lhs = [ok_ident];
+	eq_rhs = main_ok_expr;
+      }
+    ];
     node_dec_stateless = false;
     node_stateless = None;
     node_spec = Some 
@@ -257,3 +288,7 @@ let global_inline basename prog type_env clock_env =
       prog res type_env clock_env
   );
   res
+
+(* Local Variables: *)
+(* compile-command:"make -C .." *)
+(* End: *)
