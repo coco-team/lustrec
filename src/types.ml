@@ -286,7 +286,7 @@ let rec split_arrow ty =
   | Tstatic (_, ty')  -> split_arrow ty'
     (* Functions are not first order, I don't think the var case
        needs to be considered here *)
-  | _ -> Format.eprintf "%a@." print_ty ty; assert false
+  | _ -> Format.eprintf "type %a is not a map@.Unable to split@.@?" print_ty ty; assert false
 
 (** Returns the type corresponding to a type list. *)
 let type_of_type_list tyl =
