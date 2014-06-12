@@ -434,8 +434,9 @@ and type_appl env in_main loc const f args =
 
 (* type a (single) call. [args] is here a list of arguments. *)
 and type_call env in_main loc const f args =
-  let tfun = type_ident env in_main loc const f in
-  let tins, touts = split_arrow tfun in
+  let tins, touts = new_var (), new_var () in
+  let tfun = Type_predef.type_arrow tins touts in
+  type_subtyping_arg env in_main const (expr_of_ident f loc) tfun;
   let tins = type_list_of_type tins in
   if List.length args <> List.length tins then
     raise (Error (loc, WrongArity (List.length args, List.length tins)))

@@ -87,7 +87,7 @@ and print_ty fmt ty =
   | Trat ->
     fprintf fmt "rat"
   | Tarrow (ty1,ty2) ->
-    fprintf fmt "%a->%a" print_ty ty1 print_ty ty2
+    fprintf fmt "%a -> %a" print_ty ty1 print_ty ty2
   | Ttuple tylist ->
     fprintf fmt "(%a)"
       (Utils.fprintf_list ~sep:"*" print_ty) tylist
@@ -127,7 +127,7 @@ end
   | Trat ->
     fprintf fmt "rat"
   | Tarrow (ty1,ty2) ->
-    fprintf fmt "%a->%a" print_ty ty1 print_ty ty2
+    fprintf fmt "%a -> %a" print_ty ty1 print_ty ty2
   | Ttuple tylist ->
     fprintf fmt "(%a)"
       (Utils.fprintf_list ~sep:"*" print_ty) tylist
