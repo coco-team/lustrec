@@ -115,6 +115,8 @@ let eval_env =
 
 let internal_funs = ["+";"-";"*";"/";"mod";"&&";"||";"xor";"impl";"<";">";"<=";">=";"!=";"=";"uminus";"not"]
 
+let homomorphic_funs = ["+";"-";"*";"/";"mod";"&&";"||";"xor";"impl";"uminus";"not"]
+
 let is_internal_fun x =
   List.mem x internal_funs
 

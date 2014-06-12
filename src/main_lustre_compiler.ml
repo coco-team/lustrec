@@ -156,14 +156,14 @@ let rec compile basename extension =
   (* Sorting nodes *)
   let prog = SortProg.sort prog in
   
-  (* Checking stateless/stateful status *)
-  check_stateless_decls prog;
-
   (* Typing *)
   let computed_types_env = type_decls type_env prog in
   
   (* Clock calculus *)
   let computed_clocks_env = clock_decls clock_env prog in
+
+  (* Checking stateless/stateful status *)
+  check_stateless_decls prog;
 
   (* Perform global inlining *)
   let prog =
