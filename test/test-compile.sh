@@ -116,7 +116,7 @@ inline_compile_with_check () {
     fi	
 	# Cheching witness
     pushd $build > /dev/null
-    $LUSTREC -horn -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus -verbose 0
+    $LUSTREC -verbose 0 -horn -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus 
     popd > /dev/null
     z3="`z3 -T:10 $build/${name}_witnesses/inliner_witness.smt2 | xargs`"
     if [ "x`echo $z3 | grep unsat`" == "xunsat" ]; then
@@ -126,8 +126,7 @@ inline_compile_with_check () {
     elif [ "x`echo $z3 | xargs | grep -o unknown`" == "xunknown" ]; then
 	rinlining="UNKNOWN";
     else
-	rinlining="INVALID"
-	exit 1
+	rinlining="INVALID/TIMEOUT"
     fi  
     if [ $verbose -gt 0 ]; then
 	echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), inlining valid ($rinlining), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
