@@ -35,7 +35,7 @@ and type_desc =
   | Tbool
   | Trat (* Actually unused for now. Only place where it can appear is
             in a clock declaration *)
-  | Tclock of type_expr (* An type expression explicitely tagged as carrying a clock *)
+  | Tclock of type_expr (* A type expression explicitely tagged as carrying a clock *)
   | Tarrow of type_expr * type_expr
   | Ttuple of type_expr list
   | Tenum of ident list
@@ -55,6 +55,7 @@ type error =
   | Unbound_type of ident
   | Not_a_dimension
   | Not_a_constant
+  | Assigned_constant of ident
   | WrongArity of int * int
   | WrongMorphism of int * int
   | Type_clash of type_expr * type_expr
@@ -119,7 +120,7 @@ end
   | Tbool ->
     fprintf fmt "bool"
   | Tclock t ->
-    fprintf fmt "%a clock" print_ty t
+    fprintf fmt "%a clock" print_node_ty t
   | Tstatic (_, t) ->
     fprintf fmt "%a" print_node_ty t
   | Tconst t ->
@@ -127,10 +128,10 @@ end
   | Trat ->
     fprintf fmt "rat"
   | Tarrow (ty1,ty2) ->
-    fprintf fmt "%a -> %a" print_ty ty1 print_ty ty2
+    fprintf fmt "%a -> %a" print_node_ty ty1 print_node_ty ty2
   | Ttuple tylist ->
     fprintf fmt "(%a)"
-      (Utils.fprintf_list ~sep:"*" print_ty) tylist
+      (Utils.fprintf_list ~sep:"*" print_node_ty) tylist
   | Tenum taglist ->
     fprintf fmt "enum {%a }"
       (Utils.fprintf_list ~sep:", " pp_print_string) taglist
@@ -138,9 +139,9 @@ end
     fprintf fmt "struct {%a }"
       (Utils.fprintf_list ~sep:"; " print_node_struct_ty_field) fieldlist
   | Tarray (e, ty) ->
-    fprintf fmt "%a^%a" print_ty ty Dimension.pp_dimension e
+    fprintf fmt "%a^%a" print_node_ty ty Dimension.pp_dimension e
   | Tlink ty ->
-      print_ty fmt ty
+      print_node_ty fmt ty
   | Tunivar ->
     fprintf fmt "'%s" (name_of_type ty.tid)
 
@@ -155,6 +156,8 @@ let pp_error fmt = function
     fprintf fmt "Multiple definitions of variable %s@." id
   | Not_a_constant ->
     fprintf fmt "This expression is not a constant@."
+  | Assigned_constant id ->
+    fprintf fmt "The constant %s cannot be assigned@." id
   | Not_a_dimension ->
     fprintf fmt "This expression is not a valid dimension@."
   | WrongArity (ar1, ar2) ->
@@ -201,10 +204,21 @@ let get_field_type ty label =
   | Tstruct fl -> (try Some (List.assoc label fl) with Not_found -> None)
   | _          -> None
 
-let is_clock_type ty =
+let is_numeric_type ty =
  match (repr ty).tdesc with
- | Tclock _ -> true
- | _        -> false
+ | Tint
+ | Treal -> true
+ | _     -> false
+
+let is_bool_type ty =
+ match (repr ty).tdesc with
+ | Tbool -> true
+ | _     -> false
+
+let get_clock_base_type ty =
+ match (repr ty).tdesc with
+ | Tclock ty -> Some ty
+ | _         -> None
 
 let rec is_dimension_type ty =
  match (repr ty).tdesc with
