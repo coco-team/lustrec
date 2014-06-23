@@ -280,7 +280,29 @@ let find_eq x eqs =
     in
     aux [] eqs
 
+(* specialize predefined (polymorphic) operators
+   wrt their instances, so that the C semantics 
+   is preserved *)
+let specialize_to_c expr =
+ match expr.expr_desc with
+ | Expr_appl (id, e, r) ->
+   if List.exists (fun e -> Types.is_bool_type e.expr_type) (expr_list_of_expr e)
+   then let id =
+	  match id with
+	  | "="  -> "equi"
+	  | "!=" -> "xor"
+	  | _    -> id in
+	{ expr with expr_desc = Expr_appl (id, e, r) }
+   else expr
+ | _ -> expr
+
+let specialize_op expr =
+  match !Options.output with
+  | "C" -> specialize_to_c expr
+  | _   -> expr
+
 let rec translate_expr node ((m, si, j, d, s) as args) expr =
+ let expr = specialize_op expr in
  match expr.expr_desc with
  | Expr_const v                     -> Cst v
  | Expr_ident x                     -> translate_ident node args x
@@ -294,19 +316,8 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
  | Expr_when    (e1, _, _)          -> translate_expr node args e1
  | Expr_merge   (x, _)              -> raise NormalizationError
  | Expr_appl (id, e, _) when Basic_library.is_internal_fun id ->
-   let id =
-     (* need to specialize C (dis)equality operators wrt boolean type
-        because C boolean truth value is not unique *)
-     match !Options.output with
-     | "C" when Types.is_bool_type expr.expr_type ->
-       if id = "="  then "equi" else
-       if id = "!=" then "xor"
-       else id
-     | _   -> id in
    let nd = node_from_name id in
-   (match e.expr_desc with
-   | Expr_tuple el -> Fun (node_name nd, List.map (translate_expr node args) el)
-   | _             -> Fun (node_name nd, [translate_expr node args e]))
+   Fun (node_name nd, List.map (translate_expr node args) (expr_list_of_expr e))
  | Expr_ite (g,t,e) -> (
    (* special treatment depending on the active backend. For horn backend, ite
       are preserved in expression. While they are removed for C or Java
