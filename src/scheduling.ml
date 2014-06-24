@@ -125,6 +125,18 @@ let schedule_node n =
     pp_error Format.err_formatter v;
     raise exc
 
+let schedule_prog prog =
+  List.fold_right (
+    fun top_decl (accu_prog, sch_map)  ->
+      match top_decl.top_decl_desc with
+	| Node nd -> 
+	  let nd', sch = schedule_node nd in
+	  {top_decl with top_decl_desc = Node nd'}::accu_prog, (nd.node_id, sch)::sch_map
+	| _ -> top_decl::accu_prog, sch_map
+    ) 
+    prog
+    ([],[])
+
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

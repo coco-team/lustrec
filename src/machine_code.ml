@@ -430,9 +430,8 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
 let translate_eqs node args eqs =
   List.fold_right (fun eq args -> translate_eq node args eq) eqs args;;
 
-let translate_decl nd =
+let translate_decl nd sch =
   (*Log.report ~level:1 (fun fmt -> Printers.pp_node fmt nd);*)
-  let nd, sch = Scheduling.schedule_node nd in
   let split_eqs = Splitting.tuple_split_eq_list nd.node_eqs in
   let eqs_rev, remainder = 
     List.fold_left 
@@ -488,11 +487,14 @@ let translate_decl nd =
     mannot = nd.node_annot;
   }
 
-
-let translate_prog decls =
+(** takes the global delcarations and the scheduling associated to each node *)
+let translate_prog decls node_schs =
   let nodes = get_nodes decls in 
-   (* What to do with Imported/Sensor/Actuators ? *)
-   (*arrow_machine ::*)  List.map translate_decl nodes
+  List.map 
+    (fun node -> 
+      let sch = List.assoc node.node_id node_schs in
+      translate_decl node sch 
+    ) nodes
 
 let get_machine_opt name machines =  
   List.fold_left 

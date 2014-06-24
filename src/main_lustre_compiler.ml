@@ -261,9 +261,12 @@ let rec compile basename extension =
       Access.check_prog normalized_prog;
     end;
 
+  (* Computation of node equation scheduling. It also break dependency cycles. *)
+  let cycle_free_prog, node_schs = Scheduling.schedule_prog normalized_prog in
+
   (* DFS with modular code generation *)
   report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,");
-  let machine_code = Machine_code.translate_prog normalized_prog in
+  let machine_code = Machine_code.translate_prog cycle_free_prog node_schs in
   report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
     (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
     machine_code);
