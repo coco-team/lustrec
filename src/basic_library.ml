@@ -48,6 +48,7 @@ let type_env =
       "&&", (static_op type_bin_bool_op);
       "||", (static_op type_bin_bool_op);
       "xor", (static_op type_bin_bool_op);
+      "equi", (static_op type_bin_bool_op);
       "impl", (static_op type_bin_bool_op);
       "<", (static_op type_bin_comp_op);
       "<=", (static_op type_bin_comp_op);
@@ -67,7 +68,7 @@ let clock_env =
       ["uminus"; "not"] init_env in
   let env' = 
     List.fold_right (fun op env -> CE.add_value env op ck_bin_univ)
-      ["+"; "-"; "*"; "/"; "mod"; "&&"; "||"; "xor"; "impl"; "<"; "<="; ">"; ">="; "!="; "="] env' in
+      ["+"; "-"; "*"; "/"; "mod"; "&&"; "||"; "xor"; "equi"; "impl"; "<"; "<="; ">"; ">="; "!="; "="] env' in
   env'
 
 module DE = Env
@@ -79,7 +80,7 @@ let delay_env =
       ["uminus"; "not"] init_env in
   let env' = 
     List.fold_right (fun op env -> DE.add_value env op delay_binary_poly_op)
-      ["+"; "-"; "*"; "/"; "mod"; "&&"; "||"; "xor"; "impl"; "<"; "<="; ">"; ">="; "!="; "="] env' in
+      ["+"; "-"; "*"; "/"; "mod"; "&&"; "||"; "xor"; "equi"; "impl"; "<"; "<="; ">"; ">="; "!="; "="] env' in
   let env' = 
     List.fold_right (fun op env -> DE.add_value env op delay_ternary_poly_op)
       [] env' in
@@ -99,6 +100,7 @@ let eval_env =
     "&&", (function [Dbool a; Dbool b] -> Dbool (a&&b)  | _ -> assert false);
     "||", (function [Dbool a; Dbool b] -> Dbool (a||b)  | _ -> assert false);
     "xor", (function [Dbool a; Dbool b] -> Dbool (a<>b) | _ -> assert false);
+    "equi", (function [Dbool a; Dbool b] -> Dbool (a=b) | _ -> assert false);
     "impl", (function [Dbool a; Dbool b] -> Dbool (a<=b)| _ -> assert false);
     "<", (function [Dint a; Dint b] -> Dbool (a<b)      | _ -> assert false);
     ">", (function [Dint a; Dint b] -> Dbool (a>b)      | _ -> assert false);
@@ -113,13 +115,10 @@ let eval_env =
     VE.initial
     defs
 
-let internal_funs = ["+";"-";"*";"/";"mod";"&&";"||";"xor";"impl";"<";">";"<=";">=";"!=";"=";"uminus";"not"]
-
-let homomorphic_funs = ["+";"-";"*";"/";"mod";"&&";"||";"xor";"impl";"uminus";"not"]
+let internal_funs = ["+";"-";"*";"/";"mod";"&&";"||";"xor";"equi";"impl";"<";">";"<=";">=";"!=";"=";"uminus";"not"]
 
 let is_internal_fun x =
   List.mem x internal_funs
-
 
 let pp_c i pp_val fmt vl =
   match i, vl with
@@ -128,8 +127,9 @@ let pp_c i pp_val fmt vl =
     | "not", [v] -> Format.fprintf fmt "(!%a)" pp_val v 
     | "impl", [v1; v2] -> Format.fprintf fmt "(!%a || %a)" pp_val v1 pp_val v2 
     | "=", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2 
-    | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2 
-    | "xor", [v1; v2] -> Format.fprintf fmt "(%a ^ %a)" pp_val v1 pp_val v2
+    | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
+    | "equi", [v1; v2] -> Format.fprintf fmt "(!%a == !%a)" pp_val v1 pp_val v2
+    | "xor", [v1; v2] -> Format.fprintf fmt "(!%a != !%a)" pp_val v1 pp_val v2
     | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2 
     | _ -> failwith i
 
@@ -140,6 +140,9 @@ let pp_java i pp_val fmt vl =
     | "not", [v] -> Format.fprintf fmt "(!%a)" pp_val v 
     | "impl", [v1; v2] -> Format.fprintf fmt "(!%a || %a)" pp_val v1 pp_val v2 
     | "=", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2 
+    | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
+    | "equi", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2
+    | "xor", [v1; v2] -> Format.fprintf fmt "(%a != %a)" pp_val v1 pp_val v2
     | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2 
     | _ -> assert false
 
@@ -152,7 +155,9 @@ let pp_horn i pp_val fmt vl =
   | "&&", [v1; v2] -> Format.fprintf fmt "(and %a %a)" pp_val v1 pp_val v2 
   | "||", [v1; v2] -> Format.fprintf fmt "(or %a %a)" pp_val v1 pp_val v2 
   | "impl", [v1; v2] -> Format.fprintf fmt "(=> %a %a)" pp_val v1 pp_val v2 
-  (* | "xor", [v1; v2] -> Format.fprintf fmt "(%a ^ %a)" pp_val v1 pp_val v2 *)
+  | "mod", [v1; v2] -> Format.fprintf fmt "(mod %a %a)" pp_val v1 pp_val v2
+  | "equi", [v1; v2] -> Format.fprintf fmt "(%a = %a)" pp_val v1 pp_val v2
+  | "xor", [v1; v2] -> Format.fprintf fmt "(%a xor %a)" pp_val v1 pp_val v2
   | "!=", [v1; v2] -> Format.fprintf fmt "(not (= %a %a))" pp_val v1 pp_val v2 
   | _, [v1; v2] -> Format.fprintf fmt "(%s %a %a)" i pp_val v1 pp_val v2 
   | _ -> assert false

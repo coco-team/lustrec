@@ -41,21 +41,21 @@ let type_unary_bool_op =
 
 let type_unary_poly_op =
   let univ = new_univar () in
-  new_ty (Tarrow (univ, univ))
+  type_arrow univ univ
 
 let type_bin_int_op =
-  new_ty (Tarrow (new_ty (Ttuple [type_int;type_int]), type_int))
+  type_arrow (type_tuple [type_int;type_int]) type_int
 
 let type_bin_bool_op =
-  new_ty (Tarrow (new_ty (Ttuple [type_bool;type_bool]), type_bool))
+  type_arrow (type_tuple [type_bool;type_bool]) type_bool
 
 let type_ite_op =
   let univ = new_univar () in
-  new_ty (Tarrow ((new_ty (Ttuple [type_bool;univ;univ])), univ))
+  type_arrow (type_tuple [type_bool;univ;univ]) univ
 
 let type_bin_poly_op =
   let univ = new_univar () in
-  new_ty (Tarrow ((new_ty (Ttuple [univ;univ])), univ))
+  type_arrow (type_tuple [univ;univ]) univ
 
 let type_bin_comp_op =
   let univ = new_univar () in
@@ -63,11 +63,11 @@ let type_bin_comp_op =
 
 let type_univ_bool_univ =
   let univ = new_univar () in
-  new_ty (Tarrow ((new_ty (Ttuple [univ;type_bool])), univ))
+  type_arrow (type_tuple [univ;type_bool]) univ
 
 let type_bool_univ3 =
   let univ = new_univar () in
-  new_ty (Tarrow ((new_ty (Ttuple [type_bool;univ;univ])), univ))
+  type_arrow (type_tuple [type_bool;univ;univ]) univ
 
 let type_access =
   let d = Dimension.mkdim Location.dummy_loc Dimension.Dunivar in

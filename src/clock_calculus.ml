@@ -776,7 +776,7 @@ let clock_var_decl scoped env vdecl =
       (try_generalize ck vdecl.var_loc; ck)
     else
  *)
-      if Types.is_clock_type vdecl.var_type
+      if Types.get_clock_base_type vdecl.var_type <> None
       then new_ck (Ccarrying ((new_carrier Carry_name scoped),ck)) scoped
       else ck in
   vdecl.var_clock <- ck;
@@ -808,8 +808,10 @@ let clock_node env loc nd =
   Log.report ~level:3 (fun fmt -> print_ck fmt ck_node);
   (* Local variables may contain first-order carrier variables that should be generalized.
      That's not the case for types. *)
+  try_generalize ck_node loc;
+(*
   List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_inputs;
-  List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_outputs;
+  List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_outputs;*)
   (*List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_locals;*)
   (* TODO : Xavier pourquoi ai je cette erreur ? *)
 (*  if (is_main && is_polymorphic ck_node) then
@@ -889,7 +891,7 @@ let clock_prog env decls =
 *)
 let uneval_vdecl_generics vdecl =
  (*Format.eprintf "Clock_calculus.uneval_vdecl_generics %a@." Printers.pp_node_var vdecl;*)
- if Types.is_clock_type vdecl.var_type
+ if Types.get_clock_base_type vdecl.var_type <> None
  then
    match get_carrier_name vdecl.var_clock with
    | None    -> (Format.eprintf "internal error: %a@." print_ck vdecl.var_clock; assert false)
