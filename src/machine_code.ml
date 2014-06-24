@@ -374,7 +374,8 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
      j,
      d,
      control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e2)) :: s)
-  | p  , Expr_appl (f, arg, r)                  ->
+
+  | p  , Expr_appl (f, arg, r) when not (Basic_library.is_internal_fun f) ->
     let var_p = List.map (fun v -> node_var v node) p in
     let el =
       match arg.expr_desc with
@@ -390,7 +391,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
     Clock_calculus.unify_imported_clock (Some call_ck) eq.eq_rhs.expr_clock;
     (m,
      (if Stateless.check_node node_f then si else MReset o :: si),
-     (if Basic_library.is_internal_fun f then j else Utils.IMap.add o call_f j),
+     Utils.IMap.add o call_f j,
      d,
      reset_instance node args o r eq.eq_rhs.expr_clock @
        (control_on_clock node args call_ck (MStep (var_p, o, vl))) :: s)
@@ -413,7 +414,12 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
   | [x], _                                       -> (
     let var_x = node_var x node in
     (m, si, j, d, 
-     control_on_clock node args eq.eq_rhs.expr_clock (translate_act node args (var_x, eq.eq_rhs)) :: s)
+     control_on_clock 
+       node
+       args
+       eq.eq_rhs.expr_clock
+       (translate_act node args (var_x, eq.eq_rhs)) :: s
+    )
   )
   | _                                            ->
     begin
