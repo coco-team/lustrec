@@ -235,8 +235,9 @@ val pp_prog_type : Format.formatter -> program -> unit
 val pp_prog_clock : Format.formatter -> program -> unit
 
 val get_nodes : program -> node_desc list
-val get_consts : program -> const_desc list
-val prog_unfold_consts: program -> program
+ val get_consts : program -> const_desc list 
+(* val prog_unfold_consts: program -> program *)
+
 val expr_replace_var: (ident -> ident) -> expr -> expr
 val eq_replace_rhs_var: (ident -> bool) -> (ident -> ident) -> eq -> eq
 
