@@ -319,61 +319,39 @@ let rec instantiate inst_dim_vars dim =
 	inst_dim_vars := (dim.dim_id, var)::!inst_dim_vars;
 	var
 
-let rec unify dim1 dim2 =
-  let dim1 = repr dim1 in
-  let dim2 = repr dim2 in
-  if dim1.dim_id = dim2.dim_id then () else
-  match dim1.dim_desc, dim2.dim_desc with
-  | Dunivar, _
-  | _      , Dunivar -> assert false
-  | Dvar   , Dvar    ->
-      if dim1.dim_id < dim2.dim_id
-      then dim2.dim_desc <- Dlink dim1
-      else dim1.dim_desc <- Dlink dim2
-  | Dvar   , _ when not (occurs dim1 dim2) ->
-      dim1.dim_desc <- Dlink dim2
-  | _      , Dvar when not (occurs dim2 dim1) ->
-      dim2.dim_desc <- Dlink dim1
-  | Dite(i1, t1, e1), Dite(i2, t2, e2) ->
-      begin
-        unify i1 i2;
-	unify t1 t2;
-	unify e1 e2
-      end
-  | Dappl(f1, args1), Dappl(f2, args2) when f1 = f2 && List.length args1 = List.length args2 ->
-      List.iter2 unify args1 args2
-  | Dbool b1, Dbool b2 when b1 = b2 -> ()
-  | Dint i1 , Dint i2 when i1 = i2 -> ()
-  | Dident id1, Dident id2 when id1 = id2 -> ()
-  | _ -> raise (Unify (dim1, dim2))
-
-(* unification with the constraint that dim1 is an instance of dim2 *)
-let rec semi_unify dim1 dim2 =
-  let dim1 = repr dim1 in
-  let dim2 = repr dim2 in
-  if dim1.dim_id = dim2.dim_id then () else
-  match dim1.dim_desc, dim2.dim_desc with
-  | Dunivar, _
-  | _      , Dunivar -> assert false
-  | Dvar   , Dvar    ->
-      if dim1.dim_id < dim2.dim_id
-      then dim2.dim_desc <- Dlink dim1
-      else dim1.dim_desc <- Dlink dim2
-  | Dvar   , _  -> raise (Unify (dim1, dim2))
-  | _      , Dvar when not (occurs dim2 dim1) ->
-      dim2.dim_desc <- Dlink dim1
-  | Dite(i1, t1, e1), Dite(i2, t2, e2) ->
-      begin
-        semi_unify i1 i2;
-	semi_unify t1 t2;
-	semi_unify e1 e2
-      end
-  | Dappl(f1, args1), Dappl(f2, args2) when f1 = f2 && List.length args1 = List.length args2 ->
-      List.iter2 semi_unify args1 args2
-  | Dbool b1, Dbool b2 when b1 = b2 -> ()
-  | Dint i1 , Dint i2 when i1 = i2 -> ()
-  | Dident id1, Dident id2 when id1 = id2 -> ()
-  | _ -> raise (Unify (dim1, dim2))
+(** destructive unification of [dim1] and [dim2].
+   Raises [Unify (t1,t2)] if the types are not unifiable.
+   if [semi] unification is required,
+   [dim1] should furthermore be an instance of [dim2] *)
+let unify ?(semi=false) dim1 dim2 =
+  let rec unif dim1 dim2 =
+    let dim1 = repr dim1 in
+    let dim2 = repr dim2 in
+    if dim1.dim_id = dim2.dim_id then () else
+      match dim1.dim_desc, dim2.dim_desc with
+      | Dunivar, _
+      | _      , Dunivar -> assert false
+      | Dvar   , Dvar    ->
+	if dim1.dim_id < dim2.dim_id
+	then dim2.dim_desc <- Dlink dim1
+	else dim1.dim_desc <- Dlink dim2
+      | Dvar   , _ when (not semi) && not (occurs dim1 dim2) ->
+	dim1.dim_desc <- Dlink dim2
+      | _      , Dvar when not (occurs dim2 dim1) ->
+	dim2.dim_desc <- Dlink dim1
+      | Dite(i1, t1, e1), Dite(i2, t2, e2) ->
+	begin
+          unif i1 i2;
+	  unif t1 t2;
+	  unif e1 e2
+	end
+      | Dappl(f1, args1), Dappl(f2, args2) when f1 = f2 && List.length args1 = List.length args2 ->
+	List.iter2 unif args1 args2
+      | Dbool b1, Dbool b2 when b1 = b2 -> ()
+      | Dint i1 , Dint i2 when i1 = i2 -> ()
+      | Dident id1, Dident id2 when id1 = id2 -> ()
+      | _ -> raise (Unify (dim1, dim2))
+  in unif dim1 dim2
 
 let rec expr_replace_var fvar e = 
  { e with dim_desc = expr_replace_desc fvar e.dim_desc }

@@ -280,7 +280,29 @@ let find_eq x eqs =
     in
     aux [] eqs
 
+(* specialize predefined (polymorphic) operators
+   wrt their instances, so that the C semantics 
+   is preserved *)
+let specialize_to_c expr =
+ match expr.expr_desc with
+ | Expr_appl (id, e, r) ->
+   if List.exists (fun e -> Types.is_bool_type e.expr_type) (expr_list_of_expr e)
+   then let id =
+	  match id with
+	  | "="  -> "equi"
+	  | "!=" -> "xor"
+	  | _    -> id in
+	{ expr with expr_desc = Expr_appl (id, e, r) }
+   else expr
+ | _ -> expr
+
+let specialize_op expr =
+  match !Options.output with
+  | "C" -> specialize_to_c expr
+  | _   -> expr
+
 let rec translate_expr node ((m, si, j, d, s) as args) expr =
+ let expr = specialize_op expr in
  match expr.expr_desc with
  | Expr_const v                     -> Cst v
  | Expr_ident x                     -> translate_ident node args x
@@ -295,9 +317,7 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
  | Expr_merge   (x, _)              -> raise NormalizationError
  | Expr_appl (id, e, _) when Basic_library.is_internal_fun id ->
    let nd = node_from_name id in
-   (match e.expr_desc with
-   | Expr_tuple el -> Fun (node_name nd, List.map (translate_expr node args) el)
-   | _             -> Fun (node_name nd, [translate_expr node args e]))
+   Fun (node_name nd, List.map (translate_expr node args) (expr_list_of_expr e))
  | Expr_ite (g,t,e) -> (
    (* special treatment depending on the active backend. For horn backend, ite
       are preserved in expression. While they are removed for C or Java
@@ -354,7 +374,8 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
      j,
      d,
      control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e2)) :: s)
-  | p  , Expr_appl (f, arg, r)                  ->
+
+  | p  , Expr_appl (f, arg, r) when not (Basic_library.is_internal_fun f) ->
     let var_p = List.map (fun v -> node_var v node) p in
     let el =
       match arg.expr_desc with
@@ -370,7 +391,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
     Clock_calculus.unify_imported_clock (Some call_ck) eq.eq_rhs.expr_clock;
     (m,
      (if Stateless.check_node node_f then si else MReset o :: si),
-     (if Basic_library.is_internal_fun f then j else Utils.IMap.add o call_f j),
+     Utils.IMap.add o call_f j,
      d,
      reset_instance node args o r eq.eq_rhs.expr_clock @
        (control_on_clock node args call_ck (MStep (var_p, o, vl))) :: s)
@@ -393,7 +414,12 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
   | [x], _                                       -> (
     let var_x = node_var x node in
     (m, si, j, d, 
-     control_on_clock node args eq.eq_rhs.expr_clock (translate_act node args (var_x, eq.eq_rhs)) :: s)
+     control_on_clock 
+       node
+       args
+       eq.eq_rhs.expr_clock
+       (translate_act node args (var_x, eq.eq_rhs)) :: s
+    )
   )
   | _                                            ->
     begin
@@ -404,9 +430,8 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
 let translate_eqs node args eqs =
   List.fold_right (fun eq args -> translate_eq node args eq) eqs args;;
 
-let translate_decl nd =
+let translate_decl nd sch =
   (*Log.report ~level:1 (fun fmt -> Printers.pp_node fmt nd);*)
-  let nd, sch = Scheduling.schedule_node nd in
   let split_eqs = Splitting.tuple_split_eq_list nd.node_eqs in
   let eqs_rev, remainder = 
     List.fold_left 
@@ -462,11 +487,14 @@ let translate_decl nd =
     mannot = nd.node_annot;
   }
 
-
-let translate_prog decls =
+(** takes the global delcarations and the scheduling associated to each node *)
+let translate_prog decls node_schs =
   let nodes = get_nodes decls in 
-   (* What to do with Imported/Sensor/Actuators ? *)
-   (*arrow_machine ::*)  List.map translate_decl nodes
+  List.map 
+    (fun node -> 
+      let sch = List.assoc node.node_id node_schs in
+      translate_decl node sch 
+    ) nodes
 
 let get_machine_opt name machines =  
   List.fold_left 

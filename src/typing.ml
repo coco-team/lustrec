@@ -159,131 +159,85 @@ let rec eq_ground t1 t2 =
     let def_t = get_type_definition t in
     eq_ground t1 def_t
   | Tarrow (t1,t2), Tarrow (t1',t2') -> eq_ground t1 t1' && eq_ground t2 t2'
-  | Tclock t1', _ -> eq_ground t1' t2
-  | _, Tclock t2' -> eq_ground t1 t2'
+  | Tclock t1', Tclock t2' -> eq_ground t1' t2'
   | Tstatic (e1, t1'), Tstatic (e2, t2')
   | Tarray (e1, t1'), Tarray (e2, t2') -> Dimension.is_eq_dimension e1 e2 && eq_ground t1' t2'
   | _ -> false
 
-(** [unify t1 t2] unifies types [t1] and [t2]. Raises [Unify
-    (t1,t2)] if the types are not unifiable.*)
-(* Standard destructive unification *)
-let rec unify t1 t2 =
-  let t1 = repr t1 in
-  let t2 = repr t2 in
-  if t1=t2 then
-    ()
-  else
-    (* No type abbreviations resolution for now *)
-    match t1.tdesc,t2.tdesc with
-      (* This case is not mandory but will keep "older" types *)
-    | Tvar, Tvar ->
+(** [unify t1 t2] unifies types [t1] and [t2]
+    using standard destructive unification.
+    Raises [Unify (t1,t2)] if the types are not unifiable.
+    [t1] is a expected/formal/spec type, [t2] is a computed/real/implem type,
+    so in case of unification error: expected type [t1], got type [t2].
+    If [sub]-typing is allowed, [t2] may be a subtype of [t1].
+    If [semi] unification is required,
+    [t1] should furthermore be an instance of [t2]
+    and constants are handled differently.*)
+let unify ?(sub=false) ?(semi=false) t1 t2 =
+  let rec unif t1 t2 =
+    let t1 = repr t1 in
+    let t2 = repr t2 in
+    if t1=t2 then
+      ()
+    else
+      match t1.tdesc,t2.tdesc with
+      (* strictly subtyping cases first *)
+      | _ , Tclock t2 when sub && (get_clock_base_type t1 = None) ->
+	unif t1 t2
+      | _ , Tstatic (d2, t2) when sub && (get_static_value t1 = None) ->
+	unif t1 t2
+      (* This case is not mandatory but will keep "older" types *)
+      | Tvar, Tvar ->
         if t1.tid < t2.tid then
           t2.tdesc <- Tlink t1
         else
           t1.tdesc <- Tlink t2
-    | (Tvar, _) when (not (occurs t1 t2)) ->
+      | Tvar, _ when (not semi) && (not (occurs t1 t2)) ->
         t1.tdesc <- Tlink t2
-    | (_,Tvar) when (not (occurs t2 t1)) ->
+      | _, Tvar when (not (occurs t2 t1)) ->
         t2.tdesc <- Tlink t1
-    | Tarrow (t1,t2), Tarrow (t1',t2') ->
-      begin
-        unify t1 t1';
-	unify t2 t2'
-      end
-    | Ttuple tl, Ttuple tl' when List.length tl = List.length tl' ->
-      List.iter2 unify tl tl'
-    | Tstruct fl, Tstruct fl' when List.map fst fl = List.map fst fl' ->
-      List.iter2 (fun (_, t) (_, t') -> unify t t') fl fl'
-    | Tclock _, Tstatic _
-    | Tstatic _, Tclock _ -> raise (Unify (t1, t2))
-    | Tclock t1', _ -> unify t1' t2
-    | _, Tclock t2' -> unify t1 t2'
-    | Tint, Tint | Tbool, Tbool | Trat, Trat
-    | Tunivar, _ | _, Tunivar -> ()
-    | (Tconst t, _) ->
-      let def_t = get_type_definition t in
-      unify def_t t2
-    | (_, Tconst t)  ->
-      let def_t = get_type_definition t in
-      unify t1 def_t
-    | Tenum tl, Tenum tl' when tl == tl' -> ()
-    | Tstatic (e1, t1'), Tstatic (e2, t2')
-    | Tarray (e1, t1'), Tarray (e2, t2') ->
-      begin
-	unify t1' t2';
-	Dimension.eval Basic_library.eval_env (fun c -> None) e1;
-	Dimension.eval Basic_library.eval_env (fun c -> None) e2;
-	Dimension.unify e1 e2;
-      end
-    | _,_ -> raise (Unify (t1, t2))
-
-(** [semi_unify t1 t2] checks whether type [t1] is an instance of type [t2]. Raises [Unify
-    (t1,t2)] if the types are not semi-unifiable.*)
-(* Standard destructive semi-unification *)
-let rec semi_unify t1 t2 =
-  let t1 = repr t1 in
-  let t2 = repr t2 in
-  if t1=t2 then
-    ()
-  else
-    (* No type abbreviations resolution for now *)
-    match t1.tdesc,t2.tdesc with
-      (* This case is not mandory but will keep "older" types *)
-    | Tvar, Tvar ->
-        if t1.tid < t2.tid then
-          t2.tdesc <- Tlink t1
-        else
-          t1.tdesc <- Tlink t2
-    | (Tvar, _) -> raise (Unify (t1, t2))
-    | (_,Tvar) when (not (occurs t2 t1)) ->
-        t2.tdesc <- Tlink t1
-    | Tarrow (t1,t2), Tarrow (t1',t2') ->
-      begin
-        semi_unify t1 t1';
-	semi_unify t2 t2'
-      end
-    | Ttuple tl, Ttuple tl' when List.length tl = List.length tl' ->
-      List.iter2 semi_unify tl tl'
-    | Tstruct fl, Tstruct fl' when List.map fst fl = List.map fst fl' ->
-      List.iter2 (fun (_, t) (_, t') -> semi_unify t t') fl fl'
-    | Tclock _, Tstatic _
-    | Tstatic _, Tclock _ -> raise (Unify (t1, t2))
-    | Tclock t1', _ -> semi_unify t1' t2
-    | _, Tclock t2' -> semi_unify t1 t2'
-    | Tint, Tint | Tbool, Tbool | Trat, Trat
-    | Tunivar, _ | _, Tunivar -> ()
-    | (Tconst t, _) ->
-      let def_t = get_type_definition t in
-      semi_unify def_t t2
-    | (_, Tconst t)  ->
-      let def_t = get_type_definition t in
-      semi_unify t1 def_t
-    | Tenum tl, Tenum tl' when tl == tl' -> ()
-
-    | Tstatic (e1, t1'), Tstatic (e2, t2')
-    | Tarray (e1, t1'), Tarray (e2, t2') ->
-      begin
-	semi_unify t1' t2';
-	Dimension.eval Basic_library.eval_env (fun c -> Some (Dimension.mkdim_ident Location.dummy_loc c)) e1;
-	Dimension.eval Basic_library.eval_env (fun c -> Some (Dimension.mkdim_ident Location.dummy_loc c)) e2;
-	Dimension.semi_unify e1 e2;
-      end
-    | _,_ -> raise (Unify (t1, t2))
+      | Tarrow (t1,t2), Tarrow (t1',t2') ->
+	begin
+          unif t2 t2';
+	  unif t1' t1
+	end
+      | Ttuple tl, Ttuple tl' when List.length tl = List.length tl' ->
+	List.iter2 unif tl tl'
+      | Ttuple [t1]        , _                  -> unif t1 t2
+      | _                  , Ttuple [t2]        -> unif t1 t2
+      | Tstruct fl, Tstruct fl' when List.map fst fl = List.map fst fl' ->
+	List.iter2 (fun (_, t) (_, t') -> unif t t') fl fl'
+      | Tclock _, Tstatic _
+      | Tstatic _, Tclock _ -> raise (Unify (t1, t2))
+      | Tclock t1', Tclock t2' -> unif t1' t2'
+      | Tint, Tint | Tbool, Tbool | Trat, Trat
+      | Tunivar, _ | _, Tunivar -> ()
+      | (Tconst t, _) ->
+	let def_t = get_type_definition t in
+	unif def_t t2
+      | (_, Tconst t)  ->
+	let def_t = get_type_definition t in
+	unif t1 def_t
+      | Tenum tl, Tenum tl' when tl == tl' -> ()
+      | Tstatic (e1, t1'), Tstatic (e2, t2')
+      | Tarray (e1, t1'), Tarray (e2, t2') ->
+	let eval_const =
+	  if semi
+	  then (fun c -> Some (Dimension.mkdim_ident Location.dummy_loc c))
+	  else (fun c -> None) in
+	begin
+	  unif t1' t2';
+	  Dimension.eval Basic_library.eval_env eval_const e1;
+	  Dimension.eval Basic_library.eval_env eval_const e2;
+	  Dimension.unify ~semi:semi e1 e2;
+	end
+      | _,_ -> raise (Unify (t1, t2))
+  in unif t1 t2
 
 (* Expected type ty1, got type ty2 *)
-let try_unify ty1 ty2 loc =
+let try_unify ?(sub=false) ?(semi=false) ty1 ty2 loc =
   try
-    unify ty1 ty2
-  with
-  | Unify _ ->
-    raise (Error (loc, Type_clash (ty1,ty2)))
-  | Dimension.Unify _ ->
-    raise (Error (loc, Type_clash (ty1,ty2)))
-
-let try_semi_unify ty1 ty2 loc =
-  try
-    semi_unify ty1 ty2
+    unify ~sub:sub ~semi:semi ty1 ty2
   with
   | Unify _ ->
     raise (Error (loc, Type_clash (ty1,ty2)))
@@ -291,6 +245,7 @@ let try_semi_unify ty1 ty2 loc =
     raise (Error (loc, Type_clash (ty1,ty2)))
 
 (* ty1 is a subtype of ty2 *)
+(*
 let rec sub_unify sub ty1 ty2 =
   match (repr ty1).tdesc, (repr ty2).tdesc with
   | Ttuple tl1         , Ttuple tl2         ->
@@ -314,15 +269,7 @@ let rec sub_unify sub ty1 ty2 =
     end
   | Tstatic (r_d, t1)  , _         when sub -> sub_unify sub t1 ty2
   | _                                       -> unify ty1 ty2
-
-let try_sub_unify sub ty1 ty2 loc =
-  try
-    sub_unify sub ty1 ty2
-  with
-  | Unify _ ->
-    raise (Error (loc, Type_clash (ty1,ty2)))
-  | Dimension.Unify _ ->
-    raise (Error (loc, Type_clash (ty1,ty2)))
+*)
 
 let rec type_struct_const_field loc (label, c) =
   if Hashtbl.mem field_table label
@@ -383,7 +330,13 @@ let check_constant loc const_expected const_real =
   then raise (Error (loc, Not_a_constant))
 
 let rec type_standard_args env in_main const expr_list =
-  let ty_list = List.map (fun e -> dynamic_type (type_expr env in_main const e)) expr_list in
+  let ty_list =
+    List.map
+      (fun e -> let ty = dynamic_type (type_expr env in_main const e) in
+		match get_clock_base_type ty with
+		| None    -> ty
+		| Some ty -> ty)
+      expr_list in
   let ty_res = new_var () in
   List.iter2 (fun e ty -> try_unify ty_res ty e.expr_loc) expr_list ty_list;
   ty_res
@@ -409,7 +362,7 @@ and type_subtyping_arg env in_main ?(sub=true) const real_arg formal_type =
 	 real_static_type
     else real_type in
   (*Format.eprintf "subtyping const %B real %a:%a vs formal %a@." const Printers.pp_expr real_arg Types.print_ty real_type Types.print_ty formal_type;*)
-  try_sub_unify sub real_type formal_type loc
+  try_unify ~sub:sub formal_type real_type loc
 
 and type_ident env in_main loc const id =
   type_expr env in_main const (expr_of_ident id loc)
@@ -439,7 +392,7 @@ and type_call env in_main loc const f args =
   type_subtyping_arg env in_main const (expr_of_ident f loc) tfun;
   let tins = type_list_of_type tins in
   if List.length args <> List.length tins then
-    raise (Error (loc, WrongArity (List.length args, List.length tins)))
+    raise (Error (loc, WrongArity (List.length tins, List.length args)))
   else
     List.iter2 (type_subtyping_arg env in_main const) args tins;
   touts
@@ -534,7 +487,7 @@ and type_expr env in_main const expr =
     let typ_l = Type_predef.type_clock (type_const expr.expr_loc (Const_tag l)) in
     let expr_c = expr_of_ident c expr.expr_loc in
     type_subtyping_arg env in_main ~sub:false const expr_c typ_l;
-    update_clock env in_main c expr.expr_loc typ_l;
+    (*update_clock env in_main c expr.expr_loc typ_l;*)
     let ty = type_standard_args env in_main const [e1] in
     expr.expr_type <- ty;
     ty
@@ -545,7 +498,7 @@ and type_expr env in_main const expr =
     let expr_c = expr_of_ident c expr.expr_loc in
     let typ_l = Type_predef.type_clock typ_in in
     type_subtyping_arg env in_main ~sub:false const expr_c typ_l;
-    update_clock env in_main c expr.expr_loc typ_l;
+    (*update_clock env in_main c expr.expr_loc typ_l;*)
     expr.expr_type <- typ_out;
     typ_out
   | Expr_uclock (e,k) | Expr_dclock (e,k) ->
@@ -578,7 +531,7 @@ and type_branches env in_main loc const hl =
     else (typ_in, typ_out)
   with Unify (t1, t2) ->
     raise (Error (loc, Type_clash (t1,t2)))
-
+(*
 and update_clock env in_main id loc typ =
  (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "update_clock %s with %a@ " id print_ty typ);*)
  try
@@ -587,7 +540,7 @@ and update_clock env in_main id loc typ =
  with
    Not_found ->
    raise (Error (loc, Unbound_value ("clock " ^ id)))
-
+*)
 (** [type_eq env eq] types equation [eq] in environment [env] *)
 let type_eq env in_main undefined_vars eq =
   (* Check undefined variables, type lhs *)
@@ -601,6 +554,16 @@ let type_eq env in_main undefined_vars eq =
     with Not_found ->
       raise (Error (eq.eq_loc, Already_defined id))
   in
+  (* check assignment of declared constant, assignment of clock *)
+  let ty_lhs =
+    type_of_type_list
+      (List.map2 (fun ty id ->
+	if get_static_value ty <> None
+	then raise (Error (eq.eq_loc, Assigned_constant id)) else
+	match get_clock_base_type ty with
+	| None -> ty
+	| Some ty -> ty)
+	 (type_list_of_type ty_lhs) eq.eq_lhs) in
   let undefined_vars =
     List.fold_left (fun uvars v -> define_var v uvars) undefined_vars eq.eq_lhs in
   (* Type rhs wrt to lhs type with subtyping, i.e. a constant rhs value may be assigned
@@ -802,7 +765,7 @@ let check_env_compat header declared computed =
 				    raise (Error (loc, Declared_but_undefined k))) in
     (*Types.print_ty Format.std_formatter decl_type_k;
     Types.print_ty Format.std_formatter computed_t;*)
-    try_semi_unify decl_type_k computed_t Location.dummy_loc
+    try_unify ~sub:true ~semi:true decl_type_k computed_t Location.dummy_loc
 		    )
 
 (* Local Variables: *)
