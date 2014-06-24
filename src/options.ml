@@ -35,6 +35,7 @@ let dest_dir = ref "."
 let verbose_level = ref 1
 let global_inline = ref false
 let witnesses = ref false
+let optimization = ref 2
 
 let options =
   [ "-d", Arg.Set_string dest_dir,
@@ -48,10 +49,12 @@ let options =
     "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
     "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C";
     "-horn", Arg.Unit (fun () -> output := "horn"), "generates Horn clauses encoding output instead of C";
+    "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";
     "-inline", Arg.Set global_inline, "inline all node calls (require a main node)";
     "-witnesses", Arg.Set witnesses, "enable production of witnesses during compilation";
     "-print_types", Arg.Set print_types, "prints node types";
     "-print_clocks", Arg.Set print_clocks, "prints node clocks";
+    "-O", Arg.Set_int optimization, " changes optimization level <default: 2>";
     "-verbose", Arg.Set_int verbose_level, " changes verbose level <default: 1>";
     "-version", Arg.Unit (fun () -> print_endline version), " displays the version";]
 
