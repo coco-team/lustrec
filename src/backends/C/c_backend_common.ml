@@ -213,7 +213,15 @@ let rec pp_c_val self pp_var fmt v =
     | Fun (n, vl)   -> Basic_library.pp_c n (pp_c_val self pp_var) fmt vl
 
 let pp_c_checks self fmt m =
-  Utils.fprintf_list ~sep:"" (fun fmt (loc, check) -> fprintf fmt "@[<v>%a@,assert (%a);@]@," Location.pp_c_loc loc (pp_c_val self (pp_c_var_read m)) check) fmt m.mstep.step_checks
+  Utils.fprintf_list ~sep:"" 
+    (fun fmt (loc, check) -> 
+      fprintf fmt 
+	"@[<v>%a@,assert (%a);@]@," 
+	Location.pp_c_loc loc
+	(pp_c_val self (pp_c_var_read m)) check
+    ) 
+    fmt 
+    m.mstep.step_checks
 
 
 (********************************************************************************************)

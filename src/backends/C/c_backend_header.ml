@@ -7,8 +7,20 @@ open C_backend_common
 (********************************************************************************************)
 (*                         Header Printing functions                                        *)
 (********************************************************************************************)
-let print_machine_decl_prefix = ref (fun fmt x -> ())
 
+
+module type MODIFIERS_HDR =
+sig
+  val print_machine_decl_prefix: Format.formatter -> Machine_code.machine_t -> unit
+end
+
+module EmptyMod =
+struct
+  let print_machine_decl_prefix = fun fmt x -> ()
+end
+
+module Main = functor (Mod: MODIFIERS_HDR) -> 
+struct
 
 let print_import_standard fmt =
   fprintf fmt "#include \"%s/include/lustrec/arrow.h\"@.@." Version.prefix
@@ -107,7 +119,7 @@ let print_static_alloc_macro fmt m =
 
  
 let print_machine_decl fmt m =
-  !print_machine_decl_prefix fmt m;
+  Mod.print_machine_decl_prefix fmt m;
   if fst (get_stateless_status m) then
     begin
       fprintf fmt "extern %a;@.@."
@@ -182,7 +194,6 @@ let print_type_definitions fmt filename =
 (********************************************************************************************)
 (*                         MAIN Header Printing functions                                   *)
 (********************************************************************************************)
-
 let print_header header_fmt basename prog machines =
   (* Include once: start *)
   let baseNAME = String.uppercase basename in
@@ -214,6 +225,7 @@ let print_header header_fmt basename prog machines =
   (* Include once: end *)
   fprintf header_fmt "#endif@.";
   pp_print_newline header_fmt ()
+end
 
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)

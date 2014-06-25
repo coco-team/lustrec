@@ -4,6 +4,17 @@ open Corelang
 open Machine_code
 open C_backend_common
 
+module type MODIFIERS_SRC =
+sig
+end
+
+module EmptyMod =
+struct
+end
+
+module Main = functor (Mod: MODIFIERS_SRC) -> 
+struct
+
 (********************************************************************************************)
 (*                    Instruction Printing functions                                        *)
 (********************************************************************************************)
@@ -370,7 +381,7 @@ let print_c source_fmt basename prog machines dependencies =
   (* Print nodes one by one (in the previous order) *)
   List.iter (print_machine dependencies source_fmt) machines;
   main_print source_fmt
-
+end
 
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)

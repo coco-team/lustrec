@@ -1,6 +1,17 @@
 open Format
 open Corelang
 
+module type MODIFIERS_MKF =
+sig
+end
+
+module EmptyMod =
+struct
+end
+
+module Main = functor (Mod: MODIFIERS_MKF) -> 
+struct
+
 let header_has_code header =
   List.exists 
     (fun top -> 
@@ -50,7 +61,7 @@ let print_makefile basename nodename dependencies fmt =
  fprintf fmt "@.";
  fprintf fmt "clean:@.";
  fprintf fmt "\t\\rm -f *.o %s_%s@." basename nodename
-
+end
 
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)
