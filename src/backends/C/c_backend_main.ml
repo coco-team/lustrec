@@ -4,6 +4,17 @@ open Machine_code
 open Format
 open C_backend_common
 
+module type MODIFIERS_MAINSRC =
+sig
+end
+
+module EmptyMod =
+struct
+end
+
+module Main = functor (Mod: MODIFIERS_MAINSRC) -> 
+struct
+
 (********************************************************************************************)
 (*                         Main related functions                                           *)
 (********************************************************************************************)
@@ -88,6 +99,13 @@ let print_main_header fmt =
   fprintf fmt "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/include/lustrec/io_frontend.h\"@." Version.prefix
 
 
+let print_main_c main_fmt main_machine basename prog machines dependencies =
+  print_main_header main_fmt;
+  fprintf main_fmt "#include <stdlib.h>@.#include <assert.h>@.#include \"%s\"@.@." (basename^".h");
+  (* Print the svn version number and the supported C standard (C90 or C99) *)
+  print_version main_fmt;
+  print_main_fun machines main_machine main_fmt
+end  
 
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)

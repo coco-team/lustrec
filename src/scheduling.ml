@@ -121,6 +121,12 @@ let schedule_node n =
 	  n'.node_id
 	  pp_dep_graph g
       );
+    
+    (* TODO X: extend the graph with inputs (adapt the causality analysis to deal with inputs
+     compute: coi predecessors of outputs
+     warning (no modification) when memories are non used (do not impact output) or when inputs are not used (do not impact output)
+     *)
+
     let gg = IdentDepGraph.copy g in
     let sort = topological_sort eq_equiv g in
 
@@ -152,7 +158,7 @@ let schedule_node n =
 	  Liveness.pp_reuse_policy reuse
       );
  
-    n', sort
+    n', sort, (death, disjoint, reuse (* ??? *) )
 (* let sorted = TopologicalDepGraph.fold (fun x res -> if ExprDep.is_instance_var x then res else x::res) g []*)
   with (Causality.Cycle v) as exc ->
     pp_error Format.err_formatter v;
@@ -160,15 +166,17 @@ let schedule_node n =
 
 let schedule_prog prog =
   List.fold_right (
-    fun top_decl (accu_prog, sch_map)  ->
+    fun top_decl (accu_prog, sch_map, death_map)  ->
       match top_decl.top_decl_desc with
 	| Node nd -> 
-	  let nd', sch = schedule_node nd in
-	  {top_decl with top_decl_desc = Node nd'}::accu_prog, (nd.node_id, sch)::sch_map
-	| _ -> top_decl::accu_prog, sch_map
+	  let nd', sch, death_tbls = schedule_node nd in
+	  {top_decl with top_decl_desc = Node nd'}::accu_prog, 
+	  (nd.node_id, sch)::sch_map, 
+	  (nd.node_id, death_tbls)::death_map
+	| _ -> top_decl::accu_prog, sch_map, death_map
     ) 
     prog
-    ([],[])
+    ([],[],[])
 
 
 (* Local Variables: *)
