@@ -253,6 +253,9 @@ let rec compile basename extension =
 
   (* Normalization phase *)
   report ~level:1 (fun fmt -> fprintf fmt ".. normalization@,");
+  (* Special treatment of arrows in lustre backend. We want to keep them *)
+  if !Options.output = "lustre" then
+    Normalization.unfold_arrow_active := false;
   let prog = Normalization.normalize_prog prog in
   report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
 
@@ -350,14 +353,15 @@ let rec compile basename extension =
 	let fmt = formatter_of_out_channel source_out in
 	Horn_backend.translate fmt basename prog machine_code
       end
-    | "lustre" -> assert false (*
+    | "lustre" -> 
       begin
 	let source_file = destname ^ ".lustrec.lus" in (* Could be changed *)
 	let source_out = open_out source_file in
 	let fmt = formatter_of_out_channel source_out in
+	Printers.pp_prog fmt prog;
 (*	Lustre_backend.translate fmt basename normalized_prog machine_code *)
 	()
-      end*)
+      end
 
     | _ -> assert false
   in

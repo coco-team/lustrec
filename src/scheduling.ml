@@ -47,7 +47,14 @@ let add_successors eq_equiv g v pending frontier =
   let succs_v = IdentDepGraph.succ g v in
   begin
     IdentDepGraph.remove_vertex g v;
-    List.iter (fun v' -> if is_graph_root v' g then (if eq_equiv v v' then pending := ISet.add v' !pending else frontier := ISet.add v' !frontier)) succs_v;
+    List.iter 
+      (fun v' -> 
+	if is_graph_root v' g then 
+	  (if eq_equiv v v' then 
+	      pending := ISet.add v' !pending 
+	   else
+	      frontier := ISet.add v' !frontier)
+      ) succs_v;
   end
 
 (* Chooses the next var to be sorted, taking priority into account.
@@ -105,19 +112,45 @@ let schedule_node n =
       try
 	Hashtbl.find eq_equiv v1 = Hashtbl.find eq_equiv v2
       with Not_found -> false in
+
     let n', g = global_dependency n in
-    Log.report ~level:5 (fun fmt -> Format.eprintf "dependency graph for node %s: %a" n'.node_id pp_dep_graph g);
+    Log.report ~level:5 
+      (fun fmt -> 
+	Format.eprintf 
+	  "dependency graph for node %s: %a" 
+	  n'.node_id
+	  pp_dep_graph g
+      );
     let gg = IdentDepGraph.copy g in
     let sort = topological_sort eq_equiv g in
 
     let death = Liveness.death_table n gg sort in
-    Log.report ~level:5 (fun fmt -> Format.eprintf "death table for node %s: %a" n'.node_id Liveness.pp_death_table death);
+    Log.report ~level:5 
+      (fun fmt -> 
+	Format.eprintf 
+	  "death table for node %s: %a" 
+	  n'.node_id
+	  Liveness.pp_death_table death
+      );
 
     let disjoint = Disjunction.clock_disjoint_map (node_vars n) in
-    Log.report ~level:5 (fun fmt -> Format.eprintf "clock disjoint map for node %s: %a" n'.node_id Disjunction.pp_disjoint_map disjoint);
+    
+    Log.report ~level:5 
+      (fun fmt -> 
+	Format.eprintf 
+	  "clock disjoint map for node %s: %a" 
+	  n'.node_id
+	  Disjunction.pp_disjoint_map disjoint
+      );
 
     let reuse = Liveness.reuse_policy n sort death in
-    Log.report ~level:5 (fun fmt -> Format.eprintf "reuse policy for node %s: %a" n'.node_id Liveness.pp_reuse_policy reuse);
+    Log.report ~level:5 
+      (fun fmt -> 
+	Format.eprintf 
+	  "reuse policy for node %s: %a" 
+	  n'.node_id
+	  Liveness.pp_reuse_policy reuse
+      );
  
     n', sort
 (* let sorted = TopologicalDepGraph.fold (fun x res -> if ExprDep.is_instance_var x then res else x::res) g []*)

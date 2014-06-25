@@ -69,6 +69,7 @@ let unfold_arrow expr =
     { expr with expr_desc = Expr_ite (expr_once loc ck, e1, e2) }
  | _                   -> assert false
 
+let unfold_arrow_active = ref true 
 let cpt_fresh = ref 0
 
 (* Generate a new local [node] variable *)
@@ -210,7 +211,7 @@ let rec normalize_expr ?(alias=true) node offsets defvars expr =
       normalize_expr ~alias:alias node offsets defvars norm_expr
     else
       mk_expr_alias_opt (alias && not (Basic_library.is_internal_fun id)) node defvars norm_expr
-  | Expr_arrow (e1,e2) when not (is_expr_once expr) -> (* Here we differ from Colaco paper: arrows are pushed to the top *)
+  | Expr_arrow (e1,e2) when !unfold_arrow_active && not (is_expr_once expr) -> (* Here we differ from Colaco paper: arrows are pushed to the top *)
     normalize_expr ~alias:alias node offsets defvars (unfold_arrow expr)
   | Expr_arrow (e1,e2) ->
     let defvars, norm_e1 = normalize_expr node offsets defvars e1 in
