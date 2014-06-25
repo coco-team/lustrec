@@ -244,7 +244,9 @@ and pp_machine_instr machines ?(init=false) (m: machine_t) self fmt instr =
 
 
 (**************************************************************)
-    
+   
+let is_stateless m = m.minstances = [] && m.mmemory = [] 
+
 (* Print the machine m: 
    two functions: m_init and m_step
    - m_init is a predicate over m memories
@@ -266,9 +268,9 @@ let print_machine machines fmt m =
 	 (rename_machine_list m.mname.node_id m.mstep.step_locals));
    Format.pp_print_newline fmt ();
 
-   let stateless = m.minstances = [] && m.mmemory = [] in
    
-   if stateless then
+   
+   if is_stateless m then
      begin
        (* Declaring single predicate *)
        Format.fprintf fmt "(declare-rel %a (%a))@."
@@ -348,6 +350,15 @@ if !Options.main_node <> "" then
       (rename_current_list (* machine.mname.node_id *) (full_memory_vars machines machine)) @
       main_output_dummy
     in
+
+    (* Special case when the main node is stateless *)
+    let init_name, step_name = 
+      if is_stateless machine then
+	pp_machine_stateless_name, pp_machine_stateless_name
+      else
+	pp_machine_init_name, pp_machine_step_name
+    in
+    
     Format.fprintf fmt "(declare-rel MAIN (%a))@."
       (Utils.fprintf_list ~sep:" " pp_type) 
       (List.map (fun v -> v.var_type) main_memory_next);
@@ -356,7 +367,7 @@ if !Options.main_node <> "" then
     Format.fprintf fmt "(declare-rel INIT_STATE ())@.";
     Format.fprintf fmt "(rule INIT_STATE)@.";
     Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>INIT_STATE@ (@[<v 0>%a %a@])@]@ )@ (MAIN %a)@]@.))@.@."
-      pp_machine_init_name node
+      init_name node
       (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines machine)
       (Utils.fprintf_list ~sep:" " pp_var) main_memory_next ;
 
@@ -365,7 +376,7 @@ if !Options.main_node <> "" then
     Format.fprintf fmt 
       "@[<v 2>(rule (=> @ (and @[<v 0>(MAIN %a)@ (@[<v 0>%a %a@])@]@ )@ (MAIN %a)@]@.))@.@."
       (Utils.fprintf_list ~sep:" " pp_var) main_memory_current
-      pp_machine_step_name node
+      step_name node
       (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines machine)
       (Utils.fprintf_list ~sep:" " pp_var) main_memory_next ;
 
