@@ -267,7 +267,7 @@ let rec compile basename extension =
     end;
 
   (* Computation of node equation scheduling. It also break dependency cycles. *)
-  let prog, node_schs = Scheduling.schedule_prog prog in
+  let prog, node_schs, death_tbls = Scheduling.schedule_prog prog in
 
  (* Optimization of prog: 
     - Unfold consts 
