@@ -223,7 +223,7 @@ let pp_spec fmt spec =
   ()
 
 let pp_node fmt nd = 
-fprintf fmt "@[<v 0>%a%t%s %s (%a) returns (%a)@.%a%alet@.@[<h 2>   @ @[%a@]@ @]@.tel@]@."
+fprintf fmt "@[<v 0>%a%t%s %s (%a) returns (%a)@.%a%alet@.@[<h 2>   @ @[<v>%a@]@ @]@.tel@]@."
   (fun fmt s -> match s with Some s -> pp_spec fmt s | _ -> ()) nd.node_spec
   (fun fmt -> match nd.node_spec with None -> () | Some _ -> Format.fprintf fmt "@.")
   (if nd.node_dec_stateless then "function" else "node")
