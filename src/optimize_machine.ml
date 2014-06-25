@@ -30,7 +30,7 @@ and eliminate_expr elim expr =
 (* see if elim has to take in account the provided instr:
    if so, upodate elim and return the remove flag,
    otherwise, the expression should be kept and elim is left untouched *)
-let update_elim elim instr =
+let update_elim outputs elim instr =
 (*  Format.eprintf "SHOULD WE STORE THE EXPRESSION IN INSTR %a TO ELIMINATE IT@." pp_instr instr;*)
 	  
   let apply elim v new_e = 
@@ -40,7 +40,8 @@ let update_elim elim instr =
   (* Simple cases*)
   | MLocalAssign (v, (Cst _ as e)) 
   | MLocalAssign (v, (LocalVar _ as e)) 
-  | MLocalAssign (v, (StateVar _ as e)) -> true, apply elim v e
+  | MLocalAssign (v, (StateVar _ as e)) -> 
+    if not (List.mem v outputs) then  true, apply elim v e else false, elim
   (* When optimization >= 3, we also inline any basic operator call. 
      All those are returning a single ouput *)
   | MStep([v], id, vl) when
@@ -51,7 +52,8 @@ let update_elim elim instr =
 
     
   | MLocalAssign (v, ((Fun (id, il)) as e)) when 
-      List.mem id Basic_library.internal_funs (* this will avoid inlining ite *)
+      not (List.mem v outputs) 
+      && List.mem id Basic_library.internal_funs (* this will avoid inlining ite *)
       && !Options.optimization >= 3 
 	-> (
 (*	  Format.eprintf "WE STORE THE EXPRESSION DEFINING %s TO ELIMINATE IT@." v.var_id; *)
@@ -66,7 +68,7 @@ let update_elim elim instr =
     1. each expression is rewritten according to the accumulator
     2. local assigns then rewrite occurrences of the lhs in the computed accumulator
 *)
-let optimize_minstrs instrs = 
+let optimize_minstrs outputs instrs = 
   let rev_instrs, eliminate = 
     List.fold_left (fun (rinstrs, elim) instr ->
       (* each subexpression in instr that could be rewritten by the elim set is
@@ -74,7 +76,7 @@ let optimize_minstrs instrs =
       let instr = eliminate elim instr in
       (* if instr is a simple local assign, then (a) elim is simplified with it (b) it
 	 is stored as the elim set *)
-      let remove, elim = update_elim elim instr in
+      let remove, elim = update_elim outputs elim instr in
       (if remove then rinstrs else instr::rinstrs), elim
     ) ([],[]) instrs 
   in
@@ -86,7 +88,7 @@ let optimize_minstrs instrs =
     
 *)
 let optimize_machine machine =
-  let eliminated_vars, new_instrs = optimize_minstrs machine.mstep.step_instrs in
+  let eliminated_vars, new_instrs = optimize_minstrs machine.mstep.step_outputs machine.mstep.step_instrs in
   let new_locals = 
     List.filter (fun v -> not (List.mem v eliminated_vars)) machine.mstep.step_locals 
   in
