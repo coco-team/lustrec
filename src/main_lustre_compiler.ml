@@ -267,7 +267,7 @@ let rec compile basename extension =
     end;
 
   (* Computation of node equation scheduling. It also break dependency cycles. *)
-  let prog, node_schs = Scheduling.schedule_prog prog in
+  let prog, node_schs, death_tbls = Scheduling.schedule_prog prog in
 
  (* Optimization of prog: 
     - Unfold consts 
@@ -311,30 +311,23 @@ let rec compile basename extension =
       "C" -> 
 	begin
 	  let header_file = destname ^ ".h" in (* Could be changed *)
-	  let source_file = destname ^ ".c" in (* Could be changed *)
+	  let source_lib_file = destname ^ ".c" in (* Could be changed *)
+	  let source_main_file = destname ^ "_main.c" in (* Could be changed *)
 	  let makefile_file = destname ^ ".makefile" in (* Could be changed *)
-	  let spec_file_opt = if !Options.c_spec then 
-	      (
-		let spec_file = basename ^ "_spec.c" in
-		report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s, %s and %s@," header_file source_file spec_file);
-		Some spec_file 
-	      ) else (
-		report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s and %s@," header_file source_file);
-		None 
-	       )
-	  in 
-	  let header_out = open_out header_file in
-	  let header_fmt = formatter_of_out_channel header_out in
-	  let source_out = open_out source_file in
-	  let source_fmt = formatter_of_out_channel source_out in
-	  let makefile_out = open_out makefile_file in
-	  let makefile_fmt = formatter_of_out_channel makefile_out in
-	  let spec_fmt_opt = match spec_file_opt with
-	      None -> None
-	    | Some f -> Some (formatter_of_out_channel (open_out f))
-	  in
+	  (* let spec_file_opt = if !Options.c_spec then  *)
+	  (*     ( *)
+	  (* 	let spec_file = basename ^ "_spec.c" in *)
+	  (* 	report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s, %s and %s@," header_file source_file spec_file); *)
+	  (* 	Some spec_file  *)
+	  (*     ) else ( *)
+	  (* 	report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s and %s@," header_file source_file); *)
+	  (* 	None  *)
+	  (*      ) *)
+	  (* in  *)
 	  report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,");
-	  C_backend.translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt basename prog machine_code dependencies
+	  C_backend.translate_to_c 
+	    header_file source_lib_file source_main_file makefile_file
+	    basename prog machine_code dependencies
 	end
     | "java" ->
       begin
