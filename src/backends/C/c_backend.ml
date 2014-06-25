@@ -28,14 +28,26 @@
 (*                         Translation function                                             *)
 (********************************************************************************************)
 
+
 let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt 
                    basename prog machines dependencies =
 
+
+  let module HeaderMod = C_backend_header.EmptyMod in
+  let module Header = C_backend_header.Main (HeaderMod) in
+
+  let module SourceMod = C_backend_src.EmptyMod in
+  let module Source = C_backend_src.Main (SourceMod) in
+
+  let module MakefileMod = C_backend_makefile.EmptyMod in
+  let module Makefile = C_backend_makefile.Main (MakefileMod) in
+
+
   (* Generating H file *)
-  C_backend_header.print_header header_fmt basename prog machines;
+  Header.print_header header_fmt basename prog machines;
 
   (* Generating C file *)
-  C_backend_src.print_c source_fmt basename prog machines dependencies;
+  Source.print_c source_fmt basename prog machines dependencies;
 
   (* Generating Makefile *)
   (* If a main node is identified, generate a main target for it *)
@@ -45,7 +57,7 @@ let translate_to_c header_fmt source_fmt makefile_fmt spec_fmt_opt
 	match Machine_code.get_machine_opt main_node machines with
 	| None -> Format.eprintf "Unable to find a main node named %s@.@?" main_node; 
 	  ()
-	| Some _ -> C_backend_makefile.print_makefile basename !Options.main_node dependencies makefile_fmt
+	| Some _ -> Makefile.print_makefile basename !Options.main_node dependencies makefile_fmt
       )
 
 (* Local Variables: *)

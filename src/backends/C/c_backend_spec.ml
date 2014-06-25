@@ -3,6 +3,25 @@
 
 (**************************************************************************)
 
+let pp_acsl_type var fmt t =
+  let rec aux t pp_suffix =
+  match (Types.repr t).Types.tdesc with
+  | Types.Tclock t'       -> aux t' pp_suffix
+  | Types.Tbool           -> fprintf fmt "int %s%a" var pp_suffix ()
+  | Types.Treal           -> fprintf fmt "real %s%a" var pp_suffix ()
+  | Types.Tint            -> fprintf fmt "int %s%a" var pp_suffix ()
+  | Types.Tarray (d, t')  ->
+    let pp_suffix' fmt () = fprintf fmt "%a[%a]" pp_suffix () pp_c_dimension d in
+    aux t' pp_suffix'
+  (* | Types.Tstatic (_, t') -> fprintf fmt "const "; aux t' pp_suffix *)
+  (* | Types.Tconst ty       -> fprintf fmt "%s %s" ty var *)
+  (* | Types.Tarrow (_, _)   -> fprintf fmt "void (\*%s)()" var *)
+  | _                     -> eprintf "internal error: pp_acsl_type %a@." Types.print_ty t; assert false
+  in aux t (fun fmt () -> ())
+
+let pp_acsl_var_decl fmt id =
+  pp_acsl_type id.var_id fmt id.var_type
+
 
 let pp_econst fmt c = 
   match c with
