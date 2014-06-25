@@ -6,6 +6,7 @@ open Machine_code
 
 let pp_machine_init_name fmt id = fprintf fmt "%s_init" id
 let pp_machine_step_name fmt id = fprintf fmt "%s_step" id
+let pp_machine_stateless_name fmt id = fprintf fmt "%s" id
 
 let pp_type fmt t =
   match (Types.repr t).Types.tdesc with
@@ -55,23 +56,18 @@ let full_memory_vars machines machine =
   in
   aux true machine.mname.node_id machine
 
-let machine_vars machines m = 
-    (rename_machine_list m.mname.node_id m.mstep.step_inputs)@
-    (rename_machine_list m.mname.node_id m.mstep.step_outputs)@
-    (rename_current_list (full_memory_vars machines m)) @ 
-    (rename_next_list (full_memory_vars machines m)) 
-
+let stateless_vars machines m = 
+  (rename_machine_list m.mname.node_id m.mstep.step_inputs)@
+    (rename_machine_list m.mname.node_id m.mstep.step_outputs)
+    
 let step_vars machines m = 
-    (rename_machine_list m.mname.node_id m.mstep.step_inputs)@
-    (rename_machine_list m.mname.node_id m.mstep.step_outputs)@
+  (stateless_vars machines m)@
     (rename_current_list (full_memory_vars machines m)) @ 
     (rename_next_list (full_memory_vars machines m)) 
-
+    
 let init_vars machines m = 
-    (rename_machine_list m.mname.node_id m.mstep.step_inputs)@
-    (rename_machine_list m.mname.node_id m.mstep.step_outputs)@
-    (rename_next_list (full_memory_vars machines m)) 
-  
+  (stateless_vars machines m) @ (rename_next_list (full_memory_vars machines m)) 
+    
 (********************************************************************************************)
 (*                    Instruction Printing functions                                        *)
 (********************************************************************************************)
@@ -142,8 +138,9 @@ let pp_instance_call
            pp_assign
    	     m
    	     self
-   	     (pp_horn_var m)
-	     (* (pp_horn_val self (pp_horn_var m) fmt o) *)  fmt
+   	     (pp_horn_var m) 
+	     (* (pp_horn_val self (pp_horn_var m) fmt o) *)
+	     fmt
    	     o.var_type (LocalVar o) i1
          else
            pp_assign
@@ -155,37 +152,52 @@ let pp_instance_call
 	begin
 	  let target_machine = List.find (fun m  -> m.mname.node_id = name) machines in
 	  if init then
-	  Format.fprintf fmt "(%s_init %a%t%a%t%a)"
-	    (node_name n) 
+	  Format.fprintf fmt "(%a %a%t%a%t%a)"
+	    pp_machine_init_name (node_name n) 
+	    (* inputs *)
 	    (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) inputs
 	    (Utils.pp_final_char_if_non_empty " " inputs) 
+	    (* outputs *)
 	    (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) (List.map (fun v -> LocalVar v) outputs)
 	    (Utils.pp_final_char_if_non_empty " " outputs)
+	    (* memories (next) *)
 	    (Utils.fprintf_list ~sep:" " pp_var) (
-  	      rename_machine_list (concat m.mname.node_id i) (rename_next_list (* concat m.mname.node_id i *) (full_memory_vars machines target_machine)) 
+  	      rename_machine_list 
+		(concat m.mname.node_id i) 
+		(rename_next_list (* concat m.mname.node_id i *) 
+		   (full_memory_vars machines target_machine)
+		) 
 	     )
 	  else
-	    Format.fprintf fmt "(%s_step %a%t%a%t%a)"
-	    (node_name n) 
+	    Format.fprintf fmt "(%a %a%t%a%t%a)"
+	      pp_machine_step_name (node_name n) 
 	      (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) inputs
 	      (Utils.pp_final_char_if_non_empty " " inputs) 
 	      (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) (List.map (fun v -> LocalVar v) outputs)
 	      (Utils.pp_final_char_if_non_empty " " outputs)
 	      (Utils.fprintf_list ~sep:" " pp_var) (
-
-	      (rename_machine_list (concat m.mname.node_id i) (rename_current_list (* concat m.mname.node_id i *) (full_memory_vars machines target_machine))) @ 
-		(rename_machine_list (concat m.mname.node_id i) (rename_next_list (* concat m.mname.node_id i *) (full_memory_vars machines target_machine))) 
+		(rename_machine_list 
+		   (concat m.mname.node_id i) 
+		   (rename_current_list (* concat m.mname.node_id i *) 
+		      (full_memory_vars machines target_machine))
+		) @ 
+		  (rename_machine_list 
+		     (concat m.mname.node_id i) 
+		     (rename_next_list (* concat m.mname.node_id i *) 
+			(full_memory_vars machines target_machine))
+		  ) 
 	       )
 	    
-	     end
+	end
     end
     with Not_found -> ( (* stateless node instance *)
       let (n,_) = List.assoc i m.mcalls in
-   Format.fprintf fmt "(%s %a%t%a)"
-     (node_name n)
-     (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) inputs
-     (Utils.pp_final_char_if_non_empty " " inputs) 
-     (Utils.fprintf_list ~sep:" " (pp_horn_var m)) outputs 
+      Format.fprintf fmt "(%s %a%t%a)"
+	(node_name n)
+	(Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) inputs
+	(Utils.pp_final_char_if_non_empty " " inputs) 
+	(Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) (List.map (fun v -> LocalVar v) outputs)
+	(* (Utils.fprintf_list ~sep:" " (pp_horn_var m)) outputs  *)
     )
 
 let pp_machine_init (m: machine_t) self fmt inst =
@@ -217,8 +229,8 @@ and pp_machine_instr machines ?(init=false) (m: machine_t) self fmt instr =
     pp_assign
       m self (pp_horn_var m) fmt
       i.var_type (StateVar i) v
-  | MStep ([i0], i, vl) when Basic_library.is_internal_fun i  ->
-    pp_machine_instr machines ~init:init m self fmt (MLocalAssign (i0, Fun (i, vl)))
+  | MStep ([i0], i, vl) when Basic_library.is_internal_fun i  -> assert false (* This should not happen anymore *)
+(*    pp_machine_instr machines ~init:init m self fmt (MLocalAssign (i0, Fun (i, vl))) *)
   | MStep (il, i, vl) ->
     pp_instance_call machines ~init:init m self fmt i vl il
   | MBranch (g,hl) ->
@@ -241,45 +253,76 @@ and pp_machine_instr machines ?(init=false) (m: machine_t) self fmt instr =
 *)
 let print_machine machines fmt m = 
   let pp_instr init = pp_machine_instr machines ~init:init m in
-  if m.mname.node_id = arrow_id then () 
+  if m.mname.node_id = arrow_id then 
+    (* We don't print arrow function *)
+    ()
   else 
-    ( (* We don't print arrow function *)
-   Format.fprintf fmt "; %s@." m.mname.node_id;
+    begin 
+      Format.fprintf fmt "; %s@." m.mname.node_id;
+
    (* Printing variables *)
    Utils.fprintf_list ~sep:"@." pp_decl_var fmt 
-     ((machine_vars machines m)@(rename_machine_list m.mname.node_id m.mstep.step_locals));
+     ((step_vars machines m)@
+	 (rename_machine_list m.mname.node_id m.mstep.step_locals));
    Format.pp_print_newline fmt ();
-   (* Declaring predicate *)
-   Format.fprintf fmt "(declare-rel %a (%a))@."
-     pp_machine_init_name m.mname.node_id
-     (Utils.fprintf_list ~sep:" " pp_type) (List.map (fun v -> v.var_type) (init_vars machines m));
+
+   let stateless = m.minstances = [] && m.mmemory = [] in
    
-   Format.fprintf fmt "(declare-rel %a (%a))@."
-     pp_machine_step_name m.mname.node_id
-     (Utils.fprintf_list ~sep:" " pp_type) (List.map (fun v -> v.var_type) (step_vars machines m));
-   Format.pp_print_newline fmt ();
+   if stateless then
+     begin
+       (* Declaring single predicate *)
+       Format.fprintf fmt "(declare-rel %a (%a))@."
+	 pp_machine_stateless_name m.mname.node_id
+	 (Utils.fprintf_list ~sep:" " pp_type) 
+	 (List.map (fun v -> v.var_type) (stateless_vars machines m));
+       
+       (* Rule for single predicate *)
+       Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>%a@]@ )@ (%a %a)@]@.))@.@."
+	 (Utils.fprintf_list ~sep:"@ " 
+	    (pp_instr 
+	       true (* In this case, the boolean init can be set to true or false. 
+		       The node is stateless. *)
+	       m.mname.node_id)
+	 ) 
+	 m.mstep.step_instrs
+	 pp_machine_stateless_name m.mname.node_id
+	 (Utils.fprintf_list ~sep:" " pp_var) (stateless_vars machines m);
+     end
+   else 
+     begin
+       (* Declaring predicate *)
+       Format.fprintf fmt "(declare-rel %a (%a))@."
+	 pp_machine_init_name m.mname.node_id
+	 (Utils.fprintf_list ~sep:" " pp_type) (List.map (fun v -> v.var_type) (init_vars machines m));
+       
+       Format.fprintf fmt "(declare-rel %a (%a))@."
+	 pp_machine_step_name m.mname.node_id
+	 (Utils.fprintf_list ~sep:" " pp_type) (List.map (fun v -> v.var_type) (step_vars machines m));
+       Format.pp_print_newline fmt ();
 
-   Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>%a@]@ )@ (%s_init %a)@]@.))@.@."
-     (Utils.fprintf_list ~sep:"@ " (pp_instr true m.mname.node_id)) m.mstep.step_instrs
-     m.mname.node_id
-     (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m);
+   (* Rule for init *)
+       Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>%a@]@ )@ (%a %a)@]@.))@.@."
+	 (Utils.fprintf_list ~sep:"@ " (pp_instr true m.mname.node_id)) m.mstep.step_instrs
+	 pp_machine_init_name m.mname.node_id
+	 (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m);
 
+   (* Rule for step *)
+       Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>%a@]@ )@ (%a %a)@]@.))@.@."
+	 (Utils.fprintf_list ~sep:"@ " (pp_instr false m.mname.node_id)) m.mstep.step_instrs
+	 pp_machine_step_name m.mname.node_id
+	 (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
 
-   Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>%a@]@ )@ (%s_step %a)@]@.))@.@."
-     (Utils.fprintf_list ~sep:"@ " (pp_instr false m.mname.node_id)) m.mstep.step_instrs
-     m.mname.node_id
-     (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
-
-   match m.mspec with
-     None -> () (* No node spec; we do nothing *)
-   | Some {requires = []; ensures = [EnsuresExpr e]; behaviors = []} -> 
-     ( 
+       match m.mspec with
+	 None -> () (* No node spec; we do nothing *)
+       | Some {requires = []; ensures = [EnsuresExpr e]; behaviors = []} -> 
+	 ( 
        (* For the moment, we only deal with simple case: single ensures, no other parameters *)
-       ()
-	 
-     )
-   | _ -> () (* Other cases give nothing *)
-    )
+	   ()
+	     
+	 )
+       | _ -> () (* Other cases give nothing *)
+     end
+    end
 
 
 
@@ -312,17 +355,17 @@ if !Options.main_node <> "" then
     Format.fprintf fmt "; Initial set@.";
     Format.fprintf fmt "(declare-rel INIT_STATE ())@.";
     Format.fprintf fmt "(rule INIT_STATE)@.";
-    Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>INIT_STATE@ (@[<v 0>%s_init %a@])@]@ )@ (MAIN %a)@]@.))@.@."
-      node
+    Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>INIT_STATE@ (@[<v 0>%a %a@])@]@ )@ (MAIN %a)@]@.))@.@."
+      pp_machine_init_name node
       (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines machine)
       (Utils.fprintf_list ~sep:" " pp_var) main_memory_next ;
 
     Format.fprintf fmt "; Inductive def@.";
     (Utils.fprintf_list ~sep:" " (fun fmt v -> Format.fprintf fmt "%a@." pp_decl_var v)) fmt main_output_dummy;
     Format.fprintf fmt 
-      "@[<v 2>(rule (=> @ (and @[<v 0>(MAIN %a)@ (@[<v 0>%s_step %a@])@]@ )@ (MAIN %a)@]@.))@.@."
+      "@[<v 2>(rule (=> @ (and @[<v 0>(MAIN %a)@ (@[<v 0>%a %a@])@]@ )@ (MAIN %a)@]@.))@.@."
       (Utils.fprintf_list ~sep:" " pp_var) main_memory_current
-      node
+      pp_machine_step_name node
       (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines machine)
       (Utils.fprintf_list ~sep:" " pp_var) main_memory_next ;
 
