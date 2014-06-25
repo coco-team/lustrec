@@ -90,5 +90,5 @@ let print_main_header fmt =
 
 
 (* Local Variables: *)
-(* compile-command:"make -C .." *)
+(* compile-command:"make -C ../../.." *)
 (* End: *)

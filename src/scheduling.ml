@@ -112,6 +112,7 @@ let schedule_node n =
       try
 	Hashtbl.find eq_equiv v1 = Hashtbl.find eq_equiv v2
       with Not_found -> false in
+
     let n', g = global_dependency n in
     Log.report ~level:5 
       (fun fmt -> 
