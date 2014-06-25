@@ -29,7 +29,7 @@ let delay_calculus = ref true
 let track_exceptions = ref true
 let ansi = ref false
 let check = ref false
-let c_spec = ref false
+let spec = ref "acsl"
 let output = ref "C"
 let dest_dir = ref "."
 let verbose_level = ref 1
@@ -45,8 +45,10 @@ let options =
     "-dynamic", Arg.Clear static_mem, "specifies a dynamic allocation scheme for main Lustre node (default: static)";
     "-ansi", Arg.Set ansi, "specifies that generated C code is ansi C90 compliant (default: C99)";
     "-check-access", Arg.Set check, "checks at runtime that array accesses always lie within bounds (default: no check)";
-    "-c-spec", Arg.Set c_spec, 
-    "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
+
+    "-no-spec", Arg.Unit (fun () -> spec := "no"), "do not generate any specification";
+    "-acsl-spec", Arg.Unit (fun () -> spec := "acsl"), "generates an ACSL encoding of the specification. Only meaningful for the C backend (default)";
+    "-c-spec", Arg.Unit (fun () -> spec := "c"), "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
     "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C";
     "-horn", Arg.Unit (fun () -> output := "horn"), "generates Horn clauses encoding output instead of C";
     "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";

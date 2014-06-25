@@ -347,25 +347,8 @@ let print_machine dependencies fmt m =
     end
 
 
+let print_lib_c source_fmt basename prog machines dependencies =
 
-
-let print_c source_fmt basename prog machines dependencies =
-
-  (* If a main node is identified, generate a main function for it *)
-  let main_include, main_print =
-    match !Options.main_node with
-      | "" -> (fun _ -> ()), (fun _ -> ())
-      | main_node -> (
-	match Machine_code.get_machine_opt main_node machines with
-	| None -> (
-	  eprintf "Unable to find a main node named %s@.@?" main_node; 
-	  (fun _ -> ()), (fun _ -> ())
-	)
-	| Some m -> 
-	  C_backend_main.print_main_header, C_backend_main.print_main_fun machines m
-      )
-  in
-  main_include source_fmt;
   fprintf source_fmt "#include <stdlib.h>@.#include <assert.h>@.#include \"%s\"@.@." (basename^".h");
   (* Print the svn version number and the supported C standard (C90 or C99) *)
   print_version source_fmt;
@@ -380,8 +363,7 @@ let print_c source_fmt basename prog machines dependencies =
   pp_print_newline source_fmt ();
   (* Print nodes one by one (in the previous order) *)
   List.iter (print_machine dependencies source_fmt) machines;
-  main_print source_fmt
-end
+ end
 
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)

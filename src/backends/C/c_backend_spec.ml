@@ -1,3 +1,8 @@
+open Format
+open LustreSpec
+open Machine_code
+open C_backend_common
+
 (**************************************************************************)
 (*     Printing spec for c *)
 
@@ -115,6 +120,52 @@ let print_machine_decl_prefix fmt m =
   | Some spec -> 
     pp_acsl_spec m.mstep.step_outputs fmt spec
   )
+
+(**************************************************************************)
+(*                              MAKEFILE                                  *)
+(**************************************************************************)
+
+let makefile_targets fmt basename nodename dependencies =
+  fprintf fmt "FRAMACEACSL=`frama-c -print-share-path`/e-acsl@.";
+  (* EACSL version of library file . c *)
+  fprintf fmt "%s_eacsl.c: %s.c %s.h@." basename basename basename;
+  fprintf fmt 
+    "\tframa-c -e-acsl-full-mmodel -machdep x86_64 -e-acsl %s.c -then-on e-acsl -print -ocode %s_eacsl.c@." 
+    basename basename; 
+  fprintf fmt "@.";
+  fprintf fmt "@.";
+
+  (* EACSL version of library file . c + main .c  *)
+  fprintf fmt "%s_main_eacsl.c: %s.c %s.h %s_main.c@." basename basename basename basename;
+  fprintf fmt "\tframa-c -e-acsl-full-mmodel -machdep x86_64 -e-acsl %s.c %s_main.c -then-on e-acsl -print -ocode %s_main_eacsl.i@." 
+    basename basename basename; 
+  (* Ugly hack to deal with eacsl bugs *)
+  fprintf fmt "\tgrep -v _fc_stdout %s_main_eacsl.i > %s_main_eacsl.c" basename basename;
+  fprintf fmt "@.";
+  fprintf fmt "@.";
+
+  (* EACSL version of binary *)
+  fprintf fmt "%s_main_eacsl: %s_main_eacsl.c@." basename basename;
+  fprintf fmt "\t${GCC} -Wno-attributes -I${INC} -I. -c %s_main_eacsl.c@." basename; (* compiling instrumented lib + main *)
+  C_backend_makefile.fprintf_dependencies fmt dependencies; 
+  fprintf fmt "\t${GCC} -Wno-attributes -o %s_main_eacsl io_frontend.o %a %s %s_main_eacsl.o %a@." 
+    basename 
+    (Utils.fprintf_list ~sep:" " (fun fmt (s, _, _) -> Format.fprintf fmt "%s.o" s)) 
+    (C_backend_makefile.compiled_dependencies dependencies)
+    ("${FRAMACEACSL}/e_acsl.c " 
+     ^ "${FRAMACEACSL}/memory_model/e_acsl_bittree.c " 
+     ^ "${FRAMACEACSL}/memory_model/e_acsl_mmodel.c")
+    basename 
+    (Utils.fprintf_list ~sep:" " (fun fmt lib -> fprintf fmt "-l%s" lib)) 
+    (C_backend_makefile.lib_dependencies dependencies)
+  ;
+  fprintf fmt "@.";
+
+module MakefileMod =
+struct
+  let other_targets = makefile_targets
+    
+end
 
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)
