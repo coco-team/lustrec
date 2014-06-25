@@ -98,5 +98,5 @@ let print_machine_decl_prefix fmt m =
   )
 
 (* Local Variables: *)
-(* compile-command:"make -C .." *)
+(* compile-command:"make -C ../../.." *)
 (* End: *)
