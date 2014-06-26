@@ -24,6 +24,7 @@
 open Utils
 open LustreSpec
 open Corelang
+open Graph
 open Causality
 
 (* Computes the last dependency
@@ -56,6 +57,32 @@ let death_table node g sort =
     death
   end
 *)
+
+
+(* computes the cone of influence of a given [var] wrt a dependency graph [g].
+*)
+let cone_of_influence g var =
+ (*Format.printf "coi: %s@." var;*)
+ let frontier = ref (ISet.add var ISet.empty) in
+ let coi = ref ISet.empty in
+ while not (ISet.is_empty !frontier)
+ do
+   let head = ISet.min_elt !frontier in
+   (*Format.printf "head: %s@." head;*)
+   frontier := ISet.remove head !frontier;
+   if ExprDep.is_read_var head then coi := ISet.add (ExprDep.undo_read_var head) !coi;
+   List.iter (fun s -> frontier := ISet.add s !frontier) (IdentDepGraph.succ g head);
+ done;
+ !coi
+
+let compute_unused n g =
+  let inputs = ExprDep.node_input_variables n in
+  let mems = ExprDep.node_memory_variables n in
+  let outputs = ExprDep.node_output_variables n in
+  ISet.fold
+    (fun var unused -> ISet.diff unused (cone_of_influence g var))
+    (ISet.union outputs mems)
+    (ISet.union inputs mems) 
 
 (* Computes the set of (input and) output and mem variables of [node].
    We try to reuse input variables, due to C parameter copying semantics. *)

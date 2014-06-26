@@ -33,12 +33,18 @@ exception Cycle of ident list
 
 module IdentDepGraph = Graph.Imperative.Digraph.ConcreteBidirectional (IdentModule)
 
-(*module IdentDepGraphUtil = Oper.P(IdentDepGraph)*)
-
 (* Dependency of mem variables on mem variables is cut off 
    by duplication of some mem vars into local node vars.
    Thus, cylic dependency errors may only arise between no-mem vars.
-   
+   non-mem variables are:
+   - inputs: not needed for causality/scheduling, needed only for detecting useless vars
+   - read mems (fake vars): same remark as above.
+   - outputs: decoupled from mems, if necessary
+   - locals
+   - instance vars (fake vars): simplify causality analysis
+
+   global constants are not part of the dependency graph.
+
 no_mem' = combinational(no_mem, mem);
 => (mem -> no_mem' -> no_mem)
 
@@ -85,21 +91,32 @@ let new_graph () =
 
 module ExprDep = struct
 
-let eq_var_cpt = ref 0
-
 let instance_var_cpt = ref 0
 
-let mk_eq_var id =
- incr eq_var_cpt; sprintf "#%s_%d" id !eq_var_cpt
+(* read vars represent input/mem read-only vars,
+   they are not part of the program/schedule,
+   as they are not assigned,
+   but used to compute useless inputs/mems.
+   a mem read var represents a mem at the beginning of a cycle  *)
+let mk_read_var id =
+ sprintf "#%s" id
 
+(* instance vars represent node instance calls,
+   they are not part of the program/schedule,
+   but used to simplify causality analysis
+    *)
 let mk_instance_var id =
  incr instance_var_cpt; sprintf "!%s_%d" id !instance_var_cpt
 
-let is_eq_var v = v.[0] = '#'
+let is_read_var v = v.[0] = '#'
 
 let is_instance_var v = v.[0] = '!'
 
-let is_ghost_var v = is_instance_var v || is_eq_var v
+let is_ghost_var v = is_instance_var v || is_read_var v
+
+let undo_read_var id =
+ assert (is_read_var id);
+ String.sub id 1 (String.length id - 1)
 
 let eq_memory_variables mems eq =
   let rec match_mem lhs rhs mems =
@@ -108,8 +125,6 @@ let eq_memory_variables mems eq =
     | Expr_pre _    -> List.fold_right ISet.add lhs mems
     | Expr_tuple tl -> 
       let lhs' = (transpose_list [lhs]) in
-      if List.length tl <> List.length lhs' then
-	assert false;
       List.fold_right2 match_mem lhs' tl mems
     | _             -> mems in
   match_mem eq.eq_lhs eq.eq_rhs mems
@@ -117,9 +132,16 @@ let eq_memory_variables mems eq =
 let node_memory_variables nd =
  List.fold_left eq_memory_variables ISet.empty nd.node_eqs
 
-let node_non_input_variables nd =
-  let outputs = List.fold_left (fun outputs v -> ISet.add v.var_id outputs) ISet.empty nd.node_outputs in
-  List.fold_left (fun non_inputs v -> ISet.add v.var_id non_inputs) outputs nd.node_locals
+let node_input_variables nd =
+ List.fold_left (fun inputs v -> ISet.add v.var_id inputs) ISet.empty nd.node_inputs
+
+let node_output_variables nd =
+ List.fold_left (fun outputs v -> ISet.add v.var_id outputs) ISet.empty nd.node_outputs
+
+let node_variables nd =
+  let inputs = node_input_variables nd in
+  let inoutputs = List.fold_left (fun inoutputs v -> ISet.add v.var_id inoutputs) inputs nd.node_outputs in
+  List.fold_left (fun vars v -> ISet.add v.var_id vars) inoutputs nd.node_locals
 
 (* computes the equivalence relation relating variables 
    in the same equation lhs, under the form of a table 
@@ -144,15 +166,30 @@ let adjust_tuple v expr =
 (* Add dependencies from lhs to rhs in [g, g'], *)
 (* no-mem/no-mem and mem/no-mem in g            *)
 (* mem/mem in g'                                *)
-(* excluding all/[inputs]                       *)
-let add_eq_dependencies mems non_inputs eq (g, g') =
+(*     match (lhs_is_mem, ISet.mem x mems) with
+      | (false, true ) -> (add_edges [x] lhs g,
+			   g')
+      | (false, false) -> (add_edges lhs [x] g,
+			   g')
+      | (true , false) -> (add_edges lhs [x] g,
+			   g')
+      | (true , true ) -> (g,
+			   add_edges [x] lhs g')
+*)
+let add_eq_dependencies mems inputs node_vars eq (g, g') =
   let add_var lhs_is_mem lhs x (g, g') =
-    if is_instance_var x || ISet.mem x non_inputs then
-      match (lhs_is_mem, ISet.mem x mems) with
-      | (false, true ) -> (add_edges [x] lhs g, g'                  )
-      | (false, false) -> (add_edges lhs [x] g, g'                  )
-      | (true , false) -> (add_edges lhs [x] g, g'                  )
-      | (true , true ) -> (g                  , add_edges [x] lhs g')
+    if is_instance_var x || ISet.mem x node_vars then
+      if ISet.mem x mems
+      then
+	let g = add_edges lhs [mk_read_var x] g in
+	if lhs_is_mem
+	then
+	  (g, add_edges [x] lhs g')
+	else
+	  (add_edges [x] lhs g, g')
+      else
+	let x = if ISet.mem x inputs then mk_read_var x else x in
+	(add_edges lhs [x] g, g')
     else (g, g') in
 (* Add dependencies from [lhs] to rhs clock [ck]. *)
   let rec add_clock lhs_is_mem lhs ck g =
@@ -162,10 +199,7 @@ let add_eq_dependencies mems non_inputs eq (g, g') =
     | Clocks.Ccarrying (_, ck') -> add_clock lhs_is_mem lhs ck' g
     | _                         -> g 
   in
-  
-
   let rec add_dep lhs_is_mem lhs rhs g =
-    
     (* Add mashup dependencies for a user-defined node instance [lhs] = [f]([e]) *)
     (* i.e every input is connected to every output, through a ghost var *)
     let mashup_appl_dependencies f e g =
@@ -181,7 +215,8 @@ let add_eq_dependencies mems non_inputs eq (g, g') =
     | Expr_access (e1, _)
     | Expr_power (e1, _) -> add_dep lhs_is_mem lhs e1 g
     | Expr_array a -> List.fold_right (add_dep lhs_is_mem lhs) a g
-    | Expr_tuple t ->       
+    | Expr_tuple t ->
+(*
       if List.length t <> List.length lhs then ( 
 	match lhs with
 	| [l] -> List.fold_right (fun r -> add_dep lhs_is_mem [l] r) t g
@@ -193,8 +228,9 @@ let add_eq_dependencies mems non_inputs eq (g, g') =
 	    (List.length t)
 	  ;
 	  assert false
-      ) 
+      )
       else
+*)
 	List.fold_right2 (fun l r -> add_dep lhs_is_mem [l] r) lhs t g
     | Expr_merge (c, hl) -> add_var lhs_is_mem lhs c (List.fold_right (fun (_, h) -> add_dep lhs_is_mem lhs h) hl g)
     | Expr_ite   (c, t, e) -> add_dep lhs_is_mem lhs c (add_dep lhs_is_mem lhs t (add_dep lhs_is_mem lhs e g))
@@ -214,16 +250,18 @@ let add_eq_dependencies mems non_inputs eq (g, g') =
     | Expr_dclock  (e, _)
     | Expr_phclock (e, _) -> add_dep lhs_is_mem lhs e g 
   in
-  add_dep false eq.eq_lhs eq.eq_rhs (add_vertices eq.eq_lhs g, g')
+  let g =
+    List.fold_left
+      (fun g lhs -> if ISet.mem lhs mems then add_vertices [lhs; mk_read_var lhs] g else add_vertices [lhs] g) g eq.eq_lhs in
+  add_dep false eq.eq_lhs eq.eq_rhs (g, g')
   
 
 (* Returns the dependence graph for node [n] *)
-let dependence_graph mems non_inputs n =
-  eq_var_cpt := 0;
+let dependence_graph mems inputs node_vars n =
   instance_var_cpt := 0;
   let g = new_graph (), new_graph () in
   (* Basic dependencies *)
-  let g = List.fold_right (add_eq_dependencies mems non_inputs) n.node_eqs g in
+  let g = List.fold_right (add_eq_dependencies mems inputs node_vars) n.node_eqs g in
   g
 
 end
@@ -364,6 +402,7 @@ module CycleDetection = struct
   let break_cycle head cp_head g =
     let succs = IdentDepGraph.succ g head in
     IdentDepGraph.add_edge g head cp_head;
+    IdentDepGraph.add_edge g cp_head (ExprDep.mk_read_var head);
     List.iter
       (fun s ->
 	IdentDepGraph.remove_edge g head s;
@@ -451,8 +490,9 @@ let merge_with g1 g2 =
 
 let global_dependency node =
   let mems = ExprDep.node_memory_variables node in
-  let non_inputs = ExprDep.node_non_input_variables node in
-  let (g_non_mems, g_mems) = ExprDep.dependence_graph mems non_inputs node in
+  let inputs = ExprDep.node_input_variables node in
+  let node_vars = ExprDep.node_variables node in
+  let (g_non_mems, g_mems) = ExprDep.dependence_graph mems inputs node_vars node in
   (*Format.eprintf "g_non_mems: %a" pp_dep_graph g_non_mems;
   Format.eprintf "g_mems: %a" pp_dep_graph g_mems;*)
   CycleDetection.check_cycles g_non_mems;

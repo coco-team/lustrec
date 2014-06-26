@@ -31,7 +31,7 @@ let usage = "Usage: lustrec [options] <source-file>"
 let extensions = [".ec"; ".lus"; ".lusi"]
 
 let check_stateless_decls decls =
-  report ~level:1 (fun fmt -> fprintf fmt ".. checking stateless/stateful status@ ");
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. checking stateless/stateful status@ ");
   try
     Stateless.check_prog decls
   with (Stateless.Error (loc, err)) as exc ->
@@ -41,7 +41,7 @@ let check_stateless_decls decls =
     raise exc
 
 let type_decls env decls =  
-  report ~level:1 (fun fmt -> fprintf fmt ".. typing@ ");
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. typing@ ");
   let new_env = 
     begin
       try
@@ -54,11 +54,11 @@ let type_decls env decls =
     end 
   in
   if !Options.print_types then
-    report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>  %a@]@ " Corelang.pp_prog_type decls);
+    Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>  %a@]@ " Corelang.pp_prog_type decls);
   new_env
       
 let clock_decls env decls = 
-  report ~level:1 (fun fmt -> fprintf fmt ".. clock calculus@ ");
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. clock calculus@ ");
   let new_env =
     begin
       try
@@ -69,7 +69,7 @@ let clock_decls env decls =
     end
   in
   if !Options.print_clocks then
-    report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>  %a@]@ " Corelang.pp_prog_clock decls);
+    Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>  %a@]@ " Corelang.pp_prog_clock decls);
   new_env
 
 (* Loading Lusi file and filling type tables with parsed
@@ -79,7 +79,7 @@ let load_lusi own filename =
   let lexbuf = Lexing.from_channel (open_in filename) in
   Location.init lexbuf filename;
   (* Parsing *)
-  report ~level:1 (fun fmt -> fprintf fmt ".. parsing header file %s@ " filename);
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. parsing header file %s@ " filename);
     try
       Parse.header own Parser_lustre.header Lexer_lustre.token lexbuf
     with
@@ -117,7 +117,7 @@ let load_n_check_lusi source_name lusi_name prog computed_types_env computed_clo
       Stateless.check_compat header
     with Sys_error _ -> ( 
       (* Printing lusi file is necessary *)
-      report ~level:1 
+      Log.report ~level:1 
 	(fun fmt -> 
 	  fprintf fmt 
 	    ".. generating lustre interface file %s@," lusi_name);
@@ -149,7 +149,7 @@ let rec compile basename extension =
   Location.init lexbuf source_name;
 
   (* Parsing *)
-  report ~level:1 
+  Log.report ~level:1 
     (fun fmt -> fprintf fmt "@[<v>.. parsing file %s@," source_name);
   let prog =
     try
@@ -166,7 +166,7 @@ let rec compile basename extension =
   in
 
   (* Extracting dependencies *)
-  report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>.. extracting dependencies@,");
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>.. extracting dependencies@,");
   let dependencies = 
     List.fold_right 
       (fun d accu -> match d.Corelang.top_decl_desc with 
@@ -178,9 +178,9 @@ let rec compile basename extension =
     List.fold_left (fun (compilation_dep, type_env, clock_env) (s, local) -> 
       try
 	let basename = (if local then s else Version.prefix ^ "/include/lustrec/" ^ s ) ^ ".lusi" in 
-	report ~level:1 (fun fmt -> fprintf fmt "@[<v 0>Library %s@," basename);
+	Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 0>Library %s@," basename);
 	let comp_dep, lusi_type_env, lusi_clock_env = check_lusi (load_lusi false basename) in 
-	report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
+	Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
 	
 	(s, local, comp_dep)::compilation_dep,
 	Env.overwrite type_env lusi_type_env,
@@ -191,7 +191,7 @@ let rec compile basename extension =
       )
     )  ([], Basic_library.type_env, Basic_library.clock_env) dependencies
   in
-  report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
   
   (* Sorting nodes *)
   let prog = SortProg.sort prog in
@@ -219,7 +219,7 @@ let rec compile basename extension =
     if(!Options.delay_calculus)
     then
     begin
-    report ~level:1 (fun fmt -> fprintf fmt ".. initialisation analysis@?");
+    Log.report ~level:1 (fun fmt -> fprintf fmt ".. initialisation analysis@?");
     try
     Delay_calculus.delay_prog Basic_library.delay_env prog
     with (Delay.Error (loc,err)) as exc ->
@@ -252,22 +252,26 @@ let rec compile basename extension =
   (*Hashtbl.iter (fun id td -> match td.Corelang.top_decl_desc with Corelang.Node nd -> Format.eprintf "%s calls %a" id Causality.NodeDep.pp_generic_calls nd | _ -> ()) Corelang.node_table;*)
 
   (* Normalization phase *)
-  report ~level:1 (fun fmt -> fprintf fmt ".. normalization@,");
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. normalization@,");
   (* Special treatment of arrows in lustre backend. We want to keep them *)
   if !Options.output = "lustre" then
     Normalization.unfold_arrow_active := false;
   let prog = Normalization.normalize_prog prog in
-  report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
+  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
 
   (* Checking array accesses *)
   if !Options.check then
     begin
-      report ~level:1 (fun fmt -> fprintf fmt ".. array access checks@,");
+      Log.report ~level:1 (fun fmt -> fprintf fmt ".. array access checks@,");
       Access.check_prog prog;
     end;
 
-  (* Computation of node equation scheduling. It also break dependency cycles. *)
-  let prog, node_schs, death_tbls = Scheduling.schedule_prog prog in
+  (* Computation of node equation scheduling. It also breaks dependency cycles
+     and warns about unused input or memory variables *)
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. scheduling@,");
+  let prog, node_schs = Scheduling.schedule_prog prog in
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_warning_unused node_schs);
+  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
 
  (* Optimization of prog: 
     - Unfold consts 
@@ -281,9 +285,9 @@ let rec compile basename extension =
   in
 
   (* DFS with modular code generation *)
-  report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,");
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,");
   let machine_code = Machine_code.translate_prog prog node_schs in
-  report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
+  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
     (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
     machine_code);
 
@@ -297,7 +301,7 @@ let rec compile basename extension =
   
   (* Creating destination directory if needed *)
   if not (Sys.file_exists !Options.dest_dir) then (
-    report ~level:1 (fun fmt -> fprintf fmt ".. creating destination directory@,");
+    Log.report ~level:1 (fun fmt -> fprintf fmt ".. creating destination directory@,");
     Unix.mkdir !Options.dest_dir (Unix.stat ".").Unix.st_perm
   );
   if (Unix.stat !Options.dest_dir).Unix.st_kind <> Unix.S_DIR then (
@@ -317,14 +321,14 @@ let rec compile basename extension =
 	  (* let spec_file_opt = if !Options.c_spec then  *)
 	  (*     ( *)
 	  (* 	let spec_file = basename ^ "_spec.c" in *)
-	  (* 	report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s, %s and %s@," header_file source_file spec_file); *)
+	  (* 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s, %s and %s@," header_file source_file spec_file); *)
 	  (* 	Some spec_file  *)
 	  (*     ) else ( *)
-	  (* 	report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s and %s@," header_file source_file); *)
+	  (* 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. opening files %s and %s@," header_file source_file); *)
 	  (* 	None  *)
 	  (*      ) *)
 	  (* in  *)
-	  report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,");
+	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,");
 	  C_backend.translate_to_c 
 	    header_file source_lib_file source_main_file makefile_file
 	    basename prog machine_code dependencies
@@ -333,10 +337,10 @@ let rec compile basename extension =
       begin
 	failwith "Sorry, but not yet supported !"
     (*let source_file = basename ^ ".java" in
-      report ~level:1 (fun fmt -> fprintf fmt ".. opening file %s@,@?" source_file);
+      Log.report ~level:1 (fun fmt -> fprintf fmt ".. opening file %s@,@?" source_file);
       let source_out = open_out source_file in
       let source_fmt = formatter_of_out_channel source_out in
-      report ~level:1 (fun fmt -> fprintf fmt ".. java code generation@,@?");
+      Log.report ~level:1 (fun fmt -> fprintf fmt ".. java code generation@,@?");
       Java_backend.translate_to_java source_fmt basename normalized_prog machine_code;*)
       end
     | "horn" ->
@@ -358,7 +362,7 @@ let rec compile basename extension =
 
     | _ -> assert false
   in
-  report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
   (* We stop the process here *)
   exit 0
   
