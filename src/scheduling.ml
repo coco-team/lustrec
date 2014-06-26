@@ -29,6 +29,12 @@ open Corelang
 open Graph
 open Causality
 
+type schedule_report =
+{
+  schedule : ident list;
+  unused_vars : ISet.t;
+  death_table : (ident, ISet.t) Hashtbl.t
+}
 
 (* Topological sort with a priority for variables belonging in the same equation lhs.
    For variables still unrelated, standard compare is used to choose the minimal element.
@@ -72,7 +78,7 @@ let next_element eq_equiv g sort pending frontier =
 	pending := p;
 	frontier := f;
 	add_successors eq_equiv g choice pending frontier;
-	if not (ExprDep.is_instance_var choice) then sort := choice :: !sort
+	if not (ExprDep.is_ghost_var choice) then sort := choice :: !sort
       end
     else
       begin
@@ -80,7 +86,7 @@ let next_element eq_equiv g sort pending frontier =
       (*Format.eprintf "-2-> %s@." choice;*)
 	pending := ISet.remove choice !pending;
 	add_successors eq_equiv g choice pending frontier;
-	if not (ExprDep.is_instance_var choice) then sort := choice :: !sort
+	if not (ExprDep.is_ghost_var choice) then sort := choice :: !sort
       end
   end
 
@@ -129,7 +135,7 @@ let schedule_node n =
 
     let gg = IdentDepGraph.copy g in
     let sort = topological_sort eq_equiv g in
-
+    let unused = Liveness.compute_unused n gg in
     let death = Liveness.death_table n gg sort in
     Log.report ~level:5 
       (fun fmt -> 
@@ -158,26 +164,39 @@ let schedule_node n =
 	  Liveness.pp_reuse_policy reuse
       );
  
-    n', sort, (death, disjoint, reuse (* ??? *) )
-(* let sorted = TopologicalDepGraph.fold (fun x res -> if ExprDep.is_instance_var x then res else x::res) g []*)
+    n', { schedule = sort; unused_vars = unused; death_table = death }
   with (Causality.Cycle v) as exc ->
     pp_error Format.err_formatter v;
     raise exc
 
 let schedule_prog prog =
   List.fold_right (
-    fun top_decl (accu_prog, sch_map, death_map)  ->
+    fun top_decl (accu_prog, sch_map)  ->
       match top_decl.top_decl_desc with
 	| Node nd -> 
-	  let nd', sch, death_tbls = schedule_node nd in
+	  let nd', report = schedule_node nd in
 	  {top_decl with top_decl_desc = Node nd'}::accu_prog, 
-	  (nd.node_id, sch)::sch_map, 
-	  (nd.node_id, death_tbls)::death_map
-	| _ -> top_decl::accu_prog, sch_map, death_map
+	  IMap.add nd.node_id report sch_map
+	| _ -> top_decl::accu_prog, sch_map
     ) 
     prog
-    ([],[],[])
+    ([],IMap.empty)
 
+let pp_warning_unused fmt node_schs =
+ IMap.iter
+   (fun nd report ->
+     let unused = report.unused_vars in
+     if not (ISet.is_empty unused)
+     then
+       let nd = match (Corelang.node_from_name nd).top_decl_desc with Node nd -> nd | _ -> assert false in
+       ISet.iter
+	 (fun u -> 
+	   Format.fprintf fmt "Warning: variable '%s' seems unused@.%a@."
+	     u
+	     Location.pp_loc (node_var u nd).var_loc)
+	 unused
+   )
+   node_schs
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

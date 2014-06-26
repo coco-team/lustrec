@@ -492,7 +492,7 @@ let translate_prog decls node_schs =
   let nodes = get_nodes decls in 
   List.map 
     (fun node -> 
-      let sch = List.assoc node.node_id node_schs in
+      let sch = (Utils.IMap.find node.node_id node_schs).Scheduling.schedule in
       translate_decl node sch 
     ) nodes
 
