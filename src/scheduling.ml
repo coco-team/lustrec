@@ -31,8 +31,13 @@ open Causality
 
 type schedule_report =
 {
+  (* a schedule computed wrt the dependency graph *)
   schedule : ident list;
+  (* the set of unused variables (no output or mem depends on them) *)
   unused_vars : ISet.t;
+  (* the table mapping each local var to its in-degree *)
+  fanin_table : (ident, int) Hashtbl.t;
+  (* the table mapping each assignment to a set of dead/reusable variables *)
   death_table : (ident, ISet.t) Hashtbl.t
 }
 
@@ -131,11 +136,13 @@ let schedule_node n =
     (* TODO X: extend the graph with inputs (adapt the causality analysis to deal with inputs
      compute: coi predecessors of outputs
      warning (no modification) when memories are non used (do not impact output) or when inputs are not used (do not impact output)
+       DONE !
      *)
 
     let gg = IdentDepGraph.copy g in
     let sort = topological_sort eq_equiv g in
     let unused = Liveness.compute_unused n gg in
+    let fanin = Liveness.compute_fanin n gg in
     let death = Liveness.death_table n gg sort in
     Log.report ~level:5 
       (fun fmt -> 
@@ -164,7 +171,7 @@ let schedule_node n =
 	  Liveness.pp_reuse_policy reuse
       );
  
-    n', { schedule = sort; unused_vars = unused; death_table = death }
+    n', { schedule = sort; unused_vars = unused; fanin_table = fanin; death_table = death }
   with (Causality.Cycle v) as exc ->
     pp_error Format.err_formatter v;
     raise exc
@@ -181,6 +188,20 @@ let schedule_prog prog =
     ) 
     prog
     ([],IMap.empty)
+
+let pp_schedule fmt node_schs =
+ IMap.iter
+   (fun nd report ->
+     Format.fprintf fmt "%s schedule: %a@."
+       nd
+       (fprintf_list ~sep:" ; " (fun fmt v -> Format.fprintf fmt "%s" v)) report.schedule)
+   node_schs
+
+let pp_fanin_table fmt node_schs =
+  IMap.iter
+    (fun nd report ->
+      Format.fprintf fmt "%s : %a" nd Liveness.pp_fanin report.fanin_table)
+    node_schs
 
 let pp_warning_unused fmt node_schs =
  IMap.iter

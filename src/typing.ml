@@ -148,7 +148,7 @@ let get_type_definition tname =
 (* Should be used between local variables which must have a ground type *)
 let rec eq_ground t1 t2 =
   match t1.tdesc, t2.tdesc with
-  | Tint, Tint | Tbool, Tbool | Trat, Trat -> true
+  | Tint, Tint | Tbool, Tbool | Trat, Trat | Treal, Treal -> true
   | Tenum tl, Tenum tl' when tl == tl' -> true
   | Ttuple tl, Ttuple tl' when List.length tl = List.length tl' -> List.for_all2 eq_ground tl tl'
   | Tstruct fl, Tstruct fl' when List.map fst fl = List.map fst fl' -> List.for_all2 (fun (_, t) (_, t') -> eq_ground t t') fl fl'
@@ -177,7 +177,7 @@ let unify ?(sub=false) ?(semi=false) t1 t2 =
   let rec unif t1 t2 =
     let t1 = repr t1 in
     let t2 = repr t2 in
-    if t1=t2 then
+    if t1==t2 then
       ()
     else
       match t1.tdesc,t2.tdesc with
@@ -210,7 +210,7 @@ let unify ?(sub=false) ?(semi=false) t1 t2 =
       | Tclock _, Tstatic _
       | Tstatic _, Tclock _ -> raise (Unify (t1, t2))
       | Tclock t1', Tclock t2' -> unif t1' t2'
-      | Tint, Tint | Tbool, Tbool | Trat, Trat
+      | Tint, Tint | Tbool, Tbool | Trat, Trat | Treal, Treal
       | Tunivar, _ | _, Tunivar -> ()
       | (Tconst t, _) ->
 	let def_t = get_type_definition t in

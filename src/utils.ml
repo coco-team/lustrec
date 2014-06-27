@@ -292,6 +292,13 @@ let pp_array a pp_fun beg_str end_str sep_str =
   else
     print_string end_str
 
+let pp_iset fmt t =
+  begin
+    Format.fprintf fmt "{@ ";
+    ISet.iter (fun s -> Format.fprintf fmt "%s@ " s) t;
+    Format.fprintf fmt "}@."
+  end
+
 let pp_hashtbl t pp_fun beg_str end_str sep_str =
   if (beg_str="\n") then
     print_newline ()

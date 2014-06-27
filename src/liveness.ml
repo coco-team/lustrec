@@ -58,6 +58,22 @@ let death_table node g sort =
   end
 *)
 
+(* computes the in-degree for each local variable of node [n], according to dep graph [g].
+*)
+let compute_fanin n g =
+  let locals = ISet.diff (ExprDep.node_local_variables n) (ExprDep.node_memory_variables n) in
+  let fanin = Hashtbl.create 23 in
+  begin
+    IdentDepGraph.iter_vertex (fun v -> if ISet.mem v locals then Hashtbl.add fanin v (IdentDepGraph.in_degree g v)) g;
+    fanin
+  end
+ 
+let pp_fanin fmt fanin =
+  begin
+    Format.fprintf fmt "{ /* locals fanin: */@.";
+    Hashtbl.iter (fun s t -> Format.fprintf fmt "%s -> %d@." s t) fanin;
+    Format.fprintf fmt "}@."
+  end
 
 (* computes the cone of influence of a given [var] wrt a dependency graph [g].
 *)
@@ -169,17 +185,22 @@ let replace_in_death_table death v v' =
  Hashtbl.iter (fun k dead -> Hashtbl.replace death k (replace_in_set dead v v')) death
 
 let find_compatible_local node var dead =
- (*Format.eprintf "find_compatible_local %s %s@." node.node_id var;*)
+ (*Format.eprintf "find_compatible_local %s %s %a@." node.node_id var pp_iset dead;*)
   let typ = (Corelang.node_var var node).var_type in
   let eq_var = node_eq var node in
-  let inputs =
+  let aliasable_inputs =
     match NodeDep.get_callee eq_var.eq_rhs with
     | None           -> []
     | Some (_, args) -> List.fold_right (fun e r -> match e.expr_desc with Expr_ident id -> id::r | _ -> r) args [] in
   let filter v =
+    let res =
        ISet.mem v.var_id dead
     && Typing.eq_ground typ v.var_type
-    && not (List.mem v.var_id inputs) in
+    && not (Types.is_address_type v.var_type  && List.mem v.var_id aliasable_inputs) in
+    begin
+      (*Format.eprintf "filter %a = %s@." Printers.pp_var_name v (if res then "true" else "false");*)
+      res
+    end in
   try
     Some ((List.find filter node.node_locals).var_id)
   with Not_found -> None
