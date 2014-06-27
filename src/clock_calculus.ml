@@ -225,7 +225,7 @@ let unify_static_pck ck1 ck2 =
 let unify_carrier cr1 cr2 =
   let cr1 = carrier_repr cr1 in
   let cr2 = carrier_repr cr2 in
-  if cr1=cr2 then ()
+  if cr1==cr2 then ()
   else
     match cr1.carrier_desc, cr2.carrier_desc with
     | Carry_const id1, Carry_const id2 ->
@@ -257,7 +257,7 @@ let unify_carrier cr1 cr2 =
 let semi_unify_carrier cr1 cr2 =
   let cr1 = carrier_repr cr1 in
   let cr2 = carrier_repr cr2 in
-  if cr1=cr2 then ()
+  if cr1==cr2 then ()
   else
     match cr1.carrier_desc, cr2.carrier_desc with
     | Carry_const id1, Carry_const id2 ->
@@ -286,7 +286,7 @@ let semi_unify_carrier cr1 cr2 =
 let rec unify ck1 ck2 =
   let ck1 = repr ck1 in
   let ck2 = repr ck2 in
-  if ck1=ck2 then
+  if ck1==ck2 then
     ()
   else
     let left_const = is_concrete_pck ck1 in
@@ -391,7 +391,7 @@ let rec unify ck1 ck2 =
 let rec semi_unify ck1 ck2 =
   let ck1 = repr ck1 in
   let ck2 = repr ck2 in
-  if ck1=ck2 then
+  if ck1==ck2 then
     ()
   else
       match ck1.cdesc,ck2.cdesc with

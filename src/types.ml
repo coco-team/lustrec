@@ -250,9 +250,10 @@ let map_tuple_type f ty =
   | (Ttuple ty_list) -> { ty with tdesc = Ttuple (List.map f ty_list) }
   | _                -> f ty
 
-let is_struct_type ty =
+let rec is_struct_type ty =
  match (repr ty).tdesc with
  | Tstruct _        -> true
+ | Tstatic (_, ty') -> is_struct_type ty'
  | _                -> false
 
 let rec is_array_type ty =

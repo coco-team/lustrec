@@ -135,6 +135,9 @@ let node_memory_variables nd =
 let node_input_variables nd =
  List.fold_left (fun inputs v -> ISet.add v.var_id inputs) ISet.empty nd.node_inputs
 
+let node_local_variables nd =
+ List.fold_left (fun locals v -> ISet.add v.var_id locals) ISet.empty nd.node_locals
+
 let node_output_variables nd =
  List.fold_left (fun outputs v -> ISet.add v.var_id outputs) ISet.empty nd.node_outputs
 

@@ -271,6 +271,8 @@ let rec compile basename extension =
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. scheduling@,");
   let prog, node_schs = Scheduling.schedule_prog prog in
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_warning_unused node_schs);
+  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_schedule node_schs);
+  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_fanin_table node_schs);
   Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
 
  (* Optimization of prog: 
