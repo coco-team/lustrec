@@ -447,30 +447,50 @@ end
 (* Module used to compute static disjunction of variables based upon their clocks. *)
 module Disjunction =
 struct
-  (* map: var |-> list of disjoint vars, sorted in increasing branch length,
-     maybe removing shorter branches *)
-  type clock_map = (ident, ident list) Hashtbl.t
+  module ClockedIdentModule =
+  struct
+    type t = var_decl
+    let root_branch vdecl = Clocks.root vdecl.var_clock, Clocks.branch vdecl.var_clock
+    let compare v1 v2 = compare (root_branch v2) (root_branch v1)
+  end
 
-  let rec add_vdecl map vdecls =
-    match vdecls with
-    | []         -> ()
-    | vdecl :: q -> begin
-		      Hashtbl.add map vdecl.var_id (List.fold_left (fun r v -> if Clocks.disjoint v.var_clock vdecl.var_clock then v.var_id::r else r) [] q);
-                      add_vdecl map q
-		    end
+  module CISet = Set.Make(ClockedIdentModule)
+
+  (* map: var |-> list of disjoint vars, sorted in increasing branch length order,
+     maybe removing shorter branches *)
+  type clock_map = (ident, var_decl list) Hashtbl.t
 
   let clock_disjoint_map vdecls =
-    let root_branch vdecl = Clocks.root vdecl.var_clock, Clocks.branch vdecl.var_clock in
     let map = Hashtbl.create 23 in
     begin
-      add_vdecl map (List.sort (fun v1 v2 -> compare (root_branch v1) (root_branch v2)) vdecls);
+      List.iter
+	(fun v1 -> let disj_v1 =
+		     List.fold_left
+		       (fun res v2 -> if Clocks.disjoint v1.var_clock v2.var_clock then CISet.add v2 res else res)
+		       CISet.empty
+		       vdecls in
+		   (* disjoint vdecls are stored in increasing branch length order *)
+		   Hashtbl.add map v1.var_id disj_v1)
+	vdecls;
       map
+    end
+
+  (* replace variable [v] by [v'] in disjunction [map]. Then:
+     - the mapping v |-> ... disappears
+     - the mapping v' becomes v' |-> (map v) inter (map v')
+     - other mappings become x |-> (map x) \ (if v in x then v else v')
+  *)
+  let replace_in_disjoint_map map v v' =
+    begin
+      Hashtbl.remove map v.var_id;
+      Hashtbl.replace map v'.var_id (CISet.inter (Hashtbl.find map v.var_id) (Hashtbl.find map v'.var_id));
+      Hashtbl.iter (fun x map_x -> Hashtbl.replace map x (CISet.remove (if CISet.mem v map_x then v else v') map_x)) map;
     end
 
   let pp_disjoint_map fmt map =
     begin
       Format.fprintf fmt "{ /* disjoint map */@.";
-      Hashtbl.iter (fun k v -> Format.fprintf fmt "%s # { %a }@." k (Utils.fprintf_list ~sep:", " Format.pp_print_string) v) map;
+      Hashtbl.iter (fun k v -> Format.fprintf fmt "%s # { %a }@." k (Utils.fprintf_list ~sep:", " Printers.pp_var_name) (CISet.elements v)) map;
       Format.fprintf fmt "}@."
     end
 end

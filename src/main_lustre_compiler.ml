@@ -104,17 +104,18 @@ let load_n_check_lusi source_name lusi_name prog computed_types_env computed_clo
     let _ = open_in lusi_name in
     let header = load_lusi true lusi_name in
     let _, declared_types_env, declared_clocks_env = check_lusi header in
-    
-      (* checking type compatibility with computed types*)
+        
+    (* checking stateless status compatibility *)
+    Stateless.check_compat header;
+
+    (* checking type compatibility with computed types*)
     Typing.check_env_compat header declared_types_env computed_types_env;
     Typing.uneval_prog_generics prog;
     
-      (* checking clocks compatibility with computed clocks*)
-      Clock_calculus.check_env_compat header declared_clocks_env computed_clocks_env;
-      Clock_calculus.uneval_prog_generics prog;
+    (* checking clocks compatibility with computed clocks*)
+    Clock_calculus.check_env_compat header declared_clocks_env computed_clocks_env;
+    Clock_calculus.uneval_prog_generics prog
 
-      (* checking stateless status compatibility *)
-      Stateless.check_compat header
     with Sys_error _ -> ( 
       (* Printing lusi file is necessary *)
       Log.report ~level:1 
@@ -195,15 +196,15 @@ let rec compile basename extension =
   
   (* Sorting nodes *)
   let prog = SortProg.sort prog in
-  
+
+  (* Checking stateless/stateful status *)
+  check_stateless_decls prog;
+
   (* Typing *)
   let computed_types_env = type_decls type_env prog in
   
   (* Clock calculus *)
   let computed_clocks_env = clock_decls clock_env prog in
-
-  (* Checking stateless/stateful status *)
-  check_stateless_decls prog;
 
   (* Perform global inlining *)
   let prog =
