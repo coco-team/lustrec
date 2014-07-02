@@ -23,131 +23,6 @@ open Format
 open LustreSpec
 open Dimension
 
-(** The core language and its ast. Every element of the ast contains its
-    location in the program text. The type and clock of an ast element
-    is mutable (and initialized to dummy values). This avoids to have to
-    duplicate ast structures (e.g. ast, typed_ast, clocked_ast). *)
-
-type ident = Utils.ident
-type label = Utils.ident
-type rat = Utils.rat
-type tag = Utils.tag
-
-type constant =
-  | Const_int of int
-  | Const_real of string
-  | Const_float of float
-  | Const_array of constant list
-  | Const_tag of label
-  | Const_struct of (label * constant) list
-
-type type_dec = LustreSpec.type_dec
-
-let dummy_type_dec = {ty_dec_desc=Tydec_any; ty_dec_loc=Location.dummy_loc}
-
-
-type clock_dec = LustreSpec.clock_dec
-
-let dummy_clock_dec = {ck_dec_desc=Ckdec_any; ck_dec_loc=Location.dummy_loc}
-
-type var_decl = LustreSpec.var_decl
-
-(* The tag of an expression is a unique identifier used to distinguish
-   different instances of the same node *)
-type expr =
-    {expr_tag: tag;
-     expr_desc: expr_desc;
-     mutable expr_type: Types.type_expr;
-     mutable expr_clock: Clocks.clock_expr;
-     mutable expr_delay: Delay.delay_expr;
-     mutable expr_annot: LustreSpec.expr_annot option;
-     expr_loc: Location.t}
-
-and expr_desc =
-  | Expr_const of constant
-  | Expr_ident of ident
-  | Expr_tuple of expr list
-  | Expr_ite   of expr * expr * expr
-  | Expr_arrow of expr * expr
-  | Expr_fby of expr * expr
-  | Expr_array of expr list
-  | Expr_access of expr * Dimension.dim_expr
-  | Expr_power of expr * Dimension.dim_expr
-  | Expr_pre of expr
-  | Expr_when of expr * ident * label
-  | Expr_merge of ident * (label * expr) list
-  | Expr_appl of call_t
-  | Expr_uclock of expr * int
-  | Expr_dclock of expr * int
-  | Expr_phclock of expr * rat
- and call_t = ident * expr * (ident * label) option (* The third part denotes the reseting clock label and value *)
-
-type eq =
-    {eq_lhs: ident list;
-     eq_rhs: expr;
-     eq_loc: Location.t}
-
-type assert_t = 
-    {
-      assert_expr: expr;
-      assert_loc: Location.t
-    } 
-
-type node_desc =
-    {node_id: ident;
-     mutable node_type: Types.type_expr;
-     mutable node_clock: Clocks.clock_expr;
-     node_inputs: var_decl list;
-     node_outputs: var_decl list;
-     node_locals: var_decl list;
-     mutable node_gencalls: expr list;
-     mutable node_checks: Dimension.dim_expr list;
-     node_asserts: assert_t list; 
-     node_eqs: eq list;
-     mutable node_dec_stateless: bool;
-     mutable node_stateless: bool option;
-     node_spec: LustreSpec.node_annot option;
-     node_annot: LustreSpec.expr_annot option;
-    }
-
-type imported_node_desc =
-    {nodei_id: ident;
-     mutable nodei_type: Types.type_expr;
-     mutable nodei_clock: Clocks.clock_expr;
-     nodei_inputs: var_decl list;
-     nodei_outputs: var_decl list;
-     nodei_stateless: bool;
-     nodei_spec: LustreSpec.node_annot option;
-     nodei_prototype: string option;
-     nodei_in_lib: string option;
-    }
-
-type const_desc = 
-    {const_id: ident; 
-     const_loc: Location.t; 
-     const_value: constant;      
-     mutable const_type: Types.type_expr;
-    }
-
-type top_decl_desc =
-| Node of node_desc
-| Consts of const_desc list
-| ImportedNode of imported_node_desc
-| Open of bool * string (* the boolean set to true denotes a local 
-			   lusi vs a lusi installed at system level *)
-
-type top_decl =
-    {top_decl_desc: top_decl_desc;
-     top_decl_loc: Location.t}
-
-type program = top_decl list
-
-type error =
-    Main_not_found
-  | Main_wrong_kind
-  | No_main_specified
-  | Unbound_symbol of ident
-  | Already_bound_symbol of ident
 
 exception Error of Location.t * error
 
@@ -162,6 +37,14 @@ end
 module VMap = Map.Make(VDeclModule)
 
 module VSet = Set.Make(VDeclModule)
+
+let dummy_type_dec = {ty_dec_desc=Tydec_any; ty_dec_loc=Location.dummy_loc}
+
+
+
+let dummy_clock_dec = {ck_dec_desc=Ckdec_any; ck_dec_loc=Location.dummy_loc}
+
+
 
 (************************************************************)
 (* *)
@@ -206,9 +89,6 @@ let mk_new_name vdecl_list id =
     else name
   in new_name id 1
 
-let update_expr_annot e annot =
-  { e with expr_annot = LustreSpec.merge_expr_annot e.expr_annot (Some annot) }
-
 let mkeq loc (lhs, rhs) =
   { eq_lhs = lhs;
     eq_rhs = rhs;
@@ -224,6 +104,50 @@ let mktop_decl loc d =
 
 let mkpredef_call loc funname args =
   mkexpr loc (Expr_appl (funname, mkexpr loc (Expr_tuple args), None))
+
+(************************************************************)
+(*   Eexpr functions *)
+(************************************************************)
+
+let merge_node_annot ann1 ann2 =
+  { requires = ann1.requires @ ann2.requires;
+    ensures = ann1.ensures @ ann2.ensures;
+    behaviors = ann1.behaviors @ ann2.behaviors;
+    spec_loc = ann1.spec_loc
+  }
+
+let mkeexpr loc expr =
+  { eexpr_tag = Utils.new_tag ();
+    eexpr_qfexpr = expr;
+    eexpr_quantifiers = [];
+    eexpr_type = Types.new_var ();
+    eexpr_clock = Clocks.new_var true;
+    eexpr_normalized = None;
+    eexpr_loc = loc }
+
+let extend_eexpr q e = { e with eexpr_quantifiers = q@e.eexpr_quantifiers }
+
+(*
+let mkepredef_call loc funname args =
+  mkeexpr loc (EExpr_appl (funname, mkeexpr loc (EExpr_tuple args), None))
+
+let mkepredef_unary_call loc funname arg =
+  mkeexpr loc (EExpr_appl (funname, arg, None))
+*)
+
+let merge_expr_annot ann1 ann2 =
+  match ann1, ann2 with
+    | None, None -> assert false
+    | Some _, None -> ann1
+    | None, Some _ -> ann2
+    | Some ann1, Some ann2 -> Some {
+      annots = ann1.annots @ ann2.annots;
+      annot_loc = ann1.annot_loc
+    }
+
+let update_expr_annot e annot =
+  { e with expr_annot = merge_expr_annot e.expr_annot (Some annot) }
+
 
 (***********************************************************)
 (* Fast access to nodes, by name *)
@@ -449,20 +373,19 @@ let rec is_eq_expr e1 e2 = match e1.expr_desc, e2.expr_desc with
   | Expr_when (e, i, l), Expr_when (e', i', l') -> l=l' && i=i' && is_eq_expr e e'
   | Expr_merge(i, hl), Expr_merge(i', hl') -> i=i' && List.for_all2 (fun (t, h) (t', h') -> t=t' && is_eq_expr h h') (sort_handlers hl) (sort_handlers hl')
   | Expr_appl (i, e, r), Expr_appl (i', e', r') -> i=i' && r=r' && is_eq_expr e e'
-  | Expr_uclock(e, i), Expr_uclock(e', i') -> i=i' && is_eq_expr e e'
-  | Expr_dclock(e, i), Expr_dclock(e', i') -> i=i' && is_eq_expr e e'
-  | Expr_phclock(e, r), Expr_phclock(e', r') -> r=r' && is_eq_expr e e'
   | Expr_power (e1, i1), Expr_power (e2, i2)
   | Expr_access (e1, i1), Expr_access (e2, i2) -> is_eq_expr e1 e2 && is_eq_expr (expr_of_dimension i1) (expr_of_dimension i2)
   | _ -> false
 
-let node_vars nd =
+let get_node_vars nd =
   nd.node_inputs @ nd.node_locals @ nd.node_outputs
 
-let node_var id node =
- List.find (fun v -> v.var_id = id) (node_vars node)
+let get_var id var_list =
+ List.find (fun v -> v.var_id = id) var_list
 
-let node_eq id node =
+let get_node_var id node = get_var id (get_node_vars node)
+
+let get_node_eq id node =
  List.find (fun eq -> List.mem id eq.eq_lhs) node.node_eqs
 
 let get_nodes prog = 
@@ -505,7 +428,6 @@ let get_consts prog =
    | Expr_when (e', i, l)-> Expr_when (expr_replace_var fvar e', fvar i, l)
    | Expr_merge (i, hl) -> Expr_merge (fvar i, List.map (fun (t, h) -> (t, expr_replace_var fvar h)) hl)
    | Expr_appl (i, e', i') -> Expr_appl (i, expr_replace_var fvar e', Utils.option_map (fun (x, l) -> fvar x, l) i')
-   | _ -> assert false
 
 (* Applies the renaming function [fvar] to every rhs
    only when the corresponding lhs satisfies predicate [pvar] *)
@@ -541,7 +463,7 @@ let get_consts prog =
 				 in Expr_when (replace lhs e', i', l)
        | Expr_merge (i, hl)   -> let i' = if pvar lhs then fvar i else i
 				 in Expr_merge (i', List.map (fun (t, h) -> (t, replace lhs h)) hl)
-       | _                    -> assert false)
+       )
    in { eq with eq_rhs = replace eq.eq_lhs eq.eq_rhs }
 
 
@@ -565,8 +487,7 @@ let get_consts prog =
      Expr_merge (f_var i, List.map (fun (t, h) -> (t, re h)) hl)
    | Expr_appl (i, e', i') -> 
      Expr_appl (f_node i, re e', Utils.option_map (fun (x, l) -> f_var x, l) i')
-   | _ -> assert false
-
+  
  let rename_node_annot f_node f_var f_const expr  =
    expr
  (* TODO assert false *)
@@ -599,7 +520,7 @@ let rename_node f_node f_var f_const nd =
       nd.node_spec 
   in
   let annot =
-    Utils.option_map
+    List.map 
       (fun s -> rename_expr_annot f_node f_var f_const s) 
       nd.node_annot
   in
@@ -723,6 +644,66 @@ let add_internal_funs () =
   List.iter
     (fun id -> let nd = mk_internal_node id in Hashtbl.add node_table id nd)
     Basic_library.internal_funs
+
+
+let rec get_expr_calls nodes e =
+  get_calls_expr_desc nodes e.expr_desc
+and get_calls_expr_desc nodes expr_desc =
+  let get_calls = get_expr_calls nodes in
+  match expr_desc with
+  | Expr_const _ 
+   | Expr_ident _ -> Utils.ISet.empty
+   | Expr_tuple el
+   | Expr_array el -> List.fold_left (fun accu e -> Utils.ISet.union accu (get_calls e)) Utils.ISet.empty el
+   | Expr_pre e1 
+   | Expr_when (e1, _, _) 
+   | Expr_access (e1, _) 
+   | Expr_power (e1, _) -> get_calls e1
+   | Expr_ite (c, t, e) -> Utils.ISet.union (Utils.ISet.union (get_calls c) (get_calls t)) (get_calls e) 
+   | Expr_arrow (e1, e2) 
+   | Expr_fby (e1, e2) -> Utils.ISet.union (get_calls e1) (get_calls e2)
+   | Expr_merge (_, hl) -> List.fold_left (fun accu (_, h) -> Utils.ISet.union accu (get_calls h)) Utils.ISet.empty  hl
+   | Expr_appl (i, e', i') -> 
+     if Basic_library.is_internal_fun i then 
+       (get_calls e') 
+     else
+       let calls =  Utils.ISet.add i (get_calls e') in
+       let test = (fun n -> match n.top_decl_desc with Node nd -> nd.node_id = i | _ -> false) in
+       if List.exists test nodes then
+	 match (List.find test nodes).top_decl_desc with
+	 | Node nd -> Utils.ISet.union (get_node_calls nodes nd) calls
+	 | _ -> assert false
+       else 
+	 calls
+
+and get_eq_calls nodes eq =
+  get_expr_calls nodes eq.eq_rhs
+and get_node_calls nodes node =
+  List.fold_left (fun accu eq -> Utils.ISet.union (get_eq_calls nodes eq) accu) Utils.ISet.empty node.node_eqs
+
+
+let rec expr_has_arrows e =
+  expr_desc_has_arrows e.expr_desc
+and expr_desc_has_arrows expr_desc =
+  match expr_desc with
+  | Expr_const _ 
+  | Expr_ident _ -> false
+  | Expr_tuple el
+  | Expr_array el -> List.exists expr_has_arrows el
+  | Expr_pre e1 
+  | Expr_when (e1, _, _) 
+  | Expr_access (e1, _) 
+  | Expr_power (e1, _) -> expr_has_arrows e1
+  | Expr_ite (c, t, e) -> List.exists expr_has_arrows [c; t; e]
+  | Expr_arrow (e1, e2) 
+  | Expr_fby (e1, e2) -> true
+  | Expr_merge (_, hl) -> List.exists (fun (_, h) -> expr_has_arrows h) hl
+  | Expr_appl (i, e', i') -> expr_has_arrows e'
+
+and eq_has_arrows eq =
+  expr_has_arrows eq.eq_rhs
+and node_has_arrows node =
+  List.exists (fun eq -> eq_has_arrows eq) node.node_eqs
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

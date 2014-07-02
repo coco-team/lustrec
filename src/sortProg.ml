@@ -1,4 +1,5 @@
 open Graph
+open LustreSpec
 open Corelang
 module TopologicalDepGraph = Topological.Make(Causality.IdentDepGraph)
 

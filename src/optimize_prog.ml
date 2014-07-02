@@ -1,4 +1,5 @@
 open Corelang
+open LustreSpec
 
 (* Consts unfoooolding *)
 let is_const i consts = 
@@ -28,10 +29,7 @@ and expr_desc_unfold_consts consts e e_type =
   | Expr_pre e' -> Expr_pre (unfold e')
   | Expr_when (e', i, l)-> Expr_when (unfold e', i, l)
   | Expr_merge (i, hl) -> Expr_merge (i, List.map (fun (t, h) -> (t, unfold h)) hl)
-  | Expr_appl (i, e', i') -> Expr_appl (i, unfold e', i')
-  | Expr_uclock (e', i) -> Expr_uclock (unfold e', i) 
-  | Expr_dclock (e', i) -> Expr_dclock (unfold e', i)
-  | Expr_phclock _ -> e  
+  | Expr_appl (i, e', i') -> Expr_appl (i, unfold e', i')  
 
 let eq_unfold_consts consts eq =
   { eq with eq_rhs = expr_unfold_consts consts eq.eq_rhs }
@@ -74,7 +72,6 @@ let expr_distribute_when expr =
     | Expr_when (e', i, l)-> distrib ((i, l)::stack) e'
     | Expr_merge (i, hl) -> { expr with expr_desc = Expr_merge (i, List.map (fun (t, h) -> (t, distrib stack h)) hl) }
     | Expr_appl (id, e', i') -> { expr with expr_desc = Expr_appl (id, distrib stack e', i')}
-    | _ -> assert false
   in distrib [] expr
 
 let eq_distribute_when eq =

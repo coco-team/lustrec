@@ -26,7 +26,7 @@
 
 open Utils
 open Corelang
-
+open LustreSpec
 open Format
 
 
@@ -84,9 +84,6 @@ let rec tuple_split_expr expr =
     List.map
       (fun hl -> {expr with expr_tag = Utils.new_tag (); expr_desc = Expr_merge (c, List.combine tl hl) })
       (transpose_list hl)
-  | Expr_uclock _
-  | Expr_dclock _ 
-  | Expr_phclock _ -> assert false (* Not handled yet *)
 
 let rec tuple_split_eq eq =
   let split_rhs = tuple_split_expr eq.eq_rhs in
