@@ -71,7 +71,6 @@ let rec check_expr checks expr =
   | Expr_when (e1,_,_) -> check_expr checks e1
  
   | Expr_merge (_,hl) -> List.fold_left (fun checks (l, h) -> check_expr checks h) checks hl
-  | _ -> assert false
   in (*Format.eprintf "typing %B %a at %a = %a@." const Printers.pp_expr expr Location.pp_loc expr.expr_loc Types.print_ty res;*) res
 
 let rec check_var_decl_type loc checks ty =
@@ -90,7 +89,7 @@ let check_var_decl checks vdecl =
 let check_node nd =
   let checks = CSet.empty in
   let checks =
-    List.fold_left check_var_decl checks (node_vars nd) in
+    List.fold_left check_var_decl checks (get_node_vars nd) in
   let checks =
     List.fold_left (fun checks eq -> check_expr checks eq.eq_rhs) checks nd.node_eqs in
   nd.node_checks <- CSet.elements checks

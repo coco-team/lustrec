@@ -2,11 +2,14 @@ open Format
 open LustreSpec
 open Machine_code
 open C_backend_common
+open Utils
 
 (**************************************************************************)
 (*     Printing spec for c *)
 
 (**************************************************************************)
+(* OLD STUFF ???
+
 
 let pp_acsl_type var fmt t =
   let rec aux t pp_suffix =
@@ -120,6 +123,8 @@ let print_machine_decl_prefix fmt m =
   | Some spec -> 
     pp_acsl_spec m.mstep.step_outputs fmt spec
   )
+
+  *)
 
 (**************************************************************************)
 (*                              MAKEFILE                                  *)

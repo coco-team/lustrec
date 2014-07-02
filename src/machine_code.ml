@@ -99,7 +99,7 @@ type machine_t = {
   mstatic: var_decl list; (* static inputs only *)
   mstep: step_t;
   mspec: node_annot option;
-  mannot: expr_annot option;
+  mannot: expr_annot list;
 }
 
 let pp_step fmt s =
@@ -170,7 +170,7 @@ let arrow_desc =
     node_dec_stateless = false;
     node_stateless = Some false;
     node_spec = None;
-    node_annot = None;  }
+    node_annot = [];  }
 
 let arrow_top_decl =
   {
@@ -202,7 +202,7 @@ let arrow_machine =
                                  [MLocalAssign(var_output, LocalVar var_input2)] ]
     };
     mspec = None;
-    mannot = None;
+    mannot = [];
   }
 
 let new_instance =
@@ -229,7 +229,7 @@ let new_instance =
 (*                       s : step instructions           *)
 let translate_ident node (m, si, j, d, s) id =
   try (* id is a node var *)
-    let var_id = node_var id node in
+    let var_id = get_node_var id node in
     if ISet.exists (fun v -> v.var_id = id) m
     then StateVar var_id
     else LocalVar var_id
@@ -351,7 +351,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
   (*Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock;*)
   match eq.eq_lhs, eq.eq_rhs.expr_desc with
   | [x], Expr_arrow (e1, e2)                     ->
-    let var_x = node_var x node in
+    let var_x = get_node_var x node in
     let o = new_instance node arrow_top_decl eq.eq_rhs.expr_tag in
     let c1 = translate_expr node args e1 in
     let c2 = translate_expr node args e2 in
@@ -360,15 +360,15 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
      Utils.IMap.add o (arrow_top_decl, []) j,
      d,
      (control_on_clock node args eq.eq_rhs.expr_clock (MStep ([var_x], o, [c1;c2]))) :: s)
-  | [x], Expr_pre e1 when ISet.mem (node_var x node) d     ->
-    let var_x = node_var x node in
+  | [x], Expr_pre e1 when ISet.mem (get_node_var x node) d     ->
+    let var_x = get_node_var x node in
     (ISet.add var_x m,
      si,
      j,
      d,
      control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e1)) :: s)
-  | [x], Expr_fby (e1, e2) when ISet.mem (node_var x node) d ->
-    let var_x = node_var x node in
+  | [x], Expr_fby (e1, e2) when ISet.mem (get_node_var x node) d ->
+    let var_x = get_node_var x node in
     (ISet.add var_x m,
      MStateAssign (var_x, translate_expr node args e1) :: si,
      j,
@@ -376,7 +376,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
      control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e2)) :: s)
 
   | p  , Expr_appl (f, arg, r) when not (Basic_library.is_internal_fun f) ->
-    let var_p = List.map (fun v -> node_var v node) p in
+    let var_p = List.map (fun v -> get_node_var v node) p in
     let el =
       match arg.expr_desc with
       | Expr_tuple el -> el
@@ -402,7 +402,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
   | [x], Expr_ite   (c, t, e) 
     when (match !Options.output with | "horn" -> true | "C" | "java" | _ -> false)
       -> 
-    let var_x = node_var x node in
+    let var_x = get_node_var x node in
     (m, 
      si, 
      j, 
@@ -412,7 +412,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
     )
       
   | [x], _                                       -> (
-    let var_x = node_var x node in
+    let var_x = get_node_var x node in
     (m, si, j, d, 
      control_on_clock 
        node

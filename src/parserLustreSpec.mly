@@ -3,10 +3,16 @@
   open Corelang
   open LustreSpec
   
+  let mkexpr x = mkexpr (Location.symbol_rloc ()) x
+  let mkpredef_call x = mkpredef_call (Location.symbol_rloc ()) x
+  let mkpredef_unary_call x = mkpredef_unary_call (Location.symbol_rloc ()) x
+
   let mkeexpr x = mkeexpr (Location.symbol_rloc ()) x
+  (*
   let mkepredef_call x = mkepredef_call (Location.symbol_rloc ()) x
   let mkepredef_unary_call x = mkepredef_unary_call (Location.symbol_rloc ()) x
-  
+  *)
+
   let mktyp x = mktyp (Location.symbol_rloc ()) x
   let mkvar_decl x = mkvar_decl (Location.symbol_rloc ()) x
   let mkclock x = mkclock (Location.symbol_rloc ()) x
@@ -71,12 +77,12 @@ requires ensures behaviors { { requires = $1; ensures = $2; behaviors = $3; } }
  
 requires:
 { [] }
-| REQUIRES expr SCOL requires { $2::$4 }
+| REQUIRES qexpr SCOL requires { $2::$4 }
 
 ensures:
 { [] }
-| ENSURES expr SCOL ensures { (EnsuresExpr $2) :: $4 }
-| OBSERVER IDENT LPAR tuple_expr RPAR SCOL ensures { (SpecObserverNode($2,$4)) :: $7 }
+| ENSURES qexpr SCOL ensures { (EnsuresExpr $2) :: $4 }
+| OBSERVER IDENT LPAR tuple_qexpr RPAR SCOL ensures { (SpecObserverNode($2,$4)) :: $7 }
 
 behaviors:
 { [] }
@@ -84,92 +90,140 @@ behaviors:
 
 assumes:
 { [] }
-| ASSUMES expr SCOL assumes { $2::$4 } 
+| ASSUMES qexpr SCOL assumes { $2::$4 } 
+
+tuple_qexpr:
+| qexpr COMMA qexpr {[$3;$1]}
+| tuple_qexpr COMMA qexpr {$3::$1}
+
 
 tuple_expr:
-| expr COMMA expr {[$3;$1]}
+    expr COMMA expr {[$3;$1]}
 | tuple_expr COMMA expr {$3::$1}
 
+// Same as tuple expr but accepting lists with single element
+array_expr:
+  expr {[$1]}
+| expr COMMA array_expr {$1::$3}
+
+dim_list:
+  dim RBRACKET { fun base -> mkexpr (Expr_access (base, $1)) }
+| dim RBRACKET LBRACKET dim_list { fun base -> $4 (mkexpr (Expr_access (base, $1))) }
+
 expr:
-| const {mkeexpr (EExpr_const $1)} 
-| IDENT 
-    {mkeexpr (EExpr_ident $1)}
+/* constants */
+  INT {mkexpr (Expr_const (Const_int $1))}
+| REAL {mkexpr (Expr_const (Const_real $1))}
+| FLOAT {mkexpr (Expr_const (Const_float $1))}
+/* Idents or type enum tags */
+| IDENT {
+  if Hashtbl.mem tag_table $1
+  then mkexpr (Expr_const (Const_tag $1))
+  else mkexpr (Expr_ident $1)}
+| LPAR ANNOT expr RPAR
+    {update_expr_annot $3 $2}
 | LPAR expr RPAR
     {$2}
 | LPAR tuple_expr RPAR
-    {mkeexpr (EExpr_tuple (List.rev $2))}
+    {mkexpr (Expr_tuple (List.rev $2))}
+
+/* Array expressions */
+| LBRACKET array_expr RBRACKET { mkexpr (Expr_array $2) }
+| expr POWER dim { mkexpr (Expr_power ($1, $3)) }
+| expr LBRACKET dim_list { $3 $1 }
+
+/* Temporal operators */
+| PRE expr 
+    {mkexpr (Expr_pre $2)}
 | expr ARROW expr 
-    {mkeexpr (EExpr_arrow ($1,$3))}
+    {mkexpr (Expr_arrow ($1,$3))}
 | expr FBY expr 
-    {mkeexpr (EExpr_fby ($1,$3))}
+    {(*mkexpr (Expr_fby ($1,$3))*)
+      mkexpr (Expr_arrow ($1, mkexpr (Expr_pre $3)))}
 | expr WHEN IDENT 
-    {mkeexpr (EExpr_when ($1,$3))}
-| MERGE LPAR IDENT COMMA expr COMMA expr RPAR
-    {mkeexpr (EExpr_merge ($3,$5,$7))}
+    {mkexpr (Expr_when ($1,$3,tag_true))}
+| expr WHENNOT IDENT
+    {mkexpr (Expr_when ($1,$3,tag_false))}
+| expr WHEN IDENT LPAR IDENT RPAR
+    {mkexpr (Expr_when ($1, $5, $3))}
+| MERGE IDENT handler_expr_list
+    {mkexpr (Expr_merge ($2,$3))}
+
+/* Applications */
 | IDENT LPAR expr RPAR
-    {mkeexpr (EExpr_appl ($1, $3, None))}
+    {mkexpr (Expr_appl ($1, $3, None))}
 | IDENT LPAR expr RPAR EVERY IDENT
-    {mkeexpr (EExpr_appl ($1, $3, Some $6))}
+    {mkexpr (Expr_appl ($1, $3, Some ($6, tag_true)))}
+| IDENT LPAR expr RPAR EVERY IDENT LPAR IDENT RPAR
+    {mkexpr (Expr_appl ($1, $3, Some ($8, $6))) }
 | IDENT LPAR tuple_expr RPAR
-    {mkeexpr (EExpr_appl ($1, mkeexpr (EExpr_tuple (List.rev $3)), None))}
+    {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), None))}
 | IDENT LPAR tuple_expr RPAR EVERY IDENT
-    {mkeexpr (EExpr_appl ($1, mkeexpr (EExpr_tuple (List.rev $3)), Some $6)) }
+    {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), Some ($6, tag_true))) }
+| IDENT LPAR tuple_expr RPAR EVERY IDENT LPAR IDENT RPAR
+    {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), Some ($8, $6))) }
 
 /* Boolean expr */
 | expr AND expr 
-    {mkepredef_call "&&" [$1;$3]}
+    {mkpredef_call "&&" [$1;$3]}
 | expr AMPERAMPER expr 
-    {mkepredef_call "&&" [$1;$3]}
+    {mkpredef_call "&&" [$1;$3]}
 | expr OR expr 
-    {mkepredef_call "||" [$1;$3]}
+    {mkpredef_call "||" [$1;$3]}
 | expr BARBAR expr 
-    {mkepredef_call "||" [$1;$3]}
+    {mkpredef_call "||" [$1;$3]}
 | expr XOR expr 
-    {mkepredef_call "xor" [$1;$3]}
+    {mkpredef_call "xor" [$1;$3]}
 | NOT expr 
-    {mkepredef_unary_call "not" $2}
+    {mkpredef_unary_call "not" $2}
 | expr IMPL expr 
-    {mkepredef_call "impl" [$1;$3]}
+    {mkpredef_call "impl" [$1;$3]}
 
 /* Comparison expr */
 | expr EQ expr 
-    {mkepredef_call "=" [$1;$3]}
+    {mkpredef_call "=" [$1;$3]}
 | expr LT expr 
-    {mkepredef_call "<" [$1;$3]}
+    {mkpredef_call "<" [$1;$3]}
 | expr LTE expr 
-    {mkepredef_call "<=" [$1;$3]}
+    {mkpredef_call "<=" [$1;$3]}
 | expr GT expr 
-    {mkepredef_call ">" [$1;$3]}
+    {mkpredef_call ">" [$1;$3]}
 | expr GTE  expr 
-    {mkepredef_call ">=" [$1;$3]}
+    {mkpredef_call ">=" [$1;$3]}
 | expr NEQ expr 
-    {mkepredef_call "!=" [$1;$3]}
+    {mkpredef_call "!=" [$1;$3]}
 
 /* Arithmetic expr */
 | expr PLUS expr 
-    {mkepredef_call "+" [$1;$3]}
+    {mkpredef_call "+" [$1;$3]}
 | expr MINUS expr 
-    {mkepredef_call "-" [$1;$3]}
+    {mkpredef_call "-" [$1;$3]}
 | expr MULT expr 
-    {mkepredef_call "*" [$1;$3]}
+    {mkpredef_call "*" [$1;$3]}
 | expr DIV expr 
-    {mkepredef_call "/" [$1;$3]}
+    {mkpredef_call "/" [$1;$3]}
 | MINUS expr %prec UMINUS
-    {mkepredef_unary_call "uminus" $2}
+  {mkpredef_unary_call "uminus" $2}
 | expr MOD expr 
-    {mkepredef_call "mod" [$1;$3]}
-
-/* Temp op */
-| PRE expr 
-    {mkeexpr (EExpr_pre $2)}
+    {mkpredef_call "mod" [$1;$3]}
 
 /* If */
 | IF expr THEN expr ELSE expr
-    {mkepredef_call "ite" [$2;$4;$6]}
+    {mkexpr (Expr_ite ($2, $4, $6))}
 
-/* Quantifiers */
-| EXISTS vdecl SCOL expr %prec prec_exists {mkeexpr (EExpr_exists ($2, $4))} 
-| FORALL vdecl SCOL expr %prec prec_forall {mkeexpr (EExpr_forall ($2, $4))}
+
+handler_expr_list:
+   { [] }
+| handler_expr handler_expr_list { $1 :: $2 }
+
+handler_expr:
+ LPAR IDENT ARROW expr RPAR { ($2, $4) }
+
+qexpr:
+| expr { mkeexpr [] $1 }
+  /* Quantifiers */
+| EXISTS vdecl SCOL qexpr %prec prec_exists { extend_eepxr (Exists, $2) $4 } 
+| FORALL vdecl SCOL qexpr %prec prec_forall { extend_eepxr (Forall, $2) $4 }
 
 vdecl:
 | ident_list COL typ clock 
@@ -214,12 +268,12 @@ when_list:
 
 
 const:
-| INT {EConst_int $1}
-| REAL {EConst_real $1}
-| FLOAT {EConst_float $1}
-| TRUE {EConst_bool true}
-| FALSE {EConst_bool false}
-| STRING {EConst_string $1}
+| INT {Const_int $1}
+| REAL {Const_real $1}
+| FLOAT {Const_float $1}
+| TRUE {Const_bool true}
+| FALSE {Const_bool false}
+| STRING {Const_string $1}
 
 lustre_annot:
 lustre_annot_list EOF { $1 }

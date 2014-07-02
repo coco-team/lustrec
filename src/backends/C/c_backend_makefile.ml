@@ -1,4 +1,5 @@
 open Format
+open LustreSpec
 open Corelang
 
 let header_has_code header =
@@ -40,7 +41,7 @@ let fprintf_dependencies fmt dep =
 
 module type MODIFIERS_MKF =
 sig
-  val other_targets: Format.formatter -> string -> string -> (string * bool * Corelang.top_decl list) list -> unit
+  val other_targets: Format.formatter -> string -> string -> (string * bool * top_decl list) list -> unit
 end
 
 module EmptyMod =

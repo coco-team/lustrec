@@ -313,7 +313,7 @@ let print_machine machines fmt m =
 	 (Utils.fprintf_list ~sep:"@ " (pp_instr false m.mname.node_id)) m.mstep.step_instrs
 	 pp_machine_step_name m.mname.node_id
 	 (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
-
+(*
        match m.mspec with
 	 None -> () (* No node spec; we do nothing *)
        | Some {requires = []; ensures = [EnsuresExpr e]; behaviors = []} -> 
@@ -323,6 +323,7 @@ let print_machine machines fmt m =
 	     
 	 )
        | _ -> () (* Other cases give nothing *)
+*)      
      end
     end
 

@@ -74,7 +74,7 @@ let cpt_fresh = ref 0
 
 (* Generate a new local [node] variable *)
 let mk_fresh_var node loc ty ck =
-  let vars = node_vars node in
+  let vars = get_node_vars node in
   let rec aux () =
   incr cpt_fresh;
   let s = Printf.sprintf "__%s_%d" node.node_id !cpt_fresh in
@@ -240,9 +240,7 @@ let rec normalize_expr ?(alias=true) node offsets defvars expr =
     let defvars, norm_hl = normalize_branches node offsets defvars hl in
     let norm_expr = mk_norm_expr offsets expr (Expr_merge (c, norm_hl)) in
     mk_expr_alias_opt alias node defvars norm_expr
-  | Expr_uclock _
-  | Expr_dclock _ 
-  | Expr_phclock _ -> assert false (* Not handled yet *)
+  
 (* Creates a conditional with a merge construct, which is more lazy *)
 (*
 let norm_conditional_as_merge alias node norm_expr offsets defvars expr =

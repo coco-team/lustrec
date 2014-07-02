@@ -50,6 +50,7 @@ and pp_const fmt c =
     | Const_tag  t -> pp_print_string fmt t
     | Const_array ca -> Format.fprintf fmt "[%a]" (Utils.fprintf_list ~sep:"," pp_const) ca
     | Const_struct fl -> Format.fprintf fmt "{%a }" (Utils.fprintf_list ~sep:" " pp_struct_const_field) fl
+    | Const_string s -> pp_print_string fmt ("\"" ^ s ^ "\"")
 
 and pp_var fmt id = fprintf fmt "%s%s: %a" (if id.var_dec_const then "const " else "") id.var_id Types.print_ty id.var_type
 
@@ -71,9 +72,6 @@ and pp_expr fmt expr =
     | Expr_merge (id, hl) -> 
       fprintf fmt "merge %s %a" id pp_handlers hl
     | Expr_appl (id, e, r) -> pp_app fmt id e r
-    | Expr_uclock _
-    | Expr_dclock _
-    | Expr_phclock _ -> assert false
 
 and pp_tuple fmt el =
  fprintf_list ~sep:"," pp_expr fmt el
@@ -148,76 +146,27 @@ in pp_var_type_dec_desc fmt ty.ty_dec_desc
 (*   ) *)
 
 
-let pp_econst fmt c = 
-  match c with
-    | EConst_int i -> pp_print_int fmt i
-    | EConst_real r -> pp_print_string fmt r
-    | EConst_float r -> pp_print_float fmt r
-    | EConst_bool b -> pp_print_bool fmt b
-    | EConst_string s -> pp_print_string fmt ("\"" ^ s ^ "\"")
 
-let rec pp_eexpr fmt eexpr = 
-  match eexpr.eexpr_desc with
-    | EExpr_const c -> pp_econst fmt c
-    | EExpr_ident id -> pp_print_string fmt id
-    | EExpr_tuple el -> fprintf_list ~sep:"," pp_eexpr fmt el
-    | EExpr_arrow (e1, e2) -> fprintf fmt "%a -> %a" pp_eexpr e1 pp_eexpr e2
-    | EExpr_fby (e1, e2) -> fprintf fmt "%a fby %a" pp_eexpr e1 pp_eexpr e2
-    (* | EExpr_concat (e1, e2) -> fprintf fmt "%a::%a" pp_eexpr e1 pp_eexpr e2 *)
-    (* | EExpr_tail e -> fprintf fmt "tail %a" pp_eexpr e *)
-    | EExpr_pre e -> fprintf fmt "pre %a" pp_eexpr e
-    | EExpr_when (e, id) -> fprintf fmt "%a when %s" pp_eexpr e id
-    | EExpr_merge (id, e1, e2) -> 
-      fprintf fmt "merge (%s, %a, %a)" id pp_eexpr e1 pp_eexpr e2
-    | EExpr_appl (id, e, r) -> pp_eapp fmt id e r
-    | EExpr_forall (vars, e) -> fprintf fmt "forall %a; %a" pp_node_args vars pp_eexpr e 
-    | EExpr_exists (vars, e) -> fprintf fmt "exists %a; %a" pp_node_args vars pp_eexpr e 
+let pp_quantifiers fmt (q, vars) =
+  match q with
+    | Forall -> fprintf fmt "forall %a" (fprintf_list ~sep:"; " pp_var) vars 
+    | Exists -> fprintf fmt "exists %a" (fprintf_list ~sep:"; " pp_var) vars 
 
+let pp_eexpr fmt e =
+  fprintf fmt "%a%t %a"
+    (Utils.fprintf_list ~sep:"; " pp_quantifiers) e.eexpr_quantifiers
+    (fun fmt -> match e.eexpr_quantifiers with [] -> () | _ -> fprintf fmt ";")
+    pp_expr e.eexpr_qfexpr
 
-    (* | EExpr_whennot _ *)
-    (* | EExpr_uclock _ *)
-    (* | EExpr_dclock _ *)
-    (* | EExpr_phclock _ -> assert false *)
-and pp_eapp fmt id e r =
-  match r with
-  | None ->
-    (match id, e.eexpr_desc with
-    | "+", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a + %a)" pp_eexpr e1 pp_eexpr e2
-    | "uminus", _ -> fprintf fmt "(- %a)" pp_eexpr e
-    | "-", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a - %a)" pp_eexpr e1 pp_eexpr e2
-    | "*", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a * %a)" pp_eexpr e1 pp_eexpr e2
-    | "/", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a / %a)" pp_eexpr e1 pp_eexpr e2
-    | "mod", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a mod %a)" pp_eexpr e1 pp_eexpr e2
-    | "&&", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a && %a)" pp_eexpr e1 pp_eexpr e2
-    | "||", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a || %a)" pp_eexpr e1 pp_eexpr e2
-    | "xor", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a ^^ %a)" pp_eexpr e1 pp_eexpr e2
-    | "impl", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a ==> %a)" pp_eexpr e1 pp_eexpr e2
-    | "<", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a < %a)" pp_eexpr e1 pp_eexpr e2
-    | "<=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a <= %a)" pp_eexpr e1 pp_eexpr e2
-    | ">", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a > %a)" pp_eexpr e1 pp_eexpr e2
-    | ">=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a >= %a)" pp_eexpr e1 pp_eexpr e2
-    | "!=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a != %a)" pp_eexpr e1 pp_eexpr e2
-    | "=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a == %a)" pp_eexpr e1 pp_eexpr e2
-    | "not", _ -> fprintf fmt "(! %a)" pp_eexpr e
-    | "ite", EExpr_tuple([e1;e2;e3]) -> fprintf fmt "(if %a then %a else %a)" pp_eexpr e1 pp_eexpr e2 pp_eexpr e3
-    | _ -> fprintf fmt "%s (%a)" id pp_eexpr e)
-  | Some x -> fprintf fmt "%s (%a) every %s" id pp_eexpr e x 
-
-  
-let pp_ensures fmt e =
-  match e with
-    | EnsuresExpr e -> fprintf fmt "ensures %a;@ " pp_eexpr e
-    | SpecObserverNode (name, args) -> fprintf fmt "observer %s (%a);@ " name (fprintf_list ~sep:", " pp_eexpr) args
- 
 let pp_spec fmt spec =
   fprintf fmt "@[<hov 2>(*@@ ";
-  fprintf_list ~sep:"" (fun fmt r -> fprintf fmt "requires %a;@ " pp_eexpr r) fmt spec.requires;
-  fprintf_list ~sep:"" pp_ensures fmt spec.ensures;
-  fprintf_list ~sep:"@ " (fun fmt (name, assumes, requires) -> 
+  fprintf_list ~sep:"@;@@ " (fun fmt r -> fprintf fmt "requires %a;" pp_eexpr r) fmt spec.requires;
+  fprintf_list ~sep:"@;@@ " (fun fmt r -> fprintf fmt "ensures %a; " pp_eexpr r) fmt spec.ensures;
+  fprintf_list ~sep:"@;" (fun fmt (name, assumes, ensures, _) -> 
     fprintf fmt "behavior %s:@[@ %a@ %a@]" 
       name
       (fprintf_list ~sep:"@ " (fun fmt r -> fprintf fmt "assumes %a;" pp_eexpr r)) assumes
-      (fprintf_list ~sep:"@ " pp_ensures) requires
+      (fprintf_list ~sep:"@ " (fun fmt r -> fprintf fmt "ensures %a;" pp_eexpr r)) ensures
   ) fmt spec.behaviors;
   fprintf fmt "@]*)";
   ()

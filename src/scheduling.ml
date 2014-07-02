@@ -152,7 +152,7 @@ let schedule_node n =
 	  Liveness.pp_death_table death
       );
 
-    let disjoint = Disjunction.clock_disjoint_map (node_vars n) in
+    let disjoint = Disjunction.clock_disjoint_map (get_node_vars n) in
     
     Log.report ~level:5 
       (fun fmt -> 
@@ -214,7 +214,7 @@ let pp_warning_unused fmt node_schs =
 	 (fun u -> 
 	   Format.fprintf fmt "Warning: variable '%s' seems unused@.%a@."
 	     u
-	     Location.pp_loc (node_var u nd).var_loc)
+	     Location.pp_loc (get_node_var u nd).var_loc)
 	 unused
    )
    node_schs
