@@ -249,9 +249,6 @@ let add_eq_dependencies mems inputs node_vars eq (g, g') =
 	mashup_appl_dependencies f e g
     | Expr_appl (f, e, Some (r, _)) ->
       mashup_appl_dependencies f e (add_var lhs_is_mem lhs r g)
-    | Expr_uclock  (e, _)
-    | Expr_dclock  (e, _)
-    | Expr_phclock (e, _) -> add_dep lhs_is_mem lhs e g 
   in
   let g =
     List.fold_left
@@ -294,10 +291,7 @@ module NodeDep = struct
       | Expr_arrow (e1,e2) -> ESet.union (get_expr_calls prednode e1) (get_expr_calls prednode e2)
       | Expr_ite   (c, t, e) -> ESet.union (get_expr_calls prednode c) (ESet.union (get_expr_calls prednode t) (get_expr_calls prednode e))
       | Expr_pre e 
-      | Expr_when (e,_,_)
-      | Expr_uclock (e,_) 
-      | Expr_dclock (e,_) 
-      | Expr_phclock (e,_) -> get_expr_calls prednode e
+      | Expr_when (e,_,_) -> get_expr_calls prednode e
       | Expr_appl (id,e, _) ->
 	if not (Basic_library.is_internal_fun id) && prednode id
 	then ESet.add expr (get_expr_calls prednode e)
@@ -357,10 +351,10 @@ module CycleDetection = struct
   module Cycles = Graph.Components.Make (IdentDepGraph)
 
   let mk_copy_var n id =
-    mk_new_name (node_vars n) id
+    mk_new_name (get_node_vars n) id
 
   let mk_copy_eq n var =
-    let var_decl = node_var var n in
+    let var_decl = get_node_var var n in
     let cp_var = mk_copy_var n var in
     let expr =
       { expr_tag = Utils.new_tag ();

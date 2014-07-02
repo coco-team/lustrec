@@ -134,9 +134,6 @@ let rec inline_expr expr locals nodes =
     let el, l', eqs' = inline_tuple (List.map snd branches) in
     let branches' = List.map2 (fun (label, _) v -> label, v) branches el in
     { expr with expr_desc = Expr_merge (id, branches') }, l', eqs'
-  | Expr_uclock _
-  | Expr_dclock _
-  | Expr_phclock _ -> assert false 
 and inline_node nd nodes = 
   let new_locals, eqs = 
     List.fold_left (fun (locals, eqs) eq ->
@@ -244,10 +241,11 @@ let witness filename main_name orig inlined type_env clock_env =
     node_stateless = None;
     node_spec = Some 
       {requires = []; 
-       ensures = [EnsuresExpr (mkeexpr loc (EExpr_ident ok_ident))];
-       behaviors = []
+       ensures = [mkeexpr loc (mkexpr loc (Expr_ident ok_ident))];
+       behaviors = [];
+       spec_loc = loc
       };
-    node_annot = None;
+    node_annot = [];
   }
   in
   let main = [{ top_decl_desc = Node main_node; top_decl_loc = loc }] in

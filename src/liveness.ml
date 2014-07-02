@@ -186,8 +186,8 @@ let replace_in_death_table death v v' =
 
 let find_compatible_local node var dead =
  (*Format.eprintf "find_compatible_local %s %s %a@." node.node_id var pp_iset dead;*)
-  let typ = (Corelang.node_var var node).var_type in
-  let eq_var = node_eq var node in
+  let typ = (get_node_var var node).var_type in
+  let eq_var = get_node_eq var node in
   let aliasable_inputs =
     match NodeDep.get_callee eq_var.eq_rhs with
     | None           -> []

@@ -314,6 +314,7 @@ and type_const loc c =
       with Not_found -> 
 	ty_struct
     end
+  | Const_string _ -> assert false (* string should only appear in annotations *)
 
 (* The following typing functions take as parameter an environment [env]
    and whether the element being typed is expected to be constant [const]. 
@@ -501,14 +502,6 @@ and type_expr env in_main const expr =
     (*update_clock env in_main c expr.expr_loc typ_l;*)
     expr.expr_type <- typ_out;
     typ_out
-  | Expr_uclock (e,k) | Expr_dclock (e,k) ->
-      let ty = type_expr env in_main const e in
-      expr.expr_type <- ty;
-      ty
-  | Expr_phclock (e,q) ->
-      let ty = type_expr env in_main const e in
-      expr.expr_type <- ty;
-      ty
   in 
   Log.report ~level:3 (fun fmt -> Format.fprintf fmt "Type of expr %a: %a@." Printers.pp_expr expr Types.print_ty resulting_ty);
   resulting_ty

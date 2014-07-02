@@ -1,6 +1,7 @@
 {
 
-  open ParserLustreSpec
+  (* open ParserLustreSpec *)
+  open Parser_lustre
   open Utils
 
   let str_buf = Buffer.create 1024
@@ -11,8 +12,8 @@
    used to handle all the possible keywords. *)
 let keyword_table =
   create_hashtable 20 [
-  "true", TRUE;
-  "false", FALSE;
+  (* "true", TRUE; *)
+  (* "false", FALSE; *)
   "stateless", STATELESS;
   "if", IF;
   "then", THEN;
@@ -44,7 +45,7 @@ let keyword_table =
   "pre", PRE;
   "div", DIV;
   "const", CONST;
-  "include", INCLUDE;
+  (* "include", INCLUDE; *)
   "assert", ASSERT;
   "ensures", ENSURES;
   "requires", REQUIRES;
@@ -136,7 +137,7 @@ and string_parse = parse
   let annot s =
     let lb = Lexing.from_string s in
    try
-     ParserLustreSpec.lustre_annot token lb
+     Parser_lustre.lustre_annot(* ParserLustreSpec.lustre_annot *) token lb
    with Parsing.Parse_error as _e -> (
      Format.eprintf "Lexing error at position %a:@.unexpected token %s@.@?"
        (fun fmt p -> Format.fprintf fmt "%s l%i c%i" p.Lexing.pos_fname p.Lexing.pos_lnum p.Lexing.pos_cnum) lb.Lexing.lex_curr_p
@@ -146,6 +147,6 @@ and string_parse = parse
 
   let spec s =
     let lb = Lexing.from_string s in
-    ParserLustreSpec.lustre_spec token lb
+    Parser_lustre.lustre_spec (*ParserLustreSpec.lustre_spec*) token lb
 
 }

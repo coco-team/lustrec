@@ -26,6 +26,8 @@
 open Format
 open Log
 
+open LustreSpec
+
 let usage = "Usage: lustrec [options] <source-file>"
 
 let extensions = [".ec"; ".lus"; ".lusi"]
@@ -170,8 +172,8 @@ let rec compile basename extension =
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>.. extracting dependencies@,");
   let dependencies = 
     List.fold_right 
-      (fun d accu -> match d.Corelang.top_decl_desc with 
-      | Corelang.Open (local, s) -> (s, local)::accu 
+      (fun d accu -> match d.top_decl_desc with 
+      | Open (local, s) -> (s, local)::accu 
       | _ -> accu) 
       prog [] 
   in
