@@ -355,6 +355,11 @@ let const_of_bool b =
 
 (* let get_const c = snd (Hashtbl.find consts_table c) *)
 
+let ident_of_expr expr =
+ match expr.expr_desc with
+ | Expr_ident id -> id
+ | _             -> assert false
+
 (* Caution, returns an untyped and unclocked expression *)
 let expr_of_ident id loc =
   {expr_tag = Utils.new_tag ();

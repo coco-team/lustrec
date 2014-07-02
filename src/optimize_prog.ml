@@ -39,8 +39,6 @@ let eq_unfold_consts consts eq =
 let node_unfold_consts consts node = 
   { node with node_eqs = List.map (eq_unfold_consts consts) node.node_eqs }
 
-
-
 let prog_unfold_consts prog =
   let consts = get_consts prog in
     List.map (
@@ -49,6 +47,48 @@ let prog_unfold_consts prog =
 	| _       -> decl
     ) prog 
 
+let apply_stack expr stack =
+ List.fold_left (fun expr (v, t) -> mkexpr expr.expr_loc (Expr_when (expr, v, t))) expr stack
+
+let expr_distribute_when expr =
+  let rec distrib stack expr =
+    match expr.expr_desc with
+    | Expr_const _
+    | Expr_ident _
+    | Expr_arrow _
+    | Expr_fby _
+    | Expr_pre _
+	-> apply_stack expr stack
+    | Expr_appl (id, _, _) when not (Stateless.check_node (node_from_name id))
+	-> apply_stack expr stack
+    | Expr_ite (c, t, e)
+        -> let cid = ident_of_expr c in
+           mkexpr expr.expr_loc
+	     (Expr_merge (cid,
+			  [(tag_true , distrib ((cid,tag_true )::stack) t);
+			   (tag_false, distrib ((cid,tag_false)::stack) e)]))
+    | Expr_array el -> { expr with expr_desc = (Expr_array (List.map (distrib stack) el)) }
+    | Expr_access (e1, d) -> { expr with expr_desc = Expr_access (distrib stack e1, d) }
+    | Expr_power (e1, d) -> { expr with expr_desc = Expr_power (distrib stack e1, d) }
+    | Expr_tuple el -> { expr with expr_desc = Expr_tuple (List.map (distrib stack) el) }
+    | Expr_when (e', i, l)-> distrib ((i, l)::stack) e'
+    | Expr_merge (i, hl) -> { expr with expr_desc = Expr_merge (i, List.map (fun (t, h) -> (t, distrib stack h)) hl) }
+    | Expr_appl (id, e', i') -> { expr with expr_desc = Expr_appl (id, distrib stack e', i')}
+    | _ -> assert false
+  in distrib [] expr
+
+let eq_distribute_when eq =
+  { eq with eq_rhs = expr_distribute_when eq.eq_rhs }
+
+let node_distribute_when node =
+  { node with node_eqs = List.map eq_distribute_when node.node_eqs }
+
+let prog_distribute_when prog =
+    List.map (
+      fun decl -> match decl.top_decl_desc with 
+	| Node nd -> {decl with top_decl_desc = Node (node_distribute_when nd)}
+	| _       -> decl
+    ) prog 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

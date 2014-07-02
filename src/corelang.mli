@@ -218,6 +218,7 @@ val pp_error :  Format.formatter -> error -> unit
 
 (* Caution, returns an untyped, unclocked, etc, expression *)
 val is_tuple_expr : expr -> bool
+val ident_of_expr : expr -> ident
 val expr_of_ident : ident -> Location.t -> expr
 val expr_list_of_expr : expr -> expr list
 val expr_of_expr_list : Location.t -> expr list -> expr
