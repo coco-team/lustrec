@@ -21,7 +21,7 @@
  *---------------------------------------------------------------------------- *)
 
 open LustreSpec
-
+(*
 (** The core language and its ast. *)
 type ident = Utils.ident
 type label = Utils.ident
@@ -161,8 +161,11 @@ type error =
   | No_main_specified
   | Unbound_symbol of ident
   | Already_bound_symbol of ident
-
+*)
 exception Error of Location.t * error
+
+val dummy_type_dec: type_dec
+val dummy_clock_dec: clock_dec
 
 val mktyp: Location.t -> type_dec_desc -> type_dec
 val mkclock: Location.t -> clock_dec_desc -> clock_dec
@@ -204,9 +207,9 @@ val const_and: constant -> constant -> constant
 val const_xor: constant -> constant -> constant
 val const_impl: constant -> constant -> constant
 
-val node_vars: node_desc -> var_decl list
-val node_var: ident -> node_desc -> var_decl
-val node_eq: ident -> node_desc -> eq
+val get_node_vars: node_desc -> var_decl list
+val get_node_var: ident -> node_desc -> var_decl
+val get_node_eq: ident -> node_desc -> eq
 
 (* val get_const: ident -> constant *)
 
@@ -247,6 +250,13 @@ val rename_prog: (ident -> ident) -> (ident -> ident) -> (ident -> ident) -> pro
 
 val update_expr_annot: expr -> LustreSpec.expr_annot -> expr
 
+
+(** Annotation expression related functions *)
+val mkeexpr: Location.t ->  expr -> eexpr
+val merge_node_annot: node_annot -> node_annot -> node_annot 
+val extend_eexpr: (quantifier_type * var_decl list) list -> eexpr -> eexpr
+val update_expr_annot: expr -> expr_annot -> expr
+(* val mkpredef_call: Location.t -> ident -> eexpr list -> eexpr*)
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

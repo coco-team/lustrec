@@ -19,6 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
  * USA
  *---------------------------------------------------------------------------- *)
+open LustreSpec
 open Corelang
 
 type error =
@@ -44,9 +45,6 @@ let rec check_expr expr =
   | Expr_appl (i, e', i') ->
     check_expr e' &&
       (Basic_library.is_internal_fun i || check_node (node_from_name i))
-  | Expr_uclock _
-  | Expr_dclock _
-  | Expr_phclock _ -> assert false
 and compute_node nd =
  List.for_all (fun eq -> check_expr eq.eq_rhs) nd.node_eqs
 and check_node td =

@@ -26,27 +26,32 @@ open Corelang
 open Dimension
 open Utils
 
-let mktyp x = mktyp (Location.symbol_rloc ()) x
-let mkclock x = mkclock (Location.symbol_rloc ()) x
-let mkvar_decl x = mkvar_decl (Location.symbol_rloc ()) x
-let mkexpr x = mkexpr (Location.symbol_rloc ()) x
-let mkeq x = mkeq (Location.symbol_rloc ()) x
-let mkassert x = mkassert (Location.symbol_rloc ()) x
-let mktop_decl x = mktop_decl (Location.symbol_rloc ()) x
-let mkpredef_call x = mkpredef_call (Location.symbol_rloc ()) x
+let get_loc () = Location.symbol_rloc ()
+let mktyp x = mktyp (get_loc ()) x
+let mkclock x = mkclock (get_loc ()) x
+let mkvar_decl x = mkvar_decl (get_loc ()) x
+let mkexpr x = mkexpr (get_loc ()) x
+let mkeexpr x = mkeexpr (get_loc ()) x 
+let mkeq x = mkeq (get_loc ()) x
+let mkassert x = mkassert (get_loc ()) x
+let mktop_decl x = mktop_decl (get_loc ()) x
+let mkpredef_call x = mkpredef_call (get_loc ()) x
+(*let mkpredef_unary_call x = mkpredef_unary_call (get_loc ()) x*)
 
-let mkdim_int i = mkdim_int (Location.symbol_rloc ()) i
-let mkdim_bool b = mkdim_bool (Location.symbol_rloc ()) b
-let mkdim_ident id = mkdim_ident (Location.symbol_rloc ()) id
-let mkdim_appl f args = mkdim_appl (Location.symbol_rloc ()) f args
-let mkdim_ite i t e = mkdim_ite (Location.symbol_rloc ()) i t e
+let mkdim_int i = mkdim_int (get_loc ()) i
+let mkdim_bool b = mkdim_bool (get_loc ()) b
+let mkdim_ident id = mkdim_ident (get_loc ()) id
+let mkdim_appl f args = mkdim_appl (get_loc ()) f args
+let mkdim_ite i t e = mkdim_ite (get_loc ()) i t e
+
+let mkannots annots = { annots = annots; annot_loc = get_loc () }
 
 let add_node loc own msg hashtbl name value =
   try
     match (Hashtbl.find hashtbl name).top_decl_desc, value.top_decl_desc with
     | Node _        , ImportedNode _ when own   -> ()
     | ImportedNode _, _                         -> Hashtbl.add hashtbl name value
-    | Node _        , _                         -> raise (Corelang.Error (loc, Corelang.Already_bound_symbol msg))
+    | Node _        , _                         -> raise (Error (loc, Already_bound_symbol msg))
     | _                                         -> assert false
   with
     Not_found                                   -> Hashtbl.add hashtbl name value
@@ -54,19 +59,25 @@ let add_node loc own msg hashtbl name value =
 
 let add_symbol loc msg hashtbl name value =
  if Hashtbl.mem hashtbl name
- then raise (Corelang.Error (loc, Corelang.Already_bound_symbol msg))
+ then raise (Error (loc, Already_bound_symbol msg))
  else Hashtbl.add hashtbl name value
 
 let check_symbol loc msg hashtbl name =
  if not (Hashtbl.mem hashtbl name)
- then raise (Corelang.Error (loc, Corelang.Unbound_symbol msg))
+ then raise (Error (loc, Unbound_symbol msg))
  else ()
+
+let check_node_symbol msg name value =
+ if Hashtbl.mem node_table name
+ then () (* TODO: should we check the types here ? *)
+ else Hashtbl.add node_table name value
 
 %}
 
 %token <int> INT
 %token <string> REAL
 %token <float> FLOAT
+%token <string> STRING
 %token AUTOMATON STATE UNTIL UNLESS RESTART RESUME LAST
 %token STATELESS ASSERT OPEN QUOTE FUNCTION
 %token <string> IDENT
@@ -86,9 +97,13 @@ let check_symbol loc msg hashtbl name =
 %token MULT DIV MOD
 %token MINUS PLUS UMINUS
 %token PRE ARROW
+%token REQUIRES ENSURES OBSERVER
+%token INVARIANT BEHAVIOR ASSUMES
+%token EXISTS FORALL
 %token PROTOTYPE LIB
 %token EOF
 
+%nonassoc prec_exists prec_forall
 %nonassoc COMMA
 %left MERGE IF
 %nonassoc ELSE
@@ -110,9 +125,16 @@ let check_symbol loc msg hashtbl name =
 %nonassoc LBRACKET
 
 %start prog
-%type <Corelang.top_decl list> prog
+%type <LustreSpec.top_decl list> prog
+
 %start header
-%type <bool -> Corelang.top_decl list> header
+%type <bool -> LustreSpec.top_decl list> header
+
+%start lustre_annot
+%type <LustreSpec.expr_annot> lustre_annot
+
+%start lustre_spec
+%type <LustreSpec.node_annot> lustre_spec
 
 %%
 
@@ -157,8 +179,9 @@ top_decl_header:
 			     nodei_prototype = $13;
 			     nodei_in_lib = $14;})
     in
-    (let loc = Location.symbol_rloc () in 
-     fun own -> add_node loc own ("node " ^ $3) node_table $3 nd; nd) }
+     check_node_symbol ("node " ^ $3) $3 nd; 
+     let loc = get_loc () in
+     (fun own -> add_node loc own ("node " ^ $3) node_table $3 nd; nd) }
 
 prototype_opt:
  { None }
@@ -186,14 +209,17 @@ top_decl:
 			     node_dec_stateless = $2;
 			     node_stateless = None;
 			     node_spec = $1;
-			     node_annot = match annots with [] -> None | _ -> Some annots})
+			     node_annot = annots})
      in
      let loc = Location.symbol_rloc () in
      add_node loc true ("node " ^ $3) node_table $3 nd; nd}
 
 nodespec_list:
  { None }
-| NODESPEC nodespec_list { (function None -> (fun s1 -> Some s1) | Some s2 -> (fun s1 -> Some (LustreSpec.merge_node_annot s1 s2))) $2 $1 }
+| NODESPEC nodespec_list { 
+  (function 
+  | None    -> (fun s1 -> Some s1) 
+  | Some s2 -> (fun s1 -> Some (merge_node_annot s1 s2))) $2 $1 }
 
 typ_def_list:
     /* empty */ {}
@@ -203,7 +229,7 @@ typ_def:
   TYPE IDENT EQ typeconst {
     try
       let loc = Location.symbol_rloc () in
-      add_symbol loc ("type " ^ $2) type_table (Tydec_const $2) (Corelang.get_repr_type $4)
+      add_symbol loc ("type " ^ $2) type_table (Tydec_const $2) (get_repr_type $4)
     with Not_found-> assert false }
 | TYPE IDENT EQ ENUM LCUR tag_list RCUR { Hashtbl.add type_table (Tydec_const $2) (Tydec_enum ($6 (Tydec_const $2))) }
 | TYPE IDENT EQ STRUCT LCUR field_list RCUR { Hashtbl.add type_table (Tydec_const $2) (Tydec_struct ($6 (Tydec_const $2))) }
@@ -245,7 +271,7 @@ eq_list:
   { [], [], [] }
 | eq eq_list {let eql, assertl, annotl = $2 in ($1::eql), assertl, annotl}
 | assert_ eq_list {let eql, assertl, annotl = $2 in eql, ($1::assertl), annotl}
-| ANNOT eq_list {let eql, assertl, annotl = $2 in eql, assertl, $1@annotl}
+| ANNOT eq_list {let eql, assertl, annotl = $2 in eql, assertl, $1::annotl}
 | automaton eq_list {let eql, assertl, annotl = $2 in ($1::eql), assertl, annotl}
 
 automaton:
@@ -280,6 +306,42 @@ assert_:
 eq:
        ident_list      EQ expr SCOL {mkeq (List.rev $1,$3)}
 | LPAR ident_list RPAR EQ expr SCOL {mkeq (List.rev $2,$5)}
+
+lustre_spec:
+| contract EOF { $1 }
+
+contract:
+requires ensures behaviors { { requires = $1; ensures = $2; behaviors = $3; spec_loc = get_loc () } }
+ 
+requires:
+{ [] }
+| REQUIRES qexpr SCOL requires { $2::$4 }
+
+ensures:
+{ [] }
+| ENSURES qexpr SCOL ensures { $2 :: $4 }
+| OBSERVER IDENT LPAR tuple_expr RPAR SCOL ensures { 
+  mkeexpr (mkexpr ((Expr_appl ($2, mkexpr (Expr_tuple $4), None)))) :: $7
+}
+
+behaviors:
+{ [] }
+| BEHAVIOR IDENT COL assumes ensures behaviors { ($2,$4,$5,get_loc ())::$6 }
+
+assumes:
+{ [] }
+| ASSUMES qexpr SCOL assumes { $2::$4 } 
+
+tuple_qexpr:
+| qexpr COMMA qexpr {[$3;$1]}
+| tuple_qexpr COMMA qexpr {$3::$1}
+
+qexpr:
+| expr { mkeexpr $1 }
+  /* Quantifiers */
+| EXISTS vdecl SCOL qexpr %prec prec_exists { extend_eexpr [Exists, $2] $4 } 
+| FORALL vdecl SCOL qexpr %prec prec_forall { extend_eexpr [Forall, $2] $4 }
+
 
 tuple_expr:
     expr COMMA expr {[$3;$1]}
@@ -524,3 +586,25 @@ ident_list:
 
 SCOL_opt:
     SCOL {} | {}
+
+
+lustre_annot:
+lustre_annot_list EOF { { annots = $1; annot_loc = get_loc () } }
+
+lustre_annot_list:
+  { [] } 
+| kwd COL qexpr SCOL lustre_annot_list { ($1,$3)::$5 }
+| IDENT COL qexpr SCOL lustre_annot_list { ([$1],$3)::$5 }
+| INVARIANT COL qexpr SCOL lustre_annot_list{ (["invariant"],$3)::$5 }
+| OBSERVER COL qexpr SCOL lustre_annot_list { (["observer"],$3)::$5 }
+
+kwd:
+DIV { [] }
+| DIV IDENT kwd { $2::$3}
+
+%%
+(* Local Variables: *)
+(* compile-command:"make -C .." *)
+(* End: *)
+
+

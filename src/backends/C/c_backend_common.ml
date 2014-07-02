@@ -192,6 +192,7 @@ let rec pp_c_const fmt c =
     | Const_tag t     -> pp_c_tag fmt t
     | Const_array ca  -> fprintf fmt "{%a }" (Utils.fprintf_list ~sep:", " pp_c_const) ca
     | Const_struct fl -> fprintf fmt "{%a }" (Utils.fprintf_list ~sep:", " (fun fmt (f, c) -> pp_c_const fmt c)) fl
+    | Const_string _ -> assert false (* string occurs in annotations not in C *)
 
 (* Prints a value expression [v], with internal function calls only.
    [pp_var] is a printer for variables (typically [pp_c_var_read]),

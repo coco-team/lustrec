@@ -685,44 +685,6 @@ and clock_expr ?(nocarrier=true) env expr =
       List.iter (fun (t, h) -> clock_subtyping_arg env h (new_ck (Con (cvar,cr,t)) true)) hl;
       expr.expr_clock <- cvar;
       cvar
-  | Expr_uclock (e,k) ->
-      let pck = clock_expr env e in
-      if not (can_be_pck pck) then
-        raise (Error (e.expr_loc, Not_pck));
-      if k = 0 then
-        raise (Error (expr.expr_loc, Factor_zero));
-      (try
-        subsume pck (CSet_pck (k,(0,1)))
-      with Subsume (ck,cset) ->
-        raise (Error (e.expr_loc, Clock_set_mismatch (ck,CSet_pck (k,(0,1))))));
-      let ck = new_ck (Pck_up (pck,k)) true in
-      expr.expr_clock <- ck;
-      ck
-  | Expr_dclock (e,k) ->
-      let pck = clock_expr env e in
-      if not (can_be_pck pck) then
-        raise (Error (e.expr_loc, Not_pck));
-      if k = 0 then
-        raise (Error (expr.expr_loc, Factor_zero));
-      (try
-        subsume pck (CSet_pck (1,(0,1)))
-      with Subsume (ck,cset) ->
-        raise (Error (e.expr_loc, Clock_set_mismatch (ck,CSet_pck (1,(0,1))))));
-      let ck = new_ck (Pck_down (pck,k)) true in
-      expr.expr_clock <- ck;
-      ck
-  | Expr_phclock (e,(a,b)) ->
-      let pck = clock_expr env e in
-      if not (can_be_pck pck) then
-        raise (Error (e.expr_loc, Not_pck));
-      let (a,b) = simplify_rat (a,b) in
-      (try
-        subsume pck (CSet_pck (b,(0,1)))
-      with Subsume (ck,cset) ->
-        raise (Error (e.expr_loc, Clock_set_mismatch (ck,CSet_pck (b,(0,1))))));
-      let ck = new_ck (Pck_phase (pck,(a,b))) true in
-      expr.expr_clock <- ck;
-      ck
   in
   Log.report ~level:4 (fun fmt -> Format.fprintf fmt "Clock of expr %a: %a@." Printers.pp_expr expr Clocks.print_ck resulting_ck);
   resulting_ck
