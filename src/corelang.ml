@@ -29,9 +29,7 @@ exception Error of Location.t * error
 module VDeclModule =
 struct (* Node module *)
   type t = var_decl
-  let compare v1 v2 = compare v1 v2
-  let hash n = Hashtbl.hash n
-  let equal n1 n2 = n1 = n2
+  let compare v1 v2 = compare v1.var_id v2.var_id
 end
 
 module VMap = Map.Make(VDeclModule)
@@ -301,9 +299,8 @@ let is_tuple_expr expr =
 
 let expr_list_of_expr expr =
   match expr.expr_desc with
-  | Expr_tuple elist ->
-      elist
-  | _ -> [expr]
+  | Expr_tuple elist -> elist
+  | _                -> [expr]
 
 let expr_of_expr_list loc elist =
  match elist with

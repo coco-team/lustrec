@@ -37,8 +37,8 @@ type schedule_report =
   unused_vars : ISet.t;
   (* the table mapping each local var to its in-degree *)
   fanin_table : (ident, int) Hashtbl.t;
-  (* the table mapping each assignment to a set of dead/reusable variables *)
-  death_table : (ident, ISet.t) Hashtbl.t
+  (* the table mapping each assignment to a reusable variable *)
+  reuse_table : (ident, ident) Hashtbl.t
 }
 
 (* Topological sort with a priority for variables belonging in the same equation lhs.
@@ -162,7 +162,7 @@ let schedule_node n =
 	  Disjunction.pp_disjoint_map disjoint
       );
 
-    let reuse = Liveness.reuse_policy n sort death in
+    let reuse = Liveness.reuse_policy n sort death disjoint in
     Log.report ~level:5 
       (fun fmt -> 
 	Format.eprintf 
@@ -171,7 +171,7 @@ let schedule_node n =
 	  Liveness.pp_reuse_policy reuse
       );
  
-    n', { schedule = sort; unused_vars = unused; fanin_table = fanin; death_table = death }
+    n', { schedule = sort; unused_vars = unused; fanin_table = fanin; reuse_table = reuse }
   with (Causality.Cycle v) as exc ->
     pp_error Format.err_formatter v;
     raise exc
