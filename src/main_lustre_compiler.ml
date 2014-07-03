@@ -296,6 +296,9 @@ let rec compile basename extension =
     (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
     machine_code);
 
+  (* experimental
+  let machine_code = Machine_code.prog_reuse_var machine_code node_schs in
+  *)
   (* Optimize machine code *)
   let machine_code = 
     if !Options.optimization >= 2 then

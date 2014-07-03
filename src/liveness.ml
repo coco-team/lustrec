@@ -184,28 +184,52 @@ let replace_in_set s v v' =
 let replace_in_death_table death v v' =
  Hashtbl.iter (fun k dead -> Hashtbl.replace death k (replace_in_set dead v v')) death
 
-let find_compatible_local node var dead =
+let find_compatible_local node var dead death disjoint policy =
  (*Format.eprintf "find_compatible_local %s %s %a@." node.node_id var pp_iset dead;*)
   let typ = (get_node_var var node).var_type in
   let eq_var = get_node_eq var node in
+  let locals = node.node_locals in
   let aliasable_inputs =
     match NodeDep.get_callee eq_var.eq_rhs with
     | None           -> []
     | Some (_, args) -> List.fold_right (fun e r -> match e.expr_desc with Expr_ident id -> id::r | _ -> r) args [] in
-  let filter v =
+  let filter base (v : var_decl) =
     let res =
-       ISet.mem v.var_id dead
+       base v
     && Typing.eq_ground typ v.var_type
-    && not (Types.is_address_type v.var_type  && List.mem v.var_id aliasable_inputs) in
+    && not (Types.is_address_type v.var_type && List.mem v.var_id aliasable_inputs) in
     begin
       (*Format.eprintf "filter %a = %s@." Printers.pp_var_name v (if res then "true" else "false");*)
       res
     end in
+(*Format.eprintf "reuse %s@." var;*)
   try
-    Some ((List.find filter node.node_locals).var_id)
-  with Not_found -> None
+    let disj = Hashtbl.find disjoint var in
+    let reuse = List.find (filter (fun v -> ISet.mem v.var_id disj && not (ISet.mem v.var_id dead))) locals in
+(*Format.eprintf "reuse %s by %s@." var reuse.var_id;*)
+    Disjunction.replace_in_disjoint_map disjoint var reuse.var_id;
+(*Format.eprintf "new disjoint:%a@." Disjunction.pp_disjoint_map disjoint;*)
+    Hashtbl.add policy var reuse.var_id
+  with Not_found ->
+  try
+    let reuse = List.find (filter (fun v -> ISet.mem v.var_id dead)) locals in
+(*Format.eprintf "reuse %s by %s@." var reuse.var_id;*)
+    replace_in_death_table death var reuse.var_id;
+(*Format.eprintf "new death:%a@." pp_death_table death;*)
+    Hashtbl.add policy var reuse.var_id
+  with Not_found -> ()
 
-let reuse_policy node sort death =
+(* the reuse policy seeks to use less local variables
+   by replacing local variables, applying the rules
+   in the following order:
+    1) use another clock disjoint still live variable,
+       with the greatest possible disjoint clock
+    2) reuse a dead variable
+   For the sake of safety, we replace variables by others:
+    - with the same type
+    - not aliasable (i.e. address type)
+*)
+let reuse_policy node sort death disjoint =
   let dead = ref ISet.empty in
   let policy = Hashtbl.create 23 in
   let sort = ref sort in
@@ -216,9 +240,7 @@ let reuse_policy node sort death =
       begin
 	dead := ISet.union (Hashtbl.find death head) !dead;
       end;
-    (match find_compatible_local node head !dead with
-    | None   -> ()
-    | Some l -> replace_in_death_table death head l; Hashtbl.add policy head l);
+    find_compatible_local node head !dead death disjoint policy;
     sort := List.tl !sort;
   done;
   policy

@@ -45,7 +45,7 @@ let update_elim outputs elim instr =
   (* When optimization >= 3, we also inline any basic operator call. 
      All those are returning a single ouput *)
   | MStep([v], id, vl) when
-      List.mem id Basic_library.internal_funs 
+      Basic_library.is_internal_fun id
       && !Options.optimization >= 3
       -> 	  assert false 
 (*    true, apply elim v (Fun(id, vl))*)
@@ -53,7 +53,7 @@ let update_elim outputs elim instr =
     
   | MLocalAssign (v, ((Fun (id, il)) as e)) when 
       not (List.mem v outputs) 
-      && List.mem id Basic_library.internal_funs (* this will avoid inlining ite *)
+      && Basic_library.is_internal_fun id (* this will avoid inlining ite *)
       && !Options.optimization >= 3 
 	-> (
 (*	  Format.eprintf "WE STORE THE EXPRESSION DEFINING %s TO ELIMINATE IT@." v.var_id; *)

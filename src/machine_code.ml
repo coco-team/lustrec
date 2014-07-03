@@ -377,10 +377,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
 
   | p  , Expr_appl (f, arg, r) when not (Basic_library.is_internal_fun f) ->
     let var_p = List.map (fun v -> get_node_var v node) p in
-    let el =
-      match arg.expr_desc with
-      | Expr_tuple el -> el
-      | _             -> [arg] in
+    let el = expr_list_of_expr arg in
     let vl = List.map (translate_expr node args) el in
     let node_f = node_from_name f in
     let call_f =
@@ -504,6 +501,77 @@ let get_machine_opt name machines =
       | None -> if m.mname.node_id = name then Some m else None)
     None machines
     
+(* variable substitution for optimizing purposes *)
+
+(* checks whether an [instr] is skip and can be removed from program *)
+let rec instr_is_skip instr =
+  match instr with
+  | MLocalAssign (i, LocalVar v) when i = v -> true
+  | MStateAssign (i, StateVar v) when i = v -> true
+  | MBranch (g, hl) -> List.for_all (fun (_, il) -> instrs_are_skip il) hl
+  | _               -> false
+and instrs_are_skip instrs =
+  List.for_all instr_is_skip instrs
+
+let rec instr_remove_skip instr cont =
+  match instr with
+  | MLocalAssign (i, LocalVar v) when i = v -> cont
+  | MStateAssign (i, StateVar v) when i = v -> cont
+  | MBranch (g, hl) -> MBranch (g, List.map (fun (h, il) -> (h, instrs_remove_skip il [])) hl) :: cont
+  | _               -> instr::cont
+
+and instrs_remove_skip instrs cont =
+  List.fold_right instr_remove_skip instrs cont
+
+let rec value_replace_var fvar value =
+  match value with
+  | Cst c -> value
+  | LocalVar v -> LocalVar (fvar v)
+  | StateVar v -> value
+  | Fun (id, args) -> Fun (id, List.map (value_replace_var fvar) args) 
+  | Array vl -> Array (List.map (value_replace_var fvar) vl)
+  | Access (t, i) -> Access(value_replace_var fvar t, i)
+  | Power (v, n) -> Power(value_replace_var fvar v, n)
+
+let rec instr_replace_var fvar instr =
+  match instr with
+  | MLocalAssign (i, v) -> MLocalAssign (fvar i, value_replace_var fvar v)
+  | MStateAssign (i, v) -> MStateAssign (i, value_replace_var fvar v)
+  | MReset i            -> instr
+  | MStep (il, i, vl)   -> MStep (List.map fvar il, i, List.map (value_replace_var fvar) vl)
+  | MBranch (g, hl)     -> MBranch (value_replace_var fvar g, List.map (fun (h, il) -> (h, instrs_replace_var fvar il)) hl)
+
+and instrs_replace_var fvar instrs =
+  List.map (instr_replace_var fvar) instrs
+
+let step_replace_var fvar step =
+  { step with
+    step_checks = List.map (fun (l, v) -> (l, value_replace_var fvar v)) step.step_checks;
+    step_locals = Utils.remove_duplicates (List.map fvar step.step_locals);
+    step_instrs = instrs_replace_var fvar step.step_instrs;
+}
+
+let rec machine_replace_var fvar m =
+  { m with
+    mstep = step_replace_var fvar m.mstep
+  }
+
+let machine_reuse_var m reuse =
+  let reuse_vdecl = Hashtbl.create 23 in
+  begin
+    Hashtbl.iter (fun v v' -> Hashtbl.add reuse_vdecl (get_node_var v m.mname) (get_node_var v' m.mname)) reuse;
+    let fvar v =
+      try
+	Hashtbl.find reuse_vdecl v
+      with Not_found -> v in
+    machine_replace_var fvar m
+  end
+
+let prog_reuse_var prog node_schs =
+  List.map 
+    (fun m -> 
+      machine_reuse_var m (Utils.IMap.find m.mname.node_id node_schs).Scheduling.reuse_table
+    ) prog
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

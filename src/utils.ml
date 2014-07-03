@@ -53,6 +53,11 @@ let option_map f o =
   | None   -> None
   | Some e -> Some (f e)
 
+let rec remove_duplicates l =
+ match l with
+ | [] -> []
+ | t::q -> if List.mem t q then remove_duplicates q else t :: remove_duplicates q
+
 let position pred l =
   let rec pos p l =
     match l with
