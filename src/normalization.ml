@@ -196,8 +196,18 @@ let rec normalize_expr ?(alias=true) node offsets defvars expr =
     let defvars, norm_elist =
       normalize_list alias node offsets (fun alias -> normalize_expr ~alias:alias) defvars elist in
     defvars, mk_norm_expr offsets expr (Expr_tuple norm_elist)
-  | Expr_appl (id, args, None) when Basic_library.is_internal_fun id && Types.is_array_type expr.expr_type ->
-    let defvars, norm_args = normalize_list alias node offsets (fun _ -> normalize_array_expr ~alias:true) defvars (expr_list_of_expr args) in
+  | Expr_appl (id, args, None) 
+      when Basic_library.is_internal_fun id 
+	&& Types.is_array_type expr.expr_type ->
+    let defvars, norm_args = 
+      normalize_list 
+	alias
+	node
+	offsets 
+	(fun _ -> normalize_array_expr ~alias:true) 
+	defvars 
+	(expr_list_of_expr args) 
+    in
     defvars, mk_norm_expr offsets expr (Expr_appl (id, expr_of_expr_list args.expr_loc norm_args, None))
   | Expr_appl (id, args, None) when Basic_library.is_internal_fun id ->
     let defvars, norm_args = normalize_expr ~alias:true node offsets defvars args in
@@ -341,16 +351,63 @@ let rec normalize_eq node defvars eq =
     let norm_eq = { eq with eq_rhs = norm_rhs } in
     norm_eq::defs', vars'
 
+(** normalize_node node returns a normalized node, 
+    ie. 
+    - updated locals
+    - new equations
+    - 
+*)
 let normalize_node node = 
   cpt_fresh := 0;
   let inputs_outputs = node.node_inputs@node.node_outputs in
   let is_local v =
     List.for_all ((!=) v) inputs_outputs in
+  let orig_vars = inputs_outputs@node.node_locals in
   let defs, vars = 
-    List.fold_left (normalize_eq node) ([], inputs_outputs@node.node_locals) node.node_eqs in
+    List.fold_left (normalize_eq node) ([], orig_vars) node.node_eqs in
+  (* Normalize the asserts *)
+  let vars, assert_defs, asserts = 
+    List.fold_left (
+    fun (vars, def_accu, assert_accu) assert_ ->
+      let assert_expr = assert_.assert_expr in
+      let (defs, vars'), expr = 
+	normalize_expr 
+	  ~alias:false 
+	  node 
+	  [] (* empty offset for arrays *)
+	  ([], vars) (* defvar only contains vars *)
+	  assert_expr
+      in
+      vars', defs@def_accu, {assert_ with assert_expr = expr}::assert_accu
+    ) (vars, [], []) node.node_asserts in
   let new_locals = List.filter is_local vars in
+  (* Compute tracebaility info: 
+     - gather newly bound variables
+     - compute the associated expression without aliases     
+  *)
+  let diff_vars = List.filter (fun v -> not (List.mem v node.node_locals) ) new_locals in
+  let norm_traceability = {
+    annots = 
+      List.map 
+	(fun v -> 
+	  let expr = substitute_expr diff_vars defs (
+	    let eq = List.find (fun eq -> eq.eq_lhs = [v.var_id]) defs in
+	    eq.eq_rhs) in 
+	  let pair = mkeexpr expr.expr_loc (mkexpr expr.expr_loc (Expr_tuple [expr_of_ident v.var_id expr.expr_loc; expr])) in 
+	  ["horn_backend";"trace"], pair 
+    ) 
+    diff_vars ;
+    annot_loc = Location.dummy_loc
+  }
+
+  in
   let node =
-  { node with node_locals = new_locals; node_eqs = defs }
+  { node with 
+    node_locals = new_locals; 
+    node_eqs = defs @ assert_defs;
+    node_asserts = asserts;
+    node_annot = norm_traceability::node.node_annot;
+  }
   in ((*Printers.pp_node Format.err_formatter node;*) node)
 
 let normalize_decl decl =

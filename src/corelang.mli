@@ -80,16 +80,16 @@ and expr_desc =
 | Expr_phclock of expr * rat
 and call_t = ident * expr * (ident * label) option (* The third part denotes the reseting clock label and value *)
 
-type assert_t = 
-    {
-      assert_expr: expr;
-      assert_loc: Location.t
-    } 
-
 type eq =
     {eq_lhs: ident list;
      eq_rhs: expr;
      eq_loc: Location.t}
+
+type assert_t = 
+    {
+      assert_expr: expr * eq list;
+      assert_loc: Location.t
+    } 
 
 type node_desc =
     {node_id: ident;
@@ -250,6 +250,7 @@ val rename_prog: (ident -> ident) -> (ident -> ident) -> (ident -> ident) -> pro
 
 val update_expr_annot: expr -> LustreSpec.expr_annot -> expr
 
+val substitute_expr: var_decl list -> eq list -> expr -> expr
 
 (** Annotation expression related functions *)
 val mkeexpr: Location.t ->  expr -> eexpr

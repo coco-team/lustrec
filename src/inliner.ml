@@ -7,6 +7,13 @@ let check_node_name id = (fun t ->
   | _ -> false) 
 
 
+let rename_expr rename expr = expr_replace_var rename expr
+let rename_eq rename eq = 
+  { eq with
+    eq_lhs = List.map rename eq.eq_lhs; 
+    eq_rhs = rename_expr rename eq.eq_rhs
+  }
+
 (* 
     expr, locals', eqs = inline_call id args' reset locals nodes
 
@@ -27,11 +34,7 @@ let inline_call orig_expr args reset locals node =
       node.node_id uid v;
     Format.flush_str_formatter ()
   in
-  let eqs' = List.map 
-    (fun eq -> { eq with
-      eq_lhs = List.map rename eq.eq_lhs; 
-      eq_rhs = expr_replace_var rename eq.eq_rhs
-    } ) node.node_eqs
+  let eqs' = List.map (rename_eq rename) node.node_eqs
   in
   let rename_var v = { v with var_id = rename v.var_id } in
   let inputs' = List.map rename_var node.node_inputs in
@@ -51,7 +54,19 @@ let inline_call orig_expr args reset locals node =
     loc 
     (List.map (fun v -> mkexpr loc (Expr_ident v.var_id)) outputs')
   in
-  expr , inputs'@outputs'@locals'@locals, assign_inputs::eqs'
+  let asserts' = (* We rename variables in assert expressions *)
+    List.map 
+      (fun a -> 
+	{a with assert_expr = 
+	    let expr = a.assert_expr in
+	    rename_expr rename expr
+      })
+      node.node_asserts 
+  in
+  expr, 
+  inputs'@outputs'@locals'@locals, 
+  assign_inputs::eqs',
+  asserts'
 
 
 
@@ -65,87 +80,92 @@ let inline_call orig_expr args reset locals node =
 *)
 let rec inline_expr expr locals nodes =
   let inline_tuple el = 
-    List.fold_right (fun e (el_tail, locals, eqs) -> 
-      let e', locals', eqs' = inline_expr e locals nodes in
-      e'::el_tail, locals', eqs'@eqs
-    ) el ([], locals, [])
+    List.fold_right (fun e (el_tail, locals, eqs, asserts) -> 
+      let e', locals', eqs', asserts' = inline_expr e locals nodes in
+      e'::el_tail, locals', eqs'@eqs, asserts@asserts'
+    ) el ([], locals, [], [])
   in
   let inline_pair e1 e2 = 
-    let el', l', eqs' = inline_tuple [e1;e2] in
+    let el', l', eqs', asserts' = inline_tuple [e1;e2] in
     match el' with
-    | [e1'; e2'] -> e1', e2', l', eqs'
+    | [e1'; e2'] -> e1', e2', l', eqs', asserts'
     | _ -> assert false
   in
   let inline_triple e1 e2 e3 = 
-    let el', l', eqs' = inline_tuple [e1;e2;e3] in
+    let el', l', eqs', asserts' = inline_tuple [e1;e2;e3] in
     match el' with
-    | [e1'; e2'; e3'] -> e1', e2', e3', l', eqs'
+    | [e1'; e2'; e3'] -> e1', e2', e3', l', eqs', asserts'
     | _ -> assert false
   in
     
   match expr.expr_desc with
   | Expr_appl (id, args, reset) ->
-    let args', locals', eqs' = inline_expr args locals nodes in 
+    let args', locals', eqs', asserts' = inline_expr args locals nodes in 
     if List.exists (check_node_name id) nodes then 
       (* The node should be inlined *)
-(*      let _ =     Format.eprintf "Inlining call to %s@." id in
-  *)    let node = try List.find (check_node_name id) nodes 
+      (* let _ =     Format.eprintf "Inlining call to %s@." id in *)
+      let node = try List.find (check_node_name id) nodes 
 	with Not_found -> (assert false) in
-      let node = match node.top_decl_desc with Node nd -> nd | _ -> assert false in
+      let node = 
+	match node.top_decl_desc with Node nd -> nd | _ -> assert false in
       let node = inline_node node nodes in
-      let expr, locals', eqs'' = 
+      let expr, locals', eqs'', asserts'' = 
 	inline_call expr args' reset locals' node in
-      expr, locals', eqs'@eqs''
+      expr, locals', eqs'@eqs'', asserts'@asserts''
     else 
       (* let _ =     Format.eprintf "Not inlining call to %s@." id in *)
-      { expr with expr_desc = Expr_appl(id, args', reset)}, locals', eqs'
+      { expr with expr_desc = Expr_appl(id, args', reset)}, 
+      locals', 
+      eqs', 
+      asserts'
 
   (* For other cases, we just keep the structure, but convert sub-expressions *)
   | Expr_const _ 
-  | Expr_ident _ -> expr, locals, []
+  | Expr_ident _ -> expr, locals, [], []
   | Expr_tuple el -> 
-    let el', l', eqs' = inline_tuple el in
-    { expr with expr_desc = Expr_tuple el' }, l', eqs'
+    let el', l', eqs', asserts' = inline_tuple el in
+    { expr with expr_desc = Expr_tuple el' }, l', eqs', asserts'
   | Expr_ite (g, t, e) ->
-    let g', t', e', l', eqs' = inline_triple g t e in
-    { expr with expr_desc = Expr_ite (g', t', e') }, l', eqs'
+    let g', t', e', l', eqs', asserts' = inline_triple g t e in
+    { expr with expr_desc = Expr_ite (g', t', e') }, l', eqs', asserts'
   | Expr_arrow (e1, e2) ->
-    let e1', e2', l', eqs' = inline_pair e1 e2 in
-    { expr with expr_desc = Expr_arrow (e1', e2') } , l', eqs'
+    let e1', e2', l', eqs', asserts' = inline_pair e1 e2 in
+    { expr with expr_desc = Expr_arrow (e1', e2') } , l', eqs', asserts'
   | Expr_fby (e1, e2) ->
-    let e1', e2', l', eqs' = inline_pair e1 e2 in
-    { expr with expr_desc = Expr_fby (e1', e2') }, l', eqs'
+    let e1', e2', l', eqs', asserts' = inline_pair e1 e2 in
+    { expr with expr_desc = Expr_fby (e1', e2') }, l', eqs', asserts'
   | Expr_array el ->
-    let el', l', eqs' = inline_tuple el in
-    { expr with expr_desc = Expr_array el' }, l', eqs'
+    let el', l', eqs', asserts' = inline_tuple el in
+    { expr with expr_desc = Expr_array el' }, l', eqs', asserts'
   | Expr_access (e, dim) ->
-    let e', l', eqs' = inline_expr e locals nodes in 
-    { expr with expr_desc = Expr_access (e', dim) }, l', eqs'
+    let e', l', eqs', asserts' = inline_expr e locals nodes in 
+    { expr with expr_desc = Expr_access (e', dim) }, l', eqs', asserts'
   | Expr_power (e, dim) ->
-    let e', l', eqs' = inline_expr e locals nodes in 
-    { expr with expr_desc = Expr_power (e', dim) }, l', eqs'
+    let e', l', eqs', asserts' = inline_expr e locals nodes in 
+    { expr with expr_desc = Expr_power (e', dim) }, l', eqs', asserts'
   | Expr_pre e ->
-    let e', l', eqs' = inline_expr e locals nodes in 
-    { expr with expr_desc = Expr_pre e' }, l', eqs'
+    let e', l', eqs', asserts' = inline_expr e locals nodes in 
+    { expr with expr_desc = Expr_pre e' }, l', eqs', asserts'
   | Expr_when (e, id, label) ->
-    let e', l', eqs' = inline_expr e locals nodes in 
-    { expr with expr_desc = Expr_when (e', id, label) }, l', eqs'
+    let e', l', eqs', asserts' = inline_expr e locals nodes in 
+    { expr with expr_desc = Expr_when (e', id, label) }, l', eqs', asserts'
   | Expr_merge (id, branches) ->
-    let el, l', eqs' = inline_tuple (List.map snd branches) in
+    let el, l', eqs', asserts' = inline_tuple (List.map snd branches) in
     let branches' = List.map2 (fun (label, _) v -> label, v) branches el in
-    { expr with expr_desc = Expr_merge (id, branches') }, l', eqs'
+    { expr with expr_desc = Expr_merge (id, branches') }, l', eqs', asserts'
 and inline_node nd nodes = 
-  let new_locals, eqs = 
-    List.fold_left (fun (locals, eqs) eq ->
-      let eq_rhs', locals', new_eqs' = 
+  let new_locals, eqs, asserts = 
+    List.fold_left (fun (locals, eqs, asserts) eq ->
+      let eq_rhs', locals', new_eqs', asserts' = 
 	inline_expr eq.eq_rhs locals nodes 
       in
-      locals', { eq with eq_rhs = eq_rhs' }::new_eqs'@eqs 
-    ) (nd.node_locals, []) nd.node_eqs
+      locals', { eq with eq_rhs = eq_rhs' }::new_eqs'@eqs, asserts'@asserts
+    ) (nd.node_locals, [], nd.node_asserts) nd.node_eqs
   in
   { nd with
     node_locals = new_locals;
-    node_eqs = eqs
+    node_eqs = eqs;
+    node_asserts = asserts;
   }
 
 let inline_all_calls node nodes =

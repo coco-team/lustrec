@@ -647,6 +647,12 @@ let type_node env nd loc =
   let undefined_vars =
     List.fold_left (type_eq (new_env, vd_env) is_main) undefined_vars_init nd.node_eqs
   in
+  (* Typing asserts *)
+  List.iter (fun assert_ ->
+    let assert_expr =  assert_.assert_expr in
+    type_subtyping_arg (new_env, vd_env) is_main false assert_expr Type_predef.type_bool
+  )  nd.node_asserts;
+  
   (* check that table is empty *)
   if (not (IMap.is_empty undefined_vars)) then
     raise (Error (loc, Undefined_var undefined_vars));
