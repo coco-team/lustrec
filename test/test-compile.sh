@@ -151,6 +151,11 @@ check_prop () {
     else
 	$LUSTREC -horn -d $build -verbose 0 $opts "$name".lus
     fi
+    if [ $? -ne 0 ]; then
+        rlustrec="INVALID";
+    else
+        rlustrec="VALID"
+    fi
     # echo "z3 $build/$name".smt2 
     # TODO: This part of the script has to be optimized
     z3 -T:10 "$build/$name".smt2 | grep unsat > /dev/null
@@ -160,9 +165,9 @@ check_prop () {
         rhorn="VALID"
     fi
     if [ $verbose -gt 0 ]; then
-	echo "horn-pdr ($rhorn), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
+	echo "lustrec ($rlustrec), horn-pdr ($rhorn), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
     else
-	echo "horn-pdr ($rhorn), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+	echo "lustrec ($rlustrec), horn-pdr ($rhorn), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
     fi
     popd > /dev/null
 done < $file_list

@@ -40,6 +40,76 @@ let pp_var_name fmt id = fprintf fmt "%s" id.var_id
 
 let pp_eq_lhs = fprintf_list ~sep:", " pp_print_string
 
+let pp_var fmt id = fprintf fmt "%s%s: %a" (if id.var_dec_const then "const " else "") id.var_id Types.print_ty id.var_type
+
+let pp_node_var fmt id = fprintf fmt "%s%s: %a%a" (if id.var_dec_const then "const " else "") id.var_id Types.print_node_ty id.var_type Clocks.print_ck_suffix id.var_clock
+
+let pp_node_args = fprintf_list ~sep:"; " pp_node_var 
+
+let pp_quantifiers fmt (q, vars) =
+  match q with
+    | Forall -> fprintf fmt "forall %a" (fprintf_list ~sep:"; " pp_var) vars 
+    | Exists -> fprintf fmt "exists %a" (fprintf_list ~sep:"; " pp_var) vars 
+
+(*
+let pp_econst fmt c = 
+  match c with
+    | EConst_int i -> pp_print_int fmt i
+    | EConst_real r -> pp_print_string fmt r
+    | EConst_float r -> pp_print_float fmt r
+    | EConst_tag  t -> pp_print_string fmt t
+    | EConst_string s -> pp_print_string fmt ("\"" ^ s ^ "\"")
+
+
+let rec pp_eexpr fmt eexpr = 
+  match eexpr.eexpr_desc with
+    | EExpr_const c -> pp_econst fmt c
+    | EExpr_ident id -> pp_print_string fmt id
+    | EExpr_tuple el -> fprintf_list ~sep:"," pp_eexpr fmt el
+    | EExpr_arrow (e1, e2) -> fprintf fmt "%a -> %a" pp_eexpr e1 pp_eexpr e2
+    | EExpr_fby (e1, e2) -> fprintf fmt "%a fby %a" pp_eexpr e1 pp_eexpr e2
+    (* | EExpr_concat (e1, e2) -> fprintf fmt "%a::%a" pp_eexpr e1 pp_eexpr e2 *)
+    (* | EExpr_tail e -> fprintf fmt "tail %a" pp_eexpr e *)
+    | EExpr_pre e -> fprintf fmt "pre %a" pp_eexpr e
+    | EExpr_when (e, id) -> fprintf fmt "%a when %s" pp_eexpr e id
+    | EExpr_merge (id, e1, e2) -> 
+      fprintf fmt "merge (%s, %a, %a)" id pp_eexpr e1 pp_eexpr e2
+    | EExpr_appl (id, e, r) -> pp_eapp fmt id e r
+    | EExpr_forall (vars, e) -> fprintf fmt "forall %a; %a" pp_node_args vars pp_eexpr e 
+    | EExpr_exists (vars, e) -> fprintf fmt "exists %a; %a" pp_node_args vars pp_eexpr e 
+
+
+    (* | EExpr_whennot _ *)
+    (* | EExpr_uclock _ *)
+    (* | EExpr_dclock _ *)
+    (* | EExpr_phclock _ -> assert false *)
+and pp_eapp fmt id e r =
+  match r with
+  | None ->
+    (match id, e.eexpr_desc with
+    | "+", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a + %a)" pp_eexpr e1 pp_eexpr e2
+    | "uminus", _ -> fprintf fmt "(- %a)" pp_eexpr e
+    | "-", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a - %a)" pp_eexpr e1 pp_eexpr e2
+    | "*", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a * %a)" pp_eexpr e1 pp_eexpr e2
+    | "/", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a / %a)" pp_eexpr e1 pp_eexpr e2
+    | "mod", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a mod %a)" pp_eexpr e1 pp_eexpr e2
+    | "&&", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a && %a)" pp_eexpr e1 pp_eexpr e2
+    | "||", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a || %a)" pp_eexpr e1 pp_eexpr e2
+    | "xor", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a ^^ %a)" pp_eexpr e1 pp_eexpr e2
+    | "impl", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a ==> %a)" pp_eexpr e1 pp_eexpr e2
+    | "<", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a < %a)" pp_eexpr e1 pp_eexpr e2
+    | "<=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a <= %a)" pp_eexpr e1 pp_eexpr e2
+    | ">", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a > %a)" pp_eexpr e1 pp_eexpr e2
+    | ">=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a >= %a)" pp_eexpr e1 pp_eexpr e2
+    | "!=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a != %a)" pp_eexpr e1 pp_eexpr e2
+    | "=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a == %a)" pp_eexpr e1 pp_eexpr e2
+    | "not", _ -> fprintf fmt "(! %a)" pp_eexpr e
+    | "ite", EExpr_tuple([e1;e2;e3]) -> fprintf fmt "(if %a then %a else %a)" pp_eexpr e1 pp_eexpr e2 pp_eexpr e3
+    | _ -> fprintf fmt "%s (%a)" id pp_eexpr e)
+  | Some x -> fprintf fmt "%s (%a) every %s" id pp_eexpr e x 
+*)
+
+
 let rec pp_struct_const_field fmt (label, c) =
   fprintf fmt "%a = %a;" pp_print_string label pp_const c
 and pp_const fmt c = 
@@ -52,12 +122,13 @@ and pp_const fmt c =
     | Const_struct fl -> Format.fprintf fmt "{%a }" (Utils.fprintf_list ~sep:" " pp_struct_const_field) fl
     | Const_string s -> pp_print_string fmt ("\"" ^ s ^ "\"")
 
-and pp_var fmt id = fprintf fmt "%s%s: %a" (if id.var_dec_const then "const " else "") id.var_id Types.print_ty id.var_type
 
-and pp_node_var fmt id = fprintf fmt "%s%s: %a%a" (if id.var_dec_const then "const " else "") id.var_id Types.print_node_ty id.var_type Clocks.print_ck_suffix id.var_clock
-
-and pp_expr fmt expr =
-  match expr.expr_desc with
+let rec pp_expr fmt expr =
+  (match expr.expr_annot with 
+  | None -> fprintf fmt "%t" 
+  | Some ann -> fprintf fmt "(%a %t)" pp_expr_annot ann)
+    (fun fmt -> 
+      match expr.expr_desc with
     | Expr_const c -> pp_const fmt c
     | Expr_ident id -> Format.fprintf fmt "%s" id
     | Expr_array a -> fprintf fmt "[%a]" pp_tuple a
@@ -72,7 +143,7 @@ and pp_expr fmt expr =
     | Expr_merge (id, hl) -> 
       fprintf fmt "merge %s %a" id pp_handlers hl
     | Expr_appl (id, e, r) -> pp_app fmt id e r
-
+    )
 and pp_tuple fmt el =
  fprintf_list ~sep:"," pp_expr fmt el
 
@@ -107,6 +178,24 @@ and pp_app fmt id e r =
     | _ -> fprintf fmt "%s (%a)" id pp_expr e
 )
   | Some (x, l) -> fprintf fmt "%s (%a) every %s(%s)" id pp_expr e l x 
+
+
+
+and pp_eexpr fmt e =
+  fprintf fmt "%a%t %a"
+    (Utils.fprintf_list ~sep:"; " pp_quantifiers) e.eexpr_quantifiers
+    (fun fmt -> match e.eexpr_quantifiers with [] -> () | _ -> fprintf fmt ";")
+    pp_expr e.eexpr_qfexpr
+
+
+and pp_expr_annot fmt expr_ann =
+  let pp_annot fmt (kwds, ee) =
+    Format.fprintf fmt "(*! %t: %a *)"
+      (fun fmt -> match kwds with | [] -> assert false | [x] -> Format.pp_print_string fmt x | _ -> Format.fprintf fmt "/%a/" (fprintf_list ~sep:"/" Format.pp_print_string) kwds)
+      pp_eexpr ee
+  in
+  fprintf_list ~sep:"@ " pp_annot fmt expr_ann.annots
+    
 	
 let pp_node_eq fmt eq = 
   fprintf fmt "%a = %a;" 
@@ -115,7 +204,6 @@ let pp_node_eq fmt eq =
 
 let pp_node_eqs = fprintf_list ~sep:"@ " pp_node_eq 
 
-let pp_node_args = fprintf_list ~sep:"; " pp_node_var 
 
 let pp_var_type_dec fmt ty =
   let rec pp_var_struct_type_field fmt (label, tdesc) =
@@ -146,18 +234,6 @@ in pp_var_type_dec_desc fmt ty.ty_dec_desc
 (*   ) *)
 
 
-
-let pp_quantifiers fmt (q, vars) =
-  match q with
-    | Forall -> fprintf fmt "forall %a" (fprintf_list ~sep:"; " pp_var) vars 
-    | Exists -> fprintf fmt "exists %a" (fprintf_list ~sep:"; " pp_var) vars 
-
-let pp_eexpr fmt e =
-  fprintf fmt "%a%t %a"
-    (Utils.fprintf_list ~sep:"; " pp_quantifiers) e.eexpr_quantifiers
-    (fun fmt -> match e.eexpr_quantifiers with [] -> () | _ -> fprintf fmt ";")
-    pp_expr e.eexpr_qfexpr
-
 let pp_spec fmt spec =
   fprintf fmt "@[<hov 2>(*@@ ";
   fprintf_list ~sep:"@;@@ " (fun fmt r -> fprintf fmt "requires %a;" pp_eexpr r) fmt spec.requires;
@@ -171,8 +247,20 @@ let pp_spec fmt spec =
   fprintf fmt "@]*)";
   ()
 
+
+let pp_asserts fmt asserts =
+  match asserts with 
+  | _::_ -> (
+  fprintf fmt "(* Asserts definitions *)@ ";
+  fprintf_list ~sep:"@ " (fun fmt assert_ -> 
+    let expr = assert_.assert_expr in
+    fprintf fmt "assert %a;" pp_expr expr 
+  ) fmt asserts 
+  )
+  | _ -> ()
+    
 let pp_node fmt nd = 
-fprintf fmt "@[<v 0>%a%t%s %s (%a) returns (%a)@.%a%alet@.@[<h 2>   @ @[<v>%a@]@ @]@.tel@]@."
+fprintf fmt "@[<v 0>%a%t%s %s (%a) returns (%a)@.%a%alet@.@[<h 2>   @ @[<v>%a@ %a@ %a@]@ @]@.tel@]@."
   (fun fmt s -> match s with Some s -> pp_spec fmt s | _ -> ()) nd.node_spec
   (fun fmt -> match nd.node_spec with None -> () | Some _ -> Format.fprintf fmt "@.")
   (if nd.node_dec_stateless then "function" else "node")
@@ -193,7 +281,9 @@ fprintf fmt "@[<v 0>%a%t%s %s (%a) returns (%a)@.%a%alet@.@[<h 2>   @ @[<v>%a@]@
 	 (fun fmt d -> fprintf fmt "%a" Dimension.pp_dimension d))
       checks
   ) nd.node_checks
+  (fprintf_list ~sep:"@ " pp_expr_annot) nd.node_annot
   pp_node_eqs nd.node_eqs
+  pp_asserts nd.node_asserts
 (*fprintf fmt "@ /* Scheduling: %a */ @ " (fprintf_list ~sep:", " pp_print_string) (Scheduling.schedule_node nd)*)
 
 let pp_imported_node fmt ind = 

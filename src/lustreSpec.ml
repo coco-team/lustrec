@@ -1,9 +1,9 @@
 open Format
 
 type ident = Utils.ident
-type label = Utils.ident
 type rat = Utils.rat
 type tag = Utils.tag
+type label = Utils.ident
 
 type type_dec =
     {ty_dec_desc: type_dec_desc;
@@ -117,7 +117,7 @@ type node_annot = {
 type assert_t = 
     {
       assert_expr: expr;
-      assert_loc: Location.t
+      assert_loc: Location.t;
     } 
 
 type node_desc =
@@ -175,7 +175,6 @@ type error =
   | No_main_specified
   | Unbound_symbol of ident
   | Already_bound_symbol of ident
-
 
 
 (* Local Variables: *)

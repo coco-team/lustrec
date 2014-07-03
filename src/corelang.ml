@@ -495,6 +495,11 @@ let get_consts prog =
 
 let rename_node f_node f_var f_const nd =
   let rename_var v = { v with var_id = f_var v.var_id } in
+  let rename_eq eq = { eq with
+      eq_lhs = List.map f_var eq.eq_lhs; 
+      eq_rhs = rename_expr f_node f_var f_const eq.eq_rhs
+    } 
+  in
   let inputs = List.map rename_var nd.node_inputs in
   let outputs = List.map rename_var nd.node_outputs in
   let locals = List.map rename_var nd.node_locals in
@@ -502,15 +507,12 @@ let rename_node f_node f_var f_const nd =
   let node_checks = List.map (Dimension.expr_replace_var f_var)  nd.node_checks in
   let node_asserts = List.map 
     (fun a -> 
-      { a with assert_expr = rename_expr f_node f_var f_const a.assert_expr } 
-    ) nd.node_asserts
+      {a with assert_expr = 
+	  let expr = a.assert_expr in
+	  rename_expr f_node f_var f_const expr})
+    nd.node_asserts
   in
-  let eqs = List.map 
-    (fun eq -> { eq with
-      eq_lhs = List.map f_var eq.eq_lhs; 
-      eq_rhs = rename_expr f_node f_var f_const eq.eq_rhs
-    } ) nd.node_eqs
-  in
+  let eqs = List.map rename_eq nd.node_eqs in
   let spec = 
     Utils.option_map 
       (fun s -> rename_node_annot f_node f_var f_const s) 
@@ -643,6 +645,79 @@ let add_internal_funs () =
     Basic_library.internal_funs
 
 
+
+(* Replace any occurence of a var in vars_to_replace by its associated
+   expression in defs until e does not contain any such variables *)
+let rec substitute_expr vars_to_replace defs e =
+  let se = substitute_expr vars_to_replace defs in
+  { e with expr_desc = 
+      let ed = e.expr_desc in
+      match ed with
+      | Expr_const _ -> ed
+      | Expr_array el -> Expr_array (List.map se el)
+      | Expr_access (e1, d) -> Expr_access (se e1, d)
+      | Expr_power (e1, d) -> Expr_power (se e1, d)
+      | Expr_tuple el -> Expr_tuple (List.map se el)
+      | Expr_ite (c, t, e) -> Expr_ite (se c, se t, se e)
+      | Expr_arrow (e1, e2)-> Expr_arrow (se e1, se e2) 
+      | Expr_fby (e1, e2) -> Expr_fby (se e1, se e2)
+      | Expr_pre e' -> Expr_pre (se e')
+      | Expr_when (e', i, l)-> Expr_when (se e', i, l)
+      | Expr_merge (i, hl) -> Expr_merge (i, List.map (fun (t, h) -> (t, se h)) hl)
+      | Expr_appl (i, e', i') -> Expr_appl (i, se e', i')
+      | Expr_ident i -> 
+	if List.exists (fun v -> v.var_id = i) vars_to_replace then (
+	  let eq_i eq = eq.eq_lhs = [i] in
+	  if List.exists eq_i defs then
+	    let sub = List.find eq_i defs in
+	    let sub' = se sub.eq_rhs in
+	    sub'.expr_desc
+	  else 
+	    assert false
+	)
+	else
+	  ed
+
+  }
+(* FAUT IL RETIRER ?
+  
+ let rec expr_to_eexpr  expr =
+   { eexpr_tag = expr.expr_tag;
+     eexpr_desc = expr_desc_to_eexpr_desc expr.expr_desc;
+     eexpr_type = expr.expr_type;
+     eexpr_clock = expr.expr_clock;
+     eexpr_loc = expr.expr_loc
+   }
+ and expr_desc_to_eexpr_desc expr_desc =
+   let conv = expr_to_eexpr in
+   match expr_desc with
+   | Expr_const c -> EExpr_const (match c with
+     | Const_int x -> EConst_int x 
+     | Const_real x -> EConst_real x 
+     | Const_float x -> EConst_float x 
+     | Const_tag x -> EConst_tag x 
+     | _ -> assert false
+
+   )
+   | Expr_ident i -> EExpr_ident i
+   | Expr_tuple el -> EExpr_tuple (List.map conv el)
+
+   | Expr_arrow (e1, e2)-> EExpr_arrow (conv e1, conv e2) 
+   | Expr_fby (e1, e2) -> EExpr_fby (conv e1, conv e2)
+   | Expr_pre e' -> EExpr_pre (conv e')
+   | Expr_appl (i, e', i') -> 
+     EExpr_appl 
+       (i, conv e', match i' with None -> None | Some(id, _) -> Some id)
+
+   | Expr_when _
+   | Expr_merge _ -> assert false
+   | Expr_array _ 
+   | Expr_access _ 
+   | Expr_power _  -> assert false
+   | Expr_ite (c, t, e) -> assert false 
+   | _ -> assert false
+
+     *)
 let rec get_expr_calls nodes e =
   get_calls_expr_desc nodes e.expr_desc
 and get_calls_expr_desc nodes expr_desc =

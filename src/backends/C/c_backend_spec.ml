@@ -31,18 +31,10 @@ let pp_acsl_var_decl fmt id =
   pp_acsl_type id.var_id fmt id.var_type
 
 
-let pp_econst fmt c = 
-  match c with
-    | EConst_int i -> pp_print_int fmt i
-    | EConst_real r -> pp_print_string fmt r
-    | EConst_float r -> pp_print_float fmt r
-    | EConst_bool b -> pp_print_bool fmt b
-    | EConst_string s -> pp_print_string fmt ("\"" ^ s ^ "\"")
-
 let rec pp_eexpr is_output fmt eexpr = 
   let pp_eexpr = pp_eexpr is_output in
   match eexpr.eexpr_desc with
-    | EExpr_const c -> pp_econst fmt c
+    | EExpr_const c -> Printers.pp_econst fmt c
     | EExpr_ident id -> 
       if is_output id then pp_print_string fmt ("*" ^ id) else pp_print_string fmt id
     | EExpr_tuple el -> Utils.fprintf_list ~sep:"," pp_eexpr fmt el

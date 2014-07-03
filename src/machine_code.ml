@@ -86,6 +86,7 @@ type step_t = {
   step_outputs: var_decl list;
   step_locals: var_decl list;
   step_instrs: instr_t list;
+  step_asserts: value_t list;
 }
 
 type static_call = top_decl * (Dimension.dim_expr list)
@@ -103,12 +104,14 @@ type machine_t = {
 }
 
 let pp_step fmt s =
-  Format.fprintf fmt "@[<v>inputs : %a@ outputs: %a@ locals : %a@ checks : %a@ instrs : @[%a@]@]@ "
+  Format.fprintf fmt "@[<v>inputs : %a@ outputs: %a@ locals : %a@ checks : %a@ instrs : @[%a@]@ asserts : @[%a@]@]@ "
     (Utils.fprintf_list ~sep:", " Printers.pp_var) s.step_inputs
     (Utils.fprintf_list ~sep:", " Printers.pp_var) s.step_outputs
     (Utils.fprintf_list ~sep:", " Printers.pp_var) s.step_locals
     (Utils.fprintf_list ~sep:", " (fun fmt (_, c) -> pp_val fmt c)) s.step_checks
     (Utils.fprintf_list ~sep:"@ " pp_instr) s.step_instrs
+    (Utils.fprintf_list ~sep:", " pp_val) s.step_asserts
+
 
 let pp_static_call fmt (node, args) =
  Format.fprintf fmt "%s<%a>"
@@ -117,12 +120,14 @@ let pp_static_call fmt (node, args) =
 
 let pp_machine fmt m =
   Format.fprintf fmt 
-    "@[<v 2>machine %s@ mem      : %a@ instances: %a@ init     : %a@ step     :@   @[<v 2>%a@]@ @]@ "
+    "@[<v 2>machine %s@ mem      : %a@ instances: %a@ init     : %a@ step     :@   @[<v 2>%a@]@ @  spec : @[%t@]@  annot : @[%a@]@]@ "
     m.mname.node_id
     (Utils.fprintf_list ~sep:", " Printers.pp_var) m.mmemory
     (Utils.fprintf_list ~sep:", " (fun fmt (o1, o2) -> Format.fprintf fmt "(%s, %a)" o1 pp_static_call o2)) m.minstances
     (Utils.fprintf_list ~sep:"@ " pp_instr) m.minit
     pp_step m.mstep
+    (fun fmt -> match m.mspec with | None -> () | Some spec -> Printers.pp_spec fmt spec)
+    (Utils.fprintf_list ~sep:"@ " Printers.pp_expr_annot) m.mannot
 
 (* Returns the declared stateless status and the computed one. *)
 let get_stateless_status m =
@@ -199,7 +204,8 @@ let arrow_machine =
       step_instrs = [conditional (StateVar var_state)
 			         [MStateAssign(var_state, Cst (const_of_bool false));
                                   MLocalAssign(var_output, LocalVar var_input1)]
-                                 [MLocalAssign(var_output, LocalVar var_input2)] ]
+                                 [MLocalAssign(var_output, LocalVar var_input2)] ];
+      step_asserts = [];
     };
     mspec = None;
     mannot = [];
@@ -457,6 +463,7 @@ let translate_decl nd sch =
   ;
 
   let init_args = ISet.empty, [], Utils.IMap.empty, List.fold_right (fun l -> ISet.add l) nd.node_locals ISet.empty, [] in
+  (* memories, init instructions, node calls, local variables (including memories), step instrs *)
   let m, init, j, locals, s = translate_eqs nd init_args (List.rev eqs_rev) in
   let mmap = Utils.IMap.fold (fun i n res -> (i, n)::res) j [] in
   {
@@ -479,6 +486,10 @@ let translate_decl nd sch =
 	| "horn" -> s
 	| "C" | "java" | _ -> join_guards_list s
       );
+      step_asserts = 
+	let exprl = List.map (fun assert_ -> assert_.assert_expr ) nd.node_asserts in
+	List.map (translate_expr nd init_args) exprl
+	;
     };
     mspec = nd.node_spec;
     mannot = nd.node_annot;
