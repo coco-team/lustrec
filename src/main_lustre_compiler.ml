@@ -292,13 +292,15 @@ let rec compile basename extension =
   (* DFS with modular code generation *)
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,");
   let machine_code = Machine_code.translate_prog prog node_schs in
+ (* experimental
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization@,");
+  let machine_code = Machine_code.prog_reuse_var machine_code node_schs in
+  *)
   Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
     (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
     machine_code);
 
-  (* experimental
-  let machine_code = Machine_code.prog_reuse_var machine_code node_schs in
-  *)
+ 
   (* Optimize machine code *)
   let machine_code = 
     if !Options.optimization >= 2 then
