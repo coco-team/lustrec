@@ -524,6 +524,9 @@ let rec instr_is_skip instr =
 and instrs_are_skip instrs =
   List.for_all instr_is_skip instrs
 
+let instr_cons instr cont =
+ if instr_is_skip instr then cont else instr::cont
+
 let rec instr_remove_skip instr cont =
   match instr with
   | MLocalAssign (i, LocalVar v) when i = v -> cont
@@ -544,22 +547,22 @@ let rec value_replace_var fvar value =
   | Access (t, i) -> Access(value_replace_var fvar t, i)
   | Power (v, n) -> Power(value_replace_var fvar v, n)
 
-let rec instr_replace_var fvar instr =
+let rec instr_replace_var fvar instr cont =
   match instr with
-  | MLocalAssign (i, v) -> MLocalAssign (fvar i, value_replace_var fvar v)
-  | MStateAssign (i, v) -> MStateAssign (i, value_replace_var fvar v)
-  | MReset i            -> instr
-  | MStep (il, i, vl)   -> MStep (List.map fvar il, i, List.map (value_replace_var fvar) vl)
-  | MBranch (g, hl)     -> MBranch (value_replace_var fvar g, List.map (fun (h, il) -> (h, instrs_replace_var fvar il)) hl)
+  | MLocalAssign (i, v) -> instr_cons (MLocalAssign (fvar i, value_replace_var fvar v)) cont
+  | MStateAssign (i, v) -> instr_cons (MStateAssign (i, value_replace_var fvar v)) cont
+  | MReset i            -> instr_cons instr cont
+  | MStep (il, i, vl)   -> instr_cons (MStep (List.map fvar il, i, List.map (value_replace_var fvar) vl)) cont
+  | MBranch (g, hl)     -> instr_cons (MBranch (value_replace_var fvar g, List.map (fun (h, il) -> (h, instrs_replace_var fvar il [])) hl)) cont
 
-and instrs_replace_var fvar instrs =
-  List.map (instr_replace_var fvar) instrs
+and instrs_replace_var fvar instrs cont =
+  List.fold_right (instr_replace_var fvar) instrs cont
 
 let step_replace_var fvar step =
   { step with
     step_checks = List.map (fun (l, v) -> (l, value_replace_var fvar v)) step.step_checks;
     step_locals = Utils.remove_duplicates (List.map fvar step.step_locals);
-    step_instrs = instrs_replace_var fvar step.step_instrs;
+    step_instrs = instrs_replace_var fvar step.step_instrs [];
 }
 
 let rec machine_replace_var fvar m =
@@ -568,15 +571,11 @@ let rec machine_replace_var fvar m =
   }
 
 let machine_reuse_var m reuse =
-  let reuse_vdecl = Hashtbl.create 23 in
-  begin
-    Hashtbl.iter (fun v v' -> Hashtbl.add reuse_vdecl (get_node_var v m.mname) (get_node_var v' m.mname)) reuse;
-    let fvar v =
-      try
-	Hashtbl.find reuse_vdecl v
-      with Not_found -> v in
-    machine_replace_var fvar m
-  end
+  let fvar v =
+    try
+      Hashtbl.find reuse v.var_id
+    with Not_found -> v in
+  machine_replace_var fvar m
 
 let prog_reuse_var prog node_schs =
   List.map 

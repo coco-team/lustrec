@@ -38,7 +38,7 @@ type schedule_report =
   (* the table mapping each local var to its in-degree *)
   fanin_table : (ident, int) Hashtbl.t;
   (* the table mapping each assignment to a reusable variable *)
-  reuse_table : (ident, ident) Hashtbl.t
+  reuse_table : (ident, var_decl) Hashtbl.t
 }
 
 (* Topological sort with a priority for variables belonging in the same equation lhs.

@@ -332,6 +332,7 @@ assumes:
 { [] }
 | ASSUMES qexpr SCOL assumes { $2::$4 } 
 
+/* WARNING: UNUSED RULES */
 tuple_qexpr:
 | qexpr COMMA qexpr {[$3;$1]}
 | tuple_qexpr COMMA qexpr {$3::$1}

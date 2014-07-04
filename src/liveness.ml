@@ -164,7 +164,7 @@ let pp_death_table fmt death =
      - either dirty castings
      - or complex inclusion expression (for instance: array <-> array cell, struct <-> struct field) to be able to reuse only some parts of structured data.
      ... it seems too complex and potentially unsafe
-   - for node instance calls: output variables could NOT reuse input variables, 
+   - for node instance calls: output variables could NOT reuse aliasable input variables, 
      even if inputs become dead, because the correctness would depend on the scheduling
      of the callee (so, the compiling strategy could NOT be modular anymore).
    - once a policy is set, we need to:
@@ -182,9 +182,33 @@ let replace_in_set s v v' =
 
 (* Replaces [v] by [v'] in death table [death] *)
 let replace_in_death_table death v v' =
- Hashtbl.iter (fun k dead -> Hashtbl.replace death k (replace_in_set dead v v')) death
+  begin
+    Hashtbl.remove death v;
+    Hashtbl.iter (fun k dead -> Hashtbl.replace death k (replace_in_set dead v v')) death
+  end
 
-let find_compatible_local node var dead death disjoint policy =
+let reuse_by_disjoint var reuse death disjoint =
+  begin
+    Log.report ~level:6 (fun fmt -> Format.fprintf fmt "reuse %s by disjoint %s@." var reuse.var_id);
+    Disjunction.replace_in_disjoint_map disjoint var reuse.var_id;
+    Log.report ~level:6 (fun fmt -> Format.fprintf fmt "new disjoint:%a@." Disjunction.pp_disjoint_map disjoint);
+  end
+
+
+let reuse_by_dead var reuse death disjoint =
+  begin
+    Log.report ~level:6 (fun fmt -> Format.fprintf fmt "reuse %s by dead %s@." var reuse.var_id);
+    replace_in_death_table death var reuse.var_id;
+    Log.report ~level:6 (fun fmt -> Format.fprintf fmt "new death:%a@." pp_death_table death);
+  end
+
+(* the set of really dead variables is a subset of dead vars by the death table.
+   indeed, as variables may be aliased to other variables,
+   a variable is dead only if all its disjoint-from-evaluated-var aliases are dead *)
+let dead_aliased_variables var reuse dead =
+ dead
+
+let find_compatible_local node var dead death disjoint =
  (*Format.eprintf "find_compatible_local %s %s %a@." node.node_id var pp_iset dead;*)
   let typ = (get_node_var var node).var_type in
   let eq_var = get_node_eq var node in
@@ -202,22 +226,18 @@ let find_compatible_local node var dead death disjoint policy =
       (*Format.eprintf "filter %a = %s@." Printers.pp_var_name v (if res then "true" else "false");*)
       res
     end in
-(*Format.eprintf "reuse %s@." var;*)
+Log.report ~level:6 (fun fmt -> Format.fprintf fmt "reuse %s@." var);
   try
     let disj = Hashtbl.find disjoint var in
     let reuse = List.find (filter (fun v -> ISet.mem v.var_id disj && not (ISet.mem v.var_id dead))) locals in
-(*Format.eprintf "reuse %s by %s@." var reuse.var_id;*)
-    Disjunction.replace_in_disjoint_map disjoint var reuse.var_id;
-(*Format.eprintf "new disjoint:%a@." Disjunction.pp_disjoint_map disjoint;*)
-    Hashtbl.add policy var reuse.var_id
+    reuse_by_disjoint var reuse death disjoint;
+    Some reuse
   with Not_found ->
   try
     let reuse = List.find (filter (fun v -> ISet.mem v.var_id dead)) locals in
-(*Format.eprintf "reuse %s by %s@." var reuse.var_id;*)
-    replace_in_death_table death var reuse.var_id;
-(*Format.eprintf "new death:%a@." pp_death_table death;*)
-    Hashtbl.add policy var reuse.var_id
-  with Not_found -> ()
+    reuse_by_dead var reuse death disjoint;
+    Some reuse
+  with Not_found -> None
 
 (* the reuse policy seeks to use less local variables
    by replacing local variables, applying the rules
@@ -231,24 +251,32 @@ let find_compatible_local node var dead death disjoint policy =
 *)
 let reuse_policy node sort death disjoint =
   let dead = ref ISet.empty in
+  let real_dead = ref ISet.empty in
   let policy = Hashtbl.create 23 in
-  let sort = ref sort in
+  let sort = ref [] (*sort*) in
+  let aux_vars = ExprDep.node_auxiliary_variables node in
   while !sort <> []
   do
     let head = List.hd !sort in
-    if Hashtbl.mem death head then
+    if ISet.mem head aux_vars then
       begin
-	dead := ISet.union (Hashtbl.find death head) !dead;
-      end;
-    find_compatible_local node head !dead death disjoint policy;
-    sort := List.tl !sort;
+	if Hashtbl.mem death head then
+	  begin
+	    dead := ISet.union (Hashtbl.find death head) !dead;
+	  end;
+	real_dead := ISet.empty;
+	(match find_compatible_local node head !real_dead death disjoint with
+	| Some reuse -> Hashtbl.add policy head reuse
+	| None -> ());
+	sort := List.tl !sort;
+      end
   done;
   policy
  
 let pp_reuse_policy fmt policy =
   begin
     Format.fprintf fmt "{ /* reuse policy */@.";
-    Hashtbl.iter (fun s t -> Format.fprintf fmt "%s -> %s@." s t) policy;
+    Hashtbl.iter (fun s t -> Format.fprintf fmt "%s -> %s@." s t.var_id) policy;
     Format.fprintf fmt "}@."
   end
 (* Local Variables: *)
