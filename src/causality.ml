@@ -455,7 +455,7 @@ struct
 
   (* map: var |-> list of disjoint vars, sorted in increasing branch length order,
      maybe removing shorter branches *)
-  type clock_map = (ident, ident list) Hashtbl.t
+  type disjoint_map = (ident, CISet.t) Hashtbl.t
 
   let clock_disjoint_map vdecls =
     let map = Hashtbl.create 23 in
@@ -463,32 +463,31 @@ struct
       List.iter
 	(fun v1 -> let disj_v1 =
 		     List.fold_left
-		       (fun res v2 -> if Clocks.disjoint v1.var_clock v2.var_clock then ISet.add v2.var_id res else res)
-		       ISet.empty
+		       (fun res v2 -> if Clocks.disjoint v1.var_clock v2.var_clock then CISet.add v2 res else res)
+		       CISet.empty
 		       vdecls in
 		   (* disjoint vdecls are stored in increasing branch length order *)
 		   Hashtbl.add map v1.var_id disj_v1)
 	vdecls;
-      map
+      (map : disjoint_map)
     end
 
   (* replace variable [v] by [v'] in disjunction [map]. Then:
       - the mapping v' becomes v' |-> (map v) inter (map v')
       - the mapping v |-> ... then disappears
       - other mappings become x |-> (map x) \ (if v in x then v else v')
-     
   *)
   let replace_in_disjoint_map map v v' =
     begin
-      Hashtbl.replace map v' (ISet.inter (Hashtbl.find map v) (Hashtbl.find map v'));
-      Hashtbl.remove map v;
-      Hashtbl.iter (fun x map_x -> Hashtbl.replace map x (ISet.remove (if ISet.mem v map_x then v else v') map_x)) map;
+      Hashtbl.replace map v'.var_id (CISet.inter (Hashtbl.find map v.var_id) (Hashtbl.find map v'.var_id));
+      Hashtbl.remove map v.var_id;
+      Hashtbl.iter (fun x map_x -> Hashtbl.replace map x (CISet.remove (if CISet.mem v map_x then v else v') map_x)) map;
     end
 
   let pp_disjoint_map fmt map =
     begin
       Format.fprintf fmt "{ /* disjoint map */@.";
-      Hashtbl.iter (fun k v -> Format.fprintf fmt "%s # { %a }@." k (Utils.fprintf_list ~sep:", " Format.pp_print_string) (ISet.elements v)) map;
+      Hashtbl.iter (fun k v -> Format.fprintf fmt "%s # { %a }@." k (Utils.fprintf_list ~sep:", " Printers.pp_var_name) (CISet.elements v)) map;
       Format.fprintf fmt "}@."
     end
 end

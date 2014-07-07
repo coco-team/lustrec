@@ -91,7 +91,7 @@ let cone_of_influence g var =
  done;
  !coi
 
-let compute_unused n g =
+let compute_unused_variables n g =
   let inputs = ExprDep.node_input_variables n in
   let mems = ExprDep.node_memory_variables n in
   let outputs = ExprDep.node_output_variables n in
@@ -100,63 +100,108 @@ let compute_unused n g =
     (ISet.union outputs mems)
     (ISet.union inputs mems) 
 
-(* Computes the set of (input and) output and mem variables of [node].
-   We try to reuse input variables, due to C parameter copying semantics. *)
+(* Computes the set of output and mem variables of [node].
+   We don't reuse input variables, due to possible aliasing *)
 let node_non_locals node =
- List.fold_left (fun non_loc v -> ISet.add v.var_id non_loc) (ExprDep.node_memory_variables node) node.node_outputs
+  let mems = ExprDep.node_memory_variables node in
+ List.fold_left (fun non_loc v -> if ISet.mem v.var_id mems then non_loc else ISet.add v.var_id non_loc) (ExprDep.node_output_variables node) node.node_locals
 
-(* Recursively removes useless local variables,
-   i.e. variables in [non_locals] that are current roots of the dep graph [g] *)
-let remove_local_roots non_locals g =
+(* checks whether a variable is aliasable,
+   depending on its (address) type *)
+let is_aliasable var =
+ Types.is_address_type var.var_type
+ 
+(* computes the set of potentially reusable variables.
+   We don't reuse input variables, due to possible aliasing *)
+let node_reusable_variables node =
+  let mems = ExprDep.node_memory_variables node in
+  List.fold_left
+    (fun acc l ->
+      if ISet.mem l.var_id mems then acc else Disjunction.CISet.add l acc)
+    Disjunction.CISet.empty
+    node.node_locals
+
+(* Recursively removes useless variables,
+   i.e. variables that are current roots of the dep graph [g]
+   and returns [reusable] such roots *)
+let remove_local_roots reusable g =
   let rem = ref true in
-  let roots = ref ISet.empty in
+  let roots = ref Disjunction.CISet.empty in
   while !rem
   do
     rem := false;
-    let local_roots = List.filter (fun v -> not (ISet.mem v non_locals)) (graph_roots g) in
-    if local_roots <> [] then
+    let new_roots = graph_roots g in
+    let reusable_roots = Disjunction.CISet.filter (fun v -> List.mem v.var_id new_roots) reusable in
+    if not (Disjunction.CISet.is_empty reusable_roots) then
       begin
 	rem := true;
-	List.iter (IdentDepGraph.remove_vertex g) local_roots;
-	roots := List.fold_left (fun roots v -> if ExprDep.is_instance_var v then roots else ISet.add v roots) !roots local_roots 
+	Disjunction.CISet.iter (fun v -> IdentDepGraph.remove_vertex g v.var_id) reusable_roots;
+	roots := Disjunction.CISet.union reusable_roots !roots
       end
   done;
   !roots
 
-(* Computes the death table of [node] wrt dep graph [g] and topological [sort].
-   The death table is a mapping: ident -> Set(ident) such that:
-   death x is the set of local variables which get dead (i.e. unused) 
-   before x is evaluated, but were until live.
-   If death x is not defined, then x is useless.
+(* checks whether a variable [v] is an input of the [var] equation, with an address type.
+   if so, [var] could not safely reuse/alias [v], should [v] be dead in the caller node,
+   because [v] may not be dead in the callee node when [var] is assigned *)
+let is_aliasable_input node var =
+  let eq_var = get_node_eq var node in
+  let inputs_var =
+    match NodeDep.get_callee eq_var.eq_rhs with
+    | None           -> []
+    | Some (_, args) -> List.fold_right (fun e r -> match e.expr_desc with Expr_ident id -> id::r | _ -> r) args [] in
+  fun v -> Types.is_address_type v.var_type && List.mem v.var_id inputs_var
+
+(* merges two variables [v] and [v'] of graph [g].
+   [v] is replaced by [v']
 *)
-let death_table node g sort =
-  let non_locals = node_non_locals node in
-  let death = Hashtbl.create 23 in
-  let sort  = ref sort in
+let merge_in_dep_graph v v' g =
   begin
-    while (!sort <> [])
-    do
-      let head = List.hd !sort in
-      (* If current var is not already dead, i.e. useless *)
-      if IdentDepGraph.mem_vertex g head then
-	begin
-	  IdentDepGraph.iter_succ (IdentDepGraph.remove_edge g head) g head;
-	  let dead = remove_local_roots non_locals g in
-	  Hashtbl.add death head dead
-	end;
-      sort := List.tl !sort
-    done;
-    IdentDepGraph.clear g;
-    death
+    IdentDepGraph.add_vertex g v';
+    IdentDepGraph.iter_succ (fun s -> IdentDepGraph.add_edge g v' s) g v;
+    IdentDepGraph.iter_pred (fun p -> IdentDepGraph.add_edge g p v') g v;
+    IdentDepGraph.remove_vertex g v
   end
 
-let pp_death_table fmt death =
+(* computes the dead dependencies of variable [var] in graph [g],
+   once [var] has been evaluated *)
+let compute_dead_dependencies reusable var g dead =
   begin
-    Format.fprintf fmt "{ /* death table */@.";
-    Hashtbl.iter (fun s t -> Format.fprintf fmt "%s -> { %a }@." s (Utils.fprintf_list ~sep:", " Format.pp_print_string) (ISet.elements t)) death;
-    Format.fprintf fmt "}@."
+    IdentDepGraph.iter_succ (IdentDepGraph.remove_edge g var) g var;
+    dead := Disjunction.CISet.union (remove_local_roots reusable g) !dead;
   end
 
+let compute_reuse_policy node schedule disjoint g =
+  let reusable = node_reusable_variables node in
+  let sort = ref schedule in
+  let dead = ref Disjunction.CISet.empty in
+  let policy = Hashtbl.create 23 in
+  while false (*!sort <> []*)
+  do
+    let head = get_node_var (List.hd !sort) node in
+    compute_dead_dependencies reusable head.var_id g dead;
+    let aliasable = is_aliasable_input node head.var_id in
+    let eligible v = Typing.eq_ground head.var_type v.var_type && not (aliasable v) in
+    let reuse =
+      try
+	let disj = Hashtbl.find disjoint head.var_id in
+	Disjunction.CISet.max_elt (Disjunction.CISet.filter (fun v -> (eligible v) && not (Disjunction.CISet.mem v !dead)) disj)
+      with Not_found ->
+      try
+	Disjunction.CISet.choose (Disjunction.CISet.filter (fun v -> eligible v) !dead)
+      with Not_found -> head in
+    dead := Disjunction.CISet.remove reuse !dead;
+    Disjunction.replace_in_disjoint_map disjoint head reuse;
+    merge_in_dep_graph head.var_id reuse.var_id g;
+    Hashtbl.add policy head.var_id reuse;
+    Log.report ~level:6 (fun fmt -> Format.fprintf fmt "reuse %s instead of %s@." reuse.var_id head.var_id);
+    Log.report ~level:6 (fun fmt -> Format.fprintf fmt "new disjoint:%a@." Disjunction.pp_disjoint_map disjoint);
+    Log.report ~level:6 
+      (fun fmt -> Format.fprintf fmt "new dependency graph:%a@." pp_dep_graph g);
+    sort := List.tl !sort;
+  done;
+  IdentDepGraph.clear g;
+  policy
 
 (* Reuse policy:
    - could reuse variables with the same type exactly only (simple).
@@ -176,68 +221,6 @@ let pp_death_table fmt death =
      - such simplifications are, until now, only expressible at the C source level...
  *)
 
-(* Replaces [v] by [v'] in set [s] *)
-let replace_in_set s v v' =
-  if ISet.mem v s then ISet.add v' (ISet.remove v s) else s
-
-(* Replaces [v] by [v'] in death table [death] *)
-let replace_in_death_table death v v' =
-  begin
-    Hashtbl.remove death v;
-    Hashtbl.iter (fun k dead -> Hashtbl.replace death k (replace_in_set dead v v')) death
-  end
-
-let reuse_by_disjoint var reuse death disjoint =
-  begin
-    Log.report ~level:6 (fun fmt -> Format.fprintf fmt "reuse %s by disjoint %s@." var reuse.var_id);
-    Disjunction.replace_in_disjoint_map disjoint var reuse.var_id;
-    Log.report ~level:6 (fun fmt -> Format.fprintf fmt "new disjoint:%a@." Disjunction.pp_disjoint_map disjoint);
-  end
-
-
-let reuse_by_dead var reuse death disjoint =
-  begin
-    Log.report ~level:6 (fun fmt -> Format.fprintf fmt "reuse %s by dead %s@." var reuse.var_id);
-    replace_in_death_table death var reuse.var_id;
-    Log.report ~level:6 (fun fmt -> Format.fprintf fmt "new death:%a@." pp_death_table death);
-  end
-
-(* the set of really dead variables is a subset of dead vars by the death table.
-   indeed, as variables may be aliased to other variables,
-   a variable is dead only if all its disjoint-from-evaluated-var aliases are dead *)
-let dead_aliased_variables var reuse dead =
- dead
-
-let find_compatible_local node var dead death disjoint =
- (*Format.eprintf "find_compatible_local %s %s %a@." node.node_id var pp_iset dead;*)
-  let typ = (get_node_var var node).var_type in
-  let eq_var = get_node_eq var node in
-  let locals = node.node_locals in
-  let aliasable_inputs =
-    match NodeDep.get_callee eq_var.eq_rhs with
-    | None           -> []
-    | Some (_, args) -> List.fold_right (fun e r -> match e.expr_desc with Expr_ident id -> id::r | _ -> r) args [] in
-  let filter base (v : var_decl) =
-    let res =
-       base v
-    && Typing.eq_ground typ v.var_type
-    && not (Types.is_address_type v.var_type && List.mem v.var_id aliasable_inputs) in
-    begin
-      (*Format.eprintf "filter %a = %s@." Printers.pp_var_name v (if res then "true" else "false");*)
-      res
-    end in
-Log.report ~level:6 (fun fmt -> Format.fprintf fmt "reuse %s@." var);
-  try
-    let disj = Hashtbl.find disjoint var in
-    let reuse = List.find (filter (fun v -> ISet.mem v.var_id disj && not (ISet.mem v.var_id dead))) locals in
-    reuse_by_disjoint var reuse death disjoint;
-    Some reuse
-  with Not_found ->
-  try
-    let reuse = List.find (filter (fun v -> ISet.mem v.var_id dead)) locals in
-    reuse_by_dead var reuse death disjoint;
-    Some reuse
-  with Not_found -> None
 
 (* the reuse policy seeks to use less local variables
    by replacing local variables, applying the rules
@@ -249,30 +232,7 @@ Log.report ~level:6 (fun fmt -> Format.fprintf fmt "reuse %s@." var);
     - with the same type
     - not aliasable (i.e. address type)
 *)
-let reuse_policy node sort death disjoint =
-  let dead = ref ISet.empty in
-  let real_dead = ref ISet.empty in
-  let policy = Hashtbl.create 23 in
-  let sort = ref [] (*sort*) in
-  let aux_vars = ExprDep.node_auxiliary_variables node in
-  while !sort <> []
-  do
-    let head = List.hd !sort in
-    if ISet.mem head aux_vars then
-      begin
-	if Hashtbl.mem death head then
-	  begin
-	    dead := ISet.union (Hashtbl.find death head) !dead;
-	  end;
-	real_dead := ISet.empty;
-	(match find_compatible_local node head !real_dead death disjoint with
-	| Some reuse -> Hashtbl.add policy head reuse
-	| None -> ());
-	sort := List.tl !sort;
-      end
-  done;
-  policy
- 
+
 let pp_reuse_policy fmt policy =
   begin
     Format.fprintf fmt "{ /* reuse policy */@.";
