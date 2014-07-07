@@ -127,7 +127,7 @@ let schedule_node n =
     let n', g = global_dependency n in
     Log.report ~level:5 
       (fun fmt -> 
-	Format.eprintf 
+	Format.fprintf fmt
 	  "dependency graph for node %s: %a" 
 	  n'.node_id
 	  pp_dep_graph g
@@ -141,31 +141,23 @@ let schedule_node n =
 
     let gg = IdentDepGraph.copy g in
     let sort = topological_sort eq_equiv g in
-    let unused = Liveness.compute_unused n gg in
+    let unused = Liveness.compute_unused_variables n gg in
     let fanin = Liveness.compute_fanin n gg in
-    let death = Liveness.death_table n gg sort in
-    Log.report ~level:5 
-      (fun fmt -> 
-	Format.eprintf 
-	  "death table for node %s: %a" 
-	  n'.node_id
-	  Liveness.pp_death_table death
-      );
 
     let disjoint = Disjunction.clock_disjoint_map (get_node_vars n) in
     
     Log.report ~level:5 
       (fun fmt -> 
-	Format.eprintf 
+	Format.fprintf fmt
 	  "clock disjoint map for node %s: %a" 
 	  n'.node_id
 	  Disjunction.pp_disjoint_map disjoint
       );
 
-    let reuse = Liveness.reuse_policy n sort death disjoint in
+    let reuse = Liveness.compute_reuse_policy n sort disjoint gg in
     Log.report ~level:5 
       (fun fmt -> 
-	Format.eprintf 
+	Format.fprintf fmt
 	  "reuse policy for node %s: %a" 
 	  n'.node_id
 	  Liveness.pp_reuse_policy reuse
