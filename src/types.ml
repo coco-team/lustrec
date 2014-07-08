@@ -239,11 +239,6 @@ let is_tuple_type ty =
  | Ttuple _         -> true
  | _                -> false
 
-let rec is_nested_tuple_type ty =
- match (repr ty).tdesc with
- | Ttuple tl        -> List.exists is_tuple_type tl
- | _                -> false
-
 let map_tuple_type f ty =
   let ty = dynamic_type ty in
   match ty.tdesc with

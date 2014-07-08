@@ -457,6 +457,13 @@ struct
      maybe removing shorter branches *)
   type disjoint_map = (ident, CISet.t) Hashtbl.t
 
+  let pp_ciset fmt t =
+    begin
+      Format.fprintf fmt "{@ ";
+      CISet.iter (fun s -> Format.fprintf fmt "%a@ " Printers.pp_var_name s) t;
+      Format.fprintf fmt "}@."
+    end
+
   let clock_disjoint_map vdecls =
     let map = Hashtbl.create 23 in
     begin

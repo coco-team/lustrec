@@ -65,7 +65,7 @@ let unfold_arrow expr =
  match expr.expr_desc with
  | Expr_arrow (e1, e2) ->
     let loc = expr.expr_loc in
-    let ck = expr.expr_clock in
+    let ck = List.hd (Clocks.clock_list_of_clock expr.expr_clock) in
     { expr with expr_desc = Expr_ite (expr_once loc ck, e1, e2) }
  | _                   -> assert false
 
@@ -129,6 +129,7 @@ let unfold_offsets e offsets =
 
 (* Create an alias for [expr], if none exists yet *)
 let mk_expr_alias node (defs, vars) expr =
+(*Format.eprintf "mk_expr_alias %a %a %a@." Printers.pp_expr expr Types.print_ty expr.expr_type Clocks.print_ck expr.expr_clock;*)
   match get_expr_alias defs expr with
   | Some eq ->
     let aliases = List.map (fun id -> List.find (fun v -> v.var_id = id) vars) eq.eq_lhs in
@@ -387,15 +388,17 @@ let normalize_node node =
   *)
   let diff_vars = List.filter (fun v -> not (List.mem v node.node_locals) ) new_locals in
   let norm_traceability = {
-    annots = 
+    annots =
       List.map 
 	(fun v -> 
 	  let expr = substitute_expr diff_vars defs (
-	    let eq = List.find (fun eq -> eq.eq_lhs = [v.var_id]) defs in
+	    let eq = try
+		       List.find (fun eq -> eq.eq_lhs = [v.var_id]) defs 
+	      with Not_found -> (Format.eprintf "var not found %s@." v.var_id; assert false) in
 	    eq.eq_rhs) in 
 	  let pair = mkeexpr expr.expr_loc (mkexpr expr.expr_loc (Expr_tuple [expr_of_ident v.var_id expr.expr_loc; expr])) in 
 	  ["horn_backend";"trace"], pair 
-    ) 
+	)
     diff_vars ;
     annot_loc = Location.dummy_loc
   }

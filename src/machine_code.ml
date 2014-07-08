@@ -271,21 +271,6 @@ and join_guards inst1 insts2 =
 let join_guards_list insts =
  List.fold_right join_guards insts []
 
-let find_eq x eqs =
-  let rec aux accu eqs =
-      match eqs with
-	| [] ->
-	  begin
-	    Format.eprintf "Looking for variable %a in the following equations@.%a@."
-	      Format.pp_print_string x
-	      Printers.pp_node_eqs eqs;
-	    assert false
-	  end
-	| hd::tl -> 
-	  if List.mem x hd.eq_lhs then hd, accu@tl else aux (hd::accu) tl
-    in
-    aux [] eqs
-
 (* specialize predefined (polymorphic) operators
    wrt their instances, so that the C semantics 
    is preserved *)
@@ -430,12 +415,53 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       assert false
     end
 
+let find_eq xl eqs =
+  let rec aux accu eqs =
+      match eqs with
+	| [] ->
+	  begin
+	    Format.eprintf "Looking for variables %a in the following equations@.%a@."
+	      (Utils.fprintf_list ~sep:" , " (fun fmt v -> Format.fprintf fmt "%s" v)) xl
+	      Printers.pp_node_eqs eqs;
+	    assert false
+	  end
+	| hd::tl -> 
+	  if List.exists (fun x -> List.mem x hd.eq_lhs) xl then hd, accu@tl else aux (hd::accu) tl
+    in
+    aux [] eqs
+
+(* Sort the set of equations of node [nd] according 
+   to the computed schedule [sch]
+*)
+let sort_equations_from_schedule nd sch =
+  let split_eqs = Splitting.tuple_split_eq_list nd.node_eqs in
+  let eqs_rev, remainder =
+    List.fold_left 
+      (fun (accu, node_eqs_remainder) vl -> 
+       if List.exists (fun eq -> List.exists (fun v -> List.mem v eq.eq_lhs) vl) accu
+       then
+	 (accu, node_eqs_remainder)
+       else
+	 let eq_v, remainder = find_eq vl node_eqs_remainder in
+	 eq_v::accu, remainder
+      ) 
+      ([], split_eqs) 
+      sch 
+  in
+  if List.length remainder > 0 then (
+    Format.eprintf "Equations not used are@.%a@.Full equation set is:@.%a@.@?"
+		   Printers.pp_node_eqs remainder
+      		   Printers.pp_node_eqs nd.node_eqs;
+    assert false);
+  List.rev eqs_rev
+
 let translate_eqs node args eqs =
   List.fold_right (fun eq args -> translate_eq node args eq) eqs args;;
 
 let translate_decl nd sch =
   (*Log.report ~level:1 (fun fmt -> Printers.pp_node fmt nd);*)
-  let split_eqs = Splitting.tuple_split_eq_list nd.node_eqs in
+
+(*
   let eqs_rev, remainder = 
     List.fold_left 
       (fun (accu, node_eqs_remainder) v -> 
@@ -455,16 +481,12 @@ let translate_decl nd sch =
       ([], split_eqs) 
       sch 
   in
-  if List.length remainder > 0 then (
-    Format.eprintf "Equations not used are@.%a@.Full equation set is:@.%a@.@?"
-	    Printers.pp_node_eqs remainder
-      	    Printers.pp_node_eqs nd.node_eqs;
-    assert false )
-  ;
+ *)
+  let sorted_eqs = sort_equations_from_schedule nd sch in
 
   let init_args = ISet.empty, [], Utils.IMap.empty, List.fold_right (fun l -> ISet.add l) nd.node_locals ISet.empty, [] in
   (* memories, init instructions, node calls, local variables (including memories), step instrs *)
-  let m, init, j, locals, s = translate_eqs nd init_args (List.rev eqs_rev) in
+  let m, init, j, locals, s = translate_eqs nd init_args sorted_eqs in
   let mmap = Utils.IMap.fold (fun i n res -> (i, n)::res) j [] in
   {
     mname = nd;

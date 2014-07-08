@@ -32,7 +32,7 @@ open Causality
 type schedule_report =
 {
   (* a schedule computed wrt the dependency graph *)
-  schedule : ident list;
+  schedule : ident list list;
   (* the set of unused variables (no output or mem depends on them) *)
   unused_vars : ISet.t;
   (* the table mapping each local var to its in-degree *)
@@ -51,6 +51,12 @@ type schedule_report =
    - [frontier] is the set of unsorted root variables so far, not belonging in [pending]
    - [sort] is the resulting topological order
 *)
+
+(* Checks whether the currently scheduled variable [choice]
+   is an output of a call, possibly among others *)
+let is_call_output choice g =
+  List.for_all ExprDep.is_instance_var (IdentDepGraph.succ g choice)
+
 (* Adds successors of [v] in graph [g] in [pending] or [frontier] sets, wrt [eq_equiv],
    then removes [v] from [g] 
 *)
@@ -71,7 +77,7 @@ let add_successors eq_equiv g v pending frontier =
 (* Chooses the next var to be sorted, taking priority into account.
    Modifies [pending] and [frontier] accordingly.
 *)
-let next_element eq_equiv g sort pending frontier =
+let next_element eq_equiv g sort call pending frontier =
   begin
     if ISet.is_empty !pending
     then
@@ -82,8 +88,10 @@ let next_element eq_equiv g sort pending frontier =
 	let (p, f) = ISet.partition (eq_equiv choice) !frontier in
 	pending := p;
 	frontier := f;
+	call := is_call_output choice g;
 	add_successors eq_equiv g choice pending frontier;
-	if not (ExprDep.is_ghost_var choice) then sort := choice :: !sort
+	if not (ExprDep.is_ghost_var choice)
+	then sort := [choice] :: !sort
       end
     else
       begin
@@ -91,7 +99,10 @@ let next_element eq_equiv g sort pending frontier =
       (*Format.eprintf "-2-> %s@." choice;*)
 	pending := ISet.remove choice !pending;
 	add_successors eq_equiv g choice pending frontier;
-	if not (ExprDep.is_ghost_var choice) then sort := choice :: !sort
+	if not (ExprDep.is_ghost_var choice)
+	then sort := (if !call
+		      then (choice :: List.hd !sort) :: List.tl !sort
+		      else [choice] :: !sort)
       end
   end
 
@@ -101,6 +112,7 @@ let next_element eq_equiv g sort pending frontier =
 let topological_sort eq_equiv g =
   let roots = graph_roots g in
   assert (roots <> []);
+  let call = ref false in
   let frontier = ref (List.fold_right ISet.add roots ISet.empty) in
   let pending = ref ISet.empty in
   let sorted = ref [] in
@@ -110,7 +122,7 @@ let topological_sort eq_equiv g =
       (*Format.eprintf "frontier = {%a}, pending = {%a}@."
 	(fun fmt -> ISet.iter (fun e -> Format.pp_print_string fmt e)) !frontier
 	(fun fmt -> ISet.iter (fun e -> Format.pp_print_string fmt e)) !pending;*)
-      next_element eq_equiv g sorted pending frontier;
+      next_element eq_equiv g sorted call pending frontier;
     done;
     IdentDepGraph.clear g;
     !sorted
@@ -146,7 +158,7 @@ let schedule_node n =
 
     let disjoint = Disjunction.clock_disjoint_map (get_node_vars n) in
     
-    Log.report ~level:5 
+    Log.report ~level:2 
       (fun fmt -> 
 	Format.fprintf fmt
 	  "clock disjoint map for node %s: %a" 
@@ -154,8 +166,8 @@ let schedule_node n =
 	  Disjunction.pp_disjoint_map disjoint
       );
 
-    let reuse = Liveness.compute_reuse_policy n sort disjoint gg in
-    Log.report ~level:5 
+    let reuse = Hashtbl.create 23 (*Liveness.compute_reuse_policy n sort disjoint gg*) in
+    Log.report ~level:2 
       (fun fmt -> 
 	Format.fprintf fmt
 	  "reuse policy for node %s: %a" 
@@ -181,12 +193,18 @@ let schedule_prog prog =
     prog
     ([],IMap.empty)
 
+let pp_eq_schedule fmt vl =
+  match vl with
+  | []  -> assert false
+  | [v] -> Format.fprintf fmt "%s" v
+  | _   -> Format.fprintf fmt "(%a)" (fprintf_list ~sep:" , " (fun fmt v -> Format.fprintf fmt "%s" v)) vl
+ 
 let pp_schedule fmt node_schs =
  IMap.iter
    (fun nd report ->
      Format.fprintf fmt "%s schedule: %a@."
        nd
-       (fprintf_list ~sep:" ; " (fun fmt v -> Format.fprintf fmt "%s" v)) report.schedule)
+       (fprintf_list ~sep:" ; " pp_eq_schedule) report.schedule)
    node_schs
 
 let pp_fanin_table fmt node_schs =

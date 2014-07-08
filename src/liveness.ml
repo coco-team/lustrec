@@ -98,19 +98,8 @@ let compute_unused_variables n g =
   ISet.fold
     (fun var unused -> ISet.diff unused (cone_of_influence g var))
     (ISet.union outputs mems)
-    (ISet.union inputs mems) 
+    (ISet.union inputs mems)
 
-(* Computes the set of output and mem variables of [node].
-   We don't reuse input variables, due to possible aliasing *)
-let node_non_locals node =
-  let mems = ExprDep.node_memory_variables node in
- List.fold_left (fun non_loc v -> if ISet.mem v.var_id mems then non_loc else ISet.add v.var_id non_loc) (ExprDep.node_output_variables node) node.node_locals
-
-(* checks whether a variable is aliasable,
-   depending on its (address) type *)
-let is_aliasable var =
- Types.is_address_type var.var_type
- 
 (* computes the set of potentially reusable variables.
    We don't reuse input variables, due to possible aliasing *)
 let node_reusable_variables node =
@@ -123,15 +112,15 @@ let node_reusable_variables node =
 
 (* Recursively removes useless variables,
    i.e. variables that are current roots of the dep graph [g]
-   and returns [reusable] such roots *)
-let remove_local_roots reusable g =
+   and returns [locals] and [evaluated] such roots *)
+let remove_local_roots locals evaluated g =
   let rem = ref true in
   let roots = ref Disjunction.CISet.empty in
   while !rem
   do
     rem := false;
     let new_roots = graph_roots g in
-    let reusable_roots = Disjunction.CISet.filter (fun v -> List.mem v.var_id new_roots) reusable in
+    let reusable_roots = Disjunction.CISet.filter (fun v -> (List.mem v.var_id new_roots) && (Disjunction.CISet.mem v locals)) evaluated in
     if not (Disjunction.CISet.is_empty reusable_roots) then
       begin
 	rem := true;
@@ -141,6 +130,11 @@ let remove_local_roots reusable g =
   done;
   !roots
 
+(* checks whether a variable is aliasable,
+   depending on its (address) type *)
+let is_aliasable var =
+ Types.is_address_type var.var_type
+ 
 (* checks whether a variable [v] is an input of the [var] equation, with an address type.
    if so, [var] could not safely reuse/alias [v], should [v] be dead in the caller node,
    because [v] may not be dead in the callee node when [var] is assigned *)
@@ -163,40 +157,46 @@ let merge_in_dep_graph v v' g =
     IdentDepGraph.remove_vertex g v
   end
 
-(* computes the dead dependencies of variable [var] in graph [g],
-   once [var] has been evaluated *)
-let compute_dead_dependencies reusable var g dead =
+(* computes the reusable dependencies of variable [var] in graph [g],
+   once [var] has been evaluated
+   [dead] is the set of evaluated and dead variables
+   [eval] is the set of evaluated variables
+*)
+let compute_reusable_dependencies locals evaluated reusable var g =
   begin
-    IdentDepGraph.iter_succ (IdentDepGraph.remove_edge g var) g var;
-    dead := Disjunction.CISet.union (remove_local_roots reusable g) !dead;
+    Log.report ~level:2 (fun fmt -> Format.fprintf fmt "compute_reusable_dependencies %a %a %a %a %a@." Disjunction.pp_ciset locals Disjunction.pp_ciset !evaluated Disjunction.pp_ciset !reusable Printers.pp_var_name var pp_dep_graph g);
+    evaluated := Disjunction.CISet.add var !evaluated;
+    IdentDepGraph.iter_succ (IdentDepGraph.remove_edge g var.var_id) g var.var_id;
+    reusable := Disjunction.CISet.union (remove_local_roots locals !evaluated g) !reusable;
   end
 
 let compute_reuse_policy node schedule disjoint g =
-  let reusable = node_reusable_variables node in
+  let locals = node_reusable_variables node in
   let sort = ref schedule in
-  let dead = ref Disjunction.CISet.empty in
+  let evaluated = ref Disjunction.CISet.empty in
+  let reusable = ref Disjunction.CISet.empty in
   let policy = Hashtbl.create 23 in
-  while false (*!sort <> []*)
+  while !sort <> []
   do
     let head = get_node_var (List.hd !sort) node in
-    compute_dead_dependencies reusable head.var_id g dead;
+    compute_reusable_dependencies locals evaluated reusable head g;
     let aliasable = is_aliasable_input node head.var_id in
     let eligible v = Typing.eq_ground head.var_type v.var_type && not (aliasable v) in
     let reuse =
       try
 	let disj = Hashtbl.find disjoint head.var_id in
-	Disjunction.CISet.max_elt (Disjunction.CISet.filter (fun v -> (eligible v) && not (Disjunction.CISet.mem v !dead)) disj)
+	Disjunction.CISet.max_elt (Disjunction.CISet.filter (fun v -> (eligible v) && (Disjunction.CISet.mem v !evaluated) && not (Disjunction.CISet.mem v !reusable)) disj)
       with Not_found ->
       try
-	Disjunction.CISet.choose (Disjunction.CISet.filter (fun v -> eligible v) !dead)
+	Disjunction.CISet.choose (Disjunction.CISet.filter (fun v -> eligible v) !reusable)
       with Not_found -> head in
-    dead := Disjunction.CISet.remove reuse !dead;
+    reusable := Disjunction.CISet.remove reuse !reusable;
     Disjunction.replace_in_disjoint_map disjoint head reuse;
     merge_in_dep_graph head.var_id reuse.var_id g;
     Hashtbl.add policy head.var_id reuse;
-    Log.report ~level:6 (fun fmt -> Format.fprintf fmt "reuse %s instead of %s@." reuse.var_id head.var_id);
-    Log.report ~level:6 (fun fmt -> Format.fprintf fmt "new disjoint:%a@." Disjunction.pp_disjoint_map disjoint);
-    Log.report ~level:6 
+    Log.report ~level:2 (fun fmt -> Format.fprintf fmt "reuse %s instead of %s@." reuse.var_id head.var_id);
+    Log.report ~level:1 (fun fmt -> Format.fprintf fmt "new disjoint:%a@." Disjunction.pp_disjoint_map disjoint);
+    Log.report ~level:2 
       (fun fmt -> Format.fprintf fmt "new dependency graph:%a@." pp_dep_graph g);
     sort := List.tl !sort;
   done;
