@@ -664,6 +664,7 @@ and clock_expr ?(nocarrier=true) env expr =
   | Expr_fby (e1,e2)
   | Expr_arrow (e1,e2) ->
     let ck = clock_standard_args env [e1; e2] in
+    unify_tuple_clock None ck;
     expr.expr_clock <- ck;
     ck
   | Expr_pre e -> (* todo : deal with phases as in tail ? *)

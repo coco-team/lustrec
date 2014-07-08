@@ -244,33 +244,6 @@ let try_unify ?(sub=false) ?(semi=false) ty1 ty2 loc =
   | Dimension.Unify _ ->
     raise (Error (loc, Type_clash (ty1,ty2)))
 
-(* ty1 is a subtype of ty2 *)
-(*
-let rec sub_unify sub ty1 ty2 =
-  match (repr ty1).tdesc, (repr ty2).tdesc with
-  | Ttuple tl1         , Ttuple tl2         ->
-    if List.length tl1 <> List.length tl2
-    then raise (Unify (ty1, ty2))
-    else List.iter2 (sub_unify sub) tl1 tl2
-  | Ttuple [t1]        , _                  -> sub_unify sub t1 ty2
-  | _                  , Ttuple [t2]        -> sub_unify sub ty1 t2
-  | Tstruct tl1        , Tstruct tl2        ->
-    if List.map fst tl1 <> List.map fst tl2
-    then raise (Unify (ty1, ty2))
-    else List.iter2 (fun (_, t1) (_, t2) -> sub_unify sub t1 t2) tl1 tl2
-  | Tclock t1          , Tclock t2          -> sub_unify sub t1 t2
-  | Tclock t1          , _   when sub       -> sub_unify sub t1 ty2
-  | Tstatic (d1, t1)   , Tstatic (d2, t2)   ->
-    begin
-      sub_unify sub t1 t2;
-      Dimension.eval Basic_library.eval_env (fun c -> None) d1;
-      Dimension.eval Basic_library.eval_env (fun c -> None) d2;
-      Dimension.unify d1 d2
-    end
-  | Tstatic (r_d, t1)  , _         when sub -> sub_unify sub t1 ty2
-  | _                                       -> unify ty1 ty2
-*)
-
 let rec type_struct_const_field loc (label, c) =
   if Hashtbl.mem field_table label
   then let tydec = Hashtbl.find field_table label in
@@ -330,38 +303,27 @@ let check_constant loc const_expected const_real =
   if const_expected && not const_real
   then raise (Error (loc, Not_a_constant))
 
-let rec type_standard_args env in_main const expr_list =
-  let ty_list =
-    List.map
-      (fun e -> let ty = dynamic_type (type_expr env in_main const e) in
-		match get_clock_base_type ty with
-		| None    -> ty
-		| Some ty -> ty)
-      expr_list in
-  let ty_res = new_var () in
-  List.iter2 (fun e ty -> try_unify ty_res ty e.expr_loc) expr_list ty_list;
-  ty_res
+let rec type_add_const env const arg targ =
+  if const
+  then let d =
+	 if is_dimension_type targ
+	 then dimension_of_expr arg
+	 else Dimension.mkdim_var () in
+       let eval_const id = Types.get_static_value (Env.lookup_value (fst env) id) in
+       Dimension.eval Basic_library.eval_env eval_const d;
+       let real_static_type = Type_predef.type_static d (Types.dynamic_type targ) in
+       (match Types.get_static_value targ with
+       | None    -> ()
+       | Some d' -> try_unify targ real_static_type arg.expr_loc);
+       real_static_type
+  else targ
 
 (* emulates a subtyping relation between types t and (d : t),
    used during node applications and assignments *)
 and type_subtyping_arg env in_main ?(sub=true) const real_arg formal_type =
   let loc = real_arg.expr_loc in
   let const = const || (Types.get_static_value formal_type <> None) in
-  let real_type = type_expr env in_main const real_arg in
-  let real_type =
-    if const
-    then let d =
-	   if is_dimension_type real_type
-	   then dimension_of_expr real_arg
-	   else Dimension.mkdim_var () in
-	 let eval_const id = Types.get_static_value (Env.lookup_value (fst env) id) in
-	 Dimension.eval Basic_library.eval_env eval_const d;
-	 let real_static_type = Type_predef.type_static d (Types.dynamic_type real_type) in
-	 (match Types.get_static_value real_type with
-	 | None    -> ()
-	 | Some d' -> try_unify real_type real_static_type loc);
-	 real_static_type
-    else real_type in
+  let real_type = type_add_const env const real_arg (type_expr env in_main const real_arg) in
   (*Format.eprintf "subtyping const %B real %a:%a vs formal %a@." const Printers.pp_expr real_arg Types.print_ty real_type Types.print_ty formal_type;*)
   try_unify ~sub:sub formal_type real_type loc
 
@@ -375,27 +337,42 @@ and type_ident env in_main loc const id =
    it in many calls
 *)
 and type_appl env in_main loc const f args =
-  let args = expr_list_of_expr args in
-  if Basic_library.is_internal_fun f && List.exists is_tuple_expr args
+  let targs = List.map (type_expr env in_main const) args in
+  if Basic_library.is_internal_fun f && List.exists is_tuple_type targs
   then
     try
-      let args = Utils.transpose_list (List.map expr_list_of_expr args) in
-      Types.type_of_type_list (List.map (type_call env in_main loc const f) args)
+      let targs = Utils.transpose_list (List.map type_list_of_type targs) in
+      Types.type_of_type_list (List.map (type_simple_call env in_main loc const f) targs)
     with
       Utils.TransposeError (l, l') -> raise (Error (loc, WrongMorphism (l, l')))
   else
-    type_call env in_main loc const f args
+    type_dependent_call env in_main loc const f (List.combine args targs)
 
-(* type a (single) call. [args] is here a list of arguments. *)
-and type_call env in_main loc const f args =
+(* type a call with possible dependent types. [targs] is here a list of (argument, type) pairs. *)
+and type_dependent_call env in_main loc const f targs =
   let tins, touts = new_var (), new_var () in
   let tfun = Type_predef.type_arrow tins touts in
   type_subtyping_arg env in_main const (expr_of_ident f loc) tfun;
   let tins = type_list_of_type tins in
-  if List.length args <> List.length tins then
-    raise (Error (loc, WrongArity (List.length tins, List.length args)))
+  if List.length targs <> List.length tins then
+    raise (Error (loc, WrongArity (List.length tins, List.length targs)))
   else
-    List.iter2 (type_subtyping_arg env in_main const) args tins;
+    begin
+      List.iter2 (fun (a,t) ti ->
+	let t' = type_add_const env (const || Types.get_static_value ti <> None) a t
+	in try_unify ~sub:true ti t' a.expr_loc) targs tins;
+      touts
+    end
+
+(* type a simple call without dependent types 
+   but possible homomorphic extension.
+   [targs] is here a list of arguments' types. *)
+and type_simple_call env in_main loc const f targs =
+  let tins, touts = new_var (), new_var () in
+  let tfun = Type_predef.type_arrow tins touts in
+  type_subtyping_arg env in_main const (expr_of_ident f loc) tfun;
+  (*Format.eprintf "try unify %a %a@." Types.print_ty tins Types.print_ty (type_of_type_list targs);*)
+  try_unify ~sub:true tins (type_of_type_list targs) loc;
   touts
 
 (** [type_expr env in_main expr] types expression [expr] in environment
@@ -425,7 +402,8 @@ and type_expr env in_main const expr =
     expr.expr_type <- ty;
     ty 
   | Expr_array elist ->
-    let ty_elt = type_standard_args env in_main const elist in
+    let ty_elt = new_var () in
+    List.iter (fun e -> try_unify ty_elt (type_appl env in_main expr.expr_loc const "uminus" [e]) e.expr_loc) elist;
     let d = Dimension.mkdim_int expr.expr_loc (List.length elist) in
     let ty = Type_predef.type_array d ty_elt in
     expr.expr_type <- ty;
@@ -441,7 +419,7 @@ and type_expr env in_main const expr =
     let eval_const id = Types.get_static_value (Env.lookup_value (fst env) id) in
     type_subtyping_arg env in_main true (expr_of_dimension d) Type_predef.type_int;
     Dimension.eval Basic_library.eval_env eval_const d;
-    let ty_elt = type_standard_args env in_main const [e1] in
+    let ty_elt = type_appl env in_main expr.expr_loc const "uminus" [e1] in
     let ty = Type_predef.type_array d ty_elt in
     expr.expr_type <- ty;
     ty
@@ -451,7 +429,7 @@ and type_expr env in_main const expr =
     ty
   | Expr_ite (c, t, e) ->
     type_subtyping_arg env in_main const c Type_predef.type_bool;
-    let ty = type_standard_args env in_main const [t; e] in
+    let ty = type_appl env in_main expr.expr_loc const "+" [t; e] in
     expr.expr_type <- ty;
     ty
   | Expr_appl (id, args, r) ->
@@ -466,20 +444,20 @@ and type_expr env in_main const expr =
 	Type_predef.type_clock 
 	  (type_const expr.expr_loc (Const_tag l)) in
       type_subtyping_arg env in_main ~sub:false const expr_x typ_l);
-    let touts = type_appl env in_main expr.expr_loc const id args in
+    let touts = type_appl env in_main expr.expr_loc const id (expr_list_of_expr args) in
     expr.expr_type <- touts;
     touts
   | Expr_fby (e1,e2)
   | Expr_arrow (e1,e2) ->
     (* fby/arrow is not legal in a constant expression *)
     check_constant expr.expr_loc const false;
-    let ty = type_standard_args env in_main const [e1; e2] in
+    let ty = type_appl env in_main expr.expr_loc const "+" [e1; e2] in
     expr.expr_type <- ty;
     ty
   | Expr_pre e ->
     (* pre is not legal in a constant expression *)
     check_constant expr.expr_loc const false;
-    let ty = type_standard_args env in_main const [e] in
+    let ty = type_appl env in_main expr.expr_loc const "uminus" [e] in
     expr.expr_type <- ty;
     ty
   | Expr_when (e1,c,l) ->
@@ -488,8 +466,7 @@ and type_expr env in_main const expr =
     let typ_l = Type_predef.type_clock (type_const expr.expr_loc (Const_tag l)) in
     let expr_c = expr_of_ident c expr.expr_loc in
     type_subtyping_arg env in_main ~sub:false const expr_c typ_l;
-    (*update_clock env in_main c expr.expr_loc typ_l;*)
-    let ty = type_standard_args env in_main const [e1] in
+    let ty = type_appl env in_main expr.expr_loc const "uminus" [e1] in
     expr.expr_type <- ty;
     ty
   | Expr_merge (c,hl) ->
@@ -499,7 +476,6 @@ and type_expr env in_main const expr =
     let expr_c = expr_of_ident c expr.expr_loc in
     let typ_l = Type_predef.type_clock typ_in in
     type_subtyping_arg env in_main ~sub:false const expr_c typ_l;
-    (*update_clock env in_main c expr.expr_loc typ_l;*)
     expr.expr_type <- typ_out;
     typ_out
   in 
@@ -524,16 +500,7 @@ and type_branches env in_main loc const hl =
     else (typ_in, typ_out)
   with Unify (t1, t2) ->
     raise (Error (loc, Type_clash (t1,t2)))
-(*
-and update_clock env in_main id loc typ =
- (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "update_clock %s with %a@ " id print_ty typ);*)
- try
-   let vdecl = List.find (fun v -> v.var_id = id) (snd env)
-   in vdecl.var_type <- typ
- with
-   Not_found ->
-   raise (Error (loc, Unbound_value ("clock " ^ id)))
-*)
+
 (** [type_eq env eq] types equation [eq] in environment [env] *)
 let type_eq env in_main undefined_vars eq =
   (* Check undefined variables, type lhs *)
