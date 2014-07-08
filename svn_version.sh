@@ -2,6 +2,14 @@
 
 version=`svn info | awk -v ver="UNKNOWN" -F ":" '/R?vision/ { ver=$2 } END { print ver }' | tr -d " "`
 
+if [ $version = 'UNKNOWN' ] ; then
+  version=$(git rev-parse HEAD)
+fi
+
+if [ -z $version ] ; then
+  version=UNKNOWN
+fi 
+
 filename=version.ml
 prefix=$1
 
