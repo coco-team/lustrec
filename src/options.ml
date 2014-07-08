@@ -37,7 +37,8 @@ let global_inline = ref false
 let witnesses = ref false
 let optimization = ref 2
 let horntraces = ref false
-let horn_queries = ref false
+let horn_cex = ref false
+
 
 let options =
   [ "-d", Arg.Set_string dest_dir,
@@ -54,7 +55,7 @@ let options =
     "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C";
     "-horn", Arg.Unit (fun () -> output := "horn"), "generates Horn clauses encoding output instead of C";
     "-horn-traces", Arg.Unit (fun () -> output := "horn"; horntraces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
-    "-horn-queries", Arg.Set horn_queries, "add the queries instructions at the end of the generated horn files";
+    "-horn-cex", Arg.Set horn_cex, "generate cex enumeration. Enable the horn backend (work in progress)";
     "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";
     "-inline", Arg.Set global_inline, "inline all node calls (require a main node)";
     "-witnesses", Arg.Set witnesses, "enable production of witnesses during compilation";
@@ -74,7 +75,7 @@ let get_witness_dir filename =
 	    )
     with Sys_error _ -> Unix.mkdir dir 0o750
   in
-  dir 
+  dir
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
