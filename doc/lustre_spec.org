@@ -1,4 +1,5 @@
 Lustre annotation/specification language
+#+AUTHORS: Pierre-Loic Garoche, Rémi Delmas, Temesghen Kahsai
 #+LATEX_HEADER: \usepackage{tikz,listings,stmaryrd,pgfplots,mathrsfs,syntax}
 #+LATEX_HEADER: \input{lustre_lst}
 
