@@ -1,167 +1,17 @@
-(* ----------------------------------------------------------------------------
- * SchedMCore - A MultiCore Scheduling Framework
- * Copyright (C) 2009-2011, ONERA, Toulouse, FRANCE - LIFL, Lille, FRANCE
- *
- * This file is part of Prelude
- *
- * Prelude is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public License
- * as published by the Free Software Foundation ; either version 2 of
- * the License, or (at your option) any later version.
- *
- * Prelude is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY ; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this program ; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
- * USA
- *---------------------------------------------------------------------------- *)
+(********************************************************************)
+(*                                                                  *)
+(*  The LustreC compiler toolset   /  The LustreC Development Team  *)
+(*  Copyright 2012 -    --   ONERA - CNRS - INPT                    *)
+(*                                                                  *)
+(*  LustreC is free software, distributed WITHOUT ANY WARRANTY      *)
+(*  under the terms of the GNU Lesser General Public License        *)
+(*  version 2.1.                                                    *)
+(*                                                                  *)
+(********************************************************************)
+
 
 open LustreSpec
-(*
-(** The core language and its ast. *)
-type ident = Utils.ident
-type label = Utils.ident
-type rat = Utils.rat
-type tag = Utils.tag
 
-type constant =
-  | Const_int of int
-  | Const_real of string
-  | Const_float of float
-  | Const_array of constant list
-  | Const_tag  of label
-  | Const_struct of (label * constant) list
-
-val dummy_type_dec: type_dec
-
-type type_dec = LustreSpec.type_dec
-
-type clock_dec = LustreSpec.clock_dec
-val dummy_clock_dec: clock_dec
-
-type var_decl = LustreSpec.var_decl
-
-type expr =
-  {expr_tag: tag; (* Unique identifier *)
-   expr_desc: expr_desc;
-   mutable expr_type: Types.type_expr;
-   mutable expr_clock: Clocks.clock_expr;
-   mutable expr_delay: Delay.delay_expr; (* Used for the initialisation check *)
-   mutable expr_annot: LustreSpec.expr_annot option; (* Spec *)
-   expr_loc: Location.t}
-
-and expr_desc =
-| Expr_const of constant
-| Expr_ident of ident
-| Expr_tuple of expr list
-| Expr_ite   of expr * expr * expr
-| Expr_arrow of expr * expr
-| Expr_fby of expr * expr
-(*
-| Expr_struct of (label * expr) list
-| Expr_field of expr * label
-| Expr_update of expr * (label * expr)
-*)
-| Expr_array of expr list
-| Expr_access of expr * Dimension.dim_expr (* acces(e,i) is the i-th element 
-					      of array epxression e *)
-| Expr_power of expr * Dimension.dim_expr (* power(e,n) is the array of 
-					     size n filled with expression e *)
-| Expr_pre of expr
-| Expr_when of expr * ident * label
-| Expr_merge of ident * (label * expr) list
-| Expr_appl of call_t
-| Expr_uclock of expr * int
-| Expr_dclock of expr * int
-| Expr_phclock of expr * rat
-and call_t = ident * expr * (ident * label) option (* The third part denotes the reseting clock label and value *)
-
-type eq =
-    {eq_lhs: ident list;
-     eq_rhs: expr;
-     eq_loc: Location.t}
-
-type assert_t = 
-    {
-      assert_expr: expr * eq list;
-      assert_loc: Location.t
-    } 
-
-type node_desc =
-    {node_id: ident;
-     mutable node_type: Types.type_expr;
-     mutable node_clock: Clocks.clock_expr;
-     node_inputs: var_decl list;
-     node_outputs: var_decl list;
-     node_locals: var_decl list;
-     mutable node_gencalls: expr list;
-     mutable node_checks: Dimension.dim_expr list;
-     node_asserts: assert_t list; 
-     node_eqs: eq list;
-     mutable node_dec_stateless: bool;
-     mutable node_stateless: bool option;
-     node_spec: LustreSpec.node_annot option;
-     node_annot: LustreSpec.expr_annot option;}
-
-type imported_node_desc =
-    {nodei_id: ident;
-     mutable nodei_type: Types.type_expr;
-     mutable nodei_clock: Clocks.clock_expr;
-     nodei_inputs: var_decl list;
-     nodei_outputs: var_decl list;
-     nodei_stateless: bool;
-     nodei_spec: LustreSpec.node_annot option;
-     nodei_prototype: string option;
-     nodei_in_lib: string option;
-}
-(*
-type imported_fun_desc =
-    {fun_id: ident;
-     mutable fun_type: Types.type_expr;
-     fun_inputs: var_decl list;
-     fun_outputs: var_decl list;
-     fun_spec: LustreSpec.node_annot option;}
-*)
-type const_desc = 
-    {const_id: ident; 
-     const_loc: Location.t; 
-     const_value: constant;      
-     mutable const_type: Types.type_expr;
-    }
-(* type sensor_desc = *)
-(*     {sensor_id: ident; *)
-(*      sensor_wcet: int} *)
-
-(* type actuator_desc = *)
-(*     {actuator_id: ident; *)
-(*      actuator_wcet: int} *)
-
-type top_decl_desc =
-  | Node of node_desc
-  | Consts of const_desc list
-  | ImportedNode of imported_node_desc
-  (* | ImportedFun of imported_fun_desc *)
-  (* | SensorDecl of sensor_desc *)
-  (* | ActuatorDecl of actuator_desc *)
-  | Open of bool * string
-
-type top_decl =
-    {top_decl_desc: top_decl_desc;
-     top_decl_loc: Location.t}
-
-type program = top_decl list
-
-type error =
-    Main_not_found
-  | Main_wrong_kind
-  | No_main_specified
-  | Unbound_symbol of ident
-  | Already_bound_symbol of ident
-*)
 exception Error of Location.t * error
 
 val dummy_type_dec: type_dec

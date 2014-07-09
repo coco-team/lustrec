@@ -1,24 +1,13 @@
-(* ----------------------------------------------------------------------------
- * SchedMCore - A MultiCore Scheduling Framework
- * Copyright (C) 2009-2011, ONERA, Toulouse, FRANCE - LIFL, Lille, FRANCE
- *
- * This file is part of Prelude
- *
- * Prelude is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public License
- * as published by the Free Software Foundation ; either version 2 of
- * the License, or (at your option) any later version.
- *
- * Prelude is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY ; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with this program ; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
- * USA
- *---------------------------------------------------------------------------- *)
+(********************************************************************)
+(*                                                                  *)
+(*  The LustreC compiler toolset   /  The LustreC Development Team  *)
+(*  Copyright 2012 -    --   ONERA - CNRS - INPT                    *)
+(*                                                                  *)
+(*  LustreC is free software, distributed WITHOUT ANY WARRANTY      *)
+(*  under the terms of the GNU Lesser General Public License        *)
+(*  version 2.1.                                                    *)
+(*                                                                  *)
+(********************************************************************)
 
 let version = "0.1-"^Version.number
 let main_node = ref ""
@@ -36,9 +25,10 @@ let verbose_level = ref 1
 let global_inline = ref false
 let witnesses = ref false
 let optimization = ref 2
+
 let horntraces = ref false
 let horn_cex = ref false
-
+let horn_queries = ref false
 
 let options =
   [ "-d", Arg.Set_string dest_dir,
@@ -55,7 +45,8 @@ let options =
     "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C";
     "-horn", Arg.Unit (fun () -> output := "horn"), "generates Horn clauses encoding output instead of C";
     "-horn-traces", Arg.Unit (fun () -> output := "horn"; horntraces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
-    "-horn-cex", Arg.Set horn_cex, "generate cex enumeration. Enable the horn backend (work in progress)";
+    "-horn-cex", Arg.Unit (fun () -> output := "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
+    "-horn-queries", Arg.Unit (fun () -> output := "horn"; horn_queries:=true), "generate queries in generated Horn file. Enable the horn backend (work in progress)";
     "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";
     "-inline", Arg.Set global_inline, "inline all node calls (require a main node)";
     "-witnesses", Arg.Set witnesses, "enable production of witnesses during compilation";
