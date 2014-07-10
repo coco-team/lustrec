@@ -273,6 +273,17 @@ let semi_unify_carrier cr1 cr2 =
         end
     | _,_ -> assert false
 
+let try_unify_carrier ck1 ck2 loc =
+  try
+    unify_carrier ck1 ck2
+  with
+  | Unify (ck1',ck2') ->
+    raise (Error (loc, Clock_clash (ck1',ck2')))
+  | Subsume (ck,cset) ->
+    raise (Error (loc, Clock_set_mismatch (ck,cset)))
+  | Mismatch (cr1,cr2) ->
+    raise (Error (loc, Carrier_mismatch (cr1,cr2)))
+
 (** [unify ck1 ck2] unifies clocks [ck1] and [ck2]. Raises [Unify
     (ck1,ck2)] if the clocks are not unifiable.*)
 let rec unify ck1 ck2 =
@@ -459,7 +470,7 @@ let try_semi_unify ck1 ck2 loc =
   | Mismatch (cr1,cr2) ->
     raise (Error (loc, Carrier_mismatch (cr1,cr2)))
 
-(* ck1 is a subtype of ck2 *)
+(* ck2 is a subtype of ck1 *)
 let rec sub_unify sub ck1 ck2 =
   match (repr ck1).cdesc, (repr ck2).cdesc with
   | Ctuple cl1         , Ctuple cl2         ->
@@ -478,7 +489,7 @@ let rec sub_unify sub ck1 ck2 =
       unify_carrier cr1 cr2;
       sub_unify sub c1 c2
     end
-  | Ccarrying (_, c1)  , _         when sub -> sub_unify sub c1 ck2
+  | _, Ccarrying (_, c2)           when sub -> sub_unify sub ck1 c2
   | _                                       -> unify ck1 ck2
 
 let try_sub_unify sub ck1 ck2 loc =
@@ -495,6 +506,9 @@ let try_sub_unify sub ck1 ck2 loc =
 (* Unifies all the clock variables in the clock type of a tuple 
    expression, so that the clock type only uses at most one clock variable *)
 let unify_tuple_clock ref_ck_opt ck loc =
+(*(match ref_ck_opt with
+| None     -> Format.eprintf "unify_tuple_clock None %a@." Clocks.print_ck ck
+  | Some ck' -> Format.eprintf "unify_tuple_clock (Some %a) %a@." Clocks.print_ck ck' Clocks.print_ck ck);*)
   let ck_var = ref ref_ck_opt in
   let rec aux ck =
     match (repr ck).cdesc with
@@ -506,7 +520,7 @@ let unify_tuple_clock ref_ck_opt ck loc =
               ck_var:=Some ck
           | Some v ->
               (* may fail *)
-              try_unify v ck loc
+              try_unify ck v loc
         end
     | Ctuple cl ->
         List.iter aux cl
@@ -514,8 +528,7 @@ let unify_tuple_clock ref_ck_opt ck loc =
     | Ccarrying (_, ck1) ->
         aux ck1
     | _ -> ()
-  in
-  aux ck
+  in aux ck
 
 (* Unifies all the clock variables in the clock type of an imported
    node, so that the clock type only uses at most one base clock variable,
@@ -531,7 +544,7 @@ let unify_imported_clock ref_ck_opt ck loc =
               ck_var:=Some ck
           | Some v ->
               (* cannot fail *)
-              try_unify v ck loc
+              try_unify ck v loc
         end
     | Ctuple cl ->
         List.iter aux cl
@@ -587,9 +600,11 @@ and clock_carrier env c loc ce =
   let expr_c = expr_of_ident c loc in
   let ck = clock_expr ~nocarrier:false env expr_c in
   let cr = new_carrier Carry_name (*Carry_const c*) ck.cscoped in
-  let ckcarry = new_ck (Ccarrying (cr,ce)) ck.cscoped in
+  let ckb = new_var true in
+  let ckcarry = new_ck (Ccarrying (cr, ckb)) ck.cscoped in
   try_unify ck ckcarry expr_c.expr_loc;
-  ce, cr
+  unify_tuple_clock (Some ckb) ce expr_c.expr_loc;
+  cr
 
 (** [clock_expr env expr] performs the clock calculus for expression [expr] in
     environment [env] *)
@@ -666,18 +681,18 @@ and clock_expr ?(nocarrier=true) env expr =
   | Expr_when (e,c,l) ->
       let ce = clock_standard_args env [e] in
       let c_loc = loc_of_cond expr.expr_loc c in
-      let ck_c, cr = clock_carrier env c c_loc ce in
-      let ck = new_ck (Con (ce,cr,l)) true in
+      let cr = clock_carrier env c c_loc ce in
+      let ck = clock_on ce cr l in
       let cr' = new_carrier (Carry_const c) ck.cscoped in
-      let ck' = new_ck (Con (ce,cr',l)) true in
-      unify_tuple_clock (Some ck_c) ce expr.expr_loc;
+      let ck' = clock_on ce cr' l in
       expr.expr_clock <- ck';
       ck
   | Expr_merge (c,hl) ->
       let cvar = new_var true in
-      let ck_c, cr = clock_carrier env c expr.expr_loc cvar in
-      List.iter (fun (t, h) -> clock_subtyping_arg env h (new_ck (Con (cvar,cr,t)) true)) hl;
-      unify_tuple_clock (Some ck_c) cvar expr.expr_loc;
+      let crvar = new_carrier Carry_name true in
+      List.iter (fun (t, h) -> let ckh = clock_expr env h in unify_tuple_clock (Some (new_ck (Con (cvar,crvar,t)) true)) ckh h.expr_loc) hl;
+      let cr = clock_carrier env c expr.expr_loc cvar in
+      try_unify_carrier cr crvar expr.expr_loc;
       expr.expr_clock <- cvar;
       cvar
   in

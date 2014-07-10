@@ -282,7 +282,7 @@ let rec compile basename extension =
 
   (* Optimize machine code *)
   let machine_code = 
-    if !Options.optimization >= 3 then
+    if !Options.optimization >= 3 && !Options.output <> "horn" then
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization@,");
 	Optimize_machine.machines_reuse_variables machine_code node_schs

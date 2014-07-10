@@ -161,6 +161,9 @@ let clock_list_of_clock ck =
  | Ctuple cl -> cl
  | _         -> [ck]
 
+let clock_on ck cr l =
+ clock_of_clock_list (List.map (fun ck -> new_ck (Con (ck,cr,l)) true) (clock_list_of_clock ck))
+
 let clock_of_impnode_clock ck =
   let ck = repr ck in
   match ck.cdesc with
@@ -354,10 +357,10 @@ let eq_carrier cr1 cr2 =
 (* Returns the clock root of a clock *)
 let rec root ck =
   match (repr ck).cdesc with
-  | Con (ck',_,_) | Clink ck' | Ccarrying (_,ck') ->
-      root ck'
+  | Ctuple (ck'::_)
+  | Con (ck',_,_) | Clink ck' | Ccarrying (_,ck') -> root ck'
   | Pck_up _ | Pck_down _ | Pck_phase _ | Pck_const _ | Cvar _ | Cunivar _ -> ck
-  | Carrow _ | Ctuple _ -> failwith "Internal error pclock_parent"
+  | Carrow _ | Ctuple _ -> failwith "Internal error root"
 
 (* Returns the branch of clock [ck] in its clock tree *)
 let rec branch ck =
@@ -365,7 +368,7 @@ let rec branch ck =
     match (repr ck).cdesc with
     | Ccarrying (_, ck) -> branch ck acc
     | Con (ck, cr, l)   -> branch ck ((cr, l) :: acc)
-    | Ctuple _
+    | Ctuple (ck::_)    -> branch ck acc
     | Carrow _          -> assert false
     | _                 -> acc
   in branch ck [];;
