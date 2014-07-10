@@ -470,16 +470,39 @@ struct
       (map : disjoint_map)
     end
 
-  (* replace variable [v] by [v'] in disjunction [map]. Then:
+  (* merge variables [v] and [v'] in disjunction [map]. Then:
       - the mapping v' becomes v' |-> (map v) inter (map v')
       - the mapping v |-> ... then disappears
       - other mappings become x |-> (map x) \ (if v in x then v else v')
   *)
-  let replace_in_disjoint_map map v v' =
+  let merge_in_disjoint_map map v v' =
     begin
       Hashtbl.replace map v'.var_id (CISet.inter (Hashtbl.find map v.var_id) (Hashtbl.find map v'.var_id));
       Hashtbl.remove map v.var_id;
       Hashtbl.iter (fun x map_x -> Hashtbl.replace map x (CISet.remove (if CISet.mem v map_x then v else v') map_x)) map;
+    end
+
+  (* replace variable [v] by [v'] in disjunction [map].
+    [v'] is a dead variable. Then:
+      - the mapping v' becomes v' |-> (map v)
+      - the mapping v |-> ... then disappears
+      - all mappings become x |-> ((map x) \ { v}) union ({v'} if v in map x)
+  *)
+  let replace_in_disjoint_map map v v' =
+    begin
+      Hashtbl.replace map v'.var_id (Hashtbl.find map v.var_id);
+      Hashtbl.remove  map v.var_id;
+      Hashtbl.iter (fun x mapx -> Hashtbl.replace map x (if CISet.mem v mapx then CISet.add v' (CISet.remove v mapx) else CISet.remove v' mapx)) map;
+    end
+
+  (* remove variable [v] in disjunction [map]. Then:
+      - the mapping v |-> ... then disappears
+      - all mappings become x |-> (map x) \ { v}
+  *)
+  let remove_in_disjoint_map map v =
+    begin
+      Hashtbl.remove map v.var_id;
+      Hashtbl.iter (fun x mapx -> Hashtbl.replace map x (CISet.remove v mapx)) map;
     end
 
   let pp_disjoint_map fmt map =
@@ -503,12 +526,23 @@ let pp_error fmt trace =
 
 (* Merges elements of graph [g2] into graph [g1] *)
 let merge_with g1 g2 =
+  begin
     IdentDepGraph.iter_vertex (fun v -> IdentDepGraph.add_vertex g1 v) g2;
     IdentDepGraph.iter_edges (fun s t -> IdentDepGraph.add_edge g1 s t) g2
+  end
+
+let add_external_dependency outputs mems g =
+  let caller ="!_world" in
+  begin
+    IdentDepGraph.add_vertex g caller;
+    ISet.iter (fun o -> IdentDepGraph.add_edge g caller o) outputs;
+    ISet.iter (fun m -> IdentDepGraph.add_edge g caller m) mems;
+  end
 
 let global_dependency node =
   let mems = ExprDep.node_memory_variables node in
   let inputs = ExprDep.node_input_variables node in
+  let outputs = ExprDep.node_output_variables node in
   let node_vars = ExprDep.node_variables node in
   let (g_non_mems, g_mems) = ExprDep.dependence_graph mems inputs node_vars node in
   (*Format.eprintf "g_non_mems: %a" pp_dep_graph g_non_mems;
@@ -516,10 +550,12 @@ let global_dependency node =
   CycleDetection.check_cycles g_non_mems;
   let (vdecls', eqs', g_mems') = CycleDetection.break_cycles node mems g_mems in
   (*Format.eprintf "g_mems': %a" pp_dep_graph g_mems';*)
-  merge_with g_non_mems g_mems';
-  { node with node_eqs = eqs'; node_locals = vdecls'@node.node_locals }, 
-  g_non_mems
-
+  begin
+    merge_with g_non_mems g_mems';
+    add_external_dependency outputs mems g_non_mems;
+    { node with node_eqs = eqs'; node_locals = vdecls'@node.node_locals }, 
+    g_non_mems
+  end
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

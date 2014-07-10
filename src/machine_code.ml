@@ -361,7 +361,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       NodeDep.filter_static_inputs (node_inputs node_f) el in 
     let o = new_instance node node_f eq.eq_rhs.expr_tag in
     let call_ck = Clocks.new_var true in
-    Clock_calculus.unify_imported_clock (Some call_ck) eq.eq_rhs.expr_clock;
+    Clock_calculus.unify_imported_clock (Some call_ck) eq.eq_rhs.expr_clock eq.eq_rhs.expr_loc;
     (m,
      (if Stateless.check_node node_f then si else MReset o :: si),
      Utils.IMap.add o call_f j,
@@ -519,76 +519,6 @@ let get_machine_opt name machines =
       | None -> if m.mname.node_id = name then Some m else None)
     None machines
     
-(* variable substitution for optimizing purposes *)
-
-(* checks whether an [instr] is skip and can be removed from program *)
-let rec instr_is_skip instr =
-  match instr with
-  | MLocalAssign (i, LocalVar v) when i = v -> true
-  | MStateAssign (i, StateVar v) when i = v -> true
-  | MBranch (g, hl) -> List.for_all (fun (_, il) -> instrs_are_skip il) hl
-  | _               -> false
-and instrs_are_skip instrs =
-  List.for_all instr_is_skip instrs
-
-let instr_cons instr cont =
- if instr_is_skip instr then cont else instr::cont
-
-let rec instr_remove_skip instr cont =
-  match instr with
-  | MLocalAssign (i, LocalVar v) when i = v -> cont
-  | MStateAssign (i, StateVar v) when i = v -> cont
-  | MBranch (g, hl) -> MBranch (g, List.map (fun (h, il) -> (h, instrs_remove_skip il [])) hl) :: cont
-  | _               -> instr::cont
-
-and instrs_remove_skip instrs cont =
-  List.fold_right instr_remove_skip instrs cont
-
-let rec value_replace_var fvar value =
-  match value with
-  | Cst c -> value
-  | LocalVar v -> LocalVar (fvar v)
-  | StateVar v -> value
-  | Fun (id, args) -> Fun (id, List.map (value_replace_var fvar) args) 
-  | Array vl -> Array (List.map (value_replace_var fvar) vl)
-  | Access (t, i) -> Access(value_replace_var fvar t, i)
-  | Power (v, n) -> Power(value_replace_var fvar v, n)
-
-let rec instr_replace_var fvar instr cont =
-  match instr with
-  | MLocalAssign (i, v) -> instr_cons (MLocalAssign (fvar i, value_replace_var fvar v)) cont
-  | MStateAssign (i, v) -> instr_cons (MStateAssign (i, value_replace_var fvar v)) cont
-  | MReset i            -> instr_cons instr cont
-  | MStep (il, i, vl)   -> instr_cons (MStep (List.map fvar il, i, List.map (value_replace_var fvar) vl)) cont
-  | MBranch (g, hl)     -> instr_cons (MBranch (value_replace_var fvar g, List.map (fun (h, il) -> (h, instrs_replace_var fvar il [])) hl)) cont
-
-and instrs_replace_var fvar instrs cont =
-  List.fold_right (instr_replace_var fvar) instrs cont
-
-let step_replace_var fvar step =
-  { step with
-    step_checks = List.map (fun (l, v) -> (l, value_replace_var fvar v)) step.step_checks;
-    step_locals = Utils.remove_duplicates (List.map fvar step.step_locals);
-    step_instrs = instrs_replace_var fvar step.step_instrs [];
-}
-
-let rec machine_replace_var fvar m =
-  { m with
-    mstep = step_replace_var fvar m.mstep
-  }
-
-let machine_reuse_var m reuse =
-  let fvar v =
-    try
-      Hashtbl.find reuse v.var_id
-    with Not_found -> v in
-  machine_replace_var fvar m
-
-let prog_reuse_var prog node_schs =
-  List.map 
-    (fun m -> 
-      machine_reuse_var m (Utils.IMap.find m.mname.node_id node_schs).Scheduling.reuse_table
-    ) prog
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

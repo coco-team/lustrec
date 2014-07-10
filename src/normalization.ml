@@ -366,7 +366,7 @@ let normalize_node node =
       vars', defs@def_accu, {assert_ with assert_expr = expr}::assert_accu
     ) (vars, [], []) node.node_asserts in
   let new_locals = List.filter is_local vars in
-  (* Compute tracebaility info: 
+  (* Compute traceability info: 
      - gather newly bound variables
      - compute the associated expression without aliases     
   *)

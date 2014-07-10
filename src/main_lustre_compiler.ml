@@ -260,10 +260,10 @@ let rec compile basename extension =
      and warns about unused input or memory variables *)
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. scheduling@,");
   let prog, node_schs = Scheduling.schedule_prog prog in
-  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_warning_unused node_schs);
-  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_schedule node_schs);
-  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_fanin_table node_schs);
-  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
+  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_warning_unused node_schs);
+  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_schedule node_schs);
+  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_fanin_table node_schs);
+  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
 
  (* Optimization of prog: 
     - Unfold consts 
@@ -279,23 +279,21 @@ let rec compile basename extension =
   (* DFS with modular code generation *)
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,");
   let machine_code = Machine_code.translate_prog prog node_schs in
- (* experimental
-  Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization@,");
-  let machine_code = Machine_code.prog_reuse_var machine_code node_schs in
-  *)
-  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
-    (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
-    machine_code);
 
- 
   (* Optimize machine code *)
   let machine_code = 
-    if !Options.optimization >= 2 then
-      Optimize_machine.optimize_machines machine_code
+    if !Options.optimization >= 3 then
+      begin
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization@,");
+	Optimize_machine.machines_reuse_variables machine_code node_schs
+      end
     else
       machine_code
-  in
-  
+ in
+  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
+  (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
+  machine_code);
+
   (* Creating destination directory if needed *)
   if not (Sys.file_exists !Options.dest_dir) then (
     Log.report ~level:1 (fun fmt -> fprintf fmt ".. creating destination directory@,");
