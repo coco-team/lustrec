@@ -573,7 +573,7 @@ let rec clock_standard_args env expr_list =
 and clock_subtyping_arg env ?(sub=true) real_arg formal_clock =
   let loc = real_arg.expr_loc in
   let real_clock = clock_expr env real_arg in
-  try_sub_unify sub real_clock formal_clock loc
+  try_sub_unify sub formal_clock real_clock loc
 
 (* computes clocks for node application *)
 and clock_appl env f args clock_reset loc =
@@ -709,7 +709,6 @@ let clock_eq env eq =
   let expr_lhs = expr_of_expr_list eq.eq_loc (List.map (fun v -> expr_of_ident v eq.eq_loc) eq.eq_lhs) in
   let ck_rhs = clock_expr env eq.eq_rhs in
   clock_subtyping_arg env expr_lhs ck_rhs
-
 
 (* [clock_coreclock cck] returns the clock_expr corresponding to clock
     declaration [cck] *)
