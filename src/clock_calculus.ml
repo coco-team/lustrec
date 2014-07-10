@@ -430,58 +430,6 @@ let int_factor_of_expr e =
       (Const_int i) -> i
   | _ -> failwith "Internal error: int_factor_of_expr"
 
-(* Unifies all the clock variables in the clock type of a tuple 
-   expression, so that the clock type only uses at most one clock variable *)
-let unify_tuple_clock ref_ck_opt ck =
-  let ck_var = ref ref_ck_opt in
-  let rec aux ck =
-    match (repr ck).cdesc with
-    | Con _
-    | Cvar _ ->
-        begin
-          match !ck_var with
-          | None ->
-              ck_var:=Some ck
-          | Some v ->
-              (* may fail *)
-              unify v ck
-        end
-    | Ctuple cl ->
-        List.iter aux cl
-    | Carrow _ -> assert false (* should not occur *)
-    | Ccarrying (_, ck1) ->
-        aux ck1
-    | _ -> ()
-  in
-  aux ck
-
-(* Unifies all the clock variables in the clock type of an imported
-   node, so that the clock type only uses at most one base clock variable,
-   that is, the activation clock of the node *)
-let unify_imported_clock ref_ck_opt ck =
-  let ck_var = ref ref_ck_opt in
-  let rec aux ck =
-    match (repr ck).cdesc with
-    | Cvar _ ->
-        begin
-          match !ck_var with
-          | None ->
-              ck_var:=Some ck
-          | Some v ->
-              (* cannot fail *)
-              unify v ck
-        end
-    | Ctuple cl ->
-        List.iter aux cl
-    | Carrow (ck1,ck2) ->
-        aux ck1; aux ck2
-    | Ccarrying (_, ck1) ->
-        aux ck1
-    | Con (ck1, _, _) -> aux ck1
-    | _ -> ()
-  in
-  aux ck
-
 (** [clock_uncarry ck] drops the possible carrier name from clock [ck] *)
 let clock_uncarry ck =
   let ck = repr ck in
@@ -544,6 +492,58 @@ let try_sub_unify sub ck1 ck2 loc =
   | Mismatch (cr1,cr2) ->
     raise (Error (loc, Carrier_mismatch (cr1,cr2)))
 
+(* Unifies all the clock variables in the clock type of a tuple 
+   expression, so that the clock type only uses at most one clock variable *)
+let unify_tuple_clock ref_ck_opt ck loc =
+  let ck_var = ref ref_ck_opt in
+  let rec aux ck =
+    match (repr ck).cdesc with
+    | Con _
+    | Cvar _ ->
+        begin
+          match !ck_var with
+          | None ->
+              ck_var:=Some ck
+          | Some v ->
+              (* may fail *)
+              try_unify v ck loc
+        end
+    | Ctuple cl ->
+        List.iter aux cl
+    | Carrow _ -> assert false (* should not occur *)
+    | Ccarrying (_, ck1) ->
+        aux ck1
+    | _ -> ()
+  in
+  aux ck
+
+(* Unifies all the clock variables in the clock type of an imported
+   node, so that the clock type only uses at most one base clock variable,
+   that is, the activation clock of the node *)
+let unify_imported_clock ref_ck_opt ck loc =
+  let ck_var = ref ref_ck_opt in
+  let rec aux ck =
+    match (repr ck).cdesc with
+    | Cvar _ ->
+        begin
+          match !ck_var with
+          | None ->
+              ck_var:=Some ck
+          | Some v ->
+              (* cannot fail *)
+              try_unify v ck loc
+        end
+    | Ctuple cl ->
+        List.iter aux cl
+    | Carrow (ck1,ck2) ->
+        aux ck1; aux ck2
+    | Ccarrying (_, ck1) ->
+        aux ck1
+    | Con (ck1, _, _) -> aux ck1
+    | _ -> ()
+  in
+  aux ck
+
 (* Clocks a list of arguments of Lustre builtin operators:
    - type each expression, remove carriers of clocks as
      carriers may only denote variables, not arbitrary expr.
@@ -577,7 +577,7 @@ and clock_call env f args clock_reset loc =
   let cins, couts = split_arrow cfun in
   let cins = clock_list_of_clock cins in
   List.iter2 (clock_subtyping_arg env) args cins;
-  unify_imported_clock (Some clock_reset) cfun;
+  unify_imported_clock (Some clock_reset) cfun loc;
   couts
 
 and clock_ident nocarrier env id loc =
@@ -589,7 +589,7 @@ and clock_carrier env c loc ce =
   let cr = new_carrier Carry_name (*Carry_const c*) ck.cscoped in
   let ckcarry = new_ck (Ccarrying (cr,ce)) ck.cscoped in
   try_unify ck ckcarry expr_c.expr_loc;
-  cr
+  ce, cr
 
 (** [clock_expr env expr] performs the clock calculus for expression [expr] in
     environment [env] *)
@@ -632,7 +632,7 @@ and clock_expr ?(nocarrier=true) env expr =
     let ck_c = clock_standard_args env [c] in
     let ck = clock_standard_args env [t; e] in
     (* Here, the branches may exhibit a tuple clock, not the condition *)
-    unify_tuple_clock (Some ck_c) ck;
+    unify_tuple_clock (Some ck_c) ck expr.expr_loc;
     expr.expr_clock <- ck;
     ck
   | Expr_appl (id, args, r) ->
@@ -656,7 +656,7 @@ and clock_expr ?(nocarrier=true) env expr =
   | Expr_fby (e1,e2)
   | Expr_arrow (e1,e2) ->
     let ck = clock_standard_args env [e1; e2] in
-    unify_tuple_clock None ck;
+    unify_tuple_clock None ck expr.expr_loc;
     expr.expr_clock <- ck;
     ck
   | Expr_pre e -> (* todo : deal with phases as in tail ? *)
@@ -666,16 +666,18 @@ and clock_expr ?(nocarrier=true) env expr =
   | Expr_when (e,c,l) ->
       let ce = clock_standard_args env [e] in
       let c_loc = loc_of_cond expr.expr_loc c in
-      let cr = clock_carrier env c c_loc ce in
+      let ck_c, cr = clock_carrier env c c_loc ce in
       let ck = new_ck (Con (ce,cr,l)) true in
       let cr' = new_carrier (Carry_const c) ck.cscoped in
       let ck' = new_ck (Con (ce,cr',l)) true in
+      unify_tuple_clock (Some ck_c) ce expr.expr_loc;
       expr.expr_clock <- ck';
       ck
   | Expr_merge (c,hl) ->
       let cvar = new_var true in
-      let cr = clock_carrier env c expr.expr_loc cvar in
+      let ck_c, cr = clock_carrier env c expr.expr_loc cvar in
       List.iter (fun (t, h) -> clock_subtyping_arg env h (new_ck (Con (cvar,cr,t)) true)) hl;
+      unify_tuple_clock (Some ck_c) cvar expr.expr_loc;
       expr.expr_clock <- cvar;
       cvar
   in
@@ -759,7 +761,7 @@ let clock_node env loc nd =
   let ck_ins = clock_of_vlist nd.node_inputs in
   let ck_outs = clock_of_vlist nd.node_outputs in
   let ck_node = new_ck (Carrow (ck_ins,ck_outs)) false in
-  unify_imported_clock None ck_node;
+  unify_imported_clock None ck_node loc;
   Log.report ~level:3 (fun fmt -> print_ck fmt ck_node);
   (* Local variables may contain first-order carrier variables that should be generalized.
      That's not the case for types. *)
@@ -810,7 +812,7 @@ let clock_imported_node env loc nd =
   let ck_ins = clock_of_vlist nd.nodei_inputs in
   let ck_outs = clock_of_vlist nd.nodei_outputs in
   let ck_node = new_ck (Carrow (ck_ins,ck_outs)) false in
-  unify_imported_clock None ck_node;
+  unify_imported_clock None ck_node loc;
   check_imported_pclocks loc ck_node;
   try_generalize ck_node loc;
   nd.nodei_clock <- ck_node;

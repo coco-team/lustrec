@@ -152,7 +152,7 @@ let schedule_node n =
 	  Disjunction.pp_disjoint_map disjoint
       );
 
-    let reuse = Hashtbl.create 23 (*Liveness.compute_reuse_policy n sort disjoint gg*) in
+    let reuse = Liveness.compute_reuse_policy n sort disjoint gg in
     Log.report ~level:2 
       (fun fmt -> 
 	Format.fprintf fmt

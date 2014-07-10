@@ -43,10 +43,13 @@ let option_map f o =
   | None   -> None
   | Some e -> Some (f e)
 
+let add_cons x l =
+ if List.mem x l then l else x::l
+
 let rec remove_duplicates l =
  match l with
  | [] -> []
- | t::q -> if List.mem t q then remove_duplicates q else t :: remove_duplicates q
+ | t::q -> add_cons t (remove_duplicates q)
 
 let position pred l =
   let rec pos p l =
