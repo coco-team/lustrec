@@ -439,7 +439,7 @@ struct
   struct
     type t = var_decl
     let root_branch vdecl = Clocks.root vdecl.var_clock, Clocks.branch vdecl.var_clock
-    let compare v1 v2 = compare (root_branch v2) (root_branch v1)
+    let compare v1 v2 = compare (root_branch v2, v2.var_id) (root_branch v1, v1.var_id)
   end
 
   module CISet = Set.Make(ClockedIdentModule)
