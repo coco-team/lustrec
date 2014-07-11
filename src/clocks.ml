@@ -354,9 +354,13 @@ let eq_carrier cr1 cr2 =
  | Carry_const id1, Carry_const id2 -> id1 = id2
  | _                                -> cr1.carrier_id = cr2.carrier_id
 
+let eq_clock ck1 ck2 =
+ (repr ck1).cid = (repr ck2).cid
+
 (* Returns the clock root of a clock *)
 let rec root ck =
-  match (repr ck).cdesc with
+  let ck = repr ck in
+  match ck.cdesc with
   | Ctuple (ck'::_)
   | Con (ck',_,_) | Clink ck' | Ccarrying (_,ck') -> root ck'
   | Pck_up _ | Pck_down _ | Pck_phase _ | Pck_const _ | Cvar _ | Cunivar _ -> ck
@@ -369,6 +373,7 @@ let rec branch ck =
     | Ccarrying (_, ck) -> branch ck acc
     | Con (ck, cr, l)   -> branch ck ((cr, l) :: acc)
     | Ctuple (ck::_)    -> branch ck acc
+    | Ctuple _
     | Carrow _          -> assert false
     | _                 -> acc
   in branch ck [];;
@@ -382,7 +387,7 @@ let rec disjoint_branches br1 br2 =
 
 (* Disjunction relation between variables based upon their static clocks. *)
 let disjoint ck1 ck2 =
- root ck1 = root ck2 && disjoint_branches (branch ck1) (branch ck2);;
+  eq_clock (root ck1) (root ck2) && disjoint_branches (branch ck1) (branch ck2)
 
 (** [normalize pck] returns the normal form of clock [pck]. *)
 let normalize pck =
