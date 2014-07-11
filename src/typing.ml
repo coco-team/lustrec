@@ -138,6 +138,9 @@ let get_type_definition tname =
 (* Equality on ground types only *)
 (* Should be used between local variables which must have a ground type *)
 let rec eq_ground t1 t2 =
+  let t1 = repr t1 in
+  let t2 = repr t2 in
+  t1==t2 ||
   match t1.tdesc, t2.tdesc with
   | Tint, Tint | Tbool, Tbool | Trat, Trat | Treal, Treal -> true
   | Tenum tl, Tenum tl' when tl == tl' -> true
