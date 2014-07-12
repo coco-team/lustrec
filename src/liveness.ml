@@ -15,6 +15,14 @@ open Corelang
 open Graph
 open Causality
 
+type context =
+{
+  mutable evaluated : Disjunction.CISet.t;
+  dep_graph : IdentDepGraph.t;
+  disjoint : (ident, Disjunction.CISet.t) Hashtbl.t;
+  policy : (ident, var_decl) Hashtbl.t;
+}
+
 (* computes the in-degree for each local variable of node [n], according to dep graph [g].
 *)
 let compute_fanin n g =
@@ -72,29 +80,30 @@ let node_reusable_variables node =
     Disjunction.CISet.empty
     node.node_locals
 
+let kill_root ctx head =
+  IdentDepGraph.iter_succ (IdentDepGraph.remove_edge ctx.dep_graph head.var_id) ctx.dep_graph head.var_id
+
 (* Recursively removes useless variables,
-   i.e. variables that are current roots of the dep graph [g]
-   and returns [locals] and [evaluated] such roots
-   - [locals] is the set of potentially reusable variables
+   i.e. [ctx.evaluated] variables that are current roots of the dep graph [ctx.dep_graph]
    - [evaluated] is the set of already evaluated variables,
      wrt the scheduling
+   - does only remove edges, not variables themselves
 *)
-let remove_local_roots locals evaluated g =
+let remove_roots ctx =
   let rem = ref true in
-  let roots = ref Disjunction.CISet.empty in
+  let remaining = ref ctx.evaluated in
   while !rem
   do
     rem := false;
-    let new_roots = graph_roots g in
-    let reusable_roots = Disjunction.CISet.filter (fun v -> (List.mem v.var_id new_roots) && (Disjunction.CISet.mem v locals)) evaluated in
-    if not (Disjunction.CISet.is_empty reusable_roots) then
+    let all_roots = graph_roots ctx.dep_graph in
+    let frontier_roots = Disjunction.CISet.filter (fun v -> List.mem v.var_id all_roots) !remaining in
+    if not (Disjunction.CISet.is_empty frontier_roots) then
       begin
 	rem := true;
-	Disjunction.CISet.iter (fun v -> IdentDepGraph.remove_vertex g v.var_id) reusable_roots;
-	roots := Disjunction.CISet.union reusable_roots !roots
+	Disjunction.CISet.iter (kill_root ctx) frontier_roots;
+	remaining := Disjunction.CISet.diff !remaining frontier_roots
       end
-  done;
-  !roots
+  done
  
 (* checks whether a variable [v] is an input of the [var] equation, with an address type.
    if so, [var] could not safely reuse/alias [v], should [v] be dead in the caller node,
@@ -118,15 +127,6 @@ let replace_in_dep_graph v v' g =
     IdentDepGraph.remove_vertex g v
   end
 
-type context =
-{
-  mutable evaluated : Disjunction.CISet.t;
-  mutable quasi : Disjunction.CISet.t;
-  mutable reusable : Disjunction.CISet.t;
-  disjoint : (ident, Disjunction.CISet.t) Hashtbl.t;
-  policy : (ident, var_decl) Hashtbl.t;
-}
-
 let pp_reuse_policy fmt policy =
   begin
     Format.fprintf fmt "{ /* reuse policy */@.";
@@ -138,29 +138,10 @@ let pp_context fmt ctx =
   begin
     Format.fprintf fmt "{ /*BEGIN context */@.";
     Format.fprintf fmt "eval=%a;@." Disjunction.pp_ciset ctx.evaluated;
-    Format.fprintf fmt "quasi=%a;@." Disjunction.pp_ciset ctx.quasi;
-    Format.fprintf fmt "reusable=%a;@." Disjunction.pp_ciset ctx.reusable;
+    Format.fprintf fmt "graph=%a;@." pp_dep_graph ctx.dep_graph;
     Format.fprintf fmt "disjoint=%a;@." Disjunction.pp_disjoint_map ctx.disjoint;
     Format.fprintf fmt "policy=%a;@." pp_reuse_policy ctx.policy;
     Format.fprintf fmt "/* END context */ }@.";
-  end
-
-let is_reusable_quasi var ctx q =
-  (*Log.report ~level:6 (fun fmt -> Format.fprintf fmt "is_reusable_quasi@ var=%s %a q=%s@." var.var_id pp_context ctx q.var_id);*)
-  let disjoint = Hashtbl.find ctx.disjoint var.var_id in
-  let q = Hashtbl.find ctx.policy q.var_id in
-  Disjunction.CISet.for_all
-    (fun v -> (Hashtbl.find ctx.policy v.var_id = q) <= (Disjunction.CISet.mem v disjoint || Disjunction.CISet.mem v ctx.quasi))
-    ctx.evaluated
-
-let compute_reusable heads var ctx =
-  let (reusable', quasi') = Disjunction.CISet.partition (fun q -> (not (List.mem q heads)) && is_reusable_quasi var ctx q) ctx.quasi
-  in
-  begin
-    ctx.quasi <- quasi';
-    ctx.reusable <- Disjunction.CISet.fold (fun r' -> Disjunction.CISet.add (Hashtbl.find ctx.policy r'.var_id)) reusable' ctx.reusable;
-    ctx.quasi <- Disjunction.CISet.diff ctx.quasi reusable';
-    ctx.evaluated <- Disjunction.CISet.diff ctx.evaluated reusable';
   end
 
 (* computes the reusable dependencies of variable [var] in graph [g],
@@ -171,12 +152,11 @@ let compute_reusable heads var ctx =
    - [reusable] is the set of dead/reusable dependencies of [var] in graph [g]
    - [policy] is the reuse map (which domain is [evaluated])
 *)
-let compute_dependencies locals heads ctx g =
+let compute_dependencies heads ctx =
   begin
-    (*Log.report ~level:6 (fun fmt -> Format.fprintf fmt "compute_reusable_dependencies %a %a %a %a@." Disjunction.pp_ciset locals Printers.pp_var_name var pp_context ctx pp_dep_graph g);*)
-    List.iter (fun head -> IdentDepGraph.iter_succ (IdentDepGraph.remove_edge g head.var_id) g head.var_id) heads;
-    ctx.quasi <- Disjunction.CISet.union (remove_local_roots locals ctx.evaluated g) ctx.quasi;
-    List.iter (fun head -> compute_reusable heads head ctx) heads;
+    (*Log.report ~level:6 (fun fmt -> Format.fprintf fmt "compute_reusable_dependencies %a %a %a@." Disjunction.pp_ciset locals Printers.pp_var_name var pp_context ctx);*)
+    List.iter (kill_root ctx) heads;
+    remove_roots ctx;
   end
 
 let compute_evaluated heads ctx =
@@ -184,62 +164,58 @@ let compute_evaluated heads ctx =
     List.iter (fun head -> ctx.evaluated <- Disjunction.CISet.add head ctx.evaluated) heads;
   end
 
-let compute_reuse node var ctx g =
+let compute_reuse node ctx var =
   let aliasable = is_aliasable_input node var.var_id in
-  let eligible v = Typing.eq_ground var.var_type v.var_type && not (aliasable v) in
+  let disjoint = Hashtbl.find ctx.disjoint var.var_id in
+  let eligible v =
+       Typing.eq_ground var.var_type v.var_type
+    && not (aliasable v) in
+  let locally_reusable v =
+    IdentDepGraph.fold_pred (fun p r -> r && Disjunction.CISet.exists (fun d -> p = d.var_id) disjoint) ctx.dep_graph v.var_id true in
+  let eligibles = Disjunction.CISet.filter eligible ctx.evaluated in
+  let dead, live = Disjunction.CISet.partition locally_reusable eligibles in
   try
-    let disj = Hashtbl.find ctx.disjoint var.var_id in
-    let reuse =
-      Hashtbl.find ctx.policy
-	(Disjunction.CISet.max_elt (Disjunction.CISet.filter (fun v -> (eligible v) && (Disjunction.CISet.mem v ctx.evaluated) && not (Disjunction.CISet.mem v ctx.reusable)) disj)).var_id in
+    let disjoint_live = Disjunction.CISet.inter disjoint live in
+    let reuse = Disjunction.CISet.max_elt disjoint_live in
     begin
-      ctx.evaluated <- Disjunction.CISet.add var ctx.evaluated;
-      Hashtbl.add ctx.policy var.var_id reuse;
+      IdentDepGraph.add_edge ctx.dep_graph var.var_id reuse.var_id;
+      Hashtbl.add ctx.policy var.var_id (Hashtbl.find ctx.policy reuse.var_id);
     end
   with Not_found ->
   try
-    let reuse = Hashtbl.find ctx.policy (Disjunction.CISet.choose (Disjunction.CISet.filter (fun v -> eligible v) ctx.reusable)).var_id in
+    let reuse = Disjunction.CISet.choose dead in
     begin
-      replace_in_dep_graph var.var_id reuse.var_id g;
-      Disjunction.replace_in_disjoint_map ctx.disjoint var reuse;
-      ctx.evaluated <- Disjunction.CISet.add reuse ctx.evaluated;
-      ctx.reusable <- Disjunction.CISet.remove reuse ctx.reusable;
-      Hashtbl.add ctx.policy var.var_id reuse;
+      IdentDepGraph.add_edge ctx.dep_graph var.var_id reuse.var_id;
+      Hashtbl.add ctx.policy var.var_id (Hashtbl.find ctx.policy reuse.var_id);
     end
       with Not_found ->
     begin
-      ctx.evaluated <- Disjunction.CISet.add var ctx.evaluated;
       Hashtbl.add ctx.policy var.var_id var;
     end
 
 let compute_reuse_policy node schedule disjoint g =
-  let locals = node_reusable_variables node in
   let sort = ref schedule in
   let ctx = { evaluated = Disjunction.CISet.empty;
-	      quasi     = Disjunction.CISet.empty;
-	      reusable  = Disjunction.CISet.empty;
+	      dep_graph = g;
 	      disjoint  = disjoint;
 	      policy    = Hashtbl.create 23; } in
   while !sort <> []
   do
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "new context:%a@." pp_context ctx);
-    Log.report ~level:6 
-      (fun fmt -> Format.fprintf fmt "new dependency graph:%a@." pp_dep_graph g);
     let heads = List.map (fun v -> get_node_var v node) (List.hd !sort) in
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "NEW HEADS:");
     List.iter (fun head -> Log.report ~level:2 (fun fmt -> Format.fprintf fmt "%s " head.var_id)) heads;
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "@.");
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "COMPUTE_DEPENDENCIES@.");
-    compute_dependencies locals heads ctx g;
+    compute_dependencies heads ctx;
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "new context:%a@." pp_context ctx);
-    Log.report ~level:6 
-      (fun fmt -> Format.fprintf fmt "new dependency graph:%a@." pp_dep_graph g);
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "COMPUTE_REUSE@.");
-    List.iter (fun head -> compute_reuse node head ctx g) heads;
+    List.iter (compute_reuse node ctx) heads;
+    compute_evaluated heads ctx;
     List.iter (fun head -> Log.report ~level:6 (fun fmt -> Format.fprintf fmt "reuse %s instead of %s@." (Hashtbl.find ctx.policy head.var_id).var_id head.var_id)) heads;
     sort := List.tl !sort;
   done;
-  IdentDepGraph.clear g;
+  IdentDepGraph.clear ctx.dep_graph;
   ctx.policy
 
 (* Reuse policy:
@@ -257,7 +233,6 @@ let compute_reuse_policy node schedule disjoint g =
         x = x;                     --> ;           for scalar vars
        or:
         x = &{ f1 = x->f1; f2 = t; } --> x->f2 = t;   for struct vars
-     - such simplifications are, until now, only expressible at the C source level...
  *)
 
 
