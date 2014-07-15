@@ -40,6 +40,7 @@ val consts_table: (ident, const_desc) Hashtbl.t
 val type_table: (type_dec_desc, type_dec_desc) Hashtbl.t
 val get_repr_type: type_dec_desc -> type_dec_desc
 val is_user_type: type_dec_desc -> bool
+val coretype_equal: type_dec_desc -> type_dec_desc -> bool
 val tag_true: label
 val tag_false: label
 val tag_table: (label, type_dec_desc) Hashtbl.t

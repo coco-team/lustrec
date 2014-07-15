@@ -193,6 +193,29 @@ let get_repr_type typ =
   let typ_def = Hashtbl.find type_table typ in
   if is_user_type typ_def then typ else typ_def
 
+let rec coretype_equal ty1 ty2 =
+  let res = 
+  match ty1, ty2 with
+  | Tydec_any       , _
+  | _               , Tydec_any        -> assert false
+  | Tydec_const _   , Tydec_const _    -> get_repr_type ty1 = get_repr_type ty2
+  | Tydec_const _   , _                -> let ty1' = Hashtbl.find type_table ty1
+					  in (not (is_user_type ty1')) && coretype_equal ty1' ty2
+  | _               , Tydec_const _    -> coretype_equal ty2 ty1
+  | Tydec_int       , Tydec_int
+  | Tydec_real      , Tydec_real
+  | Tydec_float     , Tydec_float
+  | Tydec_bool      , Tydec_bool       -> true
+  | Tydec_clock ty1 , Tydec_clock ty2  -> coretype_equal ty1 ty2
+  | Tydec_enum tl1  , Tydec_enum tl2   -> List.sort compare tl1 = List.sort compare tl2
+  | Tydec_struct fl1, Tydec_struct fl2 ->
+       List.length fl1 = List.length fl2
+    && List.for_all2 (fun (f1, t1) (f2, t2) -> f1 = f2 && coretype_equal t1 t2)
+      (List.sort (fun (f1,_) (f2,_) -> compare f1 f2) fl1)
+      (List.sort (fun (f1,_) (f2,_) -> compare f1 f2) fl2)
+  | _                                  -> false
+  in ((*Format.eprint "coretype_equal %a %a = %B@." Printers.pp_var_type_dec_desc ty1 Printers.pp_var_type_dec_desc ty2 res;*) res)
+
 let tag_true = "true"
 let tag_false = "false"
 
@@ -380,7 +403,7 @@ let get_nodes prog =
     fun nodes decl ->
       match decl.top_decl_desc with
 	| Node nd -> nd::nodes
-	| Consts _ | ImportedNode _ | Open _ -> nodes  
+	| Consts _ | ImportedNode _ | Open _ | Type _ -> nodes  
   ) [] prog
 
 let get_consts prog = 
@@ -388,10 +411,16 @@ let get_consts prog =
     fun consts decl ->
       match decl.top_decl_desc with
 	| Consts clist -> clist@consts
-	| Node _ | ImportedNode _ | Open _ -> consts  
+	| Node _ | ImportedNode _ | Open _ | Type _ -> consts  
   ) [] prog
 
-
+let get_types prog = 
+  List.fold_left (
+    fun types decl ->
+      match decl.top_decl_desc with
+	| Type typ -> typ::types
+	| Node _ | ImportedNode _ | Open _ | Consts _ -> types  
+  ) [] prog
 
 (************************************************************************)
 (*        Renaming                                                      *)
@@ -543,7 +572,8 @@ let rename_prog f_node f_var f_const prog =
       | Consts c -> 
 	{ top with top_decl_desc = Consts (List.map (rename_const f_const) c) }
       | ImportedNode _
-      | Open _ -> top)
+      | Open _
+      | Type _ -> top)
       ::accu
 ) [] prog
   )
@@ -561,7 +591,7 @@ let pp_decl_type fmt tdecl =
     fprintf fmt "%s: " ind.nodei_id;
     Utils.reset_names ();
     fprintf fmt "%a@ " Types.print_ty ind.nodei_type
-  | Consts _ | Open _ -> ()
+  | Consts _ | Open _ | Type _ -> ()
 
 let pp_prog_type fmt tdecl_list =
   Utils.fprintf_list ~sep:"" pp_decl_type fmt tdecl_list
@@ -576,7 +606,7 @@ let pp_decl_clock fmt cdecl =
     fprintf fmt "%s: " ind.nodei_id;
     Utils.reset_names ();
     fprintf fmt "%a@ " Clocks.print_ck ind.nodei_clock
-  | Consts _ | Open _ -> ()
+  | Consts _ | Open _ | Type _ -> ()
 
 let pp_prog_clock fmt prog =
   Utils.fprintf_list ~sep:"" pp_decl_clock fmt prog

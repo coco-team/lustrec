@@ -30,6 +30,8 @@ type schedule_report =
 (* Topological sort with a priority for variables belonging in the same equation lhs.
    For variables still unrelated, standard compare is used to choose the minimal element.
    This priority is used since it helps a lot in factorizing generated code.
+   Moreover, the dependency graph is browsed in a depth-first manner whenever possible,
+   to improve the behavior of optimization algorithms applied in forthcoming compilation steps. 
    In the following functions:
    - [eq_equiv] is the equivalence relation between vars of the same equation lhs
    - [g] the (imperative) graph to be topologically sorted
