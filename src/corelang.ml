@@ -194,27 +194,28 @@ let get_repr_type typ =
   if is_user_type typ_def then typ else typ_def
 
 let rec coretype_equal ty1 ty2 =
-  let res = 
+  (*let res =*) 
   match ty1, ty2 with
-  | Tydec_any       , _
-  | _               , Tydec_any        -> assert false
-  | Tydec_const _   , Tydec_const _    -> get_repr_type ty1 = get_repr_type ty2
-  | Tydec_const _   , _                -> let ty1' = Hashtbl.find type_table ty1
-					  in (not (is_user_type ty1')) && coretype_equal ty1' ty2
-  | _               , Tydec_const _    -> coretype_equal ty2 ty1
-  | Tydec_int       , Tydec_int
-  | Tydec_real      , Tydec_real
-  | Tydec_float     , Tydec_float
-  | Tydec_bool      , Tydec_bool       -> true
-  | Tydec_clock ty1 , Tydec_clock ty2  -> coretype_equal ty1 ty2
-  | Tydec_enum tl1  , Tydec_enum tl2   -> List.sort compare tl1 = List.sort compare tl2
-  | Tydec_struct fl1, Tydec_struct fl2 ->
+  | Tydec_any           , _
+  | _                   , Tydec_any             -> assert false
+  | Tydec_const _       , Tydec_const _         -> get_repr_type ty1 = get_repr_type ty2
+  | Tydec_const _       , _                     -> let ty1' = Hashtbl.find type_table ty1
+	       					   in (not (is_user_type ty1')) && coretype_equal ty1' ty2
+  | _                   , Tydec_const _         -> coretype_equal ty2 ty1
+  | Tydec_int           , Tydec_int
+  | Tydec_real          , Tydec_real
+  | Tydec_float         , Tydec_float
+  | Tydec_bool          , Tydec_bool            -> true
+  | Tydec_clock ty1     , Tydec_clock ty2       -> coretype_equal ty1 ty2
+  | Tydec_array (d1,ty1), Tydec_array (d2, ty2) -> Dimension.is_eq_dimension d1 d2 && coretype_equal ty1 ty2
+  | Tydec_enum tl1      , Tydec_enum tl2        -> List.sort compare tl1 = List.sort compare tl2
+  | Tydec_struct fl1    , Tydec_struct fl2      ->
        List.length fl1 = List.length fl2
     && List.for_all2 (fun (f1, t1) (f2, t2) -> f1 = f2 && coretype_equal t1 t2)
       (List.sort (fun (f1,_) (f2,_) -> compare f1 f2) fl1)
       (List.sort (fun (f1,_) (f2,_) -> compare f1 f2) fl2)
   | _                                  -> false
-  in ((*Format.eprint "coretype_equal %a %a = %B@." Printers.pp_var_type_dec_desc ty1 Printers.pp_var_type_dec_desc ty2 res;*) res)
+  (*in (Format.eprintf "coretype_equal %a %a = %B@." Printers.pp_var_type_dec_desc ty1 Printers.pp_var_type_dec_desc ty2 res; res)*)
 
 let tag_true = "true"
 let tag_false = "false"
@@ -421,6 +422,18 @@ let get_types prog =
 	| Type typ -> typ::types
 	| Node _ | ImportedNode _ | Open _ | Consts _ -> types  
   ) [] prog
+
+let get_node_interface nd =
+ {nodei_id = nd.node_id;
+  nodei_type = nd.node_type;
+  nodei_clock = nd.node_clock;
+  nodei_inputs = nd.node_inputs;
+  nodei_outputs = nd.node_outputs;
+  nodei_stateless = nd.node_dec_stateless;
+  nodei_spec = nd.node_spec;
+  nodei_prototype = None;
+  nodei_in_lib = None;
+ }
 
 (************************************************************************)
 (*        Renaming                                                      *)

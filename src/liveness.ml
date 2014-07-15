@@ -105,6 +105,11 @@ let remove_roots ctx =
       end
   done
  
+(* checks whether a variable is aliasable,
+   depending on its (address) type *)
+let is_aliasable var =
+ Types.is_address_type var.var_type
+ 
 (* checks whether a variable [v] is an input of the [var] equation, with an address type.
    if so, [var] could not safely reuse/alias [v], should [v] be dead in the caller node,
    because [v] may not be dead in the callee node when [var] is assigned *)

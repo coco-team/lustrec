@@ -25,6 +25,7 @@ let verbose_level = ref 1
 let global_inline = ref false
 let witnesses = ref false
 let optimization = ref 2
+let lusi = ref false
 
 let horntraces = ref false
 let horn_cex = ref false
@@ -34,11 +35,11 @@ let options =
   [ "-d", Arg.Set_string dest_dir,
     "produces code in the specified directory (default: .)";
     "-node", Arg.Set_string main_node, "specifies the main node";
-    "-init", Arg.Set delay_calculus, "performs an initialisation analysis for Lustre nodes";
-    "-dynamic", Arg.Clear static_mem, "specifies a dynamic allocation scheme for main Lustre node (default: static)";
-    "-ansi", Arg.Set ansi, "specifies that generated C code is ansi C90 compliant (default: C99)";
-    "-check-access", Arg.Set check, "checks at runtime that array accesses always lie within bounds (default: no check)";
-
+    "-init", Arg.Set delay_calculus, "performs an initialisation analysis for Lustre nodes <default: no analysis>";
+    "-dynamic", Arg.Clear static_mem, "specifies a dynamic allocation scheme for main Lustre node <default: static>";
+    "-ansi", Arg.Set ansi, "specifies that generated C code is ansi C90 compliant <default: C99>";
+    "-check-access", Arg.Set check, "checks at runtime that array accesses always lie within bounds <default: no check>";
+    "-lusi", Arg.Set lusi, "only generates a .lusi interface source file from a Lustre source <default: no generation>";
     "-no-spec", Arg.Unit (fun () -> spec := "no"), "do not generate any specification";
     "-acsl-spec", Arg.Unit (fun () -> spec := "acsl"), "generates an ACSL encoding of the specification. Only meaningful for the C backend (default)";
     "-c-spec", Arg.Unit (fun () -> spec := "c"), "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
