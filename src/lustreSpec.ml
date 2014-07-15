@@ -32,6 +32,11 @@ and type_dec_desc =
   | Tydec_struct of (ident * type_dec_desc) list
   | Tydec_array of Dimension.dim_expr * type_dec_desc
 
+type type_def =
+  {
+    ty_def_id: ident;
+    ty_def_desc: type_dec_desc}
+
 type clock_dec =
     {ck_dec_desc: clock_dec_desc;
      ck_dec_loc: Location.t}
@@ -173,6 +178,7 @@ type top_decl_desc =
 | ImportedNode of imported_node_desc
 | Open of bool * string (* the boolean set to true denotes a local 
 			   lusi vs a lusi installed at system level *)
+| Type of type_def
 
 type top_decl =
     {top_decl_desc: top_decl_desc;

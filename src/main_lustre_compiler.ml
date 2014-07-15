@@ -75,7 +75,7 @@ let load_lusi own filename =
       Parse.report_error err;
       raise exc
     | Corelang.Error (loc, err) as exc -> (
-      eprintf "Parsing error %a%a@."
+      eprintf "Parsing error: %a%a@."
 	Corelang.pp_error err
 	Location.pp_loc loc;
       raise exc
@@ -93,6 +93,8 @@ let load_n_check_lusi source_name lusi_name prog computed_types_env computed_clo
     let header = load_lusi true lusi_name in
     let _, declared_types_env, declared_clocks_env = check_lusi header in
         
+   (* checking defined types are compatible with declared types*)
+    Typing.check_typedef_compat header;
 
     (* checking type compatibility with computed types*)
     Typing.check_env_compat header declared_types_env computed_types_env;
@@ -286,6 +288,15 @@ let rec compile basename extension =
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization@,");
 	Optimize_machine.machines_reuse_variables machine_code node_schs
+      end
+    else
+      machine_code
+ in  
+  let machine_code = 
+    if !Options.optimization >= 3 && !Options.output <> "horn" then
+      begin
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization@,");
+	Optimize_machine.machines_fusion machine_code
       end
     else
       machine_code

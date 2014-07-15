@@ -670,6 +670,7 @@ let type_top_decl env decl =
       type_imported_node env nd decl.top_decl_loc
   | Consts clist ->
       type_top_consts env clist
+  | Type _
   | Open _  -> env
 
 let type_prog env decls =
@@ -701,7 +702,8 @@ let uneval_top_generics decl =
       uneval_node_generics (nd.node_inputs @ nd.node_outputs)
   | ImportedNode nd ->
       uneval_node_generics (nd.nodei_inputs @ nd.nodei_outputs)
-  | Consts clist -> ()
+  | Consts _
+  | Type _
   | Open _  -> ()
 
 let uneval_prog_generics prog =
@@ -727,6 +729,16 @@ let check_env_compat header declared computed =
     Types.print_ty Format.std_formatter computed_t;*)
     try_unify ~sub:true ~semi:true decl_type_k computed_t Location.dummy_loc
 		    )
+let check_typedef_top decl =
+  match decl.top_decl_desc with
+  | Type ty ->
+Format.eprintf "check_typedef %a %a@." Printers.pp_var_type_dec_desc ty.ty_def_desc Printers.pp_var_type_dec_desc (Hashtbl.find type_table (Tydec_const ty.ty_def_id));
+    if coretype_equal ty.ty_def_desc (Hashtbl.find type_table (Tydec_const ty.ty_def_id)) then ()
+    else raise (Error (decl.top_decl_loc, Type_mismatch ty.ty_def_id))
+  | _  -> ()
+
+let check_typedef_compat header =
+  List.iter check_typedef_top header
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

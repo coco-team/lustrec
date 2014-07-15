@@ -11,6 +11,7 @@
 
 open LustreSpec 
 open Corelang
+open Causality
 open Machine_code 
 
 let rec eliminate elim instr =
@@ -201,6 +202,64 @@ let machines_reuse_variables prog node_schs =
       machine_reuse_variables m (Utils.IMap.find m.mname.node_id node_schs).Scheduling.reuse_table
     ) prog
 
+let rec instr_assign res instr =
+  match instr with
+  | MLocalAssign (i, _) -> Disjunction.CISet.add i res
+  | MStateAssign (i, _) -> Disjunction.CISet.add i res
+  | MBranch (g, hl)     -> List.fold_left (fun res (h, b) -> instrs_assign res b) res hl
+  | MStep (il, _, _)    -> List.fold_right Disjunction.CISet.add il res
+  | _                   -> res
+
+and instrs_assign res instrs =
+  List.fold_left instr_assign res instrs
+
+let rec instr_constant_assign var instr =
+  match instr with
+  | MLocalAssign (i, Cst (Const_tag _))
+  | MStateAssign (i, Cst (Const_tag _)) -> i = var
+  | MBranch (g, hl)                     -> List.for_all (fun (h, b) -> instrs_constant_assign var b) hl
+  | _                                   -> false
+
+and instrs_constant_assign var instrs =
+  List.fold_left (fun res i -> if Disjunction.CISet.mem var (instr_assign Disjunction.CISet.empty i) then instr_constant_assign var i else res) false instrs
+
+let rec instr_reduce branches instr1 cont =
+  match instr1 with
+  | MLocalAssign (_, Cst (Const_tag c)) -> instr1 :: (List.assoc c branches @ cont)
+  | MStateAssign (_, Cst (Const_tag c)) -> instr1 :: (List.assoc c branches @ cont)
+  | MBranch (g, hl)                     -> MBranch (g, List.map (fun (h, b) -> (h, instrs_reduce branches b [])) hl) :: cont
+  | _                                   -> instr1 :: cont
+
+and instrs_reduce branches instrs cont =
+ match instrs with
+ | []        -> cont
+ | [i]       -> instr_reduce branches i cont
+ | i1::i2::q -> i1 :: instrs_reduce branches (i2::q) cont
+
+let rec instrs_fusion instrs =
+  match instrs with
+  | []
+  | [_]                                                               ->
+    instrs
+  | i1::(MBranch (LocalVar v, hl))::q when instr_constant_assign v i1 ->
+    instr_reduce (List.map (fun (h, b) -> h, instrs_fusion b) hl) i1 (instrs_fusion q)
+  | i1::(MBranch (StateVar v, hl))::q when instr_constant_assign v i1 ->
+    instr_reduce (List.map (fun (h, b) -> h, instrs_fusion b) hl) i1 (instrs_fusion q) 
+  | i1::i2::q                                                         ->
+    i1 :: instrs_fusion (i2::q)
+
+let step_fusion step =
+  { step with
+    step_instrs = instrs_fusion step.step_instrs;
+  }
+
+let rec machine_fusion m =
+  { m with
+    mstep = step_fusion m.mstep
+  }
+
+let machines_fusion prog =
+  List.map machine_fusion prog
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

@@ -124,11 +124,10 @@ let rec is_eq_dimension d1 d2 =
     f1 = f2 && List.length args1 = List.length args2 && List.for_all2 is_eq_dimension args1 args2
   | Dite (c1, t1, e1), Dite (c2, t2, e2) ->
     is_eq_dimension c1 c2 && is_eq_dimension t1 t2 && is_eq_dimension e1 e2
-  | Dvar, _
-  | _, Dvar
-  | Dunivar, _
-  | _, Dunivar -> false
-  | _ -> d1 = d2
+  | Dint i1   , Dint i2    -> i1 = i2
+  | Dbool b1  , Dbool b2   -> b1 = b2
+  | Dident id1, Dident id2 -> id1 = id2
+  | _                      -> false
 
 let is_dimension_const dim =
  match (repr dim).dim_desc with

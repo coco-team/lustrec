@@ -10,10 +10,11 @@
 /********************************************************************/
 
 %{
+open Utils
 open LustreSpec
 open Corelang
 open Dimension
-open Utils
+open Parse
 
 let get_loc () = Location.symbol_rloc ()
 let mktyp x = mktyp (get_loc ()) x
@@ -34,32 +35,6 @@ let mkdim_appl f args = mkdim_appl (get_loc ()) f args
 let mkdim_ite i t e = mkdim_ite (get_loc ()) i t e
 
 let mkannots annots = { annots = annots; annot_loc = get_loc () }
-
-let add_node loc own msg hashtbl name value =
-  try
-    match (Hashtbl.find hashtbl name).top_decl_desc, value.top_decl_desc with
-    | Node _        , ImportedNode _ when own   -> ()
-    | ImportedNode _, _                         -> Hashtbl.add hashtbl name value
-    | Node _        , _                         -> raise (Error (loc, Already_bound_symbol msg))
-    | _                                         -> assert false
-  with
-    Not_found                                   -> Hashtbl.add hashtbl name value
-
-
-let add_symbol loc msg hashtbl name value =
- if Hashtbl.mem hashtbl name
- then raise (Error (loc, Already_bound_symbol msg))
- else Hashtbl.add hashtbl name value
-
-let check_symbol loc msg hashtbl name =
- if not (Hashtbl.mem hashtbl name)
- then raise (Error (loc, Unbound_symbol msg))
- else ()
-
-let check_node_symbol msg name value =
- if Hashtbl.mem node_table name
- then () (* TODO: should we check the types here ? *)
- else Hashtbl.add node_table name value
 
 %}
 
@@ -128,10 +103,13 @@ let check_node_symbol msg name value =
 %%
 
 prog:
- open_list typ_def_list top_decl_list EOF { $1 @ (List.rev $3) }
+ open_list typ_def_prog top_decl_list EOF { $1 @ $2 @ (List.rev $3) }
+
+typ_def_prog:
+ typ_def_list { $1 true }
 
 header:
- open_list typ_def_list top_decl_header_list EOF { (fun own -> ($1 @ (List.rev ($3 own)))) }
+ open_list typ_def_list top_decl_header_list EOF { (fun own -> ($1 @ let typs = $2 own in typs @ (List.rev ($3 own)))) }
 
 open_list:
   { [] }
@@ -142,13 +120,13 @@ open_lusi:
 | OPEN LT IDENT GT { mktop_decl (Open (false, $3)) }
 
 top_decl_list:
-  top_decl {[$1]}
+   {[]}
 | top_decl_list top_decl {$2::$1}
 
 
 top_decl_header_list:
-  top_decl_header {(fun own -> [$1 own]) }
-| top_decl_header_list top_decl_header {(fun own -> ($2 own)::($1 own)) }
+   {(fun own -> []) }
+| top_decl_header_list top_decl_header {(fun own -> let h1 = $1 own in ($2 own)::h1) }
 
 state_annot:
   FUNCTION { true }
@@ -168,9 +146,7 @@ top_decl_header:
 			     nodei_prototype = $13;
 			     nodei_in_lib = $14;})
     in
-     check_node_symbol ("node " ^ $3) $3 nd; 
-     let loc = get_loc () in
-     (fun own -> add_node loc own ("node " ^ $3) node_table $3 nd; nd) }
+     (fun own -> add_node own $3 nd; nd) }
 
 prototype_opt:
  { None }
@@ -200,8 +176,7 @@ top_decl:
 			     node_spec = $1;
 			     node_annot = annots})
      in
-     let loc = Location.symbol_rloc () in
-     add_node loc true ("node " ^ $3) node_table $3 nd; nd}
+     add_node true $3 nd; nd}
 
 nodespec_list:
  { None }
@@ -211,50 +186,39 @@ nodespec_list:
   | Some s2 -> (fun s1 -> Some (merge_node_annot s1 s2))) $2 $1 }
 
 typ_def_list:
-    /* empty */ {}
-| typ_def SCOL typ_def_list {$1;$3}
+    /* empty */             { (fun own -> []) }
+| typ_def SCOL typ_def_list { (fun own -> let ty1 = ($1 own) in ty1 :: ($3 own)) }
 
 typ_def:
-  TYPE IDENT EQ typeconst {
-    try
-      let loc = Location.symbol_rloc () in
-      add_symbol loc ("type " ^ $2) type_table (Tydec_const $2) (get_repr_type $4)
-    with Not_found-> assert false }
-| TYPE IDENT EQ ENUM LCUR tag_list RCUR { Hashtbl.add type_table (Tydec_const $2) (Tydec_enum ($6 (Tydec_const $2))) }
-| TYPE IDENT EQ STRUCT LCUR field_list RCUR { Hashtbl.add type_table (Tydec_const $2) (Tydec_struct ($6 (Tydec_const $2))) }
+  TYPE IDENT EQ typ_def_rhs { let typ = mktop_decl (Type { ty_def_id = $2;
+							   ty_def_desc = $4
+							 })
+			      in (fun own -> add_type own $2 typ; typ) }
+
+typ_def_rhs:
+  typeconst                   { $1 }
+| ENUM LCUR tag_list RCUR     { Tydec_enum (List.rev $3) }
+| STRUCT LCUR field_list RCUR { Tydec_struct (List.rev $3) }
 
 array_typ_decl:
                             { fun typ -> typ }
  | POWER dim array_typ_decl { fun typ -> $3 (Tydec_array ($2, typ)) }
 
 typeconst:
-  TINT array_typ_decl  { $2 Tydec_int }
-| TBOOL array_typ_decl { $2 Tydec_bool  }
-| TREAL array_typ_decl { $2 Tydec_real  }
+  TINT array_typ_decl   { $2 Tydec_int }
+| TBOOL array_typ_decl  { $2 Tydec_bool  }
+| TREAL array_typ_decl  { $2 Tydec_real  }
 | TFLOAT array_typ_decl { $2 Tydec_float }
-| IDENT array_typ_decl { 
-        let loc = Location.symbol_rloc () in
-	check_symbol loc ("type " ^ $1) type_table (Tydec_const $1); $2 (Tydec_const $1) }
-| TBOOL TCLOCK  { Tydec_clock Tydec_bool }
-| IDENT TCLOCK  { Tydec_clock (Tydec_const $1) }
+| IDENT array_typ_decl  { $2 (Tydec_const $1) }
+| TBOOL TCLOCK          { Tydec_clock Tydec_bool }
+| IDENT TCLOCK          { Tydec_clock (Tydec_const $1) }
 
 tag_list:
-  IDENT
-  { let loc = Location.symbol_rloc () in 
-    (fun t -> 
-      add_symbol loc ("tag " ^ $1) tag_table $1 t; $1 :: []) }
-| tag_list COMMA IDENT
-      {       
-	let loc = Location.symbol_rloc () in
-	(fun t -> add_symbol loc ("tag " ^ $3)tag_table $3 t; $3 :: ($1 t)) 
-      }
+  IDENT                { $1 :: [] }
+| tag_list COMMA IDENT { $3 :: $1 }
       
-field_list:
-  { (fun t -> []) }
-| field_list IDENT COL typeconst SCOL
-      {
-	let loc = Location.symbol_rloc () in
-	(fun t -> add_symbol loc ("field " ^ $2) field_table $2 t; ($1 t) @ [ ($2, $4) ]) }
+field_list:                           { [] }
+| field_list IDENT COL typeconst SCOL { ($2, $4) :: $1 }
       
 eq_list:
   { [], [], [] }

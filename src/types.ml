@@ -49,6 +49,7 @@ type error =
   | Assigned_constant of ident
   | WrongArity of int * int
   | WrongMorphism of int * int
+  | Type_mismatch of ident
   | Type_clash of type_expr * type_expr
   | Poly_imported_node of ident
 
@@ -155,6 +156,8 @@ let pp_error fmt = function
     fprintf fmt "Expecting %d argument(s), found %d@." ar1 ar2
   | WrongMorphism (ar1, ar2) ->
     fprintf fmt "Expecting %d argument(s) for homomorphic extension, found %d@." ar1 ar2
+  | Type_mismatch id ->
+    fprintf fmt "Definition and declaration of type %s don't agree@." id
   | Undefined_var vmap ->
     fprintf fmt "No definition provided for variable(s): %a@."
       (Utils.fprintf_list ~sep:"," pp_print_string)

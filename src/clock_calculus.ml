@@ -846,8 +846,8 @@ let clock_top_decl env decl =
     clock_imported_node env decl.top_decl_loc nd
   | Consts clist ->
     clock_top_consts env clist
-  | Open _ ->
-    env
+  | Open _
+  | Type _ -> env
 
 let clock_prog env decls =
   List.fold_left (fun e decl -> clock_top_decl e decl) env decls
@@ -878,8 +878,9 @@ let uneval_top_generics decl =
       uneval_node_generics (nd.node_inputs @ nd.node_locals @ nd.node_outputs)
   | ImportedNode nd ->
       uneval_node_generics (nd.nodei_inputs @ nd.nodei_outputs)
-  | Consts clist -> ()
-  | Open _  -> ()
+  | Consts _
+  | Open _
+  | Type _   -> ()
 
 let uneval_prog_generics prog =
  List.iter uneval_top_generics prog
