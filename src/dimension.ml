@@ -285,7 +285,7 @@ let rec generalize dim =
 let rec instantiate inst_dim_vars dim =
   let dim = repr dim in
   match dim.dim_desc with
-  | Dvar _
+  | Dvar
   | Dident _
   | Dint _
   | Dbool _ -> dim

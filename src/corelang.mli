@@ -61,6 +61,7 @@ val const_impl: constant -> constant -> constant
 val get_node_vars: node_desc -> var_decl list
 val get_node_var: ident -> node_desc -> var_decl
 val get_node_eq: ident -> node_desc -> eq
+val get_node_interface: node_desc -> imported_node_desc
 
 (* val get_const: ident -> constant *)
 

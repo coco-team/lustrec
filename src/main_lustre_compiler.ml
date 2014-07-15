@@ -131,7 +131,45 @@ let load_n_check_lusi source_name lusi_name prog computed_types_env computed_clo
       eprintf "Stateless status mismatch between defined status and declared status in lustre interface file: %a@."
 	Stateless.pp_error err;
       raise exc
-    
+
+let extract_interface prog =
+ List.fold_right
+   (fun decl header ->
+    match decl.top_decl_desc with
+    | Node nd        -> { decl with top_decl_desc = ImportedNode (Corelang.get_node_interface nd) } :: header 
+    | ImportedNode _ -> header
+    | Consts _
+    | Type _
+    | Open _         -> decl :: header)
+   prog []
+
+let write_compiled_header (header : top_decl list) basename extension =
+  let target_name = basename^extension in
+  let outchan = open_out_bin target_name in
+  begin
+    Marshal.to_channel outchan header [];
+    close_out outchan
+  end
+
+let read_compiled_header basename extension =
+  let source_name = basename^extension in
+  let inchan = open_in_bin source_name in
+  let header = (Marshal.from_channel inchan : top_decl list) in
+  begin
+    close_in inchan;
+    header
+  end
+
+let compile_header basename extension =
+   let header_name = basename^extension in
+   let header = load_lusi true header_name in
+   begin
+     ignore (check_lusi header);
+     write_compiled_header header basename (extension^"c")
+   end
+
+let compile_prog basename extension =
+
 let rec compile basename extension =
 
   (* Loading the input file *)
