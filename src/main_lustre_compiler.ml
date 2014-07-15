@@ -169,6 +169,7 @@ let compile_header basename extension =
    end
 
 let compile_prog basename extension =
+ ()
 
 let rec compile basename extension =
 
@@ -413,9 +414,11 @@ let rec compile basename extension =
 
     | _ -> assert false
   in
-  Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
+  begin
+    Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
   (* We stop the process here *)
-  exit 0
+    exit 0
+  end
   
 let anonymous filename =
   let ok_ext, ext = List.fold_left (fun (ok, ext) ext' -> if not ok && Filename.check_suffix filename ext' then true, ext' else ok, ext) (false, "") extensions in
