@@ -17,6 +17,10 @@ let delay_zero () = new_univar ()
 let delay_un =
   new_delay Dundef
 
+let delay_nullary_poly_op =
+  let univ = new_univar () in
+  univ
+
 let delay_unary_poly_op =
   let univ = new_univar () in
   new_delay (Darrow (univ, univ))

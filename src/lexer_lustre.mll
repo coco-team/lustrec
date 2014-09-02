@@ -53,6 +53,8 @@ let keyword_table =
   "clock", TCLOCK;
   "not", NOT;
   "tail", TAIL;
+  "true", TRUE;
+  "false", FALSE;
   "and", AND;
   "or", OR;
   "xor", XOR;
@@ -114,12 +116,18 @@ rule token = parse
 | "tel." {TEL}
 | "tel;" {TEL}
 | "#open" { OPEN }
-| ['_' 'a'-'z' 'A'-'Z'] [ '_' 'a'-'z' 'A'-'Z' '0'-'9']*
+| ['_' 'a'-'z'] [ '_' 'a'-'z' 'A'-'Z' '0'-'9']*
     {let s = Lexing.lexeme lexbuf in
     try
       Hashtbl.find keyword_table s
     with Not_found ->
       IDENT s}
+| ['A'-'Z'] [ '_' 'a'-'z' 'A'-'Z' '0'-'9']*
+    {let s = Lexing.lexeme lexbuf in
+    try
+      Hashtbl.find keyword_table s
+    with Not_found ->
+      UIDENT s}
 | "->" {ARROW}
 | "=>" {IMPL}
 | "<=" {LTE}

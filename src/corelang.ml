@@ -28,8 +28,6 @@ module VSet = Set.Make(VDeclModule)
 
 let dummy_type_dec = {ty_dec_desc=Tydec_any; ty_dec_loc=Location.dummy_loc}
 
-
-
 let dummy_clock_dec = {ck_dec_desc=Ckdec_any; ck_dec_loc=Location.dummy_loc}
 
 
@@ -87,11 +85,45 @@ let mkassert loc expr =
     assert_expr = expr
   }
 
-let mktop_decl loc d =
-  { top_decl_desc = d; top_decl_loc = loc }
+let mktop_decl loc own itf d =
+  { top_decl_desc = d; top_decl_loc = loc; top_decl_owner = own; top_decl_itf = itf }
 
 let mkpredef_call loc funname args =
   mkexpr loc (Expr_appl (funname, mkexpr loc (Expr_tuple args), None))
+
+
+let const_of_top top_decl =
+  match top_decl.top_decl_desc with
+  | Const c -> c
+  | _ -> assert false
+
+let node_of_top top_decl =
+  match top_decl.top_decl_desc with
+  | Node nd -> nd
+  | _ -> assert false
+
+let imported_node_of_top top_decl =
+  match top_decl.top_decl_desc with
+  | ImportedNode ind -> ind
+  | _ -> assert false
+
+let typedef_of_top top_decl =
+  match top_decl.top_decl_desc with
+  | TypeDef tdef -> tdef
+  | _ -> assert false
+
+let dependency_of_top top_decl =
+  match top_decl.top_decl_desc with
+  | Open (local, dep) -> (local, dep)
+  | _ -> assert false
+
+let consts_of_enum_type top_decl =
+  match top_decl.top_decl_desc with
+  | TypeDef tdef ->
+    (match tdef.tydef_desc with
+     | Tydec_enum tags -> List.map (fun tag -> let cdecl = { const_id = tag; const_loc = top_decl.top_decl_loc; const_value = Const_tag tag; const_type = Type_predef.type_const tdef.tydef_id } in { top_decl with top_decl_desc = Const cdecl }) tags
+     | _               -> [])
+  | _ -> assert false
 
 (************************************************************)
 (*   Eexpr functions *)
@@ -142,6 +174,28 @@ let update_expr_annot e annot =
 let (node_table : (ident, top_decl) Hashtbl.t) = Hashtbl.create 30
 let consts_table = Hashtbl.create 30
 
+let print_node_table fmt () =
+  begin
+    Format.fprintf fmt "{ /* node table */@.";
+    Hashtbl.iter (fun id nd ->
+      Format.fprintf fmt "%s |-> %a"
+	id
+	Printers.pp_short_decl nd
+    ) node_table;
+    Format.fprintf fmt "}@."
+  end
+
+let print_consts_table fmt () =
+  begin
+    Format.fprintf fmt "{ /* consts table */@.";
+    Hashtbl.iter (fun id const ->
+      Format.fprintf fmt "%s |-> %a"
+	id
+	Printers.pp_const_decl (const_of_top const)
+    ) consts_table;
+    Format.fprintf fmt "}@."
+  end
+
 let node_name td =
     match td.top_decl_desc with 
     | Node nd         -> nd.node_id
@@ -174,13 +228,30 @@ let is_imported_node td =
 
 
 (* alias and type definition table *)
+
+let top_int_type = mktop_decl Location.dummy_loc Version.prefix false (TypeDef {tydef_id = "int"; tydef_desc = Tydec_int})
+let top_bool_type = mktop_decl Location.dummy_loc Version.prefix false (TypeDef {tydef_id = "bool"; tydef_desc = Tydec_bool})
+let top_float_type = mktop_decl Location.dummy_loc Version.prefix false (TypeDef {tydef_id = "float"; tydef_desc = Tydec_float})
+let top_real_type = mktop_decl Location.dummy_loc Version.prefix false (TypeDef {tydef_id = "real"; tydef_desc = Tydec_real})
+
 let type_table =
   Utils.create_hashtable 20 [
-    Tydec_int  , Tydec_int;
-    Tydec_bool , Tydec_bool;
-    Tydec_float, Tydec_float;
-    Tydec_real , Tydec_real
+    Tydec_int  , top_int_type;
+    Tydec_bool , top_bool_type;
+    Tydec_float, top_float_type;
+    Tydec_real , top_real_type
   ]
+
+let print_type_table fmt () =
+  begin
+    Format.fprintf fmt "{ /* type table */@.";
+    Hashtbl.iter (fun tydec tdef ->
+      Format.fprintf fmt "%a |-> %a"
+	Printers.pp_var_type_dec_desc tydec
+	Printers.pp_typedef (typedef_of_top tdef)
+    ) type_table;
+    Format.fprintf fmt "}@."
+  end
 
 let rec is_user_type typ =
   match typ with
@@ -190,16 +261,16 @@ let rec is_user_type typ =
   | _ -> true
 
 let get_repr_type typ =
-  let typ_def = Hashtbl.find type_table typ in
+  let typ_def = (typedef_of_top (Hashtbl.find type_table typ)).tydef_desc in
   if is_user_type typ_def then typ else typ_def
 
 let rec coretype_equal ty1 ty2 =
-  (*let res =*) 
+  let res =
   match ty1, ty2 with
   | Tydec_any           , _
   | _                   , Tydec_any             -> assert false
   | Tydec_const _       , Tydec_const _         -> get_repr_type ty1 = get_repr_type ty2
-  | Tydec_const _       , _                     -> let ty1' = Hashtbl.find type_table ty1
+  | Tydec_const _       , _                     -> let ty1' = (typedef_of_top (Hashtbl.find type_table ty1)).tydef_desc
 	       					   in (not (is_user_type ty1')) && coretype_equal ty1' ty2
   | _                   , Tydec_const _         -> coretype_equal ty2 ty1
   | Tydec_int           , Tydec_int
@@ -215,7 +286,7 @@ let rec coretype_equal ty1 ty2 =
       (List.sort (fun (f1,_) (f2,_) -> compare f1 f2) fl1)
       (List.sort (fun (f1,_) (f2,_) -> compare f1 f2) fl2)
   | _                                  -> false
-  (*in (Format.eprintf "coretype_equal %a %a = %B@." Printers.pp_var_type_dec_desc ty1 Printers.pp_var_type_dec_desc ty2 res; res)*)
+  in ((*Format.eprintf "coretype_equal %a %a = %B@." Printers.pp_var_type_dec_desc ty1 Printers.pp_var_type_dec_desc ty2 res;*) res)
 
 let tag_true = "true"
 let tag_false = "false"
@@ -262,8 +333,8 @@ let const_impl c1 c2 =
 (* To guarantee uniqueness of tags in enum types *)
 let tag_table =
   Utils.create_hashtable 20 [
-   tag_true, Tydec_bool;
-   tag_false, Tydec_bool
+   tag_true, top_bool_type;
+   tag_false, top_bool_type
   ]
 
 (* To guarantee uniqueness of fields in struct types *)
@@ -272,16 +343,17 @@ let field_table =
   ]
 
 let get_enum_type_tags cty =
+(*Format.eprintf "get_enum_type_tags %a@." Printers.pp_var_type_dec_desc cty;*)
  match cty with
  | Tydec_bool    -> [tag_true; tag_false]
- | Tydec_const _ -> (match Hashtbl.find type_table cty with
+ | Tydec_const _ -> (match (typedef_of_top (Hashtbl.find type_table cty)).tydef_desc with
                      | Tydec_enum tl -> tl
                      | _             -> assert false)
  | _            -> assert false
 
 let get_struct_type_fields cty =
  match cty with
- | Tydec_const _ -> (match Hashtbl.find type_table cty with
+ | Tydec_const _ -> (match (typedef_of_top (Hashtbl.find type_table cty)).tydef_desc with
                      | Tydec_struct fl -> fl
                      | _               -> assert false)
  | _            -> assert false
@@ -403,25 +475,41 @@ let get_nodes prog =
   List.fold_left (
     fun nodes decl ->
       match decl.top_decl_desc with
-	| Node nd -> nd::nodes
-	| Consts _ | ImportedNode _ | Open _ | Type _ -> nodes  
+	| Node _ -> decl::nodes
+	| Const _ | ImportedNode _ | Open _ | TypeDef _ -> nodes  
+  ) [] prog
+
+let get_imported_nodes prog = 
+  List.fold_left (
+    fun nodes decl ->
+      match decl.top_decl_desc with
+	| ImportedNode _ -> decl::nodes
+	| Const _ | Node _ | Open _ | TypeDef _-> nodes  
   ) [] prog
 
 let get_consts prog = 
-  List.fold_left (
-    fun consts decl ->
+  List.fold_right (
+    fun decl consts ->
       match decl.top_decl_desc with
-	| Consts clist -> clist@consts
-	| Node _ | ImportedNode _ | Open _ | Type _ -> consts  
-  ) [] prog
+	| Const _ -> decl::consts
+	| Node _ | ImportedNode _ | Open _ | TypeDef _ -> consts  
+  ) prog []
 
-let get_types prog = 
-  List.fold_left (
-    fun types decl ->
+let get_typedefs prog = 
+  List.fold_right (
+    fun decl types ->
       match decl.top_decl_desc with
-	| Type typ -> typ::types
-	| Node _ | ImportedNode _ | Open _ | Consts _ -> types  
-  ) [] prog
+	| TypeDef _ -> decl::types
+	| Node _ | ImportedNode _ | Open _ | Const _ -> types  
+  ) prog []
+
+let get_dependencies prog =
+  List.fold_right (
+    fun decl deps ->
+      match decl.top_decl_desc with
+	| Open _ -> decl::deps
+	| Node _ | ImportedNode _ | TypeDef _ | Const _ -> deps  
+  ) prog []
 
 let get_node_interface nd =
  {nodei_id = nd.node_id;
@@ -582,11 +670,11 @@ let rename_prog f_node f_var f_const prog =
       (match top.top_decl_desc with
       | Node nd -> 
 	{ top with top_decl_desc = Node (rename_node f_node f_var f_const nd) }
-      | Consts c -> 
-	{ top with top_decl_desc = Consts (List.map (rename_const f_const) c) }
+      | Const c -> 
+	{ top with top_decl_desc = Const (rename_const f_const c) }
       | ImportedNode _
       | Open _
-      | Type _ -> top)
+      | TypeDef _ -> top)
       ::accu
 ) [] prog
   )
@@ -604,7 +692,7 @@ let pp_decl_type fmt tdecl =
     fprintf fmt "%s: " ind.nodei_id;
     Utils.reset_names ();
     fprintf fmt "%a@ " Types.print_ty ind.nodei_type
-  | Consts _ | Open _ | Type _ -> ()
+  | Const _ | Open _ | TypeDef _ -> ()
 
 let pp_prog_type fmt tdecl_list =
   Utils.fprintf_list ~sep:"" pp_decl_type fmt tdecl_list
@@ -619,7 +707,7 @@ let pp_decl_clock fmt cdecl =
     fprintf fmt "%s: " ind.nodei_id;
     Utils.reset_names ();
     fprintf fmt "%a@ " Clocks.print_ck ind.nodei_clock
-  | Consts _ | Open _ | Type _ -> ()
+  | Const _ | Open _ | TypeDef _ -> ()
 
 let pp_prog_clock fmt prog =
   Utils.fprintf_list ~sep:"" pp_decl_clock fmt prog
@@ -642,6 +730,10 @@ let pp_error fmt = function
     fprintf fmt
       "%s is already defined.@."
       sym
+  | Unknown_library sym ->
+    fprintf fmt
+      "impossible to load library %s.@."
+      sym
 
 (* filling node table with internal functions *)
 let vdecls_of_typ_ck cpt ty =
@@ -659,7 +751,7 @@ let mk_internal_node id =
   let (tin, tout) = Types.split_arrow ty in
   (*eprintf "internal fun %s: %d -> %d@." id (List.length (Types.type_list_of_type tin)) (List.length (Types.type_list_of_type tout));*)
   let cpt = ref (-1) in
-  mktop_decl Location.dummy_loc
+  mktop_decl Location.dummy_loc Version.prefix false
     (ImportedNode
        {nodei_id = id;
 	nodei_type = ty;

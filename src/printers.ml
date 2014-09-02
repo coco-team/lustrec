@@ -40,65 +40,6 @@ let pp_quantifiers fmt (q, vars) =
     | Forall -> fprintf fmt "forall %a" (fprintf_list ~sep:"; " pp_var) vars 
     | Exists -> fprintf fmt "exists %a" (fprintf_list ~sep:"; " pp_var) vars 
 
-(*
-let pp_econst fmt c = 
-  match c with
-    | EConst_int i -> pp_print_int fmt i
-    | EConst_real r -> pp_print_string fmt r
-    | EConst_float r -> pp_print_float fmt r
-    | EConst_tag  t -> pp_print_string fmt t
-    | EConst_string s -> pp_print_string fmt ("\"" ^ s ^ "\"")
-
-
-let rec pp_eexpr fmt eexpr = 
-  match eexpr.eexpr_desc with
-    | EExpr_const c -> pp_econst fmt c
-    | EExpr_ident id -> pp_print_string fmt id
-    | EExpr_tuple el -> fprintf_list ~sep:"," pp_eexpr fmt el
-    | EExpr_arrow (e1, e2) -> fprintf fmt "%a -> %a" pp_eexpr e1 pp_eexpr e2
-    | EExpr_fby (e1, e2) -> fprintf fmt "%a fby %a" pp_eexpr e1 pp_eexpr e2
-    (* | EExpr_concat (e1, e2) -> fprintf fmt "%a::%a" pp_eexpr e1 pp_eexpr e2 *)
-    (* | EExpr_tail e -> fprintf fmt "tail %a" pp_eexpr e *)
-    | EExpr_pre e -> fprintf fmt "pre %a" pp_eexpr e
-    | EExpr_when (e, id) -> fprintf fmt "%a when %s" pp_eexpr e id
-    | EExpr_merge (id, e1, e2) -> 
-      fprintf fmt "merge (%s, %a, %a)" id pp_eexpr e1 pp_eexpr e2
-    | EExpr_appl (id, e, r) -> pp_eapp fmt id e r
-    | EExpr_forall (vars, e) -> fprintf fmt "forall %a; %a" pp_node_args vars pp_eexpr e 
-    | EExpr_exists (vars, e) -> fprintf fmt "exists %a; %a" pp_node_args vars pp_eexpr e 
-
-
-    (* | EExpr_whennot _ *)
-    (* | EExpr_uclock _ *)
-    (* | EExpr_dclock _ *)
-    (* | EExpr_phclock _ -> assert false *)
-and pp_eapp fmt id e r =
-  match r with
-  | None ->
-    (match id, e.eexpr_desc with
-    | "+", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a + %a)" pp_eexpr e1 pp_eexpr e2
-    | "uminus", _ -> fprintf fmt "(- %a)" pp_eexpr e
-    | "-", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a - %a)" pp_eexpr e1 pp_eexpr e2
-    | "*", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a * %a)" pp_eexpr e1 pp_eexpr e2
-    | "/", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a / %a)" pp_eexpr e1 pp_eexpr e2
-    | "mod", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a mod %a)" pp_eexpr e1 pp_eexpr e2
-    | "&&", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a && %a)" pp_eexpr e1 pp_eexpr e2
-    | "||", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a || %a)" pp_eexpr e1 pp_eexpr e2
-    | "xor", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a ^^ %a)" pp_eexpr e1 pp_eexpr e2
-    | "impl", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a ==> %a)" pp_eexpr e1 pp_eexpr e2
-    | "<", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a < %a)" pp_eexpr e1 pp_eexpr e2
-    | "<=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a <= %a)" pp_eexpr e1 pp_eexpr e2
-    | ">", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a > %a)" pp_eexpr e1 pp_eexpr e2
-    | ">=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a >= %a)" pp_eexpr e1 pp_eexpr e2
-    | "!=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a != %a)" pp_eexpr e1 pp_eexpr e2
-    | "=", EExpr_tuple([e1;e2]) -> fprintf fmt "(%a == %a)" pp_eexpr e1 pp_eexpr e2
-    | "not", _ -> fprintf fmt "(! %a)" pp_eexpr e
-    | "ite", EExpr_tuple([e1;e2;e3]) -> fprintf fmt "(if %a then %a else %a)" pp_eexpr e1 pp_eexpr e2 pp_eexpr e3
-    | _ -> fprintf fmt "%s (%a)" id pp_eexpr e)
-  | Some x -> fprintf fmt "%s (%a) every %s" id pp_eexpr e x 
-*)
-
-
 let rec pp_struct_const_field fmt (label, c) =
   fprintf fmt "%a = %a;" pp_print_string label pp_const c
 and pp_const fmt c = 
@@ -211,8 +152,11 @@ and pp_var_type_dec_desc fmt tdesc =
 let pp_var_type_dec fmt ty =
   pp_var_type_dec_desc fmt ty.ty_dec_desc
 
-let pp_type_def fmt ty =
-  fprintf fmt "type %s = %a;@ " ty.ty_def_id pp_var_type_dec_desc ty.ty_def_desc
+let pp_typedef fmt ty =
+  fprintf fmt "type %s = %a;@ " ty.tydef_id pp_var_type_dec_desc ty.tydef_desc
+
+let pp_typedec fmt ty =
+  fprintf fmt "type %s;@ " ty.tydec_id
 
 (* let rec pp_var_type fmt ty =  *)
 (*   fprintf fmt "%a" (match ty.tdesc with  *)
@@ -279,26 +223,26 @@ fprintf fmt "@[<v 0>%a%t%s %s (%a) returns (%a)@.%a%alet@.@[<h 2>   @ @[<v>%a@ %
 (*fprintf fmt "@ /* Scheduling: %a */ @ " (fprintf_list ~sep:", " pp_print_string) (Scheduling.schedule_node nd)*)
 
 let pp_imported_node fmt ind = 
-  fprintf fmt "@[<v>%s %s (%a) returns (%a) %t@]"
+  fprintf fmt "@[<v>%s %s (%a) returns (%a)@]"
     (if ind.nodei_stateless then "function" else "node")
     ind.nodei_id
     pp_node_args ind.nodei_inputs
     pp_node_args ind.nodei_outputs
-    (fun fmt -> if ind.nodei_stateless then Format.fprintf fmt "stateless") 
 
-let pp_const_list fmt clist = 
-  fprintf_list ~sep:"@ " (fun fmt cdecl ->
-    fprintf fmt "%s = %a;"
-      cdecl.const_id pp_const cdecl.const_value) fmt clist
+let pp_const_decl fmt cdecl =
+  fprintf fmt "%s = %a;" cdecl.const_id pp_const cdecl.const_value
+
+let pp_const_decl_list fmt clist = 
+  fprintf_list ~sep:"@ " pp_const_decl fmt clist
 
 let pp_decl fmt decl =
   match decl.top_decl_desc with
   | Node nd -> fprintf fmt "%a@ " pp_node nd
   | ImportedNode ind ->
     fprintf fmt "imported %a;@ " pp_imported_node ind
-  | Consts clist -> (fprintf fmt "const %a@ " pp_const_list clist)
-  | Open (local, s) -> if local then fprintf fmt "open \"%s\"@ " s else fprintf fmt "open <%s>@ " s
-  | Type tdef -> fprintf fmt "%a@ " pp_type_def tdef
+  | Const c -> fprintf fmt "const %a@ " pp_const_decl c
+  | Open (local, s) -> if local then fprintf fmt "#open \"%s\"@ " s else fprintf fmt "#open <%s>@ " s
+  | TypeDef tdef -> fprintf fmt "%a@ " pp_typedef tdef
 
 let pp_prog fmt prog = 
   fprintf_list ~sep:"@ " pp_decl fmt prog
@@ -307,26 +251,20 @@ let pp_short_decl fmt decl =
   match decl.top_decl_desc with
   | Node nd -> fprintf fmt "node %s@ " nd.node_id
   | ImportedNode ind -> fprintf fmt "imported node %s" ind.nodei_id
-  | Consts clist -> (fprintf fmt "const %a@ " pp_const_list clist)
-  | Open (local, s) -> if local then fprintf fmt "open \"%s\"@ " s else fprintf fmt "open <%s>@ " s
-  | Type tdef -> fprintf fmt "type %s;@ " tdef.ty_def_id
+  | Const c -> fprintf fmt "const %a@ " pp_const_decl c
+  | Open (local, s) -> if local then fprintf fmt "#open \"%s\"@ " s else fprintf fmt "#open <%s>@ " s
+  | TypeDef tdef -> fprintf fmt "type %s;@ " tdef.tydef_id
 
 let pp_lusi fmt decl = 
   match decl.top_decl_desc with
-  | Node nd ->  
-    fprintf fmt 
-      "@[<v>%s %s (%a) returns (%a);@ @]@ "
-      (if nd.node_dec_stateless then "function" else "node")
-      nd.node_id
-      pp_node_args nd.node_inputs
-      pp_node_args nd.node_outputs
-| Consts clist -> (fprintf fmt "const %a@ " pp_const_list clist)
-| Open (local, s) -> if local then fprintf fmt "open \"%s\"@ " s else fprintf fmt "open <%s>@ " s
-| Type tdef -> fprintf fmt "%a@ " pp_type_def tdef
-| ImportedNode _ -> ()
+  | ImportedNode ind -> fprintf fmt "%a;@ " pp_imported_node ind
+  | Const c -> fprintf fmt "const %a@ " pp_const_decl c
+  | Open (local, s) -> if local then fprintf fmt "#open \"%s\"@ " s else fprintf fmt "#open <%s>@ " s
+  | TypeDef tdef -> fprintf fmt "%a@ " pp_typedef tdef
+  | Node _ -> assert false
 
-let pp_lusi_header fmt filename prog =
-  fprintf fmt "(* Generated Lustre Interface file from %s *)@." filename;
+let pp_lusi_header fmt basename prog =
+  fprintf fmt "(* Generated Lustre Interface file from %s.lus *)@." basename;
   fprintf fmt "(* by Lustre-C compiler version %s, %a *)@." Version.number pp_date (Unix.gmtime (Unix.time ()));
   fprintf fmt "(* Feel free to mask some of the definitions by removing them from this file. *)@.@.";
   List.iter (fprintf fmt "%a@." pp_lusi) prog    

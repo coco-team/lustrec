@@ -130,10 +130,16 @@ let rec coretype_type ty =
  | Tstatic (_, t) -> coretype_type t
  | _         -> assert false
 
-let get_type_definition tname =
+let get_coretype_definition tname =
   try
-    type_coretype (fun d -> ()) (Hashtbl.find type_table (Tydec_const tname))
+    let top = Hashtbl.find type_table (Tydec_const tname) in
+    match top.top_decl_desc with
+    | TypeDef tdef -> tdef.tydef_desc
+    | _ -> assert false
   with Not_found -> raise (Error (Location.dummy_loc, Unbound_type tname))
+
+let get_type_definition tname =
+    type_coretype (fun d -> ()) (get_coretype_definition tname)
 
 (* Equality on ground types only *)
 (* Should be used between local variables which must have a ground type *)
@@ -240,7 +246,8 @@ let try_unify ?(sub=false) ?(semi=false) ty1 ty2 loc =
 
 let rec type_struct_const_field loc (label, c) =
   if Hashtbl.mem field_table label
-  then let tydec = Hashtbl.find field_table label in
+  then let tydef = Hashtbl.find field_table label in
+       let tydec = (typedef_of_top tydef).tydef_desc in 
        let tydec_struct = get_struct_type_fields tydec in
        let ty_label = type_coretype (fun d -> ()) (List.assoc label tydec_struct) in
        begin
@@ -260,7 +267,13 @@ and type_const loc c =
 		      Type_predef.type_array d ty
   | Const_tag t     ->
     if Hashtbl.mem tag_table t
-    then type_coretype (fun d -> ()) (Hashtbl.find tag_table t)
+    then 
+      let tydef = typedef_of_top (Hashtbl.find tag_table t) in
+      let tydec =
+	if is_user_type tydef.tydef_desc
+	then Tydec_const tydef.tydef_id
+	else tydef.tydef_desc in
+      type_coretype (fun d -> ()) tydec
     else raise (Error (loc, Unbound_value ("enum tag " ^ t)))
   | Const_struct fl ->
     let ty_struct = new_var () in
@@ -642,19 +655,21 @@ let type_imported_node env nd loc =
   nd.nodei_type <- ty_node;
   new_env
 
-let type_top_consts env clist =
-  List.fold_left (fun env cdecl ->
-    let ty = type_const cdecl.const_loc cdecl.const_value in
-    let d =
-      if is_dimension_type ty
-      then dimension_of_const cdecl.const_loc cdecl.const_value
-      else Dimension.mkdim_var () in
-    let ty = Type_predef.type_static d ty in
-    let new_env = Env.add_value env cdecl.const_id ty in
-    cdecl.const_type <- ty;
-    new_env) env clist
+let type_top_const env cdecl =
+  let ty = type_const cdecl.const_loc cdecl.const_value in
+  let d =
+    if is_dimension_type ty
+    then dimension_of_const cdecl.const_loc cdecl.const_value
+    else Dimension.mkdim_var () in
+  let ty = Type_predef.type_static d ty in
+  let new_env = Env.add_value env cdecl.const_id ty in
+  cdecl.const_type <- ty;
+  new_env
 
-let type_top_decl env decl =
+let type_top_consts env clist =
+  List.fold_left type_top_const env clist
+
+let rec type_top_decl env decl =
   match decl.top_decl_desc with
   | Node nd -> (
       try
@@ -668,9 +683,9 @@ let type_top_decl env decl =
   )
   | ImportedNode nd ->
       type_imported_node env nd decl.top_decl_loc
-  | Consts clist ->
-      type_top_consts env clist
-  | Type _
+  | Const c ->
+      type_top_const env c
+  | TypeDef _ -> List.fold_left type_top_decl env (consts_of_enum_type decl)
   | Open _  -> env
 
 let type_prog env decls =
@@ -702,39 +717,53 @@ let uneval_top_generics decl =
       uneval_node_generics (nd.node_inputs @ nd.node_outputs)
   | ImportedNode nd ->
       uneval_node_generics (nd.nodei_inputs @ nd.nodei_outputs)
-  | Consts _
-  | Type _
+  | Const _
+  | TypeDef _
   | Open _  -> ()
 
 let uneval_prog_generics prog =
  List.iter uneval_top_generics prog
 
-let rec get_imported_node decls id =
+let rec get_imported_symbol decls id =
   match decls with
   | [] -> assert false
   | decl::q ->
      (match decl.top_decl_desc with
-      | ImportedNode nd when id = nd.nodei_id -> decl
-      | _ -> get_imported_node q id)
+      | ImportedNode nd when id = nd.nodei_id && decl.top_decl_itf -> decl
+      | Const c when id = c.const_id && decl.top_decl_itf -> decl
+      | TypeDef _ -> get_imported_symbol (consts_of_enum_type decl @ q) id
+      | _ -> get_imported_symbol q id)
 
 let check_env_compat header declared computed = 
   uneval_prog_generics header;
-  Env.iter declared (fun k decl_type_k -> 
-    let computed_t = instantiate (ref []) (ref []) 
-				 (try Env.lookup_value computed k
-				  with Not_found ->
-				    let loc = (get_imported_node header k).top_decl_loc in 
-				    raise (Error (loc, Declared_but_undefined k))) in
+  Env.iter declared (fun k decl_type_k ->
+    let loc = (get_imported_symbol header k).top_decl_loc in 
+    let computed_t =
+      instantiate (ref []) (ref []) 
+	(try Env.lookup_value computed k
+	 with Not_found -> raise (Error (loc, Declared_but_undefined k))) in
     (*Types.print_ty Format.std_formatter decl_type_k;
-    Types.print_ty Format.std_formatter computed_t;*)
-    try_unify ~sub:true ~semi:true decl_type_k computed_t Location.dummy_loc
-		    )
+      Types.print_ty Format.std_formatter computed_t;*)
+    try_unify ~sub:true ~semi:true decl_type_k computed_t loc
+  )
+
 let check_typedef_top decl =
+(*Format.eprintf "check_typedef %a@." Printers.pp_short_decl decl;*)
+(*Printers.pp_var_type_dec_desc (typedef_of_top decl).tydef_id*)
+(*Format.eprintf "%a" Corelang.print_type_table ();*)
   match decl.top_decl_desc with
-  | Type ty ->
-Format.eprintf "check_typedef %a %a@." Printers.pp_var_type_dec_desc ty.ty_def_desc Printers.pp_var_type_dec_desc (Hashtbl.find type_table (Tydec_const ty.ty_def_id));
-    if coretype_equal ty.ty_def_desc (Hashtbl.find type_table (Tydec_const ty.ty_def_id)) then ()
-    else raise (Error (decl.top_decl_loc, Type_mismatch ty.ty_def_id))
+  | TypeDef ty ->
+     let owner = decl.top_decl_owner in
+     let itf = decl.top_decl_itf in
+     let decl' =
+       try Hashtbl.find type_table (Tydec_const (typedef_of_top decl).tydef_id)
+       with Not_found -> raise (Error (decl.top_decl_loc, Declared_but_undefined ("type "^ ty.tydef_id))) in
+     let owner' = decl'.top_decl_owner in
+     let itf' = decl'.top_decl_itf in
+     (match decl'.top_decl_desc with
+     | Const _ | Node _ | ImportedNode _ -> assert false
+     | TypeDef ty' when coretype_equal ty'.tydef_desc ty.tydef_desc && owner' = owner && itf && (not itf') -> ()
+     | _ -> raise (Error (decl.top_decl_loc, Type_mismatch ty.tydef_id)))
   | _  -> ()
 
 let check_typedef_compat header =

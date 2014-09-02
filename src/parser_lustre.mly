@@ -17,6 +17,7 @@ open Dimension
 open Parse
 
 let get_loc () = Location.symbol_rloc ()
+
 let mktyp x = mktyp (get_loc ()) x
 let mkclock x = mkclock (get_loc ()) x
 let mkvar_decl x = mkvar_decl (get_loc ()) x
@@ -24,7 +25,7 @@ let mkexpr x = mkexpr (get_loc ()) x
 let mkeexpr x = mkeexpr (get_loc ()) x 
 let mkeq x = mkeq (get_loc ()) x
 let mkassert x = mkassert (get_loc ()) x
-let mktop_decl x = mktop_decl (get_loc ()) x
+let mktop_decl itf x = mktop_decl (get_loc ()) (Location.get_module ()) itf x
 let mkpredef_call x = mkpredef_call (get_loc ()) x
 (*let mkpredef_unary_call x = mkpredef_unary_call (get_loc ()) x*)
 
@@ -45,6 +46,8 @@ let mkannots annots = { annots = annots; annot_loc = get_loc () }
 %token AUTOMATON STATE UNTIL UNLESS RESTART RESUME LAST
 %token STATELESS ASSERT OPEN QUOTE FUNCTION
 %token <string> IDENT
+%token <string> UIDENT
+%token TRUE FALSE
 %token <LustreSpec.expr_annot> ANNOT
 %token <LustreSpec.node_annot> NODESPEC
 %token LBRACKET RBRACKET LCUR RCUR LPAR RPAR SCOL COL COMMA COLCOL 
@@ -92,7 +95,7 @@ let mkannots annots = { annots = annots; annot_loc = get_loc () }
 %type <LustreSpec.top_decl list> prog
 
 %start header
-%type <bool -> LustreSpec.top_decl list> header
+%type <LustreSpec.top_decl list> header
 
 %start lustre_annot
 %type <LustreSpec.expr_annot> lustre_annot
@@ -102,81 +105,108 @@ let mkannots annots = { annots = annots; annot_loc = get_loc () }
 
 %%
 
+module_ident:
+  UIDENT { $1 }
+| IDENT  { $1 }
+
+tag_ident:
+  UIDENT  { $1 }
+| TRUE    { tag_true }
+| FALSE   { tag_false }
+
+node_ident:
+  UIDENT { $1 }
+| IDENT  { $1 }
+
+vdecl_ident:
+  UIDENT { $1 }
+| IDENT  { $1 }
+
+const_ident:
+  UIDENT { $1 }
+| IDENT  { $1 }
+
+type_ident:
+  IDENT { $1 }
+
 prog:
  open_list typ_def_prog top_decl_list EOF { $1 @ $2 @ (List.rev $3) }
 
 typ_def_prog:
- typ_def_list { $1 true }
+ typ_def_list { $1 false }
 
 header:
- open_list typ_def_list top_decl_header_list EOF { (fun own -> ($1 @ let typs = $2 own in typs @ (List.rev ($3 own)))) }
+ open_list typ_def_header top_decl_header_list EOF { $1 @ $2 @ (List.rev $3) }
+
+typ_def_header:
+ typ_def_list { $1 true }
 
 open_list:
   { [] }
 | open_lusi open_list { $1 :: $2 }
 
 open_lusi:
-| OPEN QUOTE IDENT QUOTE { mktop_decl (Open (true, $3))}
-| OPEN LT IDENT GT { mktop_decl (Open (false, $3)) }
+| OPEN QUOTE module_ident QUOTE { mktop_decl false (Open (true, $3))}
+| OPEN LT module_ident GT { mktop_decl false (Open (false, $3)) }
 
 top_decl_list:
    {[]}
-| top_decl_list top_decl {$2::$1}
+| top_decl_list top_decl {$2@$1}
 
 
 top_decl_header_list:
-   {(fun own -> []) }
-| top_decl_header_list top_decl_header {(fun own -> let h1 = $1 own in ($2 own)::h1) }
+   { [] }
+| top_decl_header_list top_decl_header { $2@$1 }
 
 state_annot:
   FUNCTION { true }
 | NODE { false }
 
 top_decl_header:
-| CONST cdecl_list { let top = mktop_decl (Consts (List.rev $2)) in fun _ -> top }
-| nodespec_list state_annot IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR  prototype_opt in_lib_opt SCOL
-    {let nd = mktop_decl (ImportedNode
-                            {nodei_id = $3;
-                             nodei_type = Types.new_var ();
-                             nodei_clock = Clocks.new_var true;
-                             nodei_inputs = List.rev $5;
-                             nodei_outputs = List.rev $10;
-			     nodei_stateless = $2;
-			     nodei_spec = $1;
-			     nodei_prototype = $13;
-			     nodei_in_lib = $14;})
-    in
-     (fun own -> add_node own $3 nd; nd) }
+| CONST cdecl_list { List.rev ($2 true) }
+| nodespec_list state_annot node_ident LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR  prototype_opt in_lib_opt SCOL
+    {let nd = mktop_decl true (ImportedNode
+				 {nodei_id = $3;
+				  nodei_type = Types.new_var ();
+				  nodei_clock = Clocks.new_var true;
+				  nodei_inputs = List.rev $5;
+				  nodei_outputs = List.rev $10;
+				  nodei_stateless = $2;
+				  nodei_spec = $1;
+				  nodei_prototype = $13;
+				  nodei_in_lib = $14;})
+     in
+     (*add_imported_node $3 nd;*) [nd] }
 
 prototype_opt:
  { None }
-| PROTOTYPE IDENT { Some $2}
+| PROTOTYPE node_ident { Some $2}
 
 in_lib_opt:
 { None }
-| LIB IDENT {Some $2} 
+| LIB module_ident {Some $2} 
 
 top_decl:
-| CONST cdecl_list { mktop_decl (Consts (List.rev $2)) }
-| nodespec_list state_annot IDENT LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET eq_list TEL 
+| CONST cdecl_list { List.rev ($2 false) }
+| nodespec_list state_annot node_ident LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET eq_list TEL 
     {let eqs, asserts, annots = $16 in
-     let nd = mktop_decl (Node
-                            {node_id = $3;
-                             node_type = Types.new_var ();
-                             node_clock = Clocks.new_var true;
-                             node_inputs = List.rev $5;
-                             node_outputs = List.rev $10;
-                             node_locals = List.rev $14;
-			     node_gencalls = [];
-			     node_checks = [];
-			     node_asserts = asserts; 
-                             node_eqs = eqs;
-			     node_dec_stateless = $2;
-			     node_stateless = None;
-			     node_spec = $1;
-			     node_annot = annots})
+     let nd = mktop_decl false (Node
+				  {node_id = $3;
+				   node_type = Types.new_var ();
+				   node_clock = Clocks.new_var true;
+				   node_inputs = List.rev $5;
+				   node_outputs = List.rev $10;
+				   node_locals = List.rev $14;
+				   node_gencalls = [];
+				   node_checks = [];
+				   node_asserts = asserts; 
+				   node_eqs = eqs;
+				   node_dec_stateless = $2;
+				   node_stateless = None;
+				   node_spec = $1;
+				   node_annot = annots})
      in
-     add_node true $3 nd; nd}
+     (*add_node $3 nd;*) [nd] }
 
 nodespec_list:
  { None }
@@ -186,14 +216,15 @@ nodespec_list:
   | Some s2 -> (fun s1 -> Some (merge_node_annot s1 s2))) $2 $1 }
 
 typ_def_list:
-    /* empty */             { (fun own -> []) }
-| typ_def SCOL typ_def_list { (fun own -> let ty1 = ($1 own) in ty1 :: ($3 own)) }
+    /* empty */             { (fun itf -> []) }
+| typ_def SCOL typ_def_list { (fun itf -> let ty1 = ($1 itf) in ty1 :: ($3 itf)) }
 
 typ_def:
-  TYPE IDENT EQ typ_def_rhs { let typ = mktop_decl (Type { ty_def_id = $2;
-							   ty_def_desc = $4
-							 })
-			      in (fun own -> add_type own $2 typ; typ) }
+  TYPE type_ident EQ typ_def_rhs { (fun itf ->
+			       let typ = mktop_decl itf (TypeDef { tydef_id = $2;
+								   tydef_desc = $4
+							})
+			       in (*add_type itf $2 typ;*) typ) }
 
 typ_def_rhs:
   typeconst                   { $1 }
@@ -209,13 +240,13 @@ typeconst:
 | TBOOL array_typ_decl  { $2 Tydec_bool  }
 | TREAL array_typ_decl  { $2 Tydec_real  }
 | TFLOAT array_typ_decl { $2 Tydec_float }
-| IDENT array_typ_decl  { $2 (Tydec_const $1) }
+| type_ident array_typ_decl  { $2 (Tydec_const $1) }
 | TBOOL TCLOCK          { Tydec_clock Tydec_bool }
 | IDENT TCLOCK          { Tydec_clock (Tydec_const $1) }
 
 tag_list:
-  IDENT                { $1 :: [] }
-| tag_list COMMA IDENT { $3 :: $1 }
+  UIDENT                { $1 :: [] }
+| tag_list COMMA UIDENT { $3 :: $1 }
       
 field_list:                           { [] }
 | field_list IDENT COL typeconst SCOL { ($2, $4) :: $1 }
@@ -228,30 +259,30 @@ eq_list:
 | automaton eq_list {let eql, assertl, annotl = $2 in ($1::eql), assertl, annotl}
 
 automaton:
- AUTOMATON IDENT handler_list { failwith "not implemented" }
+ AUTOMATON type_ident handler_list { failwith "not implemented" }
 
 handler_list:
      { [] }
 | handler handler_list { $1::$2 }
 
 handler:
- STATE IDENT ARROW unless_list locals LET eq_list TEL until_list { () }
+ STATE UIDENT ARROW unless_list locals LET eq_list TEL until_list { () }
 
 unless_list:
-    { [] }
-| unless unless_list { $1::$2 }
+    { Automata.init }
+| unless unless_list { let (expr1, case1) = $1 in (fun case -> Automata.add_branch expr1 case1 ($2 case)) }
 
 until_list:
-    { [] }
-| until until_list { $1::$2 }
+    { Automata.init }
+| until until_list { let (expr1, case1) = $1 in (fun case -> Automata.add_branch expr1 case1 ($2 case)) }
 
 unless:
-  UNLESS expr RESTART IDENT { }
-| UNLESS expr RESUME IDENT  { }
+  UNLESS expr RESTART UIDENT { ($2, (get_loc (), true, $4))  }
+| UNLESS expr RESUME UIDENT  { ($2, (get_loc (), false, $4)) }
 
 until:
-  UNTIL expr RESTART IDENT { }
-| UNTIL expr RESUME IDENT  { }
+  UNTIL expr RESTART UIDENT { ($2, (get_loc (), true, $4))  }
+| UNTIL expr RESUME UIDENT  { ($2, (get_loc (), false, $4)) }
 
 assert_:
 | ASSERT expr SCOL {mkassert ($2)}
@@ -273,7 +304,7 @@ requires:
 ensures:
 { [] }
 | ENSURES qexpr SCOL ensures { $2 :: $4 }
-| OBSERVER IDENT LPAR tuple_expr RPAR SCOL ensures { 
+| OBSERVER node_ident LPAR tuple_expr RPAR SCOL ensures { 
   mkeexpr (mkexpr ((Expr_appl ($2, mkexpr (Expr_tuple $4), None)))) :: $7
 }
 
@@ -316,10 +347,8 @@ expr:
 | REAL {mkexpr (Expr_const (Const_real $1))}
 | FLOAT {mkexpr (Expr_const (Const_float $1))}
 /* Idents or type enum tags */
-| IDENT {
-  if Hashtbl.mem tag_table $1
-  then mkexpr (Expr_const (Const_tag $1))
-  else mkexpr (Expr_ident $1)}
+| IDENT { mkexpr (Expr_ident $1) }
+| tag_ident { mkexpr (Expr_ident $1) (*(Expr_const (Const_tag $1))*) }
 | LPAR ANNOT expr RPAR
     {update_expr_annot $3 $2}
 | LPAR expr RPAR
@@ -340,27 +369,27 @@ expr:
 | expr FBY expr 
     {(*mkexpr (Expr_fby ($1,$3))*)
       mkexpr (Expr_arrow ($1, mkexpr (Expr_pre $3)))}
-| expr WHEN IDENT 
+| expr WHEN vdecl_ident
     {mkexpr (Expr_when ($1,$3,tag_true))}
-| expr WHENNOT IDENT
+| expr WHENNOT vdecl_ident
     {mkexpr (Expr_when ($1,$3,tag_false))}
-| expr WHEN IDENT LPAR IDENT RPAR
+| expr WHEN tag_ident LPAR vdecl_ident RPAR
     {mkexpr (Expr_when ($1, $5, $3))}
-| MERGE IDENT handler_expr_list
+| MERGE vdecl_ident handler_expr_list
     {mkexpr (Expr_merge ($2,$3))}
 
 /* Applications */
-| IDENT LPAR expr RPAR
+| node_ident LPAR expr RPAR
     {mkexpr (Expr_appl ($1, $3, None))}
-| IDENT LPAR expr RPAR EVERY IDENT
+| node_ident LPAR expr RPAR EVERY vdecl_ident
     {mkexpr (Expr_appl ($1, $3, Some ($6, tag_true)))}
-| IDENT LPAR expr RPAR EVERY IDENT LPAR IDENT RPAR
+| node_ident LPAR expr RPAR EVERY tag_ident LPAR vdecl_ident RPAR
     {mkexpr (Expr_appl ($1, $3, Some ($8, $6))) }
-| IDENT LPAR tuple_expr RPAR
+| node_ident LPAR tuple_expr RPAR
     {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), None))}
-| IDENT LPAR tuple_expr RPAR EVERY IDENT
+| node_ident LPAR tuple_expr RPAR EVERY vdecl_ident
     {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), Some ($6, tag_true))) }
-| IDENT LPAR tuple_expr RPAR EVERY IDENT LPAR IDENT RPAR
+| node_ident LPAR tuple_expr RPAR EVERY tag_ident LPAR vdecl_ident RPAR
     {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), Some ($8, $6))) }
 
 /* Boolean expr */
@@ -416,7 +445,7 @@ handler_expr_list:
 | handler_expr handler_expr_list { $1 :: $2 }
 
 handler_expr:
- LPAR IDENT ARROW expr RPAR { ($2, $4) }
+ LPAR tag_ident ARROW expr RPAR { ($2, $4) }
 
 signed_const_array:
 | signed_const { [$1] }
@@ -430,7 +459,7 @@ signed_const:
   INT {Const_int $1}
 | REAL {Const_real $1}
 | FLOAT {Const_float $1}
-| IDENT {Const_tag $1}
+| tag_ident {Const_tag $1}
 | MINUS INT {Const_int (-1 * $2)}
 | MINUS REAL {Const_real ("-" ^ $2)}
 | MINUS FLOAT {Const_float (-1. *. $2)}
@@ -440,6 +469,7 @@ signed_const:
 dim:
    INT { mkdim_int $1 }
 | LPAR dim RPAR { $2 }
+| UIDENT { mkdim_ident $1 }
 | IDENT { mkdim_ident $1 }
 | dim AND dim 
     {mkdim_appl "&&" [$1;$3]}
@@ -506,18 +536,19 @@ vdecl:
     {List.map mkvar_decl (List.map (fun id -> (id, mktyp $4, mkclock Ckdec_any, true)) $2)}
 
 cdecl_list:
-  cdecl SCOL { [$1] }
-| cdecl_list cdecl SCOL { $2::$1 }
+  cdecl SCOL { (fun itf -> [$1 itf]) }
+| cdecl cdecl_list SCOL { (fun itf -> let c1 = ($1 itf) in c1::($2 itf)) }
 
 cdecl:
-    IDENT EQ signed_const {
-      let c = {
-	const_id = $1;
-	const_loc = Location.symbol_rloc ();
-        const_type = Types.new_var ();
-	const_value = $3;
-      } in
-      Hashtbl.add consts_table $1 c; c
+    const_ident EQ signed_const {
+      (fun itf -> 
+       let c = mktop_decl itf (Const {
+				   const_id = $1;
+				   const_loc = Location.symbol_rloc ();
+				   const_type = Types.new_var ();
+				   const_value = $3})
+       in
+       (*add_const itf $1 c;*) c)
     }
 
 clock:
@@ -526,17 +557,17 @@ clock:
     {mkclock (Ckdec_bool (List.rev $1))}
 
 when_cond:
-    WHEN IDENT {($2, tag_true)}
+  WHEN IDENT {($2, tag_true)}
 | WHENNOT IDENT {($2, tag_false)}
-| WHEN IDENT LPAR IDENT RPAR {($4, $2)}
+| WHEN tag_ident LPAR IDENT RPAR {($4, $2)}
 
 when_list:
     when_cond {[$1]}
 | when_list when_cond {$2::$1}
 
 ident_list:
-  IDENT {[$1]}
-| ident_list COMMA IDENT {$3::$1}
+  vdecl_ident {[$1]}
+| ident_list COMMA vdecl_ident {$3::$1}
 
 SCOL_opt:
     SCOL {} | {}

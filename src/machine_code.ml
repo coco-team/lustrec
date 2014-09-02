@@ -165,6 +165,8 @@ let arrow_desc =
 let arrow_top_decl =
   {
     top_decl_desc = Node arrow_desc;
+    top_decl_owner = Version.prefix;
+    top_decl_itf = false;
     top_decl_loc = Location.dummy_loc
   }
 
@@ -224,8 +226,12 @@ let translate_ident node (m, si, j, d, s) id =
     if ISet.exists (fun v -> v.var_id = id) m
     then StateVar var_id
     else LocalVar var_id
-  with Not_found -> (* id is a constant *)
-    LocalVar (Corelang.var_decl_of_const (Hashtbl.find Corelang.consts_table id))
+  with Not_found ->
+    try (* id is a constant *)
+      LocalVar (Corelang.var_decl_of_const (const_of_top (Hashtbl.find Corelang.consts_table id)))
+    with Not_found ->
+      (* id is a tag *)
+      Cst (Const_tag id)
 
 let rec control_on_clock node ((m, si, j, d, s) as args) ck inst =
  match (Clocks.repr ck).cdesc with
@@ -446,27 +452,6 @@ let translate_eqs node args eqs =
 let translate_decl nd sch =
   (*Log.report ~level:1 (fun fmt -> Printers.pp_node fmt nd);*)
 
-(*
-  let eqs_rev, remainder = 
-    List.fold_left 
-      (fun (accu, node_eqs_remainder) v -> 
-	  if List.exists (fun eq -> List.mem v eq.eq_lhs) accu
-	  then
-	    (accu, node_eqs_remainder)
-	  else
-	    (*if   List.exists (fun vdecl -> vdecl.var_id = v) nd.node_locals
-	      || List.exists (fun vdecl -> vdecl.var_id = v) nd.node_outputs
-	    then*)
-	      let eq_v, remainder = find_eq v node_eqs_remainder in
-	      eq_v::accu, remainder
-	    (* else it is a constant value, checked during typing phase
-	    else	 
-	      accu, node_eqs_remainder *)
-      ) 
-      ([], split_eqs) 
-      sch 
-  in
- *)
   let sorted_eqs = sort_equations_from_schedule nd sch in
 
   let init_args = ISet.empty, [], Utils.IMap.empty, List.fold_right (fun l -> ISet.add l) nd.node_locals ISet.empty, [] in
@@ -506,7 +491,8 @@ let translate_decl nd sch =
 let translate_prog decls node_schs =
   let nodes = get_nodes decls in 
   List.map 
-    (fun node -> 
+    (fun decl -> 
+     let node = node_of_top decl in
       let sch = (Utils.IMap.find node.node_id node_schs).Scheduling.schedule in
       translate_decl node sch 
     ) nodes

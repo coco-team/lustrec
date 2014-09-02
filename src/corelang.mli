@@ -24,31 +24,36 @@ val var_decl_of_const: const_desc -> var_decl
 val mkexpr: Location.t ->  expr_desc -> expr
 val mkeq: Location.t -> ident list * expr -> eq
 val mkassert: Location.t -> expr -> assert_t
-val mktop_decl: Location.t -> top_decl_desc -> top_decl
+val mktop_decl: Location.t -> ident -> bool -> top_decl_desc -> top_decl
 val mkpredef_call: Location.t -> ident -> expr list -> expr
 val mk_new_name: var_decl list -> ident -> ident
 
 
 val node_table : (ident, top_decl) Hashtbl.t
+val print_node_table:  Format.formatter -> unit -> unit
 val node_name: top_decl -> ident
 val node_inputs: top_decl -> var_decl list
 val node_from_name: ident -> top_decl
 val is_generic_node: top_decl -> bool
 val is_imported_node: top_decl -> bool
 
-val consts_table: (ident, const_desc) Hashtbl.t
-val type_table: (type_dec_desc, type_dec_desc) Hashtbl.t
+val consts_table: (ident, top_decl) Hashtbl.t
+val print_consts_table:  Format.formatter -> unit -> unit
+val type_table: (type_dec_desc, top_decl) Hashtbl.t
+val print_type_table:  Format.formatter -> unit -> unit
 val get_repr_type: type_dec_desc -> type_dec_desc
 val is_user_type: type_dec_desc -> bool
 val coretype_equal: type_dec_desc -> type_dec_desc -> bool
 val tag_true: label
 val tag_false: label
-val tag_table: (label, type_dec_desc) Hashtbl.t
-val field_table: (label, type_dec_desc) Hashtbl.t
+val tag_table: (label, top_decl) Hashtbl.t
+val field_table: (label, top_decl) Hashtbl.t
 
 val get_enum_type_tags: type_dec_desc -> label list
 
 val get_struct_type_fields: type_dec_desc -> (label * type_dec_desc) list
+
+val consts_of_enum_type: top_decl -> top_decl list
 
 val const_of_bool: bool -> constant
 val const_is_bool: constant -> bool
@@ -90,8 +95,17 @@ val pp_prog_type : Format.formatter -> program -> unit
 
 val pp_prog_clock : Format.formatter -> program -> unit
 
-val get_nodes : program -> node_desc list
- val get_consts : program -> const_desc list 
+val const_of_top: top_decl -> const_desc
+val node_of_top: top_decl -> node_desc
+val imported_node_of_top: top_decl -> imported_node_desc
+val typedef_of_top: top_decl -> typedef_desc
+val dependency_of_top: top_decl -> (bool * ident)
+
+val get_nodes : program -> top_decl list
+val get_imported_nodes : program -> top_decl list
+val get_consts : program -> top_decl list
+val get_typedefs: program -> top_decl list
+val get_dependencies : program -> top_decl list
 (* val prog_unfold_consts: program -> program *)
 
 val expr_replace_var: (ident -> ident) -> expr -> expr

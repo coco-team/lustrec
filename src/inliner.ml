@@ -279,7 +279,7 @@ let witness filename main_name orig inlined type_env clock_env =
     node_annot = [];
   }
   in
-  let main = [{ top_decl_desc = Node main_node; top_decl_loc = loc }] in
+  let main = [{ top_decl_desc = Node main_node; top_decl_loc = loc; top_decl_owner = filename; top_decl_itf = false }] in
   let new_prog = others@nodes_origs@nodes_inlined@main in
   let _ = Typing.type_prog type_env new_prog in
   let _ = Clock_calculus.clock_prog clock_env new_prog in

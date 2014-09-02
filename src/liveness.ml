@@ -65,11 +65,6 @@ let compute_unused_variables n g =
     (ISet.union outputs mems)
     (ISet.union inputs mems)
 
-(* checks whether a variable is aliasable,
-   depending on its (address) type *)
-let is_aliasable var =
- Types.is_address_type var.var_type
-
 (* computes the set of potentially reusable variables.
    We don't reuse input variables, due to possible aliasing *)
 let node_reusable_variables node =

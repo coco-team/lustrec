@@ -27,7 +27,9 @@ let type_env =
     (fun env (op, op_type) -> TE.add_value env op op_type)
     TE.initial
     [
-       "+", (static_op type_bin_poly_op);
+      "true", (static_op type_bool);
+      "false", (static_op type_bool);
+      "+", (static_op type_bin_poly_op);
       "uminus", (static_op type_unary_poly_op); 
       "-", (static_op type_bin_poly_op); 
       "*", (static_op type_bin_poly_op);
@@ -51,9 +53,12 @@ module CE = Env
 
 let clock_env =
   let init_env = CE.initial in
+  let env' =
+    List.fold_right (fun op env -> CE.add_value env op ck_nullary_univ)
+      ["true"; "false"] init_env in
   let env' = 
     List.fold_right (fun op env -> CE.add_value env op ck_unary_univ)
-      ["uminus"; "not"] init_env in
+      ["uminus"; "not"] env' in
   let env' = 
     List.fold_right (fun op env -> CE.add_value env op ck_bin_univ)
       ["+"; "-"; "*"; "/"; "mod"; "&&"; "||"; "xor"; "equi"; "impl"; "<"; "<="; ">"; ">="; "!="; "="] env' in
@@ -63,9 +68,12 @@ module DE = Env
 
 let delay_env =
   let init_env = DE.initial in
-  let env' = 
+  let env' =
+    List.fold_right (fun op env -> DE.add_value env op delay_nullary_poly_op)
+      ["true"; "false"] init_env in
+  let env' =
     List.fold_right (fun op env -> DE.add_value env op delay_unary_poly_op)
-      ["uminus"; "not"] init_env in
+      ["uminus"; "not"] env' in
   let env' = 
     List.fold_right (fun op env -> DE.add_value env op delay_binary_poly_op)
       ["+"; "-"; "*"; "/"; "mod"; "&&"; "||"; "xor"; "equi"; "impl"; "<"; "<="; ">"; ">="; "!="; "="] env' in
