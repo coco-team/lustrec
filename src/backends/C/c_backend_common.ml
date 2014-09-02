@@ -21,8 +21,7 @@ let print_version fmt =
     (Filename.basename Sys.executable_name) 
     Version.number 
     (if !Options.ansi then "ANSI C90" else "C99")
-
-
+ 
 (* Generation of a non-clashing name for the self memory variable (for step and reset functions) *)
 let mk_self m =
   mk_new_name (m.mstep.step_inputs@m.mstep.step_outputs@m.mstep.step_locals@m.mmemory) "self"
@@ -235,6 +234,43 @@ let pp_c_checks self fmt m =
     fmt 
     m.mstep.step_checks
 
+(********************************************************************************************)
+(*                       Struct Printing functions                                          *)
+(********************************************************************************************)
+
+let pp_registers_struct fmt m =
+  if m.mmemory <> []
+  then
+    fprintf fmt "@[%a {@[%a; @]}@] _reg; "
+      pp_machine_regtype_name m.mname.node_id
+      (Utils.fprintf_list ~sep:"; " pp_c_decl_struct_var) m.mmemory
+  else
+    ()
+
+let print_machine_struct fmt m =
+  if fst (get_stateless_status m) then
+    begin
+    end
+  else
+    begin
+      (* Define struct *)
+      fprintf fmt "@[%a {@[%a%a%t@]};@]@."
+	pp_machine_memtype_name m.mname.node_id
+	pp_registers_struct m
+	(Utils.fprintf_list ~sep:"; " pp_c_decl_instance_var) m.minstances
+	(Utils.pp_final_char_if_non_empty "; " m.minstances)
+    end
+
+let print_machine_struct_from_header fmt inode =
+  if inode.nodei_stateless then
+    begin
+    end
+  else
+    begin
+      (* Declare struct *)
+      fprintf fmt "@[%a;@]@."
+	pp_machine_memtype_name inode.nodei_id
+    end
 
 (********************************************************************************************)
 (*                      Prototype Printing functions                                        *)
@@ -271,8 +307,19 @@ let print_step_prototype self fmt (name, inputs, outputs) =
     pp_machine_memtype_name name
     self
 
-let print_import_prototype fmt (s, _, _) =
+let print_import_prototype fmt (_, s, _) =
   fprintf fmt "#include \"%s.h\"@," s
+
+let print_import_alloc_prototype fmt (_, s, _) =
+  fprintf fmt "#include \"%s_alloc.h\"@," s
+
+let print_extern_alloc_prototypes fmt (_,_, header) =
+  List.iter (fun decl -> match decl.top_decl_desc with
+  | ImportedNode ind when not ind.nodei_stateless ->
+    let static = List.filter (fun v -> v.var_dec_const) ind.nodei_inputs
+    in fprintf fmt "extern %a;@." print_alloc_prototype (ind.nodei_id, static)
+  | _                -> ()
+  ) header
 
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)

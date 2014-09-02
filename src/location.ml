@@ -10,9 +10,17 @@
 (********************************************************************)
 
 type t = { loc_start: Lexing.position; loc_end: Lexing.position }
+
+type filename = string
+
 let dummy_loc = {loc_start=Lexing.dummy_pos; loc_end=Lexing.dummy_pos}
 
-let input_name = ref ""
+let set_input, get_input, get_module =
+  let input_name : filename ref = ref "__UNINITIALIZED__" in
+  let module_name : filename ref = ref "__UNINITIALIZED__" in
+  (fun name -> input_name := name; module_name := Filename.chop_extension name),
+  (fun () -> !input_name),
+  (fun () -> !module_name)
 
 let curr lexbuf = {
   loc_start = lexbuf.Lexing.lex_start_p;

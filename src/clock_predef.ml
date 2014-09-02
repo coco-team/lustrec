@@ -22,6 +22,10 @@ let ck_ite =
   let univ = new_univar () in
   new_ck (Carrow (new_ck (Ctuple [univ;univ;univ]) true, univ)) true
 
+let ck_nullary_univ =
+  let univ = new_univar () in
+  univ
+
 let ck_unary_univ =
   let univ = new_univar () in
   new_ck (Carrow (univ, univ)) true

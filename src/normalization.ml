@@ -401,7 +401,7 @@ let normalize_decl decl =
   match decl.top_decl_desc with
   | Node nd ->
     {decl with top_decl_desc = Node (normalize_node nd)}
-  | Open _ | ImportedNode _ | Consts _ | Type _ -> decl
+  | Open _ | ImportedNode _ | Const _ | TypeDef _ -> decl
   
 let normalize_prog decls = 
   List.map normalize_decl decls

@@ -49,7 +49,7 @@ let node_unfold_consts consts node =
   { node with node_eqs = List.map (eq_unfold_consts consts) node.node_eqs }
 
 let prog_unfold_consts prog =
-  let consts = get_consts prog in
+  let consts = List.map const_of_top (get_consts prog) in
     List.map (
       fun decl -> match decl.top_decl_desc with 
 	| Node nd -> {decl with top_decl_desc = Node (node_unfold_consts consts nd)}

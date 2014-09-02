@@ -32,10 +32,12 @@ and type_dec_desc =
   | Tydec_struct of (ident * type_dec_desc) list
   | Tydec_array of Dimension.dim_expr * type_dec_desc
 
-type type_def =
-  {
-    ty_def_id: ident;
-    ty_def_desc: type_dec_desc}
+type typedec_desc =
+    {tydec_id: ident}
+
+type typedef_desc =
+    {tydef_id: ident;
+     tydef_desc: type_dec_desc}
 
 type clock_dec =
     {ck_dec_desc: clock_dec_desc;
@@ -99,12 +101,18 @@ and expr_desc =
   | Expr_when of expr * ident * label
   | Expr_merge of ident * (label * expr) list
   | Expr_appl of call_t
- and call_t = ident * expr * (ident * label) option 
+
+and call_t = ident * expr * (ident * label) option 
      (* The third part denotes the reseting clock label and value *)
-and 
+
+and eq =
+    {eq_lhs: ident list;
+     eq_rhs: expr;
+     eq_loc: Location.t}
+
   (* The tag of an expression is a unique identifier used to distinguish
      different instances of the same node *)
-  eexpr =
+and  eexpr =
     {eexpr_tag: tag;
      eexpr_qfexpr: expr;
      eexpr_quantifiers: (quantifier_type * var_decl list) list;
@@ -113,16 +121,9 @@ and
      mutable eexpr_normalized: (var_decl * eq list * var_decl list) option;
      eexpr_loc: Location.t}
 
-and expr_annot = {
-  annots: (string list * eexpr) list;
-  annot_loc: Location.t
-}
-and 
- eq =
-    {eq_lhs: ident list;
-     eq_rhs: expr;
-     eq_loc: Location.t}
-
+and expr_annot =
+ {annots: (string list * eexpr) list;
+  annot_loc: Location.t}
 
 type node_annot = {
   requires: eexpr list;
@@ -135,6 +136,23 @@ type assert_t =
       assert_expr: expr;
       assert_loc: Location.t;
     } 
+
+type automata_desc =
+  {aut_id : ident;
+   aut_handlers: handler_desc list;
+   aut_loc: Location.t}
+
+and handler_desc =
+  {hand_state: ident;
+   hand_unless: (expr * bool * ident) list;
+   hand_until: (expr * bool * ident) list;
+   hand_locals: var_decl list;
+   hand_eqs: eq list;
+   hand_loc: Location.t}
+
+type statement =
+| Eq of eq
+| Aut of automata_desc
 
 type node_desc =
     {node_id: ident;
@@ -174,15 +192,17 @@ type const_desc =
 
 type top_decl_desc =
 | Node of node_desc
-| Consts of const_desc list
+| Const of const_desc
 | ImportedNode of imported_node_desc
 | Open of bool * string (* the boolean set to true denotes a local 
 			   lusi vs a lusi installed at system level *)
-| Type of type_def
+| TypeDef of typedef_desc
 
 type top_decl =
-    {top_decl_desc: top_decl_desc;
-     top_decl_loc: Location.t}
+    {top_decl_desc: top_decl_desc;      (* description of the symbol *)
+     top_decl_owner: Location.filename; (* the module where it is defined *)
+     top_decl_itf: bool;                (* header or source file ? *)
+     top_decl_loc: Location.t}          (* the location where it is defined *)
 
 type program = top_decl list
 
@@ -192,7 +212,7 @@ type error =
   | No_main_specified
   | Unbound_symbol of ident
   | Already_bound_symbol of ident
-
+  | Unknown_library of ident
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

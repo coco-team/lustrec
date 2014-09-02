@@ -163,7 +163,7 @@ let pp_error fmt = function
       (Utils.fprintf_list ~sep:"," pp_print_string)
       (fst (Utils.list_of_imap vmap))
   | Declared_but_undefined id ->
-     fprintf fmt "Node %s is declared but not defined@." id
+     fprintf fmt "%s is declared but not defined@." id
   | Type_clash (ty1,ty2) ->
       Utils.reset_names ();
     fprintf fmt "Expected type %a, got type %a@." print_ty ty1 print_ty ty2

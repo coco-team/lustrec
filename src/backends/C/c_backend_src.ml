@@ -259,7 +259,7 @@ let print_alloc_code fmt m =
 
 let print_stateless_code dependencies fmt m =
   let self = "__ERROR__" in
-  if not (!Options.ansi && is_generic_node { top_decl_desc = Node m.mname; top_decl_loc = Location.dummy_loc })
+  if not (!Options.ansi && is_generic_node { top_decl_desc = Node m.mname; top_decl_loc = Location.dummy_loc; top_decl_owner = ""; top_decl_itf = false })
   then
     (* C99 code *)
     fprintf fmt "@[<v 2>%a {@,%a%t@,%a%a%t%t@]@,}@.@."
@@ -296,7 +296,7 @@ let print_reset_code dependencies fmt m self =
     (Utils.pp_newline_if_non_empty m.minit)
 
 let print_step_code dependencies fmt m self =
-  if not (!Options.ansi && is_generic_node { top_decl_desc = Node m.mname; top_decl_loc = Location.dummy_loc })
+  if not (!Options.ansi && is_generic_node { top_decl_desc = Node m.mname; top_decl_loc = Location.dummy_loc; top_decl_owner = ""; top_decl_itf = false })
   then
     (* C99 code *)
     let array_mems = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
@@ -345,11 +345,11 @@ let print_machine dependencies fmt m =
     begin
       (* Alloc function, only if non static mode *)
       if (not !Options.static_mem) then  
-	(
+	begin
 	  fprintf fmt "@[<v 2>%a {@,%a@]@,}@.@."
 	    print_alloc_prototype (m.mname.node_id, m.mstatic)
 	    print_alloc_code m;
-	);
+	end;
       let self = mk_self m in
       (* Reset function *)
       print_reset_code dependencies fmt m self;
@@ -360,17 +360,41 @@ let print_machine dependencies fmt m =
 
 let print_lib_c source_fmt basename prog machines dependencies =
 
-  fprintf source_fmt "#include <stdlib.h>@.#include <assert.h>@.#include \"%s\"@.@." (basename^".h");
+  fprintf source_fmt "#include <assert.h>@.";
+  if not !Options.static_mem then
+    begin
+      fprintf source_fmt "#include <stdlib.h>@.";
+    end;
+  print_import_prototype source_fmt (true, basename, []);
+  pp_print_newline source_fmt ();
   (* Print the svn version number and the supported C standard (C90 or C99) *)
   print_version source_fmt;
   (* Print the prototype of imported nodes *)
-  fprintf source_fmt "/* Imported nodes declarations */@.";
+  fprintf source_fmt "/* Import dependencies */@.";
   fprintf source_fmt "@[<v>";
   List.iter (print_import_prototype source_fmt) dependencies;
   fprintf source_fmt "@]@.";
   (* Print consts *)
   fprintf source_fmt "/* Global constants (definitions) */@.";
-  List.iter (fun c -> print_const_def source_fmt c) (get_consts prog);
+  fprintf source_fmt "@[<v>";
+  List.iter (fun c -> print_const_def source_fmt (const_of_top c)) (get_consts prog);
+  fprintf source_fmt "@]@.";
+  if not !Options.static_mem then
+    begin
+      fprintf source_fmt "/* External allocation function prototypes */@.";
+      fprintf source_fmt "@[<v>";
+      List.iter (print_extern_alloc_prototypes source_fmt) dependencies;
+      fprintf source_fmt "@]@.";
+      fprintf source_fmt "/* Node allocation function prototypes */@.";
+      fprintf source_fmt "@[<v>";
+      List.iter (fun m -> fprintf source_fmt "%a;@." print_alloc_prototype (m.mname.node_id, m.mstatic)) machines;
+      fprintf source_fmt "@]@.";
+    end;
+  (* Print the struct definitions of all machines. *)
+  fprintf source_fmt "/* Struct definitions */@.";
+  fprintf source_fmt "@[<v>";
+  List.iter (print_machine_struct source_fmt) machines;
+  fprintf source_fmt "@]@.";
   pp_print_newline source_fmt ();
   (* Print nodes one by one (in the previous order) *)
   List.iter (print_machine dependencies source_fmt) machines;

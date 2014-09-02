@@ -832,25 +832,27 @@ let clock_imported_node env loc nd =
   nd.nodei_clock <- ck_node;
   Env.add_value env nd.nodei_id ck_node
 
-let clock_top_consts env clist =
-  List.fold_left (fun env cdecl ->
-    let ck = new_var false in
-    try_generalize ck cdecl.const_loc;
-    Env.add_value env cdecl.const_id ck) env clist
+let clock_top_const env cdecl=
+  let ck = new_var false in
+  try_generalize ck cdecl.const_loc;
+  Env.add_value env cdecl.const_id ck
 
-let clock_top_decl env decl =
+let clock_top_consts env clist =
+  List.fold_left clock_top_const env clist
+ 
+let rec clock_top_decl env decl =
   match decl.top_decl_desc with
   | Node nd ->
     clock_node env decl.top_decl_loc nd
   | ImportedNode nd ->
     clock_imported_node env decl.top_decl_loc nd
-  | Consts clist ->
-    clock_top_consts env clist
-  | Open _
-  | Type _ -> env
+  | Const c ->
+    clock_top_const env c
+  | TypeDef _ -> List.fold_left clock_top_decl env (consts_of_enum_type decl)
+  | Open _    -> env
 
 let clock_prog env decls =
-  List.fold_left (fun e decl -> clock_top_decl e decl) env decls
+  List.fold_left clock_top_decl env decls
 
 (* Once the Lustre program is fully clocked,
    we must get back to the original description of clocks,
@@ -878,9 +880,9 @@ let uneval_top_generics decl =
       uneval_node_generics (nd.node_inputs @ nd.node_locals @ nd.node_outputs)
   | ImportedNode nd ->
       uneval_node_generics (nd.nodei_inputs @ nd.nodei_outputs)
-  | Consts _
+  | Const _
   | Open _
-  | Type _   -> ()
+  | TypeDef _ -> ()
 
 let uneval_prog_generics prog =
  List.iter uneval_top_generics prog
