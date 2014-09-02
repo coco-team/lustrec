@@ -40,10 +40,11 @@ TODO: deal with reset
 let inline_call orig_expr args reset locals node =
   let loc = orig_expr.expr_loc in
   let uid = orig_expr.expr_tag in
-  let rename v = 
-    Format.fprintf Format.str_formatter "%s_%i_%s" 
+  let rename v =
+    if v = tag_true || v = tag_false then v else
+    (Format.fprintf Format.str_formatter "%s_%i_%s" 
       node.node_id uid v;
-    Format.flush_str_formatter ()
+    Format.flush_str_formatter ())
   in
   let eqs' = List.map (rename_eq rename) node.node_eqs
   in
@@ -247,7 +248,7 @@ let witness filename main_name orig inlined type_env clock_env =
     node_clock = Clocks.new_var true;
     node_inputs = main_orig_node.node_inputs;
     node_outputs = [ok_output];
-    node_locals = [];
+    node_locals = ok_i;
     node_gencalls = [];
     node_checks = [];
     node_asserts = [];

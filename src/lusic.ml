@@ -41,8 +41,7 @@ let extract_header own prog =
 
 (* encode and write a header in a file *)
 let write_lusic lusi (header : top_decl list) basename extension =
-  let basename' = !Options.dest_dir ^ "/" ^ basename in
-  let target_name = basename' ^ extension in
+  let target_name = basename ^ extension in
   let outchan = open_out_bin target_name in
   begin
     Marshal.to_channel outchan {from_lusi = lusi; contents = header} [];
@@ -51,8 +50,7 @@ let write_lusic lusi (header : top_decl list) basename extension =
 
 (* read and decode a header from a file *)
 let read_lusic basename extension =
-  let basename' = !Options.dest_dir ^ "/" ^ basename in
-  let source_name = basename' ^ extension in
+  let source_name = basename ^ extension in
   let inchan = open_in_bin source_name in
   let lusic = (Marshal.from_channel inchan : lusic) in
   begin
@@ -61,15 +59,14 @@ let read_lusic basename extension =
   end
 
 let print_lusic_to_h basename extension =
-  let basename' = !Options.dest_dir ^ "/" ^ basename in
   let lusic = read_lusic basename extension in
-  let header_name = basename' ^ ".h" in
+  let header_name = basename ^ ".h" in
   let h_out = open_out header_name in
   let h_fmt = formatter_of_out_channel h_out in
   begin
     Typing.uneval_prog_generics lusic.contents;
     Clock_calculus.uneval_prog_generics lusic.contents;
-    Header.print_header_from_header h_fmt basename lusic.contents;
+    Header.print_header_from_header h_fmt (Filename.basename basename) lusic.contents;
     close_out h_out
   end
 

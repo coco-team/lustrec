@@ -32,40 +32,41 @@ let print_lusi prog basename extension =
 
 (* compile a .lusi header file *)
 let compile_header basename extension =
-   let header_name = basename ^ extension in
-   let lusic_ext = extension ^ "c" in
-   begin
-     Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v>");
-     let header = parse_header true header_name in
-     ignore (check_top_decls header);
-     create_dest_dir ();
-     Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating compiled header file %sc@," header_name);
-     Lusic.write_lusic true header basename lusic_ext;
-     Lusic.print_lusic_to_h basename lusic_ext;
-     Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.")
-   end
+  let destname = !Options.dest_dir ^ "/" ^ basename in
+  let header_name = basename ^ extension in
+  let lusic_ext = extension ^ "c" in
+  begin
+    Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v>");
+    let header = parse_header true header_name in
+    ignore (check_top_decls header);
+    create_dest_dir ();
+    Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating compiled header file %sc@," header_name);
+    Lusic.write_lusic true header destname lusic_ext;
+    Lusic.print_lusic_to_h destname lusic_ext;
+    Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.")
+  end
 
 (* check whether a source file has a compiled header,
    if not, generate the compiled header *)
 let compile_source_to_header prog computed_types_env computed_clocks_env basename extension =
-  let basename' = !Options.dest_dir ^ "/" ^ basename in
+  let destname = !Options.dest_dir ^ "/" ^ basename in
   let lusic_ext = extension ^ "c" in
-  let header_name = basename' ^ lusic_ext in
+  let header_name = destname ^ lusic_ext in
   begin
     if not (Sys.file_exists header_name) then
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating compiled header file %s@," header_name);
-	Lusic.write_lusic false (Lusic.extract_header basename prog) basename lusic_ext;
-	Lusic.print_lusic_to_h basename lusic_ext
+	Lusic.write_lusic false (Lusic.extract_header basename prog) destname lusic_ext;
+	Lusic.print_lusic_to_h destname lusic_ext
       end
     else
-      let lusic = Lusic.read_lusic basename lusic_ext in
+      let lusic = Lusic.read_lusic destname lusic_ext in
       if not lusic.Lusic.from_lusi then
 	begin
 	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating compiled header file %s@," header_name);
-       	  Lusic.write_lusic false (Lusic.extract_header basename prog) basename lusic_ext;
+       	  Lusic.write_lusic false (Lusic.extract_header basename prog) destname lusic_ext;
 (*List.iter (fun top_decl -> Format.eprintf "lusic: %a@." Printers.pp_decl top_decl) lusic.Lusic.contents;*)
-	  Lusic.print_lusic_to_h basename lusic_ext
+	  Lusic.print_lusic_to_h destname lusic_ext
 	end
       else
 	begin
@@ -290,7 +291,7 @@ let compile basename extension =
 let anonymous filename =
   let ok_ext, ext = List.fold_left (fun (ok, ext) ext' -> if not ok && Filename.check_suffix filename ext' then true, ext' else ok, ext) (false, "") extensions in
   if ok_ext then
-    let basename = Filename.chop_suffix filename ext in
+    let basename = Filename.chop_suffix (Filename.basename filename) ext in
     compile basename ext
   else
     raise (Arg.Bad ("Can only compile *.lusi, *.lus or *.ec files"))

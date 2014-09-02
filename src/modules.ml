@@ -114,7 +114,7 @@ let add_const itf name value =
   with Not_found -> Hashtbl.add consts_table name value
 
 let name_dependency (local, dep) =
-  (if local then "" else Version.prefix ^ "/include/lustrec/") ^ dep
+  (if local then !Options.dest_dir ^ "/" else Version.prefix ^ "/include/lustrec/") ^ dep
 
 let import_dependency loc (local, dep) =
   let basename = name_dependency (local, dep) in
@@ -122,13 +122,10 @@ let import_dependency loc (local, dep) =
   try
     Lusic.read_lusic basename extension
   with Sys_error msg ->
-    raise (Error (loc, Unknown_library basename))
-(*
     begin
-      Format.eprintf "Failure: impossible to load library %s.@.%s@." basename msg;
-      exit 1
+      (*Format.eprintf "Error: %s@." msg;*)
+      raise (Error (loc, Unknown_library basename))
     end
-*)
 
 let rec load_header imported header =
   List.fold_left (fun imp decl ->

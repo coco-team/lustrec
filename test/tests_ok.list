@@ -894,6 +894,7 @@
 ./tests/kind_fmcad08/large/ccp20.lus,top
 ./tests/kind_fmcad08/large/ccp11.lus,top
 ./tests/kind_fmcad08/large/cruise_controller_21.lus,top
+./tests/arrays_arnaud/dummy_lib.lusi
 ./tests/arrays_arnaud/arrays.lus,,-check-access
 ./tests/arrays_arnaud/RelOpMatrix.lus
 ./tests/arrays_arnaud/access1.lus,,-check-access
@@ -903,6 +904,10 @@
 ./tests/clocks/clocks1.lus
 ./tests/clocks/clocks2.lus
 ./tests/clocks/oversampling0.lus
+./tests/lusic/test2.lusi
+./tests/lusic/test1.lusi
+./tests/lusic/test1.lus,as_soon_as
+./tests/lusic/test2.lus
 ./tests/linear_ctl/ex8sat.lus,top
 ./tests/linear_ctl/ex2reset.lus,top
 ./tests/linear_ctl/lp_iir_9600_2.lus,top
