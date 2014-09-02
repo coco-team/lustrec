@@ -663,21 +663,27 @@ let rename_node f_node f_var f_const nd =
 
 let rename_const f_const c =
   { c with const_id = f_const c.const_id }
-    
+
+let rename_typedef f_var t =
+  match t.tydef_desc with
+  | Tydec_enum tags -> { t with tydef_desc = Tydec_enum (List.map f_var tags) }
+  | _               -> t
+
 let rename_prog f_node f_var f_const prog =
   List.rev (
     List.fold_left (fun accu top ->
       (match top.top_decl_desc with
       | Node nd -> 
-	{ top with top_decl_desc = Node (rename_node f_node f_var f_const nd) }
+	 { top with top_decl_desc = Node (rename_node f_node f_var f_const nd) }
       | Const c -> 
-	{ top with top_decl_desc = Const (rename_const f_const c) }
+	 { top with top_decl_desc = Const (rename_const f_const c) }
+      | TypeDef tdef ->
+	 { top with top_decl_desc = TypeDef (rename_typedef f_var tdef) }
       | ImportedNode _
-      | Open _
-      | TypeDef _ -> top)
+      | Open _       -> top)
       ::accu
 ) [] prog
-  )
+		   )
 
 (**********************************************************************)
 (* Pretty printers *)

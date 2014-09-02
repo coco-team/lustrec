@@ -13,50 +13,63 @@ report=`pwd`/report-$NOW
 LUSTREC=lustrec
 mkdir -p build
 build=`pwd`"/build"
-    
+
 
 base_compile() {
     while IFS=, read -r file main opts
     do
 	name=`basename "$file" .lus`
-	dir=${SRC_PREFIX}/`dirname "$file"`
+        ext=".lus"
+	if [ `dirname "$file"`/"$name" = "$file" ]; then
+	    name=`basename "$file" .lusi`
+	    ext=".lusi"
+	fi
+        dir=${SRC_PREFIX}/`dirname "$file"`
 	pushd $dir > /dev/null
     if [ "$main" != "" ]; then
-	$LUSTREC -d $build -verbose 0 $opts -node $main "$name".lus;
+	$LUSTREC -d $build -verbose 0 $opts -node $main "$name""$ext";
         if [ $? -ne 0 ]; then
             rlustrec1="INVALID";
         else
             rlustrec1="VALID"
 	fi
 	pushd $build > /dev/null
-        gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ "$name".c > /dev/null
+	if [ $ext = ".lus" ]; then
+            gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ "$name".c > /dev/null
+            if [ $? -ne 0 ]; then
+		rgcc1="INVALID";
+            else
+		rgcc1="VALID"
+	    fi
+	else
+	    rgcc1="NONE"
+	fi
 	popd > /dev/null
-        if [ $? -ne 0 ]; then
-            rgcc1="INVALID";
-        else
-            rgcc1="VALID"
-	fi	
     else
-	$LUSTREC -d $build -verbose 0 $opts "$name".lus;
+	$LUSTREC -d $build -verbose 0 $opts "$name""$ext";
         if [ $? -ne 0 ]; then
             rlustrec1="INVALID";
         else
             rlustrec1="VALID"
         fi
 	pushd $build > /dev/null
-        gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ "$name".c > /dev/null
+	if [ $ext = ".lus" ]; then
+            gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ "$name".c > /dev/null
+            if [ $? -ne 0 ]; then
+		rgcc1="INVALID";
+            else
+		rgcc1="VALID"
+            fi
+	else
+	    rgcc1="NONE"
+	fi
 	popd > /dev/null
-        if [ $? -ne 0 ]; then
-            rgcc1="INVALID";
-        else
-            rgcc1="VALID"
-        fi
     fi
     popd > /dev/null
     if [ $verbose -gt 0 ]; then
-	echo "lustrec ($rlustrec1), gcc($rgcc1), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
+	echo "lustrec ($rlustrec1), gcc($rgcc1), $dir, ${name}${ext}, node $main" | column -t -s',' | tee -a $report;
     else
-	echo "lustrec ($rlustrec1), gcc($rgcc1), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+	echo "lustrec ($rlustrec1), gcc($rgcc1), $dir, ${name}${ext}, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
     fi;
     done < $file_list
 }
@@ -65,6 +78,9 @@ inline_compile () {
     while IFS=, read -r file main opts
     do
 	name=`basename "$file" .lus`
+	if [ `dirname "$file"`/"$name" = "$file" ]; then
+	    return 0
+	fi
 	dir=${SRC_PREFIX}/`dirname "$file"`
 
 	pushd $dir > /dev/null
@@ -78,12 +94,12 @@ inline_compile () {
     fi
     pushd $build > /dev/null
     gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ "$name".c > /dev/null
-    popd > /dev/null
     if [ $? -ne 0 ]; then
         rgcc2="INVALID";
     else
         rgcc2="VALID"
-    fi	
+    fi
+    popd > /dev/null
     if [ $verbose -gt 0 ]; then
 	echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
     else
@@ -98,6 +114,9 @@ inline_compile_with_check () {
     while IFS=, read -r file main opts
     do
 	name=`basename "$file" .lus`
+	if [ "$name" = "$file" ]; then
+	    return 0
+	fi
 	dir=${SRC_PREFIX}/`dirname "$file"`
 	pushd $dir > /dev/null
     $LUSTREC -d $build -verbose 0 $opts -inline -witnesses -node $main "$name".lus;
@@ -108,12 +127,12 @@ inline_compile_with_check () {
     fi
     pushd $build > /dev/null
     gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ "$name".c > /dev/null
-    popd > /dev/null
     if [ $? -ne 0 ]; then
         rgcc2="INVALID";
     else
         rgcc2="VALID"
     fi	
+    popd > /dev/null
 	# Cheching witness
     pushd $build > /dev/null
     $LUSTREC -verbose 0 -horn -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus 
@@ -142,6 +161,9 @@ check_prop () {
     while IFS=, read -r file main opts
     do
 	name=`basename "$file" .lus`
+	if [ "$name" = "$file" ]; then
+	    return 0
+	fi
 	dir=${SRC_PREFIX}/`dirname "$file"`
 	pushd $dir > /dev/null
 	

@@ -33,7 +33,7 @@ let horn_queries = ref false
 
 let options =
   [ "-d", Arg.Set_string dest_dir,
-    "produces code in the specified directory (default: .)";
+    "uses the specified directory as root for generated/imported object and C files (default: .)";
     "-node", Arg.Set_string main_node, "specifies the main node";
     "-init", Arg.Set delay_calculus, "performs an initialisation analysis for Lustre nodes <default: no analysis>";
     "-dynamic", Arg.Clear static_mem, "specifies a dynamic allocation scheme for main Lustre node <default: static>";
