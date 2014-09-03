@@ -85,31 +85,30 @@ and pp_handlers fmt hl =
 
 and pp_app fmt id e r =
   match r with
-  | None ->
-    (match id, e.expr_desc with
-    | "+", Expr_tuple([e1;e2]) -> fprintf fmt "(%a + %a)" pp_expr e1 pp_expr e2
-    | "uminus", _ -> fprintf fmt "(- %a)" pp_expr e
-    | "-", Expr_tuple([e1;e2]) -> fprintf fmt "(%a - %a)" pp_expr e1 pp_expr e2
-    | "*", Expr_tuple([e1;e2]) -> fprintf fmt "(%a * %a)" pp_expr e1 pp_expr e2
-    | "/", Expr_tuple([e1;e2]) -> fprintf fmt "(%a / %a)" pp_expr e1 pp_expr e2
-    | "mod", Expr_tuple([e1;e2]) -> fprintf fmt "(%a mod %a)" pp_expr e1 pp_expr e2
-    | "&&", Expr_tuple([e1;e2]) -> fprintf fmt "(%a and %a)" pp_expr e1 pp_expr e2
-    | "||", Expr_tuple([e1;e2]) -> fprintf fmt "(%a or %a)" pp_expr e1 pp_expr e2
-    | "xor", Expr_tuple([e1;e2]) -> fprintf fmt "(%a xor %a)" pp_expr e1 pp_expr e2
-    | "impl", Expr_tuple([e1;e2]) -> fprintf fmt "(%a => %a)" pp_expr e1 pp_expr e2
-    | "<", Expr_tuple([e1;e2]) -> fprintf fmt "(%a < %a)" pp_expr e1 pp_expr e2
-    | "<=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a <= %a)" pp_expr e1 pp_expr e2
-    | ">", Expr_tuple([e1;e2]) -> fprintf fmt "(%a > %a)" pp_expr e1 pp_expr e2
-    | ">=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a >= %a)" pp_expr e1 pp_expr e2
-    | "!=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a != %a)" pp_expr e1 pp_expr e2
-    | "=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a = %a)" pp_expr e1 pp_expr e2
-    | "not", _ -> fprintf fmt "(not %a)" pp_expr e
-    | _, Expr_tuple _ -> fprintf fmt "%s %a" id pp_expr e
-    | _ -> fprintf fmt "%s (%a)" id pp_expr e
-)
-  | Some (x, l) -> fprintf fmt "%s (%a) every %s(%s)" id pp_expr e l x 
+  | None -> pp_call fmt id e
+  | Some (x, l) -> fprintf fmt "%t every %s(%s)" (fun fmt -> pp_call fmt id e) l x 
 
-
+and pp_call fmt id e =
+  match id, e.expr_desc with
+  | "+", Expr_tuple([e1;e2]) -> fprintf fmt "(%a + %a)" pp_expr e1 pp_expr e2
+  | "uminus", _ -> fprintf fmt "(- %a)" pp_expr e
+  | "-", Expr_tuple([e1;e2]) -> fprintf fmt "(%a - %a)" pp_expr e1 pp_expr e2
+  | "*", Expr_tuple([e1;e2]) -> fprintf fmt "(%a * %a)" pp_expr e1 pp_expr e2
+  | "/", Expr_tuple([e1;e2]) -> fprintf fmt "(%a / %a)" pp_expr e1 pp_expr e2
+  | "mod", Expr_tuple([e1;e2]) -> fprintf fmt "(%a mod %a)" pp_expr e1 pp_expr e2
+  | "&&", Expr_tuple([e1;e2]) -> fprintf fmt "(%a and %a)" pp_expr e1 pp_expr e2
+  | "||", Expr_tuple([e1;e2]) -> fprintf fmt "(%a or %a)" pp_expr e1 pp_expr e2
+  | "xor", Expr_tuple([e1;e2]) -> fprintf fmt "(%a xor %a)" pp_expr e1 pp_expr e2
+  | "impl", Expr_tuple([e1;e2]) -> fprintf fmt "(%a => %a)" pp_expr e1 pp_expr e2
+  | "<", Expr_tuple([e1;e2]) -> fprintf fmt "(%a < %a)" pp_expr e1 pp_expr e2
+  | "<=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a <= %a)" pp_expr e1 pp_expr e2
+  | ">", Expr_tuple([e1;e2]) -> fprintf fmt "(%a > %a)" pp_expr e1 pp_expr e2
+  | ">=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a >= %a)" pp_expr e1 pp_expr e2
+  | "!=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a != %a)" pp_expr e1 pp_expr e2
+  | "=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a = %a)" pp_expr e1 pp_expr e2
+  | "not", _ -> fprintf fmt "(not %a)" pp_expr e
+  | _, Expr_tuple _ -> fprintf fmt "%s %a" id pp_expr e
+  | _ -> fprintf fmt "%s (%a)" id pp_expr e
 
 and pp_eexpr fmt e =
   fprintf fmt "%a%t %a"
