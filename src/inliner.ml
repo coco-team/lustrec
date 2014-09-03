@@ -62,7 +62,6 @@ let inline_call orig_expr args reset locals node =
   assert (reset = None);
 
   let assign_inputs = mkeq loc (List.map (fun v -> v.var_id) inputs', args) in
-  let assign_inputs = Splitting.tuple_split_eq assign_inputs in
   let expr = expr_of_expr_list 
     loc 
     (List.map (fun v -> mkexpr loc (Expr_ident v.var_id)) outputs')
@@ -78,7 +77,7 @@ let inline_call orig_expr args reset locals node =
   in
   expr, 
   inputs'@outputs'@locals'@locals, 
-  assign_inputs@eqs',
+  assign_inputs::eqs',
   asserts'
 
 

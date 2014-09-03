@@ -43,7 +43,7 @@ type schedule_report =
 (* Checks whether the currently scheduled variable [choice]
    is an output of a call, possibly among others *)
 let is_call_output choice g =
-  List.for_all ExprDep.is_instance_var (IdentDepGraph.succ g choice)
+ List.exists ExprDep.is_instance_var (IdentDepGraph.succ g choice)
 
 (* Adds successors of [v] in graph [g] in [pending] or [frontier] sets, wrt [eq_equiv],
    then removes [v] from [g] 
