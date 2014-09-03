@@ -62,6 +62,7 @@ let inline_call orig_expr args reset locals node =
   assert (reset = None);
 
   let assign_inputs = mkeq loc (List.map (fun v -> v.var_id) inputs', args) in
+  let assign_inputs = Splitting.tuple_split_eq assign_inputs in
   let expr = expr_of_expr_list 
     loc 
     (List.map (fun v -> mkexpr loc (Expr_ident v.var_id)) outputs')
@@ -77,7 +78,7 @@ let inline_call orig_expr args reset locals node =
   in
   expr, 
   inputs'@outputs'@locals'@locals, 
-  assign_inputs::eqs',
+  assign_inputs@eqs',
   asserts'
 
 
@@ -118,8 +119,7 @@ let rec inline_expr expr locals nodes =
       (* let _ =     Format.eprintf "Inlining call to %s@." id in *)
       let node = try List.find (check_node_name id) nodes 
 	with Not_found -> (assert false) in
-      let node = 
-	match node.top_decl_desc with Node nd -> nd | _ -> assert false in
+      let node = node_of_top node in
       let node = inline_node node nodes in
       let expr, locals', eqs'', asserts'' = 
 	inline_call expr args' reset locals' node in

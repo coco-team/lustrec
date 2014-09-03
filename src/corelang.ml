@@ -391,7 +391,14 @@ let expr_list_of_expr expr =
 let expr_of_expr_list loc elist =
  match elist with
  | [t]  -> { t with expr_loc = loc }
- | t::_ -> { t with expr_desc = Expr_tuple elist; expr_loc = loc }
+ | t::_ ->
+    let tlist = List.map (fun e -> e.expr_type) elist in
+    let clist = List.map (fun e -> e.expr_clock) elist in
+    { t with expr_desc = Expr_tuple elist;
+	     expr_type = Type_predef.type_tuple tlist;
+	     expr_clock = Clock_predef.ck_tuple clist;
+	     expr_tag = Utils.new_tag ();
+	     expr_loc = loc }
  | _    -> assert false
 
 let call_of_expr expr =

@@ -14,6 +14,8 @@
 (** Predefined operator clocks *)
 open Clocks
 
+let ck_tuple cl = new_ck (Ctuple cl) true
+
 let ck_bin_univ =
   let univ = new_univar () in
   new_ck (Carrow (new_ck (Ctuple [univ;univ]) true, univ)) true
