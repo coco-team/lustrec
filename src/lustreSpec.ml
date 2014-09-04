@@ -144,10 +144,12 @@ type automata_desc =
 
 and handler_desc =
   {hand_state: ident;
-   hand_unless: (expr * bool * ident) list;
-   hand_until: (expr * bool * ident) list;
+   hand_unless: (Location.t * expr * bool * ident) list;
+   hand_until: (Location.t * expr * bool * ident) list;
    hand_locals: var_decl list;
    hand_eqs: eq list;
+   hand_asserts: assert_t list;
+   hand_annots: expr_annot list;
    hand_loc: Location.t}
 
 type statement =

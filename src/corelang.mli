@@ -108,6 +108,7 @@ val get_typedefs: program -> top_decl list
 val get_dependencies : program -> top_decl list
 (* val prog_unfold_consts: program -> program *)
 
+val get_expr_vars: Utils.ISet.t -> expr -> Utils.ISet.t
 val expr_replace_var: (ident -> ident) -> expr -> expr
 val eq_replace_rhs_var: (ident -> bool) -> (ident -> ident) -> eq -> eq
 
