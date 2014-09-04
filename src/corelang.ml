@@ -891,6 +891,25 @@ and get_eq_calls nodes eq =
 and get_node_calls nodes node =
   List.fold_left (fun accu eq -> Utils.ISet.union (get_eq_calls nodes eq) accu) Utils.ISet.empty node.node_eqs
 
+let rec get_expr_vars vars e =
+  get_expr_desc_vars vars e.expr_desc
+and get_expr_desc_vars vars expr_desc =
+  match expr_desc with
+  | Expr_const _ -> vars
+  | Expr_ident x -> Utils.ISet.add x vars
+  | Expr_tuple el
+  | Expr_array el -> List.fold_left get_expr_vars vars el
+  | Expr_pre e1 -> get_expr_vars vars e1
+  | Expr_when (e1, c, _) -> get_expr_vars (Utils.ISet.add c vars) e1 
+  | Expr_access (e1, d) 
+  | Expr_power (e1, d)   -> List.fold_left get_expr_vars vars [e1; expr_of_dimension d]
+  | Expr_ite (c, t, e) -> List.fold_left get_expr_vars vars [c; t; e]
+  | Expr_arrow (e1, e2) 
+  | Expr_fby (e1, e2) -> List.fold_left get_expr_vars vars [e1; e2]
+  | Expr_merge (c, hl) -> List.fold_left (fun vars (_, h) -> get_expr_vars vars h) (Utils.ISet.add c vars) hl
+  | Expr_appl (_, arg, None)   -> get_expr_vars vars arg
+  | Expr_appl (_, arg, Some (r,_)) -> get_expr_vars (Utils.ISet.add r vars) arg
+
 
 let rec expr_has_arrows e =
   expr_desc_has_arrows e.expr_desc

@@ -259,30 +259,30 @@ eq_list:
 | automaton eq_list {let eql, assertl, annotl = $2 in ($1::eql), assertl, annotl}
 
 automaton:
- AUTOMATON type_ident handler_list { failwith "not implemented" }
+ AUTOMATON type_ident handler_list { (Automata.mkautomata (get_loc ()) $2 $3); failwith "not implemented" }
 
 handler_list:
      { [] }
 | handler handler_list { $1::$2 }
 
 handler:
- STATE UIDENT ARROW unless_list locals LET eq_list TEL until_list { () }
+ STATE UIDENT ARROW unless_list locals LET eq_list TEL until_list { Automata.mkhandler (get_loc ()) $2 $4 $9 $5 $7 }
 
 unless_list:
-    { Automata.init }
-| unless unless_list { let (expr1, case1) = $1 in (fun case -> Automata.add_branch expr1 case1 ($2 case)) }
+    { [] }
+| unless unless_list { $1::$2 }
 
 until_list:
-    { Automata.init }
-| until until_list { let (expr1, case1) = $1 in (fun case -> Automata.add_branch expr1 case1 ($2 case)) }
+    { [] }
+| until until_list { $1::$2 }
 
 unless:
-  UNLESS expr RESTART UIDENT { ($2, (get_loc (), true, $4))  }
-| UNLESS expr RESUME UIDENT  { ($2, (get_loc (), false, $4)) }
+  UNLESS expr RESTART UIDENT { (get_loc (), $2, true, $4)  }
+| UNLESS expr RESUME UIDENT  { (get_loc (), $2, false, $4) }
 
 until:
-  UNTIL expr RESTART UIDENT { ($2, (get_loc (), true, $4))  }
-| UNTIL expr RESUME UIDENT  { ($2, (get_loc (), false, $4)) }
+  UNTIL expr RESTART UIDENT { (get_loc (), $2, true, $4)  }
+| UNTIL expr RESUME UIDENT  { (get_loc (), $2, false, $4) }
 
 assert_:
 | ASSERT expr SCOL {mkassert ($2)}

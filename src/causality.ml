@@ -532,7 +532,7 @@ let merge_with g1 g2 =
   end
 
 let add_external_dependency outputs mems g =
-  let caller ="!_world" in
+  let caller ="!!_world" in
   begin
     IdentDepGraph.add_vertex g caller;
     ISet.iter (fun o -> IdentDepGraph.add_edge g caller o) outputs;
