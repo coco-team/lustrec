@@ -26,7 +26,7 @@ val mkeq: Location.t -> ident list * expr -> eq
 val mkassert: Location.t -> expr -> assert_t
 val mktop_decl: Location.t -> ident -> bool -> top_decl_desc -> top_decl
 val mkpredef_call: Location.t -> ident -> expr list -> expr
-val mk_new_name: var_decl list -> ident -> ident
+val mk_new_name: (ident -> bool) -> ident -> ident
 
 
 val node_table : (ident, top_decl) Hashtbl.t
@@ -65,6 +65,7 @@ val const_impl: constant -> constant -> constant
 
 val get_node_vars: node_desc -> var_decl list
 val get_node_var: ident -> node_desc -> var_decl
+val get_node_eqs: node_desc -> eq list
 val get_node_eq: ident -> node_desc -> eq
 val get_node_interface: node_desc -> imported_node_desc
 

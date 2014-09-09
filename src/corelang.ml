@@ -68,9 +68,9 @@ let var_decl_of_const c =
     var_clock = Clocks.new_var false;
     var_loc = c.const_loc }
 
-let mk_new_name vdecl_list id =
+let mk_new_name used id =
   let rec new_name name cpt =
-    if List.exists (fun v -> v.var_id = name) vdecl_list
+    if used name
     then new_name (sprintf "_%s_%i" id cpt) (cpt+1)
     else name
   in new_name id 1
@@ -475,8 +475,29 @@ let get_var id var_list =
 
 let get_node_var id node = get_var id (get_node_vars node)
 
+let get_node_eqs =
+  let get_eqs stmts =
+    List.fold_right
+      (fun stmt res ->
+	match stmt with
+	| Eq eq -> eq :: res
+	| Aut _ -> assert false)
+      stmts
+      [] in
+  let table_eqs = Hashtbl.create 23 in
+  (fun nd ->
+    try
+      let (old, res) = Hashtbl.find table_eqs nd.node_id
+      in if old == nd.node_stmts then res else raise Not_found
+    with Not_found -> 
+      let res = get_eqs nd.node_stmts in
+      begin
+	Hashtbl.replace table_eqs nd.node_id (nd.node_stmts, res);
+	res
+      end)
+
 let get_node_eq id node =
- List.find (fun eq -> List.mem id eq.eq_lhs) node.node_eqs
+ List.find (fun eq -> List.mem id eq.eq_lhs) (get_node_eqs node)
 
 let get_nodes prog = 
   List.fold_left (
@@ -639,7 +660,7 @@ let rename_node f_node f_var f_const nd =
 	  rename_expr f_node f_var f_const expr})
     nd.node_asserts
   in
-  let eqs = List.map rename_eq nd.node_eqs in
+  let node_stmts = List.map (fun eq -> Eq (rename_eq eq)) (get_node_eqs nd) in
   let spec = 
     Utils.option_map 
       (fun s -> rename_node_annot f_node f_var f_const s) 
@@ -660,7 +681,7 @@ let rename_node f_node f_var f_const nd =
     node_gencalls = gen_calls;
     node_checks = node_checks;
     node_asserts = node_asserts;
-    node_eqs = eqs;
+    node_stmts = node_stmts;
     node_dec_stateless = nd.node_dec_stateless;
     node_stateless = nd.node_stateless;
     node_spec = spec;
@@ -889,7 +910,7 @@ and get_calls_expr_desc nodes expr_desc =
 and get_eq_calls nodes eq =
   get_expr_calls nodes eq.eq_rhs
 and get_node_calls nodes node =
-  List.fold_left (fun accu eq -> Utils.ISet.union (get_eq_calls nodes eq) accu) Utils.ISet.empty node.node_eqs
+  List.fold_left (fun accu eq -> Utils.ISet.union (get_eq_calls nodes eq) accu) Utils.ISet.empty (get_node_eqs node)
 
 let rec get_expr_vars vars e =
   get_expr_desc_vars vars e.expr_desc
@@ -932,7 +953,7 @@ and expr_desc_has_arrows expr_desc =
 and eq_has_arrows eq =
   expr_has_arrows eq.eq_rhs
 and node_has_arrows node =
-  List.exists (fun eq -> eq_has_arrows eq) node.node_eqs
+  List.exists (fun eq -> eq_has_arrows eq) (get_node_eqs node)
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

@@ -24,15 +24,26 @@ let print_version fmt =
  
 (* Generation of a non-clashing name for the self memory variable (for step and reset functions) *)
 let mk_self m =
-  mk_new_name (m.mstep.step_inputs@m.mstep.step_outputs@m.mstep.step_locals@m.mmemory) "self"
+  let used name =
+       (List.exists (fun v -> v.var_id = name) m.mstep.step_inputs)
+    || (List.exists (fun v -> v.var_id = name) m.mstep.step_outputs)
+    || (List.exists (fun v -> v.var_id = name) m.mstep.step_locals)
+    || (List.exists (fun v -> v.var_id = name) m.mmemory) in
+  mk_new_name used "self"
 
 (* Generation of a non-clashing name for the instance variable of static allocation macro *)
 let mk_instance m =
-  mk_new_name (m.mstep.step_inputs@m.mmemory) "inst"
+  let used name =
+       (List.exists (fun v -> v.var_id = name) m.mstep.step_inputs)
+    || (List.exists (fun v -> v.var_id = name) m.mmemory) in
+  mk_new_name used "inst"
 
 (* Generation of a non-clashing name for the attribute variable of static allocation macro *)
 let mk_attribute m =
-  mk_new_name (m.mstep.step_inputs@m.mmemory) "attr"
+  let used name =
+       (List.exists (fun v -> v.var_id = name) m.mstep.step_inputs)
+    || (List.exists (fun v -> v.var_id = name) m.mmemory) in
+  mk_new_name used "attr"
 
 let mk_call_var_decl loc id =
   { var_id = id;

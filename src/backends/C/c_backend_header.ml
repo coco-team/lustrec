@@ -172,7 +172,10 @@ let print_machine_decl_from_header fmt inode =
   else
     begin
       let static_inputs = List.filter (fun v -> v.var_dec_const) inode.nodei_inputs in
-      let self = mk_new_name (inode.nodei_inputs@inode.nodei_outputs) "self" in
+      let used name =
+	   (List.exists (fun v -> v.var_id = name) inode.nodei_inputs)
+	|| (List.exists (fun v -> v.var_id = name) inode.nodei_outputs) in
+      let self = mk_new_name used "self" in
       fprintf fmt "extern %a;@.@."
 	(print_reset_prototype self) (inode.nodei_id, static_inputs);
 

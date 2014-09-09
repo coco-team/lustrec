@@ -80,7 +80,7 @@ let check_node nd =
   let checks =
     List.fold_left check_var_decl checks (get_node_vars nd) in
   let checks =
-    List.fold_left (fun checks eq -> check_expr checks eq.eq_rhs) checks nd.node_eqs in
+    List.fold_left (fun checks eq -> check_expr checks eq.eq_rhs) checks (get_node_eqs nd) in
   nd.node_checks <- CSet.elements checks
 
 let check_top_decl decl =
