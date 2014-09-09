@@ -131,7 +131,48 @@ let pp_node_eq fmt eq =
     pp_eq_lhs eq.eq_lhs
     pp_expr eq.eq_rhs
 
-let pp_node_eqs = fprintf_list ~sep:"@ " pp_node_eq
+let pp_restart fmt restart =
+  Format.fprintf fmt "%s" (if restart then "restart" else "resume")
+
+let pp_unless fmt (_, expr, restart, st) =
+  Format.fprintf fmt "unless %a %a %s"
+    pp_expr expr
+    pp_restart restart
+    st
+
+let pp_until fmt (_, expr, restart, st) =
+  Format.fprintf fmt "until %a %a %s"
+    pp_expr expr
+    pp_restart restart
+    st
+
+let rec pp_handler fmt handler =
+  Format.fprintf fmt "state %s -> %a %a let %a tel %a"
+    handler.hand_state
+    (Utils.fprintf_list ~sep:"@ " pp_unless) handler.hand_unless
+    (fun fmt locals ->
+      match locals with [] -> () | _ ->
+	Format.fprintf fmt "@[<v 4>var %a@]@ " 
+	  (Utils.fprintf_list ~sep:"@ " 
+	     (fun fmt v -> Format.fprintf fmt "%a;" pp_node_var v))
+	  locals)
+    handler.hand_locals
+    pp_node_stmts handler.hand_stmts
+    (Utils.fprintf_list ~sep:"@ " pp_until) handler.hand_until
+
+and pp_node_stmt fmt stmt =
+  match stmt with
+  | Eq eq -> pp_node_eq fmt eq
+  | Aut aut -> pp_node_aut fmt aut
+
+and pp_node_stmts fmt stmts = fprintf_list ~sep:"@ " pp_node_stmt fmt stmts
+
+and pp_node_aut fmt aut =
+  Format.fprintf fmt "automaton %s %a"
+    aut.aut_id
+    (Utils.fprintf_list ~sep:"@ " pp_handler) aut.aut_handlers
+
+and pp_node_eqs fmt eqs = fprintf_list ~sep:"@ " pp_node_eq fmt eqs
 
 let rec pp_var_struct_type_field fmt (label, tdesc) =
   fprintf fmt "%a : %a;" pp_print_string label pp_var_type_dec_desc tdesc
@@ -217,7 +258,7 @@ fprintf fmt "@[<v 0>%a%t%s %s (%a) returns (%a)@.%a%alet@.@[<h 2>   @ @[<v>%a@ %
       checks
   ) nd.node_checks
   (fprintf_list ~sep:"@ " pp_expr_annot) nd.node_annot
-  pp_node_eqs nd.node_eqs
+  pp_node_stmts nd.node_stmts
   pp_asserts nd.node_asserts
 (*fprintf fmt "@ /* Scheduling: %a */ @ " (fprintf_list ~sep:", " pp_print_string) (Scheduling.schedule_node nd)*)
 

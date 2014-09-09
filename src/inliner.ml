@@ -46,7 +46,7 @@ let inline_call orig_expr args reset locals node =
       node.node_id uid v;
     Format.flush_str_formatter ())
   in
-  let eqs' = List.map (rename_eq rename) node.node_eqs
+  let eqs' = List.map (rename_eq rename) (get_node_eqs node)
   in
   let rename_var v = { v with var_id = rename v.var_id } in
   let inputs' = List.map rename_var node.node_inputs in
@@ -171,11 +171,11 @@ and inline_node nd nodes =
 	inline_expr eq.eq_rhs locals nodes 
       in
       locals', { eq with eq_rhs = eq_rhs' }::new_eqs'@eqs, asserts'@asserts
-    ) (nd.node_locals, [], nd.node_asserts) nd.node_eqs
+    ) (nd.node_locals, [], nd.node_asserts) (get_node_eqs nd)
   in
   { nd with
     node_locals = new_locals;
-    node_eqs = eqs;
+    node_stmts = List.map (fun eq -> Eq eq) eqs;
     node_asserts = asserts;
   }
 
@@ -241,6 +241,23 @@ let witness filename main_name orig inlined type_env clock_env =
 
   (* Building main node *)
 
+  let ok_i_eq =
+    { eq_loc = loc;
+      eq_lhs = List.map (fun v -> v.var_id) ok_i;
+      eq_rhs = 
+	let inputs = expr_of_expr_list  loc (List.map (fun v -> mkexpr loc (Expr_ident v.var_id)) main_orig_node.node_inputs) in
+	let call_orig = 
+	  mkexpr loc (Expr_appl ("orig_" ^ main_name, inputs, None)) in
+	let call_inlined = 
+	  mkexpr loc (Expr_appl ("inlined_" ^ main_name, inputs, None)) in
+	let args = mkexpr loc (Expr_tuple [call_orig; call_inlined]) in 
+	mkexpr loc (Expr_appl ("=", args, None))
+    } in
+  let ok_eq =
+    { eq_loc = loc;
+      eq_lhs = [ok_ident];
+      eq_rhs = main_ok_expr;
+    } in
   let main_node = {
     node_id = "check";
     node_type = Types.new_var ();
@@ -251,23 +268,7 @@ let witness filename main_name orig inlined type_env clock_env =
     node_gencalls = [];
     node_checks = [];
     node_asserts = [];
-    node_eqs = [
-      { eq_loc = loc;
-	eq_lhs = List.map (fun v -> v.var_id) ok_i;
-	eq_rhs = 
-	  let inputs = expr_of_expr_list  loc (List.map (fun v -> mkexpr loc (Expr_ident v.var_id)) main_orig_node.node_inputs) in
-	  let call_orig = 
-	    mkexpr loc (Expr_appl ("orig_" ^ main_name, inputs, None)) in
-	  let call_inlined = 
-	    mkexpr loc (Expr_appl ("inlined_" ^ main_name, inputs, None)) in
-	  let args = mkexpr loc (Expr_tuple [call_orig; call_inlined]) in 
-	  mkexpr loc (Expr_appl ("=", args, None))
-      };
-      { eq_loc = loc;
-	eq_lhs = [ok_ident];
-	eq_rhs = main_ok_expr;
-      }
-    ];
+    node_stmts = [Eq ok_i_eq; Eq ok_eq];
     node_dec_stateless = false;
     node_stateless = None;
     node_spec = Some 

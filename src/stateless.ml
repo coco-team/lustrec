@@ -36,7 +36,7 @@ let rec check_expr expr =
     check_expr e' &&
       (Basic_library.is_internal_fun i || check_node (node_from_name i))
 and compute_node nd =
- List.for_all (fun eq -> check_expr eq.eq_rhs) nd.node_eqs
+ List.for_all (fun eq -> check_expr eq.eq_rhs) (get_node_eqs nd)
 and check_node td =
   match td.top_decl_desc with 
   | Node nd         -> (

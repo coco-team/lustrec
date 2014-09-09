@@ -619,7 +619,7 @@ let type_node env nd loc =
       (fun uvs v -> IMap.add v.var_id () uvs)
       IMap.empty vd_env_ol in
   let undefined_vars =
-    List.fold_left (type_eq (new_env, vd_env) is_main) undefined_vars_init nd.node_eqs
+    List.fold_left (type_eq (new_env, vd_env) is_main) undefined_vars_init (get_node_eqs nd)
   in
   (* Typing asserts *)
   List.iter (fun assert_ ->

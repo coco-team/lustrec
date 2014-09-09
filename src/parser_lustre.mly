@@ -188,8 +188,8 @@ in_lib_opt:
 
 top_decl:
 | CONST cdecl_list { List.rev ($2 false) }
-| nodespec_list state_annot node_ident LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET eq_list TEL 
-    {let eqs, asserts, annots = $16 in
+| nodespec_list state_annot node_ident LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET stmt_list TEL 
+    {let stmts, asserts, annots = $16 in
      let nd = mktop_decl false (Node
 				  {node_id = $3;
 				   node_type = Types.new_var ();
@@ -200,7 +200,7 @@ top_decl:
 				   node_gencalls = [];
 				   node_checks = [];
 				   node_asserts = asserts; 
-				   node_eqs = eqs;
+				   node_stmts = stmts;
 				   node_dec_stateless = $2;
 				   node_stateless = None;
 				   node_spec = $1;
@@ -251,12 +251,12 @@ tag_list:
 field_list:                           { [] }
 | field_list IDENT COL typeconst SCOL { ($2, $4) :: $1 }
       
-eq_list:
+stmt_list:
   { [], [], [] }
-| eq eq_list {let eql, assertl, annotl = $2 in ($1::eql), assertl, annotl}
-| assert_ eq_list {let eql, assertl, annotl = $2 in eql, ($1::assertl), annotl}
-| ANNOT eq_list {let eql, assertl, annotl = $2 in eql, assertl, $1::annotl}
-| automaton eq_list {let eql, assertl, annotl = $2 in ($1::eql), assertl, annotl}
+| eq stmt_list {let eql, assertl, annotl = $2 in ((Eq $1)::eql), assertl, annotl}
+| assert_ stmt_list {let eql, assertl, annotl = $2 in eql, ($1::assertl), annotl}
+| ANNOT stmt_list {let eql, assertl, annotl = $2 in eql, assertl, $1::annotl}
+| automaton stmt_list {let eql, assertl, annotl = $2 in ((Aut $1)::eql), assertl, annotl}
 
 automaton:
  AUTOMATON type_ident handler_list { (Automata.mkautomata (get_loc ()) $2 $3); failwith "not implemented" }
@@ -266,7 +266,7 @@ handler_list:
 | handler handler_list { $1::$2 }
 
 handler:
- STATE UIDENT ARROW unless_list locals LET eq_list TEL until_list { Automata.mkhandler (get_loc ()) $2 $4 $9 $5 $7 }
+ STATE UIDENT ARROW unless_list locals LET stmt_list TEL until_list { Automata.mkhandler (get_loc ()) $2 $4 $9 $5 $7 }
 
 unless_list:
     { [] }

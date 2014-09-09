@@ -46,7 +46,7 @@ let eq_unfold_consts consts eq =
   { eq with eq_rhs = expr_unfold_consts consts eq.eq_rhs }
 
 let node_unfold_consts consts node = 
-  { node with node_eqs = List.map (eq_unfold_consts consts) node.node_eqs }
+  { node with node_stmts = List.map (fun eq -> Eq (eq_unfold_consts consts eq)) (get_node_eqs node) }
 
 let prog_unfold_consts prog =
   let consts = List.map const_of_top (get_consts prog) in
@@ -89,7 +89,7 @@ let eq_distribute_when eq =
   { eq with eq_rhs = expr_distribute_when eq.eq_rhs }
 
 let node_distribute_when node =
-  { node with node_eqs = List.map eq_distribute_when node.node_eqs }
+  { node with node_stmts = List.map (fun eq -> Eq (eq_distribute_when eq)) (get_node_eqs node) }
 
 let prog_distribute_when prog =
     List.map (

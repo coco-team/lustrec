@@ -156,7 +156,7 @@ let arrow_desc =
     node_gencalls = [];
     node_checks = [];
     node_asserts = [];
-    node_eqs= [];
+    node_stmts= [];
     node_dec_stateless = false;
     node_stateless = Some false;
     node_spec = None;
@@ -428,7 +428,7 @@ let sort_equations_from_schedule nd sch =
 (*  Format.eprintf "%s schedule: %a@."
 		 nd.node_id
 		 (Utils.fprintf_list ~sep:" ; " Scheduling.pp_eq_schedule) sch;*)
-  let split_eqs = Splitting.tuple_split_eq_list nd.node_eqs in
+  let split_eqs = Splitting.tuple_split_eq_list (get_node_eqs nd) in
   let eqs_rev, remainder =
     List.fold_left 
       (fun (accu, node_eqs_remainder) vl -> 
@@ -446,7 +446,7 @@ let sort_equations_from_schedule nd sch =
     if List.length remainder > 0 then (
       Format.eprintf "Equations not used are@.%a@.Full equation set is:@.%a@.@?"
 		     Printers.pp_node_eqs remainder
-      		     Printers.pp_node_eqs nd.node_eqs;
+      		     Printers.pp_node_eqs (get_node_eqs nd);
       assert false);
     List.rev eqs_rev
   end

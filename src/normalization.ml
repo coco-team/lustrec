@@ -349,7 +349,7 @@ let normalize_node node =
     List.for_all ((!=) v) inputs_outputs in
   let orig_vars = inputs_outputs@node.node_locals in
   let defs, vars = 
-    List.fold_left (normalize_eq node) ([], orig_vars) node.node_eqs in
+    List.fold_left (normalize_eq node) ([], orig_vars) (get_node_eqs node) in
   (* Normalize the asserts *)
   let vars, assert_defs, asserts = 
     List.fold_left (
@@ -391,7 +391,7 @@ let normalize_node node =
   let node =
   { node with 
     node_locals = new_locals; 
-    node_eqs = defs @ assert_defs;
+    node_stmts = List.map (fun eq -> Eq eq) (defs @ assert_defs);
     node_asserts = asserts;
     node_annot = norm_traceability::node.node_annot;
   }

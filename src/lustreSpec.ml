@@ -135,9 +135,13 @@ type assert_t =
     {
       assert_expr: expr;
       assert_loc: Location.t;
-    } 
+    }
 
-type automata_desc =
+type statement =
+| Eq of eq
+| Aut of automata_desc
+
+and automata_desc =
   {aut_id : ident;
    aut_handlers: handler_desc list;
    aut_loc: Location.t}
@@ -147,14 +151,10 @@ and handler_desc =
    hand_unless: (Location.t * expr * bool * ident) list;
    hand_until: (Location.t * expr * bool * ident) list;
    hand_locals: var_decl list;
-   hand_eqs: eq list;
+   hand_stmts: statement list;
    hand_asserts: assert_t list;
    hand_annots: expr_annot list;
    hand_loc: Location.t}
-
-type statement =
-| Eq of eq
-| Aut of automata_desc
 
 type node_desc =
     {node_id: ident;
@@ -166,7 +166,7 @@ type node_desc =
      mutable node_gencalls: expr list;
      mutable node_checks: Dimension.dim_expr list;
      node_asserts: assert_t list; 
-     node_eqs: eq list;
+     node_stmts: statement list;
      mutable node_dec_stateless: bool;
      mutable node_stateless: bool option;
      node_spec: node_annot option;

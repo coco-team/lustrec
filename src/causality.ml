@@ -121,7 +121,7 @@ let eq_memory_variables mems eq =
   match_mem eq.eq_lhs eq.eq_rhs mems
 
 let node_memory_variables nd =
- List.fold_left eq_memory_variables ISet.empty nd.node_eqs
+ List.fold_left eq_memory_variables ISet.empty (get_node_eqs nd)
 
 let node_input_variables nd =
  List.fold_left (fun inputs v -> ISet.add v.var_id inputs) ISet.empty nd.node_inputs
@@ -149,7 +149,7 @@ let node_eq_equiv nd =
     let first = List.hd eq.eq_lhs in
     List.iter (fun v -> Hashtbl.add eq_equiv v first) eq.eq_lhs
   )
-    nd.node_eqs;
+    (get_node_eqs nd);
   eq_equiv
 
 (* Create a tuple of right dimension, according to [expr] type, *)
@@ -255,7 +255,7 @@ let dependence_graph mems inputs node_vars n =
   instance_var_cpt := 0;
   let g = new_graph (), new_graph () in
   (* Basic dependencies *)
-  let g = List.fold_right (add_eq_dependencies mems inputs node_vars) n.node_eqs g in
+  let g = List.fold_right (add_eq_dependencies mems inputs node_vars) (get_node_eqs n) g in
   g
 
 end
@@ -312,7 +312,7 @@ module NodeDep = struct
 	| Node nd ->
 	  (*Format.eprintf "Computing deps of node %s@.@?" nd.node_id; *)
 	  let accu = add_vertices [nd.node_id] accu in
-	  let deps = List.map (fun e -> fst (desome (get_callee e))) (get_calls (fun _ -> true) nd.node_eqs) in
+	  let deps = List.map (fun e -> fst (desome (get_callee e))) (get_calls (fun _ -> true) (get_node_eqs nd)) in
 	   (*Format.eprintf "%a@.@?" (Utils.fprintf_list ~sep:"@." Format.pp_print_string) deps; *)
 	  add_edges [nd.node_id] deps accu
 	| _ -> assert false (* should not happen *)
@@ -332,7 +332,7 @@ module NodeDep = struct
 	match td.top_decl_desc with 
 	| Node nd ->
 	  let prednode n = is_generic_node (Hashtbl.find node_table n) in
-	  nd.node_gencalls <- get_calls prednode nd.node_eqs
+	  nd.node_gencalls <- get_calls prednode (get_node_eqs nd)
 	| _ -> ()
       
       ) prog
@@ -345,7 +345,11 @@ module CycleDetection = struct
   module Cycles = Graph.Components.Make (IdentDepGraph)
 
   let mk_copy_var n id =
-    mk_new_name (get_node_vars n) id
+    let used name =
+         (List.exists (fun v -> v.var_id = name) n.node_locals)
+      || (List.exists (fun v -> v.var_id = name) n.node_inputs)
+      || (List.exists (fun v -> v.var_id = name) n.node_outputs)
+    in mk_new_name used id
 
   let mk_copy_eq n var =
     let var_decl = get_node_var var n in
@@ -407,7 +411,7 @@ module CycleDetection = struct
    - a modified acyclic version of [g]
 *)
   let break_cycles node mems g =
-    let (mem_eqs, non_mem_eqs) = List.partition (fun eq -> List.exists (fun v -> ISet.mem v mems) eq.eq_lhs) node.node_eqs in
+    let (mem_eqs, non_mem_eqs) = List.partition (fun eq -> List.exists (fun v -> ISet.mem v mems) eq.eq_lhs) (get_node_eqs node) in
     let rec break vdecls mem_eqs g =
       let scc_l = Cycles.scc_list g in
       let wrong = List.filter (wrong_partition g) scc_l in
@@ -553,7 +557,7 @@ let global_dependency node =
   begin
     merge_with g_non_mems g_mems';
     add_external_dependency outputs mems g_non_mems;
-    { node with node_eqs = eqs'; node_locals = vdecls'@node.node_locals }, 
+    { node with node_stmts = List.map (fun eq -> Eq eq) eqs'; node_locals = vdecls'@node.node_locals }, 
     g_non_mems
   end
 
