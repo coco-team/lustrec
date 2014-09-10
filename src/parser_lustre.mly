@@ -259,7 +259,7 @@ stmt_list:
 | automaton stmt_list {let eql, assertl, annotl = $2 in ((Aut $1)::eql), assertl, annotl}
 
 automaton:
- AUTOMATON type_ident handler_list { (Automata.mkautomata (get_loc ()) $2 $3); failwith "not implemented" }
+ AUTOMATON type_ident handler_list { Automata.mkautomata (get_loc ()) $2 $3 }
 
 handler_list:
      { [] }

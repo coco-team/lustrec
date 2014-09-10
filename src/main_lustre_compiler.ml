@@ -89,7 +89,11 @@ let rec compile_source basename extension =
 
   (* Extracting dependencies *)
   let dependencies, type_env, clock_env = import_dependencies prog in
- 
+
+  (* Removing automata *) 
+  (*let prog = Automata.expand_decls prog in*)
+
+  (*Printers.pp_prog Format.std_formatter prog;*)
   (* Sorting nodes *)
   let prog = SortProg.sort prog in
 

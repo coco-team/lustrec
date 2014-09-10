@@ -61,11 +61,11 @@ let rec handler_write writes handler =
       | Aut aut -> List.fold_left handler_write write aut.aut_handlers) writes handler.hand_stmts
   in ISet.diff allvars locals
 
-let node_of_handler node aut_id handler =
+let node_of_handler nused node aut_id handler =
   let inputs = handler_read ISet.empty handler in
   let outputs = handler_write ISet.empty handler in
   {
-    node_id = Format.sprintf "%s_%s_handler" aut_id handler.hand_state;
+    node_id = mk_new_name nused (Format.sprintf "%s_%s_handler" aut_id handler.hand_state);
     node_type = Types.new_var ();
     node_clock = Clocks.new_var true;
     node_inputs = List.map (fun v -> get_node_var v node) (ISet.elements inputs);
@@ -95,27 +95,18 @@ let assign_aut_handlers loc actual_r actual_s hnodes =
   let assign_eq = mkeq loc (List.map (fun v -> v.var_id) outputs, assign_expr) in
   assign_eq
 
-let typedef_of_automata node aut =
+let typedef_of_automata aut =
   let tname = Format.sprintf "%s_type" aut.aut_id in
   { tydef_id = tname;
     tydef_desc = Tydec_enum (List.map (fun h -> h.hand_state) aut.aut_handlers)
   }
-(*
-let expand_automata_stmt (top_decls, locals, eqs) stmt =
-  match stmt with
-  | Eq eq -> (top_decls, locals, eq::eqs)
-  | Aut aut ->
 
-
-let expand_automata top_node aut =
-  let node = node_of_top top_node in
-  let owner = top_node.top_decl_owner in
-  let typedef = typedef_of_automata node aut in
+let expand_automata nused used owner typedef node aut =
   let initial = (List.hd aut.aut_handlers).hand_state in
-  let incoming_r = mk_new_name (get_node_vars node) (aut.aut_id ^ "__restart_in") in
-  let incoming_s = mk_new_name (get_node_vars node) (aut.aut_id ^ "__state_in") in
-  let actual_r = mk_new_name (get_node_vars node) (aut.aut_id ^ "__restart_act") in
-  let actual_s = mk_new_name (get_node_vars node) (aut.aut_id ^ "__state_act") in
+  let incoming_r = mk_new_name used (aut.aut_id ^ "__restart_in") in
+  let incoming_s = mk_new_name used (aut.aut_id ^ "__state_in") in
+  let actual_r = mk_new_name used (aut.aut_id ^ "__restart_act") in
+  let actual_s = mk_new_name used (aut.aut_id ^ "__state_act") in
   let unless_handlers = List.map (fun h -> (h.hand_state, expr_of_exit h.hand_loc incoming_r incoming_s h.hand_unless h.hand_state)) aut.aut_handlers in
   let unless_expr = mkexpr aut.aut_loc (Expr_merge (incoming_s, unless_handlers)) in
   let unless_eq = mkeq aut.aut_loc ([actual_r; actual_s], unless_expr) in
@@ -123,7 +114,7 @@ let expand_automata top_node aut =
   let until_expr = mkexpr aut.aut_loc (Expr_merge (actual_s, until_handlers)) in
   let fby_until_expr = mkfby aut.aut_loc (init aut.aut_loc tag_false initial) until_expr in
   let until_eq = mkeq aut.aut_loc ([incoming_r; incoming_s], fby_until_expr) in
-  let hnodes = List.map (fun h -> (h.hand_state, node_of_handler node aut.aut_id h)) aut.aut_handlers in
+  let hnodes = List.map (fun h -> (h.hand_state, node_of_handler nused node aut.aut_id h)) aut.aut_handlers in
   let assign_eq = assign_aut_handlers aut.aut_loc actual_r actual_s hnodes in
   let tydec_bool = { ty_dec_desc = Tydec_bool; ty_dec_loc = aut.aut_loc } in
   let tydec_const id = { ty_dec_desc = Tydec_const id; ty_dec_loc = aut.aut_loc } in
@@ -133,19 +124,56 @@ let expand_automata top_node aut =
                  mkvar_decl aut.aut_loc (incoming_s, tydec_const typedef.tydef_id, ckdec_any, false);
                  mkvar_decl aut.aut_loc (actual_s  , tydec_const typedef.tydef_id, ckdec_any, false)] in
   let eqs' = [Eq unless_eq; Eq assign_eq; Eq until_eq] in
-  let node' = { node with node_locals = locals'@node.node_locals; node_stmts = eqs'@node.node_stmts } in
-  (mktop_decl aut.aut_loc owner false (TypeDef typedef)) ::
-  { top_node with top_decl_desc = Node node' } ::
-  (List.map2 (fun h (hs, n) -> mktop_decl h.hand_loc owner false (Node n)) aut.aut_handlers hnodes)
-*)
-let rec node_extract_automata top_decl =
-  match top_decl.top_decl_desc with
-  | Node nd -> []
-  | _ -> [top_decl]
-(*
-let extract_automata top_decls =
- List.fold_left (fun top_decls top_decl -> ) top_decls
-*)
+  (List.map2 (fun h (hs, n) -> mktop_decl h.hand_loc owner false (Node n)) aut.aut_handlers hnodes,
+  locals',
+  eqs')
+
+let expand_node_stmt nused used owner node (top_types, top_nodes, locals, eqs) stmt =
+  match stmt with
+  | Eq eq -> (top_types, top_nodes, locals, (Eq eq)::eqs)
+  | Aut aut ->
+    let typedef = typedef_of_automata aut in
+    let used' name = used name || List.exists (fun v -> v.var_id = name) locals in
+    let nused' name =
+      nused name ||
+      List.exists (fun t -> match t.top_decl_desc with
+      | ImportedNode nd -> nd.nodei_id = name | Node nd -> nd.node_id = name
+      | _ -> false) top_nodes in
+    let (top_decls', locals', eqs') = expand_automata nused' used' owner typedef node aut in
+    let top_typedef = mktop_decl aut.aut_loc owner false (TypeDef typedef) in
+    (top_typedef :: top_types, top_decls'@top_nodes, locals'@locals, eqs'@eqs)
+
+let expand_node_stmts nused used loc owner node =
+  let (top_types', top_nodes', locals', eqs') =
+    List.fold_left (expand_node_stmt nused used owner node) ([], [], [], []) node.node_stmts in
+  let node' = 
+    { node with node_locals = locals'@node.node_locals; node_stmts = eqs' } in
+  let top_node = mktop_decl loc owner false (Node node') in
+  top_types', top_node, top_nodes'
+
+let rec expand_decls_rec nused top_decls =
+  match top_decls with
+  | [] -> []
+  | top_decl::q ->
+    match top_decl.top_decl_desc with
+    | Node nd ->
+      let used name =
+	   List.exists (fun v -> v.var_id = name) nd.node_inputs
+	|| List.exists (fun v -> v.var_id = name) nd.node_outputs
+	|| List.exists (fun v -> v.var_id = name) nd.node_locals in
+      let (top_types', top_decl', top_nodes') = expand_node_stmts nused used top_decl.top_decl_loc top_decl.top_decl_owner nd in
+      top_types' @ (top_decl' :: expand_decls_rec nused (top_nodes'@q))
+    | _       -> top_decl :: expand_decls_rec nused q
+
+let expand_decls top_decls =
+  let top_names = List.fold_left (fun names t -> match t.top_decl_desc with
+    | Node nd         -> ISet.add nd.node_id names
+    | ImportedNode nd -> ISet.add nd.nodei_id names
+    | _               -> names) ISet.empty top_decls in
+  let nused name = ISet.mem name top_names in
+  expand_decls_rec nused top_decls
+
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)
+
