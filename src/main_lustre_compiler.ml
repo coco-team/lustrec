@@ -12,6 +12,7 @@
 open Format
 open Log
 
+open Utils
 open LustreSpec
 open Compiler_common
 
@@ -38,6 +39,7 @@ let compile_header basename extension =
   begin
     Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v>");
     let header = parse_header true header_name in
+    ignore (Modules.load_header ISet.empty header);
     ignore (check_top_decls header);
     create_dest_dir ();
     Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating compiled header file %sc@," header_name);
@@ -85,15 +87,18 @@ let rec compile_source basename extension =
 
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v>");
 
+  (* Parsing source *)
   let prog = parse_source source_name in
+
+  (* Removing automata *) 
+  let prog = Automata.expand_decls prog in
+
+  (* Importing source *)
+  let _ = Modules.load_program ISet.empty prog in
 
   (* Extracting dependencies *)
   let dependencies, type_env, clock_env = import_dependencies prog in
 
-  (* Removing automata *) 
-  (*let prog = Automata.expand_decls prog in*)
-
-  (*Printers.pp_prog Format.std_formatter prog;*)
   (* Sorting nodes *)
   let prog = SortProg.sort prog in
 

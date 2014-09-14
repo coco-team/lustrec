@@ -65,6 +65,7 @@ let mk_fresh_var node loc ty ck =
   if List.exists (fun v -> v.var_id = s) vars then aux () else
   {
     var_id = s;
+    var_orig = false;
     var_dec_type = dummy_type_dec;
     var_dec_clock = dummy_clock_dec;
     var_dec_const = false;
@@ -371,19 +372,17 @@ let normalize_node node =
      - compute the associated expression without aliases     
   *)
   let diff_vars = List.filter (fun v -> not (List.mem v node.node_locals) ) new_locals in
+  let split_defs = Splitting.tuple_split_eq_list defs in
   let norm_traceability = {
-    annots =
-      List.map 
-	(fun v -> 
-	  let expr = substitute_expr diff_vars defs (
-	    let eq = try
-		       List.find (fun eq -> eq.eq_lhs = [v.var_id]) defs 
-	      with Not_found -> (Format.eprintf "var not found %s@." v.var_id; assert false) in
-	    eq.eq_rhs) in 
-	  let pair = mkeexpr expr.expr_loc (mkexpr expr.expr_loc (Expr_tuple [expr_of_ident v.var_id expr.expr_loc; expr])) in 
-	  ["horn_backend";"trace"], pair 
-	)
-    diff_vars ;
+    annots = List.map (fun v ->
+      let eq =
+	try
+	  List.find (fun eq -> eq.eq_lhs = [v.var_id]) split_defs 
+	with Not_found -> (Format.eprintf "var not found %s@." v.var_id; assert false) in
+      let expr = substitute_expr diff_vars split_defs eq.eq_rhs in
+      let pair = mkeexpr expr.expr_loc (mkexpr expr.expr_loc (Expr_tuple [expr_of_ident v.var_id expr.expr_loc; expr])) in
+      (["horn_backend";"trace"], pair)
+    ) diff_vars;
     annot_loc = Location.dummy_loc
   }
 

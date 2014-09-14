@@ -47,6 +47,7 @@ let mk_attribute m =
 
 let mk_call_var_decl loc id =
   { var_id = id;
+    var_orig = false;
     var_dec_type = mktyp Location.dummy_loc Tydec_any;
     var_dec_clock = mkclock Location.dummy_loc Ckdec_any;
     var_dec_const = false;

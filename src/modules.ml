@@ -82,7 +82,7 @@ let import_typedef name tydef =
   in import ((typedef_of_top tydef).tydef_desc)
 
 let add_type itf name value =
-(*Format.eprintf "add_type %B %s %a (owner=%s)@." itf name Printers.pp_typedef (typedef_of_top value) value.top_decl_owner;*)
+(*Format.eprintf "Modules.add_type %B %s %a (owner=%s)@." itf name Printers.pp_typedef (typedef_of_top value) value.top_decl_owner;*)
   try
     let value' = Hashtbl.find type_table (Tydec_const name) in
     let owner' = value'.top_decl_owner in

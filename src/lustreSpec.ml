@@ -50,6 +50,7 @@ and clock_dec_desc =
 
 type var_decl = 
     {var_id: ident;
+     var_orig:bool;
      var_dec_type: type_dec;
      var_dec_clock: clock_dec;
      var_dec_const: bool;
@@ -102,8 +103,8 @@ and expr_desc =
   | Expr_merge of ident * (label * expr) list
   | Expr_appl of call_t
 
-and call_t = ident * expr * (ident * label) option 
-     (* The third part denotes the reseting clock label and value *)
+and call_t = ident * expr * expr option 
+     (* The third part denotes the boolean condition for resetting *)
 
 and eq =
     {eq_lhs: ident list;

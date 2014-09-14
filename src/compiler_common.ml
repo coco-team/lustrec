@@ -39,7 +39,7 @@ let parse_header own filename =
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. parsing header file %s@ " filename);
     try
       let header = Parse.header Parser_lustre.header Lexer_lustre.token lexbuf in
-      ignore (Modules.load_header ISet.empty header);
+      (*ignore (Modules.load_header ISet.empty header);*)
       close_in h_in;
       header
     with
@@ -65,7 +65,7 @@ let parse_source source_name =
     (fun fmt -> fprintf fmt ".. parsing source file %s@," source_name);
   try
     let prog = Parse.prog Parser_lustre.prog Lexer_lustre.token lexbuf in
-    ignore (Modules.load_program ISet.empty prog);
+    (*ignore (Modules.load_program ISet.empty prog);*)
     close_in s_in;
     prog
   with

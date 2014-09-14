@@ -444,13 +444,9 @@ and type_expr env in_main const expr =
        expression *)
     (match r with
     | None        -> ()
-    | Some (x, l) -> 
-      check_constant expr.expr_loc const false;
-      let expr_x = expr_of_ident x expr.expr_loc in	
-      let typ_l = 
-	Type_predef.type_clock 
-	  (type_const expr.expr_loc (Const_tag l)) in
-      type_subtyping_arg env in_main ~sub:false const expr_x typ_l);
+    | Some c -> 
+      check_constant expr.expr_loc const false;	
+      type_subtyping_arg env in_main const c Type_predef.type_bool);
     let touts = type_appl env in_main expr.expr_loc const id (expr_list_of_expr args) in
     expr.expr_type <- touts;
     touts

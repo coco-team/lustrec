@@ -908,6 +908,7 @@
 ./tests/lusic/test1.lusi
 ./tests/lusic/test1.lus,as_soon_as
 ./tests/lusic/test2.lus
+./tests/automata/aut1.lus
 ./tests/linear_ctl/ex8sat.lus,top
 ./tests/linear_ctl/ex2reset.lus,top
 ./tests/linear_ctl/lp_iir_9600_2.lus,top

@@ -133,6 +133,7 @@ let conditional c t e =
 let dummy_var_decl name typ =
   {
     var_id = name;
+    var_orig = false;
     var_dec_type = dummy_type_dec;
     var_dec_clock = dummy_clock_dec;
     var_dec_const = false;
@@ -327,7 +328,8 @@ let rec translate_act node ((m, si, j, d, s) as args) (y, expr) =
 let reset_instance node args i r c =
   match r with
   | None        -> []
-  | Some (x, l) -> [control_on_clock node args c (MBranch (translate_ident node args x, [l, [MReset i]]))]
+  | Some r      -> let g = translate_guard node args r in
+                   [control_on_clock node args c (conditional g [MReset i] [])]
 
 let translate_eq node ((m, si, j, d, s) as args) eq =
   (*Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock;*)
@@ -366,8 +368,11 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       node_f,
       NodeDep.filter_static_inputs (node_inputs node_f) el in 
     let o = new_instance node node_f eq.eq_rhs.expr_tag in
-    let call_ck = Clocks.new_var true in
+    let env_cks = List.fold_right (fun arg cks -> arg.expr_clock :: cks) el [eq.eq_rhs.expr_clock] in
+    let call_ck = Clock_calculus.compute_root_clock (Clock_predef.ck_tuple env_cks) in
+    (*Clocks.new_var true in
     Clock_calculus.unify_imported_clock (Some call_ck) eq.eq_rhs.expr_clock eq.eq_rhs.expr_loc;
+    Format.eprintf "call %a: %a: %a@," Printers.pp_expr eq.eq_rhs Clocks.print_ck (Clock_predef.ck_tuple env_cks) Clocks.print_ck call_ck;*)
     (m,
      (if Stateless.check_node node_f then si else MReset o :: si),
      Utils.IMap.add o call_f j,

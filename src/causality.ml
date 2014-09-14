@@ -109,6 +109,10 @@ let undo_read_var id =
  assert (is_read_var id);
  String.sub id 1 (String.length id - 1)
 
+let undo_instance_var id =
+ assert (is_instance_var id);
+ String.sub id 1 (String.length id - 1)
+
 let eq_memory_variables mems eq =
   let rec match_mem lhs rhs mems =
     match rhs.expr_desc with
@@ -241,8 +245,8 @@ let add_eq_dependencies mems inputs node_vars eq (g, g') =
       (* mashed up dependency for user-defined operators *)
       else
 	mashup_appl_dependencies f e g
-    | Expr_appl (f, e, Some (r, _)) ->
-      mashup_appl_dependencies f e (add_var lhs_is_mem lhs r g)
+    | Expr_appl (f, e, Some c) ->
+      mashup_appl_dependencies f e (add_dep lhs_is_mem lhs c g)
   in
   let g =
     List.fold_left
@@ -362,7 +366,7 @@ module CycleDetection = struct
 	expr_delay = Delay.new_var ();
 	expr_annot = None;
 	expr_loc = var_decl.var_loc } in
-    { var_decl with var_id = cp_var },
+    { var_decl with var_id = cp_var; var_orig = false },
     mkeq var_decl.var_loc ([cp_var], expr)
 
   let wrong_partition g partition =
@@ -526,7 +530,7 @@ let pp_dep_graph fmt g =
 
 let pp_error fmt trace =
   fprintf fmt "@.Causality error, cyclic data dependencies: %a@."
-    (fprintf_list ~sep:"->" pp_print_string) trace
+    (fprintf_list ~sep:", " pp_print_string) trace
 
 (* Merges elements of graph [g2] into graph [g1] *)
 let merge_with g1 g2 =

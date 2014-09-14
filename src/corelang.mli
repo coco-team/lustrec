@@ -19,7 +19,7 @@ val dummy_clock_dec: clock_dec
 
 val mktyp: Location.t -> type_dec_desc -> type_dec
 val mkclock: Location.t -> clock_dec_desc -> clock_dec
-val mkvar_decl: Location.t -> ident * type_dec * clock_dec * bool (* is const *) -> var_decl
+val mkvar_decl: Location.t -> ?orig:bool -> ident * type_dec * clock_dec * bool (* is const *) -> var_decl
 val var_decl_of_const: const_desc -> var_decl
 val mkexpr: Location.t ->  expr_desc -> expr
 val mkeq: Location.t -> ident list * expr -> eq
@@ -83,7 +83,7 @@ val ident_of_expr : expr -> ident
 val expr_of_ident : ident -> Location.t -> expr
 val expr_list_of_expr : expr -> expr list
 val expr_of_expr_list : Location.t -> expr list -> expr
-val call_of_expr: expr -> (ident * expr list * (ident * label) option)
+val call_of_expr: expr -> (ident * expr list * expr option)
 val expr_of_dimension: Dimension.dim_expr -> expr
 val dimension_of_expr: expr -> Dimension.dim_expr
 val dimension_of_const: Location.t -> constant -> Dimension.dim_expr

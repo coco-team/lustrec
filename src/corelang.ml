@@ -41,8 +41,9 @@ let mktyp loc d =
 let mkclock loc d =
   { ck_dec_desc = d; ck_dec_loc = loc }
 
-let mkvar_decl loc (id, ty_dec, ck_dec, is_const) =
+let mkvar_decl loc ?(orig=false) (id, ty_dec, ck_dec, is_const) =
   { var_id = id;
+    var_orig = orig;
     var_dec_type = ty_dec;
     var_dec_clock = ck_dec;
     var_dec_const = is_const;
@@ -61,6 +62,7 @@ let mkexpr loc d =
 
 let var_decl_of_const c =
   { var_id = c.const_id;
+    var_orig = true;
     var_dec_type = { ty_dec_loc = c.const_loc; ty_dec_desc = Tydec_any };
     var_dec_clock = { ck_dec_loc = c.const_loc; ck_dec_desc = Ckdec_any };
     var_dec_const = true;
@@ -572,7 +574,7 @@ let get_node_interface nd =
    | Expr_pre e' -> Expr_pre (expr_replace_var fvar e')
    | Expr_when (e', i, l)-> Expr_when (expr_replace_var fvar e', fvar i, l)
    | Expr_merge (i, hl) -> Expr_merge (fvar i, List.map (fun (t, h) -> (t, expr_replace_var fvar h)) hl)
-   | Expr_appl (i, e', i') -> Expr_appl (i, expr_replace_var fvar e', Utils.option_map (fun (x, l) -> fvar x, l) i')
+   | Expr_appl (i, e', i') -> Expr_appl (i, expr_replace_var fvar e', Utils.option_map (expr_replace_var fvar) i')
 
 (* Applies the renaming function [fvar] to every rhs
    only when the corresponding lhs satisfies predicate [pvar] *)
@@ -631,7 +633,7 @@ let get_node_interface nd =
    | Expr_merge (i, hl) -> 
      Expr_merge (f_var i, List.map (fun (t, h) -> (t, re h)) hl)
    | Expr_appl (i, e', i') -> 
-     Expr_appl (f_node i, re e', Utils.option_map (fun (x, l) -> f_var x, l) i')
+     Expr_appl (f_node i, re e', Utils.option_map re i')
   
  let rename_node_annot f_node f_var f_const expr  =
    expr
@@ -929,7 +931,7 @@ and get_expr_desc_vars vars expr_desc =
   | Expr_fby (e1, e2) -> List.fold_left get_expr_vars vars [e1; e2]
   | Expr_merge (c, hl) -> List.fold_left (fun vars (_, h) -> get_expr_vars vars h) (Utils.ISet.add c vars) hl
   | Expr_appl (_, arg, None)   -> get_expr_vars vars arg
-  | Expr_appl (_, arg, Some (r,_)) -> get_expr_vars (Utils.ISet.add r vars) arg
+  | Expr_appl (_, arg, Some r) -> List.fold_left get_expr_vars vars [arg; r]
 
 
 let rec expr_has_arrows e =
