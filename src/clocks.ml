@@ -164,6 +164,9 @@ let clock_list_of_clock ck =
 let clock_on ck cr l =
  clock_of_clock_list (List.map (fun ck -> new_ck (Con (ck,cr,l)) true) (clock_list_of_clock ck))
 
+let clock_current ck =
+ clock_of_clock_list (List.map (fun ck -> match (repr ck).cdesc with Con(ck',_,_) -> ck' | _ -> assert false) (clock_list_of_clock ck))
+
 let clock_of_impnode_clock ck =
   let ck = repr ck in
   match ck.cdesc with
@@ -377,6 +380,19 @@ let rec branch ck =
     | Carrow _          -> assert false
     | _                 -> acc
   in branch ck [];;
+
+let clock_of_root_branch r br =
+ List.fold_left (fun ck (cr,l) -> new_ck (Con (ck, cr, l)) true) r br
+
+(* Computes the (longest) common prefix of two branches *)
+let rec common_prefix br1 br2 =
+ match br1, br2 with
+ | []          , _
+ | _           , []           -> []
+ | (cr1,l1)::q1, (cr2,l2)::q2 ->
+   if eq_carrier cr1 cr2 && (l1 = l2)
+   then (cr1, l1) :: common_prefix q1 q2
+   else []
 
 (* Tests whether clock branches [br1] nd [br2] are statically disjoint *)
 let rec disjoint_branches br1 br2 =

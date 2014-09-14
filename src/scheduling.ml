@@ -116,7 +116,16 @@ let topological_sort eq_equiv g =
     !sorted
   end
 
+(* Filters out normalization variables and renames instance variables to keep things readable,
+   in a case of a dependency error *)
+let filter_original n vl =
+ List.fold_right (fun v res ->
+   if ExprDep.is_instance_var v then Format.sprintf "node %s" (ExprDep.undo_instance_var v) :: res else
+   let vdecl = get_node_var v n in
+   if vdecl.var_orig then v :: res else res) vl []
+
 let schedule_node n =
+  let node_vars = get_node_vars n in
   try
     let eq_equiv = ExprDep.node_eq_equiv n in
     let eq_equiv v1 v2 =
@@ -143,8 +152,8 @@ let schedule_node n =
     let sort = topological_sort eq_equiv g in
     let unused = Liveness.compute_unused_variables n gg in
     let fanin = Liveness.compute_fanin n gg in
-
-    let disjoint = Disjunction.clock_disjoint_map (get_node_vars n) in
+ 
+    let disjoint = Disjunction.clock_disjoint_map node_vars in
     
     Log.report ~level:2 
       (fun fmt -> 
@@ -164,8 +173,9 @@ let schedule_node n =
       );
  
     n', { schedule = sort; unused_vars = unused; fanin_table = fanin; reuse_table = reuse }
-  with (Causality.Cycle v) as exc ->
-    pp_error Format.err_formatter v;
+  with (Causality.Cycle vl) as exc ->
+    let vl = filter_original n vl in
+    pp_error Format.err_formatter vl;
     raise exc
 
 let schedule_prog prog =

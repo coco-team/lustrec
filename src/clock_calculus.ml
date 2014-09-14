@@ -441,11 +441,13 @@ let int_factor_of_expr e =
       (Const_int i) -> i
   | _ -> failwith "Internal error: int_factor_of_expr"
 
-(** [clock_uncarry ck] drops the possible carrier name from clock [ck] *)
-let clock_uncarry ck =
+(** [clock_uncarry ck] drops the possible carrier(s) name(s) from clock [ck] *)
+let rec clock_uncarry ck =
   let ck = repr ck in
   match ck.cdesc with
   | Ccarrying (_, ck') -> ck'
+  | Con(ck', cr, l)    -> clock_on (clock_uncarry ck') cr l
+  | Ctuple ckl         -> clock_of_clock_list (List.map clock_uncarry ckl)
   | _                  -> ck
 
 let try_unify ck1 ck2 loc =
@@ -557,6 +559,34 @@ let unify_imported_clock ref_ck_opt ck loc =
   in
   aux ck
 
+(* Computes the root clock of a tuple or a node clock,
+   which is not the same as the base clock.
+   Root clock will be used as the call clock 
+   of a given node instance *)
+let compute_root_clock ck =
+  let root = Clocks.root ck in
+  let branch = ref None in
+  let rec aux ck =
+    match (repr ck).cdesc with
+    | Ctuple cl ->
+        List.iter aux cl
+    | Carrow (ck1,ck2) ->
+        aux ck1; aux ck2
+    | _ ->
+        begin
+          match !branch with
+          | None ->
+              branch := Some (Clocks.branch ck)
+          | Some br ->
+              (* cannot fail *)
+              branch := Some (Clocks.common_prefix br (Clocks.branch ck))
+        end
+  in
+  begin
+    aux ck;
+    Clocks.clock_of_root_branch root (Utils.desome !branch)
+  end
+
 (* Clocks a list of arguments of Lustre builtin operators:
    - type each expression, remove carriers of clocks as
      carriers may only denote variables, not arbitrary expr.
@@ -658,9 +688,7 @@ and clock_expr ?(nocarrier=true) env expr =
     let cr =
       match r with
       | None        -> new_var true
-      | Some (x, _) -> let loc_r = loc_of_cond expr.expr_loc x in
-		       let expr_r = expr_of_ident x loc_r in
-		       clock_expr env expr_r in
+      | Some c      -> clock_standard_args env [c] in
     let couts = clock_appl env id args cr expr.expr_loc in
     expr.expr_clock <- couts;
     couts
@@ -690,11 +718,12 @@ and clock_expr ?(nocarrier=true) env expr =
   | Expr_merge (c,hl) ->
       let cvar = new_var true in
       let crvar = new_carrier Carry_name true in
-      List.iter (fun (t, h) -> let ckh = clock_expr env h in unify_tuple_clock (Some (new_ck (Con (cvar,crvar,t)) true)) ckh h.expr_loc) hl;
+      List.iter (fun (t, h) -> let ckh = clock_uncarry (clock_expr env h) in unify_tuple_clock (Some (new_ck (Con (cvar,crvar,t)) true)) ckh h.expr_loc) hl;
       let cr = clock_carrier env c expr.expr_loc cvar in
       try_unify_carrier cr crvar expr.expr_loc;
-      expr.expr_clock <- cvar;
-      cvar
+      let cres = clock_current ((snd (List.hd hl)).expr_clock) in
+      expr.expr_clock <- cres;
+      cres
   in
   Log.report ~level:4 (fun fmt -> Format.fprintf fmt "Clock of expr %a: %a@." Printers.pp_expr expr Clocks.print_ck resulting_ck);
   resulting_ck

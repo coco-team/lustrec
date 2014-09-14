@@ -20,7 +20,7 @@ let get_loc () = Location.symbol_rloc ()
 
 let mktyp x = mktyp (get_loc ()) x
 let mkclock x = mkclock (get_loc ()) x
-let mkvar_decl x = mkvar_decl (get_loc ()) x
+let mkvar_decl x = mkvar_decl (get_loc ()) ~orig:true x
 let mkexpr x = mkexpr (get_loc ()) x
 let mkeexpr x = mkeexpr (get_loc ()) x 
 let mkeq x = mkeq (get_loc ()) x
@@ -266,7 +266,7 @@ handler_list:
 | handler handler_list { $1::$2 }
 
 handler:
- STATE UIDENT ARROW unless_list locals LET stmt_list TEL until_list { Automata.mkhandler (get_loc ()) $2 $4 $9 $5 $7 }
+ STATE UIDENT COL unless_list locals LET stmt_list TEL until_list { Automata.mkhandler (get_loc ()) $2 $4 $9 $5 $7 }
 
 unless_list:
     { [] }
@@ -381,16 +381,12 @@ expr:
 /* Applications */
 | node_ident LPAR expr RPAR
     {mkexpr (Expr_appl ($1, $3, None))}
-| node_ident LPAR expr RPAR EVERY vdecl_ident
-    {mkexpr (Expr_appl ($1, $3, Some ($6, tag_true)))}
-| node_ident LPAR expr RPAR EVERY tag_ident LPAR vdecl_ident RPAR
-    {mkexpr (Expr_appl ($1, $3, Some ($8, $6))) }
+| node_ident LPAR expr RPAR EVERY expr
+    {mkexpr (Expr_appl ($1, $3, Some $6))}
 | node_ident LPAR tuple_expr RPAR
     {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), None))}
-| node_ident LPAR tuple_expr RPAR EVERY vdecl_ident
-    {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), Some ($6, tag_true))) }
-| node_ident LPAR tuple_expr RPAR EVERY tag_ident LPAR vdecl_ident RPAR
-    {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), Some ($8, $6))) }
+| node_ident LPAR tuple_expr RPAR EVERY expr
+    {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), Some $6)) }
 
 /* Boolean expr */
 | expr AND expr 
@@ -527,13 +523,12 @@ vdecl_list:
 
 vdecl:
 /* Useless no ?*/    ident_list
-    {List.map mkvar_decl 
-        (List.map (fun id -> (id, mktyp Tydec_any, mkclock Ckdec_any, false)) $1)}
+    { List.map (fun id -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, false)) $1 }
 
 | ident_list COL typeconst clock 
-    {List.map mkvar_decl (List.map (fun id -> (id, mktyp $3, $4, false)) $1)}
+    { List.map (fun id -> mkvar_decl (id, mktyp $3, $4, false)) $1 }
 | CONST ident_list COL typeconst /* static parameters don't have clocks */
-    {List.map mkvar_decl (List.map (fun id -> (id, mktyp $4, mkclock Ckdec_any, true)) $2)}
+    { List.map (fun id -> mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true)) $2 }
 
 cdecl_list:
   cdecl SCOL { (fun itf -> [$1 itf]) }

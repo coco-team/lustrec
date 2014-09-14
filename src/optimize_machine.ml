@@ -40,7 +40,7 @@ and eliminate_expr elim expr =
   | Cst _ | StateVar _ -> expr
 
 (* see if elim has to take in account the provided instr:
-   if so, upodate elim and return the remove flag,
+   if so, update elim and return the remove flag,
    otherwise, the expression should be kept and elim is left untouched *)
 let update_elim outputs elim instr =
 (*  Format.eprintf "SHOULD WE STORE THE EXPRESSION IN INSTR %a TO ELIMINATE IT@." pp_instr instr;*)

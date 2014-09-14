@@ -86,7 +86,7 @@ and pp_handlers fmt hl =
 and pp_app fmt id e r =
   match r with
   | None -> pp_call fmt id e
-  | Some (x, l) -> fprintf fmt "%t every %s(%s)" (fun fmt -> pp_call fmt id e) l x 
+  | Some c -> fprintf fmt "%t every (%a)" (fun fmt -> pp_call fmt id e) pp_expr c 
 
 and pp_call fmt id e =
   match id, e.expr_desc with
@@ -135,21 +135,21 @@ let pp_restart fmt restart =
   Format.fprintf fmt "%s" (if restart then "restart" else "resume")
 
 let pp_unless fmt (_, expr, restart, st) =
-  Format.fprintf fmt "unless %a %a %s"
+  Format.fprintf fmt "unless %a %a %s@ "
     pp_expr expr
     pp_restart restart
     st
 
 let pp_until fmt (_, expr, restart, st) =
-  Format.fprintf fmt "until %a %a %s"
+  Format.fprintf fmt "until %a %a %s@ "
     pp_expr expr
     pp_restart restart
     st
 
 let rec pp_handler fmt handler =
-  Format.fprintf fmt "state %s -> %a %a let %a tel %a"
+  Format.fprintf fmt "state %s ->@ @[<v 2>  %a%alet@,@[<v 2>  %a@]@,tel%a@]"
     handler.hand_state
-    (Utils.fprintf_list ~sep:"@ " pp_unless) handler.hand_unless
+    (Utils.fprintf_list ~sep:"@," pp_unless) handler.hand_unless
     (fun fmt locals ->
       match locals with [] -> () | _ ->
 	Format.fprintf fmt "@[<v 4>var %a@]@ " 
@@ -158,7 +158,7 @@ let rec pp_handler fmt handler =
 	  locals)
     handler.hand_locals
     pp_node_stmts handler.hand_stmts
-    (Utils.fprintf_list ~sep:"@ " pp_until) handler.hand_until
+    (Utils.fprintf_list ~sep:"@," pp_until) handler.hand_until
 
 and pp_node_stmt fmt stmt =
   match stmt with
@@ -168,7 +168,7 @@ and pp_node_stmt fmt stmt =
 and pp_node_stmts fmt stmts = fprintf_list ~sep:"@ " pp_node_stmt fmt stmts
 
 and pp_node_aut fmt aut =
-  Format.fprintf fmt "automaton %s %a"
+  Format.fprintf fmt "@[<v 0>automaton %s@,%a@]"
     aut.aut_id
     (Utils.fprintf_list ~sep:"@ " pp_handler) aut.aut_handlers
 

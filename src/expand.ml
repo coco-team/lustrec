@@ -73,6 +73,7 @@ let new_local vtyp vck vdd vloc =
   let ty_dec = {ty_dec_desc = Tydec_any; ty_dec_loc = vloc} in (* dummy *)
   let ck_dec = {ck_dec_desc = Ckdec_any; ck_dec_loc = vloc} in (* dummy *)
   {var_id = vid;
+   var_orig = false;
    var_dec_type = ty_dec;
    var_dec_clock = ck_dec;
    var_dec_deadline = vdd;
