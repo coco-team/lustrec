@@ -204,7 +204,7 @@ let compute_reuse_policy node schedule disjoint g =
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "new context:%a@." pp_context ctx);
     let heads = List.map (fun v -> get_node_var v node) (List.hd !sort) in
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "NEW HEADS:");
-    List.iter (fun head -> Log.report ~level:2 (fun fmt -> Format.fprintf fmt "%s " head.var_id)) heads;
+    List.iter (fun head -> Log.report ~level:6 (fun fmt -> Format.fprintf fmt "%s " head.var_id)) heads;
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "@.");
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "COMPUTE_DEPENDENCIES@.");
     compute_dependencies heads ctx;

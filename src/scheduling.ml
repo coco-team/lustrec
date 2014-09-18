@@ -155,7 +155,7 @@ let schedule_node n =
  
     let disjoint = Disjunction.clock_disjoint_map node_vars in
     
-    Log.report ~level:2 
+    Log.report ~level:3 
       (fun fmt -> 
 	Format.fprintf fmt
 	  "clock disjoint map for node %s: %a" 
@@ -164,13 +164,6 @@ let schedule_node n =
       );
 
     let reuse = Liveness.compute_reuse_policy n sort disjoint gg in
-    Log.report ~level:2 
-      (fun fmt -> 
-	Format.fprintf fmt
-	  "reuse policy for node %s: %a" 
-	  n'.node_id
-	  Liveness.pp_reuse_policy reuse
-      );
  
     n', { schedule = sort; unused_vars = unused; fanin_table = fanin; reuse_table = reuse }
   with (Causality.Cycle vl) as exc ->

@@ -382,7 +382,7 @@ let normalize_node node =
       let expr = substitute_expr diff_vars split_defs eq.eq_rhs in
       let pair = mkeexpr expr.expr_loc (mkexpr expr.expr_loc (Expr_tuple [expr_of_ident v.var_id expr.expr_loc; expr])) in
       (["horn_backend";"trace"], pair)
-    ) diff_vars;
+    ) [] (*diff_vars*);
     annot_loc = Location.dummy_loc
   }
 

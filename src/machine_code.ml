@@ -377,7 +377,9 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
      (if Stateless.check_node node_f then si else MReset o :: si),
      Utils.IMap.add o call_f j,
      d,
-     reset_instance node args o r eq.eq_rhs.expr_clock @
+     (if Stateless.check_node node_f
+      then []
+      else reset_instance node args o r call_ck) @
        (control_on_clock node args call_ck (MStep (var_p, o, vl))) :: s)
 
    (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
