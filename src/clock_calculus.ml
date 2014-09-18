@@ -689,7 +689,7 @@ and clock_expr ?(nocarrier=true) env expr =
       match r with
       | None        -> new_var true
       | Some c      -> clock_standard_args env [c] in
-    let couts = clock_appl env id args cr expr.expr_loc in
+    let couts = clock_appl env id args (clock_uncarry cr) expr.expr_loc in
     expr.expr_clock <- couts;
     couts
     with exn -> (

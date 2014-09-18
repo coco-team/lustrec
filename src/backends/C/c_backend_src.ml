@@ -144,7 +144,10 @@ let pp_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list
      (Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs 
 
 let pp_machine_reset (m: machine_t) self fmt inst =
-  let (node, static) = List.assoc inst m.minstances in
+  let (node, static) =
+    try
+      List.assoc inst m.minstances
+    with Not_found -> (Format.eprintf "pp_machine_reset %s %s %s: internal error@," m.mname.node_id self inst; raise Not_found) in
   fprintf fmt "%a(%a%t%s->%s);"
     pp_machine_reset_name (node_name node)
     (Utils.fprintf_list ~sep:", " Dimension.pp_dimension) static
