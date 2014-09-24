@@ -212,10 +212,10 @@ let pp_warning_unused fmt node_schs =
      then
        let nd = match (Corelang.node_from_name nd).top_decl_desc with Node nd -> nd | _ -> assert false in
        ISet.iter
-	 (fun u -> 
-	   Format.fprintf fmt "Warning: variable '%s' seems unused@.%a@."
-	     u
-	     Location.pp_loc (get_node_var u nd).var_loc)
+	 (fun u ->
+	   let vu = get_node_var u nd in
+	   if vu.var_orig
+	   then Format.fprintf fmt "Warning: variable '%s' seems unused@.%a@." u Location.pp_loc vu.var_loc)
 	 unused
    )
    node_schs

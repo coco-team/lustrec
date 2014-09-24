@@ -164,33 +164,48 @@ let compute_evaluated heads ctx =
     List.iter (fun head -> ctx.evaluated <- Disjunction.CISet.add head ctx.evaluated) heads;
   end
 
-let compute_reuse node ctx var =
-  let aliasable = is_aliasable_input node var.var_id in
+(* tests whether a variable [v] may be (re)used instead of [var]. The conditions are:
+   - same type
+   - [v] is not an aliasable input of the equation defining [var]
+   - [v] is not one of the current heads (which contain [var])
+   - the representative of [v] is not currently in use
+ *)
+let eligible node ctx heads var v =
+     Typing.eq_ground var.var_type v.var_type
+  && not (is_aliasable_input node var.var_id v)
+  && not (List.exists (fun h -> h.var_id = v.var_id) heads)
+  && let repr_v = Hashtbl.find ctx.policy v.var_id
+     in not (Disjunction.CISet.exists (fun p -> IdentDepGraph.mem_edge ctx.dep_graph p.var_id repr_v.var_id) ctx.evaluated)
+
+let compute_reuse node ctx heads var =
   let disjoint = Hashtbl.find ctx.disjoint var.var_id in
-  let eligible v =
-       Typing.eq_ground var.var_type v.var_type
-    && not (aliasable v) in
   let locally_reusable v =
     IdentDepGraph.fold_pred (fun p r -> r && Disjunction.CISet.exists (fun d -> p = d.var_id) disjoint) ctx.dep_graph v.var_id true in
-  let eligibles = Disjunction.CISet.filter eligible ctx.evaluated in
-  let dead, live = Disjunction.CISet.partition locally_reusable eligibles in
+  let eligibles = Disjunction.CISet.filter (eligible node ctx heads var) ctx.evaluated in
+  let quasi_dead, live = Disjunction.CISet.partition locally_reusable eligibles in
   try
     let disjoint_live = Disjunction.CISet.inter disjoint live in
     let reuse = Disjunction.CISet.max_elt disjoint_live in
     begin
       IdentDepGraph.add_edge ctx.dep_graph var.var_id reuse.var_id;
       Hashtbl.add ctx.policy var.var_id (Hashtbl.find ctx.policy reuse.var_id);
+      ctx.evaluated <- Disjunction.CISet.add var ctx.evaluated;
+      (*Format.eprintf "%s reused by live@." var.var_id;*)
     end
   with Not_found ->
   try
+    let dead = Disjunction.CISet.filter (fun v -> is_graph_root v.var_id ctx.dep_graph) quasi_dead in
     let reuse = Disjunction.CISet.choose dead in
     begin
       IdentDepGraph.add_edge ctx.dep_graph var.var_id reuse.var_id;
       Hashtbl.add ctx.policy var.var_id (Hashtbl.find ctx.policy reuse.var_id);
+      ctx.evaluated <- Disjunction.CISet.add var ctx.evaluated;
+      (*Format.eprintf "%s reused by dead %a@." var.var_id Disjunction.pp_ciset dead;*)
     end
       with Not_found ->
     begin
       Hashtbl.add ctx.policy var.var_id var;
+      ctx.evaluated <- Disjunction.CISet.add var ctx.evaluated;
     end
 
 let compute_reuse_policy node schedule disjoint g =
@@ -210,8 +225,8 @@ let compute_reuse_policy node schedule disjoint g =
     compute_dependencies heads ctx;
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "new context:%a@." pp_context ctx);
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "COMPUTE_REUSE@.");
-    List.iter (compute_reuse node ctx) heads;
-    compute_evaluated heads ctx;
+    List.iter (compute_reuse node ctx heads) heads;
+    (*compute_evaluated heads ctx;*)
     List.iter (fun head -> Log.report ~level:6 (fun fmt -> Format.fprintf fmt "reuse %s instead of %s@." (Hashtbl.find ctx.policy head.var_id).var_id head.var_id)) heads;
     sort := List.tl !sort;
   done;

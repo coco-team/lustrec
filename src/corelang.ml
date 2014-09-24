@@ -475,7 +475,8 @@ let get_node_vars nd =
 let get_var id var_list =
  List.find (fun v -> v.var_id = id) var_list
 
-let get_node_var id node = get_var id (get_node_vars node)
+let get_node_var id node =
+  get_var id (get_node_vars node)
 
 let get_node_eqs =
   let get_eqs stmts =
