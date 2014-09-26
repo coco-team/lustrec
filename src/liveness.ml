@@ -27,9 +27,15 @@ type context =
 *)
 let compute_fanin n g =
   let locals = ISet.diff (ExprDep.node_local_variables n) (ExprDep.node_memory_variables n) in
+  let inputs = ExprDep.node_input_variables n in
   let fanin = Hashtbl.create 23 in
   begin
-    IdentDepGraph.iter_vertex (fun v -> if ISet.mem v locals then Hashtbl.add fanin v (IdentDepGraph.in_degree g v)) g;
+    IdentDepGraph.iter_vertex
+      (fun v ->
+	if ISet.mem v locals
+	then Hashtbl.add fanin v (IdentDepGraph.in_degree g v) else
+	if ExprDep.is_read_var v && not (ISet.mem v inputs)
+	then Hashtbl.add fanin (ExprDep.undo_read_var v) (IdentDepGraph.in_degree g v)) g;
     fanin
   end
  
