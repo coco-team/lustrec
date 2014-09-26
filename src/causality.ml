@@ -191,7 +191,7 @@ let add_eq_dependencies mems inputs node_vars eq (g, g') =
       else
 	let x = if ISet.mem x inputs then mk_read_var x else x in
 	(add_edges lhs [x] g, g')
-    else (g, g') in
+    else (add_edges lhs [mk_read_var x] g, g') (* x is a global constant, treated as a read var *) in
 (* Add dependencies from [lhs] to rhs clock [ck]. *)
   let rec add_clock lhs_is_mem lhs ck g =
     (*Format.eprintf "add_clock %a@." Clocks.print_ck ck;*)

@@ -56,6 +56,9 @@ let prog_unfold_consts prog =
 	| _       -> decl
     ) prog 
 
+(* Distribution of when inside sub-expressions, i.e. (a+b) when c --> a when c + b when c 
+   May increase clock disjointness of variables, which is useful for code optimization
+*)
 let apply_stack expr stack =
  List.fold_left (fun expr (v, t) -> mkexpr expr.expr_loc (Expr_when (expr, v, t))) expr stack
 

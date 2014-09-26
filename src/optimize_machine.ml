@@ -9,10 +9,18 @@
 (*                                                                  *)
 (********************************************************************)
 
+open Utils
 open LustreSpec 
 open Corelang
 open Causality
 open Machine_code 
+
+let pp_elim fmt elim =
+  begin
+    Format.fprintf fmt "{ /* elim table: */@.";
+    IMap.iter (fun v expr -> Format.fprintf fmt "%s |-> %a@." v pp_val expr) elim;
+    Format.fprintf fmt "}@.";
+  end
 
 let rec eliminate elim instr =
   let e_expr = eliminate_expr elim in
@@ -32,77 +40,90 @@ let rec eliminate elim instr =
     
 and eliminate_expr elim expr =
   match expr with
-  | LocalVar v -> if List.mem_assoc v elim then List.assoc v elim else expr
+  | LocalVar v -> (try IMap.find v.var_id elim with Not_found -> expr)
   | Fun (id, vl) -> Fun (id, List.map (eliminate_expr elim) vl)
   | Array(vl) -> Array(List.map (eliminate_expr elim) vl)
   | Access(v1, v2) -> Access(eliminate_expr elim v1, eliminate_expr elim v2)
-  | Power(v1, v2) -> Access(eliminate_expr elim v1, eliminate_expr elim v2)
+  | Power(v1, v2) -> Power(eliminate_expr elim v1, eliminate_expr elim v2)
   | Cst _ | StateVar _ -> expr
+
+let is_scalar_const c =
+  match c with
+  | Const_int _
+  | Const_real _
+  | Const_float _
+  | Const_tag _   -> true
+  | _             -> false
+
+let unfoldable_assign fanin v expr =
+  try
+    let d = Hashtbl.find fanin v.var_id
+    in match expr with
+    | Cst c when is_scalar_const c -> true
+    | Cst c when d < 2             -> true
+    | LocalVar _
+    | StateVar _                   -> true
+    | Fun (id, _) when d < 2 && Basic_library.is_internal_fun id -> true
+    | _                                                          -> false
+  with Not_found -> false
+
+let merge_elim elim1 elim2 =
+  let merge k e1 e2 =
+    match e1, e2 with
+    | Some e1, Some e2 -> if e1 = e2 then Some e1 else None
+    | _      , Some e2 -> Some e2
+    | Some e1, _       -> Some e1
+    | _                -> None
+  in IMap.merge merge elim1 elim2
 
 (* see if elim has to take in account the provided instr:
    if so, update elim and return the remove flag,
    otherwise, the expression should be kept and elim is left untouched *)
-let update_elim outputs elim instr =
+let rec instrs_unfold fanin elim instrs =
+  let elim, rev_instrs = 
+    List.fold_left (fun (elim, instrs) instr ->
+      (* each subexpression in instr that could be rewritten by the elim set is
+	 rewritten *)
+      let instr = eliminate elim instr in
+      (* if instr is a simple local assign, then (a) elim is simplified with it (b) it
+	 is stored as the elim set *)
+      instr_unfold fanin instrs elim instr
+    ) (elim, []) instrs
+  in elim, List.rev rev_instrs
+
+and instr_unfold fanin instrs elim instr =
 (*  Format.eprintf "SHOULD WE STORE THE EXPRESSION IN INSTR %a TO ELIMINATE IT@." pp_instr instr;*)
-	  
-  let apply elim v new_e = 
-    (v, new_e)::List.map (fun (v, e) -> v, eliminate_expr [v, new_e] e) elim 
-  in
   match instr with
   (* Simple cases*)
-  | MLocalAssign (v, (Cst _ as e)) 
-  | MLocalAssign (v, (LocalVar _ as e)) 
-  | MLocalAssign (v, (StateVar _ as e)) -> 
-    if not (List.mem v outputs) then  true, apply elim v e else false, elim
-  (* When optimization >= 3, we also inline any basic operator call. 
-     All those are returning a single ouput *)
-  | MStep([v], id, vl) when
-      Basic_library.is_internal_fun id
-      && !Options.optimization >= 3
-      -> 	  assert false 
-(*    true, apply elim v (Fun(id, vl))*)
-
-    
-  | MLocalAssign (v, ((Fun (id, il)) as e)) when 
-      not (List.mem v outputs) 
-      && Basic_library.is_internal_fun id (* this will avoid inlining ite *)
-      && !Options.optimization >= 3 
-	-> (
-(*	  Format.eprintf "WE STORE THE EXPRESSION DEFINING %s TO ELIMINATE IT@." v.var_id; *)
-	  true, apply elim v e
-	)
-  | _ -> 
+  | MStep([v], id, vl) when Basic_library.is_internal_fun id
+    -> instr_unfold fanin instrs elim (MLocalAssign (v, Fun (id, vl)))
+  | MLocalAssign(v, expr) when unfoldable_assign fanin v expr
+    -> (IMap.add v.var_id expr elim, instrs)
+  | MBranch(g, hl) when false
+    -> let elim_branches = List.map (fun (h, l) -> (h, instrs_unfold fanin elim l)) hl in
+       let (elim, branches) =
+	 List.fold_right
+	   (fun (h, (e, l)) (elim, branches) -> (merge_elim elim e, (h, l)::branches))
+	   elim_branches (elim, [])
+       in elim, (MBranch (g, branches) :: instrs)
+  | _
+    -> (elim, instr :: instrs)
     (* default case, we keep the instruction and do not modify elim *)
-    false, elim
   
 
 (** We iterate in the order, recording simple local assigns in an accumulator
     1. each expression is rewritten according to the accumulator
     2. local assigns then rewrite occurrences of the lhs in the computed accumulator
 *)
-let optimize_minstrs outputs instrs = 
-  let rev_instrs, eliminate = 
-    List.fold_left (fun (rinstrs, elim) instr ->
-      (* each subexpression in instr that could be rewritten by the elim set is
-	 rewritten *)
-      let instr = eliminate elim instr in
-      (* if instr is a simple local assign, then (a) elim is simplified with it (b) it
-	 is stored as the elim set *)
-      let remove, elim = update_elim outputs elim instr in
-      (if remove then rinstrs else instr::rinstrs), elim
-    ) ([],[]) instrs 
-  in
-  let eliminated_vars = List.map fst eliminate in
-  eliminated_vars, List.rev rev_instrs
 
 (** Perform optimization on machine code:
     - iterate through step instructions and remove simple local assigns
     
 *)
-let optimize_machine machine =
-  let eliminated_vars, new_instrs = optimize_minstrs machine.mstep.step_outputs machine.mstep.step_instrs in
-  let new_locals = 
-    List.filter (fun v -> not (List.mem v eliminated_vars)) machine.mstep.step_locals 
+let machine_unfold fanin elim machine =
+  (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "machine_unfold %a@." pp_elim elim);*)
+  let eliminated_vars, new_instrs = instrs_unfold fanin elim machine.mstep.step_instrs in
+  let new_locals = List.filter (fun v -> not (IMap.mem v.var_id eliminated_vars)) machine.mstep.step_locals 
   in
   {
     machine with
@@ -112,11 +133,20 @@ let optimize_machine machine =
 	  step_instrs = new_instrs
       }
   }
-    
 
+let instr_of_const top_const =
+  let const = const_of_top top_const in
+  let vdecl = mkvar_decl Location.dummy_loc (const.const_id, mktyp Location.dummy_loc Tydec_any, mkclock Location.dummy_loc Ckdec_any, true) in
+  let vdecl = { vdecl with var_type = const.const_type }
+  in MLocalAssign (vdecl, Cst const.const_value)
 
-let optimize_machines machines =
-  List.map optimize_machine machines
+let machines_unfold consts node_schs machines =
+  List.map
+    (fun m ->
+      let fanin = (IMap.find m.mname.node_id node_schs).Scheduling.fanin_table in
+      let elim_consts, _ = instrs_unfold fanin IMap.empty (List.map instr_of_const consts)
+      in machine_unfold fanin elim_consts m)
+    machines
 
 (* variable substitution for optimizing purposes *)
 
