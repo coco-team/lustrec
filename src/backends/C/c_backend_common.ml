@@ -222,18 +222,18 @@ let rec pp_c_const fmt c =
 *)
 let rec pp_c_val self pp_var fmt v =
   match v with
-    | Cst c         -> pp_c_const fmt c
-    | Array vl      -> fprintf fmt "{%a}" (Utils.fprintf_list ~sep:", " (pp_c_val self pp_var)) vl
-    | Access (t, i) -> fprintf fmt "%a[%a]" (pp_c_val self pp_var) t (pp_c_val self pp_var) i
-    | Power (v, n)  -> assert false
-    | LocalVar v    -> pp_var fmt v
-    | StateVar v    ->
+  | Cst c         -> pp_c_const fmt c
+  | Array vl      -> fprintf fmt "{%a}" (Utils.fprintf_list ~sep:", " (pp_c_val self pp_var)) vl
+  | Access (t, i) -> fprintf fmt "%a[%a]" (pp_c_val self pp_var) t (pp_c_val self pp_var) i
+  | Power (v, n)  -> assert false
+  | LocalVar v    -> pp_var fmt v
+  | StateVar v    ->
     (* array memory vars are represented by an indirection to a local var with the right type,
        in order to avoid casting everywhere. *)
-      if Types.is_array_type v.var_type
-      then fprintf fmt "%a" pp_var v
-      else fprintf fmt "%s->_reg.%a" self pp_var v
-    | Fun (n, vl)   -> Basic_library.pp_c n (pp_c_val self pp_var) fmt vl
+    if Types.is_array_type v.var_type
+    then fprintf fmt "%a" pp_var v
+    else fprintf fmt "%s->_reg.%a" self pp_var v
+  | Fun (n, vl)   -> Basic_library.pp_c n (pp_c_val self pp_var) fmt vl
 
 let pp_c_checks self fmt m =
   Utils.fprintf_list ~sep:"" 

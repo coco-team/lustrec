@@ -44,8 +44,43 @@ let rec expansion_depth v =
  | Access (v, i) -> max 0 (expansion_depth v - 1)
  | Power (v, n)  -> 0 (*1 + expansion_depth v*)
 
-type loop_index = LVar of ident | LInt of int ref
+let rec merge_static_loop_profiles lp1 lp2 =
+  match lp1, lp2 with
+  | []      , _        -> lp2
+  | _       , []       -> lp1
+  | p1 :: q1, p2 :: q2 -> (p1 || p2) :: merge_static_loop_profiles q1 q2
 
+(* Returns a list of bool values, indicating whether the indices must be static or not *)
+let rec static_loop_profile v =
+ match v with
+ | Cst (Const_array cl) ->
+   List.fold_right (fun c lp -> merge_static_loop_profiles lp (static_loop_profile (Cst c))) cl []
+ | Cst _
+ | LocalVar _
+ | StateVar _  -> []
+ | Fun (_, vl) -> List.fold_right (fun v lp -> merge_static_loop_profiles lp (static_loop_profile v)) vl []
+ | Array vl    -> true :: List.fold_right (fun v lp -> merge_static_loop_profiles lp (static_loop_profile v)) vl []
+ | Access (v, i) -> (match (static_loop_profile v) with [] -> [] | _ :: q -> q)
+ | Power (v, n)  -> false :: static_loop_profile v
+
+let rec is_const_index v =
+  match v with
+  | Cst (Const_int _) -> true
+  | Fun (_, vl)       -> List.for_all is_const_index vl
+  | _                 -> false
+
+type loop_index = LVar of ident | LInt of int ref | LAcc of value_t
+(*
+let rec value_offsets v offsets =
+ match v, offsets with
+ | _                        , []          -> v
+ | Power (v, n)             , _ :: q      -> value_offsets v q
+ | Array vl                 , LInt r :: q -> value_offsets (List.nth vl !r) q
+ | Cst (Const_array cl)     , LInt r :: q -> value_offsets (Cst (List.nth cl !r)) q
+ | Fun (f, vl)              , _           -> Fun (f, List.map (fun v -> value_offsets v offsets) vl)
+ | _                        , LInt r :: q -> value_offsets (Access (v, Cst (Const_int !r))) q
+ | _                        , LVar i :: q -> value_offsets (Access (v, LocalVar i)) q
+*)
 (* Computes the list of nested loop variables together with their dimension bounds.
    - LInt r stands for loop expansion (no loop variable, but int loop index)
    - LVar v stands for loop variable v
@@ -72,6 +107,7 @@ let pp_loop_var fmt lv =
  match snd lv with
  | LVar v -> fprintf fmt "[%s]" v
  | LInt r -> fprintf fmt "[%d]" !r
+ | LAcc i -> fprintf fmt "[%a]" pp_val i
 
 (* Prints a suffix of loop variables for arrays *)
 let pp_suffix fmt loop_vars =
@@ -80,13 +116,15 @@ let pp_suffix fmt loop_vars =
 (* Prints a [value] indexed by the suffix list [loop_vars] *)
 let rec pp_value_suffix self loop_vars pp_value fmt value =
  match loop_vars, value with
- | (_, LInt r) :: q, Array vl     ->
+ | (_, LInt r) :: q, Array vl      ->
    pp_value_suffix self q pp_value fmt (List.nth vl !r)
- | _           :: q, Power (v, n) ->
-   pp_value_suffix self loop_vars pp_value fmt v
- | _               , Fun (n, vl)  ->
+ | _           :: q, Power (v, n)  ->
+   pp_value_suffix self q pp_value fmt v
+ | _               , Fun (n, vl)   ->
    Basic_library.pp_c n (pp_value_suffix self loop_vars pp_value) fmt vl
- | _               , _            ->
+ | _               , Access (v, i) ->
+   pp_value_suffix self ((Dimension.mkdim_var (), LAcc i) :: loop_vars) pp_value fmt v
+ | _               , _             ->
    let pp_var_suffix fmt v = fprintf fmt "%a%a" pp_value v pp_suffix loop_vars in
    pp_c_val self pp_var_suffix fmt value
 
@@ -95,6 +133,20 @@ let rec pp_value_suffix self loop_vars pp_value fmt value =
    - [var_name]: name of variable to be assigned
    - [value]: assigned value
    - [pp_var]: printer for variables
+*)
+(*
+let pp_assign_rec pp_var var_type var_name value =
+  match (Types.repr var_type).Types.tdesc, value with
+  | Types.Tarray (d, ty'), Array vl     ->
+    let szl = Utils.enumerate (Dimension.size_const_dimension d) in
+    fprintf fmt "@[<v 2>{@,%a@]@,}"
+      (Utils.fprintf_list ~sep:"@," (fun fmt i -> r := i; aux fmt q)) szl
+  | Types.Tarray (d, ty'), Power (v, _) -> 
+  | Types.Tarray (d, ty'), _            ->
+  | _                    , _            ->
+    fprintf fmt "%a = %a;" 
+      pp_var var_name
+      (pp_value_suffix self loop_vars pp_var) value
 *)
 let pp_assign m self pp_var fmt var_type var_name value =
   let depth = expansion_depth value in
@@ -117,6 +169,7 @@ let pp_assign m self pp_var fmt var_type var_name value =
       let szl = Utils.enumerate (Dimension.size_const_dimension d) in
       fprintf fmt "@[<v 2>{@,%a@]@,}"
 	(Utils.fprintf_list ~sep:"@," (fun fmt i -> r := i; aux fmt q)) szl
+    | _ -> assert false
   in
   begin
     reset_loop_counter ();
