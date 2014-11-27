@@ -127,7 +127,7 @@ let import_dependency loc (local, dep) =
       raise (Error (loc, Unknown_library basename))
     end
 
-let rec load_header imported header =
+let rec load_header_rec imported header =
   List.fold_left (fun imp decl ->
     match decl.top_decl_desc with
     | Node nd -> assert false
@@ -138,10 +138,21 @@ let rec load_header imported header =
        let basename = name_dependency (local, dep) in
        if ISet.mem basename imported then imp else
 	 let lusic = import_dependency decl.top_decl_loc (local, dep)
-	 in load_header (ISet.add basename imported) lusic.Lusic.contents
+	 in load_header_rec (ISet.add basename imported) lusic.Lusic.contents
 		 ) imported header
 
-let rec load_program imported program =
+let load_header imported header =
+  try
+    load_header_rec imported header
+  with
+    Corelang.Error (loc, err) as exc -> (
+      Format.eprintf "Import error: %a%a@."
+	Corelang.pp_error err
+	Location.pp_loc loc;
+      raise exc
+    );;
+
+let rec load_program_rec imported program =
   List.fold_left (fun imp decl ->
     match decl.top_decl_desc with
     | Node nd -> (add_node nd.node_id decl; imp)
@@ -152,5 +163,16 @@ let rec load_program imported program =
        let basename = name_dependency (local, dep) in
        if ISet.mem basename imported then imp else
 	 let lusic = import_dependency decl.top_decl_loc (local, dep)
-	 in load_header (ISet.add basename imported) lusic.Lusic.contents
+	 in load_header_rec (ISet.add basename imported) lusic.Lusic.contents
 		 ) imported program
+
+let load_program imported program =
+  try
+    load_program_rec imported program
+  with
+    Corelang.Error (loc, err) as exc -> (
+      Format.eprintf "Import error: %a%a@."
+	Corelang.pp_error err
+	Location.pp_loc loc;
+      raise exc
+    );;
