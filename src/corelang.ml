@@ -769,7 +769,7 @@ let pp_error fmt = function
       sym
   | Unknown_library sym ->
     fprintf fmt
-      "impossible to load library %s.@."
+      "impossible to load library %s.lusic@.Please compile the corresponding interface or source file.@."
       sym
 
 (* filling node table with internal functions *)
