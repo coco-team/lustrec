@@ -34,7 +34,7 @@ module Main = functor (Mod: MODIFIERS_HDR) ->
 struct
 
 let print_import_standard fmt =
-  fprintf fmt "#include \"%s/include/lustrec/arrow.h\"@.@." Version.prefix
+  fprintf fmt "#include \"%s/arrow.h\"@.@." Version.include_path
 
 let print_static_declare_instance attr fmt (i, (m, static)) =
   fprintf fmt "%a(%s, %a%t%s)"
@@ -163,26 +163,36 @@ let print_machine_alloc_decl fmt m =
 
 let print_machine_decl_from_header fmt inode =
   (*Mod.print_machine_decl_prefix fmt m;*)
-  if inode.nodei_stateless then
-    begin
-      fprintf fmt "extern %a;@.@."
-	print_stateless_prototype
-	(inode.nodei_id, inode.nodei_inputs, inode.nodei_outputs)
-    end
+  if inode.nodei_prototype = Some "C" then
+    if inode.nodei_stateless then
+      begin
+	fprintf fmt "extern %a;@.@."
+	  print_stateless_C_prototype
+	  (inode.nodei_id, inode.nodei_inputs, inode.nodei_outputs)
+      end
+    else (
+      raise (Invalid_argument ("A node with declared prototype C cannot be stateful, it has to be a function")))
   else
+    if inode.nodei_stateless then
     begin
-      let static_inputs = List.filter (fun v -> v.var_dec_const) inode.nodei_inputs in
-      let used name =
-	   (List.exists (fun v -> v.var_id = name) inode.nodei_inputs)
-	|| (List.exists (fun v -> v.var_id = name) inode.nodei_outputs) in
-      let self = mk_new_name used "self" in
       fprintf fmt "extern %a;@.@."
-	(print_reset_prototype self) (inode.nodei_id, static_inputs);
-
-      fprintf fmt "extern %a;@.@."
-	(print_step_prototype self)
+	print_stateless_prototype 
 	(inode.nodei_id, inode.nodei_inputs, inode.nodei_outputs)
     end
+    else 
+      begin
+	let static_inputs = List.filter (fun v -> v.var_dec_const) inode.nodei_inputs in
+	let used name =
+	  (List.exists (fun v -> v.var_id = name) inode.nodei_inputs)
+	  || (List.exists (fun v -> v.var_id = name) inode.nodei_outputs) in
+	let self = mk_new_name used "self" in
+	fprintf fmt "extern %a;@.@."
+	  (print_reset_prototype self) (inode.nodei_id, static_inputs);
+	
+	fprintf fmt "extern %a;@.@."
+	  (print_step_prototype self)
+	  (inode.nodei_id, inode.nodei_inputs, inode.nodei_outputs)
+      end
 
 let print_const_decl fmt cdecl =
   fprintf fmt "extern %a;@." 
@@ -303,6 +313,8 @@ let print_alloc_header header_fmt basename prog machines dependencies =
     pp_print_newline header_fmt ()
   end
 
+(* Function called when compiling a lusi file and generating the associated C
+   header. *)
 let print_header_from_header header_fmt basename header =
   (* Include once: start *)
   let baseNAME = String.uppercase basename in

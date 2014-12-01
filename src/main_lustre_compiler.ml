@@ -32,17 +32,18 @@ let print_lusi prog basename extension =
   end
 
 (* compile a .lusi header file *)
-let compile_header basename extension =
+let compile_header dirname  basename extension =
   let destname = !Options.dest_dir ^ "/" ^ basename in
   let header_name = basename ^ extension in
   let lusic_ext = extension ^ "c" in
   begin
     Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v>");
-    let header = parse_header true header_name in
+    let header = parse_header true (dirname ^ "/" ^ header_name) in
     ignore (Modules.load_header ISet.empty header);
     ignore (check_top_decls header);
     create_dest_dir ();
-    Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating compiled header file %sc@," header_name);
+    Log.report ~level:1 
+      (fun fmt -> fprintf fmt ".. generating compiled header file %sc@," (destname ^ extension));
     Lusic.write_lusic true header destname lusic_ext;
     Lusic.print_lusic_to_h destname lusic_ext;
     Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.")
@@ -82,8 +83,8 @@ let compile_source_to_header prog computed_types_env computed_clocks_env basenam
   end
 
 (* compile a .lus source file *)
-let rec compile_source basename extension =
-  let source_name = basename ^ extension in
+let rec compile_source dirname basename extension =
+  let source_name = (*dirname ^ "/" ^*) basename ^ extension in
 
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v>");
 
@@ -293,17 +294,24 @@ let rec compile_source basename extension =
     exit 0
   end
 
-let compile basename extension =
+let compile dirname basename extension =
   match extension with
-  | ".lusi"  -> compile_header basename extension
-  | ".lus"   -> compile_source basename extension
+  | ".lusi"  -> compile_header dirname basename extension
+  | ".lus"   -> compile_source dirname basename extension
   | _        -> assert false
 
 let anonymous filename =
-  let ok_ext, ext = List.fold_left (fun (ok, ext) ext' -> if not ok && Filename.check_suffix filename ext' then true, ext' else ok, ext) (false, "") extensions in
+  let ok_ext, ext = List.fold_left 
+    (fun (ok, ext) ext' -> 
+      if not ok && Filename.check_suffix filename ext' then 
+	true, ext' 
+      else
+	ok, ext) 
+    (false, "") extensions in
   if ok_ext then
+    let dirname = Filename.dirname filename in
     let basename = Filename.chop_suffix (Filename.basename filename) ext in
-    compile basename ext
+    compile dirname basename ext
   else
     raise (Arg.Bad ("Can only compile *.lusi, *.lus or *.ec files"))
 

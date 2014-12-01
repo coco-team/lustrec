@@ -231,10 +231,12 @@ let is_imported_node td =
 
 (* alias and type definition table *)
 
-let top_int_type = mktop_decl Location.dummy_loc Version.prefix false (TypeDef {tydef_id = "int"; tydef_desc = Tydec_int})
-let top_bool_type = mktop_decl Location.dummy_loc Version.prefix false (TypeDef {tydef_id = "bool"; tydef_desc = Tydec_bool})
-let top_float_type = mktop_decl Location.dummy_loc Version.prefix false (TypeDef {tydef_id = "float"; tydef_desc = Tydec_float})
-let top_real_type = mktop_decl Location.dummy_loc Version.prefix false (TypeDef {tydef_id = "real"; tydef_desc = Tydec_real})
+let mktop = mktop_decl Location.dummy_loc Version.include_path false 
+
+let top_int_type = mktop (TypeDef {tydef_id = "int"; tydef_desc = Tydec_int})
+let top_bool_type = mktop (TypeDef {tydef_id = "bool"; tydef_desc = Tydec_bool})
+let top_float_type = mktop (TypeDef {tydef_id = "float"; tydef_desc = Tydec_float})
+let top_real_type = mktop (TypeDef {tydef_id = "real"; tydef_desc = Tydec_real})
 
 let type_table =
   Utils.create_hashtable 20 [
@@ -788,7 +790,7 @@ let mk_internal_node id =
   let (tin, tout) = Types.split_arrow ty in
   (*eprintf "internal fun %s: %d -> %d@." id (List.length (Types.type_list_of_type tin)) (List.length (Types.type_list_of_type tout));*)
   let cpt = ref (-1) in
-  mktop_decl Location.dummy_loc Version.prefix false
+  mktop
     (ImportedNode
        {nodei_id = id;
 	nodei_type = ty;
