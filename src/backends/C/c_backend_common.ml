@@ -94,20 +94,31 @@ let pp_machine_step_name fmt id = fprintf fmt "%s_step" id
 let pp_c_dimension fmt d =
  fprintf fmt "%a" Dimension.pp_dimension d
 
+let is_basic_c_type t =
+  match (Types.repr t).Types.tdesc with
+  | Types.Tbool | Types.Treal | Types.Tint  -> true
+  | _                                       -> false
+
+let pp_basic_c_type fmt t =
+  match (Types.repr t).Types.tdesc with
+  | Types.Tbool           -> fprintf fmt "_Bool"
+  | Types.Treal           -> fprintf fmt "double"
+  | Types.Tint            -> fprintf fmt "int"
+  | _ -> assert false (* Not a basic C type. Do not handle arrays or pointers *)
+
 let pp_c_type var fmt t =
   let rec aux t pp_suffix =
-  match (Types.repr t).Types.tdesc with
-  | Types.Tclock t'       -> aux t' pp_suffix
-  | Types.Tbool           -> fprintf fmt "_Bool %s%a" var pp_suffix ()
-  | Types.Treal           -> fprintf fmt "double %s%a" var pp_suffix ()
-  | Types.Tint            -> fprintf fmt "int %s%a" var pp_suffix ()
-  | Types.Tarray (d, t')  ->
-    let pp_suffix' fmt () = fprintf fmt "%a[%a]" pp_suffix () pp_c_dimension d in
-    aux t' pp_suffix'
-  | Types.Tstatic (_, t') -> fprintf fmt "const "; aux t' pp_suffix
-  | Types.Tconst ty       -> fprintf fmt "%s %s" ty var
-  | Types.Tarrow (_, _)   -> fprintf fmt "void (*%s)()" var
-  | _                     -> eprintf "internal error: pp_c_type %a@." Types.print_ty t; assert false
+    match (Types.repr t).Types.tdesc with
+    | Types.Tclock t'       -> aux t' pp_suffix
+    | Types.Tbool | Types.Treal | Types.Tint 
+                            -> fprintf fmt "%a %s%a" pp_basic_c_type t var pp_suffix ()
+    | Types.Tarray (d, t')  ->
+      let pp_suffix' fmt () = fprintf fmt "%a[%a]" pp_suffix () pp_c_dimension d in
+      aux t' pp_suffix'
+    | Types.Tstatic (_, t') -> fprintf fmt "const "; aux t' pp_suffix
+    | Types.Tconst ty       -> fprintf fmt "%s %s" ty var
+    | Types.Tarrow (_, _)   -> fprintf fmt "void (*%s)()" var
+    | _                     -> eprintf "internal error: pp_c_type %a@." Types.print_ty t; assert false
   in aux t (fun fmt () -> ())
 
 let rec pp_c_initialize fmt t = 
@@ -318,6 +329,19 @@ let print_step_prototype self fmt (name, inputs, outputs) =
     (Utils.pp_final_char_if_non_empty ",@," outputs) 
     pp_machine_memtype_name name
     self
+
+let print_stateless_C_prototype fmt (name, inputs, outputs) =
+  let output = 
+    match outputs with
+    | [hd] -> hd
+    | _ -> assert false
+  in
+  fprintf fmt "%a %s (@[<v>@[%a@]@,@])"
+    pp_basic_c_type output.var_type
+    name
+    (Utils.fprintf_list ~sep:",@ " pp_c_decl_input_var) inputs
+    
+    
 
 let print_import_prototype fmt (_, s, _) =
   fprintf fmt "#include \"%s.h\"@," s

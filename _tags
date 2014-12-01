@@ -1,26 +1,11 @@
 "src": include
 "src/backends/C": include
 "src/backends/Horn": include
-# OASIS_START
-# DO NOT EDIT (digest: 98bcbc21d29d2f6266238c1025fff223)
-# Ignore VCS directories, you can use the same kind of rule outside 
-# OASIS_START/STOP if you want to exclude directories that contains 
-# useless stuff for the build process
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic
-".bzr": -traverse
-".bzr": not_hygienic
-".hg": -traverse
-".hg": not_hygienic
-".git": -traverse
-".git": not_hygienic
-"_darcs": -traverse
-"_darcs": not_hygienic
-# Executable lustrec
-"src/main_lustre_compiler.native": pkg_ocamlgraph
-"src/main_lustre_compiler.native": pkg_str
-"src/main_lustre_compiler.native": pkg_unix
-<src/*.ml{,i}>: pkg_ocamlgraph
-<src/*.ml{,i}>: pkg_str
-<src/*.ml{,i}>: pkg_unix
-# OASIS_STOP
+"src/main_lustre_compiler.native": use_graph
+"src/main_lustre_compiler.native": use_str
+"src/main_lustre_compiler.native": use_unix
+<src/*.ml{,i}>: use_graph
+<src/*.ml{,i}>: use_str
+<src/*.ml{,i}>: use_unix

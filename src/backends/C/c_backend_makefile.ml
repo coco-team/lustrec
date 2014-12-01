@@ -47,7 +47,7 @@ let fprintf_dependencies fmt dep =
     (("${INC}/io_frontend.c"):: (* IO functions when a main function is computed *)
 	(List.map 
 	   (fun (local, s, _) -> 
-	     (if local then s else Version.prefix ^ "/include/lustrec/" ^ s) ^ ".c")
+	     (if local then s else Version.include_path ^ "/" ^ s) ^ ".c")
 	   compiled_dep))
 
 module type MODIFIERS_MKF =

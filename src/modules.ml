@@ -114,7 +114,7 @@ let add_const itf name value =
   with Not_found -> Hashtbl.add consts_table name value
 
 let name_dependency (local, dep) =
-  (if local then !Options.dest_dir ^ "/" else Version.prefix ^ "/include/lustrec/") ^ dep
+  ((if local then !Options.dest_dir else Version.include_path) ^ "/") ^ dep
 
 let import_dependency loc (local, dep) =
   let basename = name_dependency (local, dep) in

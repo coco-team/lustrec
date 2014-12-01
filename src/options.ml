@@ -9,7 +9,13 @@
 (*                                                                  *)
 (********************************************************************)
 
-let version = "0.1-"^Version.number
+let version = Version.number
+let include_path = Version.include_path
+
+let print_version () = 
+  Format.printf "Lustrec compiler, version %s@." version;
+  Format.printf "Include directory: %s@." include_path  
+
 let main_node = ref ""
 let static_mem = ref true
 let print_types = ref true
@@ -30,6 +36,7 @@ let lusi = ref false
 let horntraces = ref false
 let horn_cex = ref false
 let horn_queries = ref false
+
 
 let options =
   [ "-d", Arg.Set_string dest_dir,
@@ -55,7 +62,7 @@ let options =
     "-print_clocks", Arg.Set print_clocks, "prints node clocks";
     "-O", Arg.Set_int optimization, " changes optimization level <default: 2>";
     "-verbose", Arg.Set_int verbose_level, " changes verbose level <default: 1>";
-    "-version", Arg.Unit (fun () -> print_endline version), " displays the version";]
+    "-version", Arg.Unit print_version, " displays the version";]
 
 let get_witness_dir filename =
   (* Make sure the directory exists *)

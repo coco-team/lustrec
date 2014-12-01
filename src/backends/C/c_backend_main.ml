@@ -107,7 +107,7 @@ let print_main_fun machines m fmt =
   fprintf fmt "@]@ }@."       
 
 let print_main_header fmt =
-  fprintf fmt "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/include/lustrec/io_frontend.h\"@." Version.prefix
+  fprintf fmt "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/io_frontend.h\"@." Version.include_path 
 
 
 let print_main_c main_fmt main_machine basename prog machines dependencies =
