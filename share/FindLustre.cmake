@@ -82,25 +82,34 @@ function(Lustre_Compile)
   endif()
 
   file(MAKE_DIRECTORY ${LUSTRE_OUTPUT_DIR})
-  set(GLOBAL_LUSTRE_GENERATED_FILES)
+  set(GLOBAL_LUSTRE_GENERATED_C_FILES "")
+  # create list of generated C files in parent scope
+  set(LUSTRE_GENERATED_C_FILES_${LUS_LIBNAME} "" PARENT_SCOPE)
   foreach(LFILE IN LISTS LUS_LUS_FILES)
     get_filename_component(L ${LFILE} NAME_WE)
-    set(LUSTRE_GENERATED_FILES ${LUSTRE_OUTPUT_DIR}/${L}.h ${LUSTRE_OUTPUT_DIR}/${L}.c)
-    list(APPEND GLOBAL_LUSTRE_GENERATED_FILES ${LUSTRE_GENERATED_FILES})
+    get_filename_component(E ${LFILE} EXT)
+    if ("${E}" STREQUAL ".lus")
+      set(LUSTRE_GENERATED_FILES ${LUSTRE_OUTPUT_DIR}/${L}.h ${LUSTRE_OUTPUT_DIR}/${L}.c ${LUSTRE_OUTPUT_DIR}/${L}_alloc.h)
+    elseif("${E}" STREQUAL ".lusi")
+      set(LUSTRE_GENERATED_FILES ${LUSTRE_OUTPUT_DIR}/${L}.h)
+    endif()
+    list(APPEND GLOBAL_LUSTRE_GENERATED_C_FILES ${LUSTRE_GENERATED_FILES})
+    set(LUSTRE_GENERATED_FILES ${LUSTRE_GENERATED_FILES} ${LUSTRE_OUTPUT_DIR}/${L}.lusic)
     add_custom_command(
       OUTPUT ${LUSTRE_GENERATED_FILES}
       COMMAND ${LUSTRE_COMPILER} ${LUSTRE_NODE_OPT} -d ${LUSTRE_OUTPUT_DIR} ${LFILE}
       DEPENDS ${LFILE}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-      COMMENT "Compile Lustre source(s): ${LFILE}."
+      COMMENT "Compile Lustre source(s): ${LFILE} (generates: ${LUSTRE_GENERATED_FILES})."
       )
     set_source_files_properties(${LUSTRE_GENERATED_FILES} PROPERTIES GENERATED TRUE)
   endforeach()
 
   include_directories(${LUSTRE_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${LUSTRE_OUTPUT_DIR})
   add_library(${LUS_LIBNAME} SHARED
-              ${GLOBAL_LUSTRE_GENERATED_FILES} ${LUS_USER_C_FILES}
-             )
+              ${GLOBAL_LUSTRE_GENERATED_C_FILES} ${LUS_USER_C_FILES}
+              )
+  set(LUSTRE_GENERATED_C_FILES_${LUS_LIBNAME} "${GLOBAL_LUSTRE_GENERATED_C_FILES}" PARENT_SCOPE)
   message(STATUS "Lustre: Added rule for building lustre library: ${LUS_LIBNAME}")
 endfunction(Lustre_Compile)
 
