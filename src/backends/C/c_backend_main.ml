@@ -110,10 +110,10 @@ let print_main_header fmt =
   fprintf fmt "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/io_frontend.h\"@." Version.include_path 
 
 
-let print_main_c main_fmt main_machine basename prog machines dependencies =
+let print_main_c main_fmt main_machine basename prog machines _ (*dependencies*) =
   print_main_header main_fmt;
   fprintf main_fmt "#include <stdlib.h>@.#include <assert.h>@.";
-  print_import_alloc_prototype main_fmt (true, basename, []);
+  print_import_alloc_prototype main_fmt (Dep (true, basename, [], true (* assuming it is stateful*) ));
   pp_print_newline main_fmt ();
 
   (* Print the svn version number and the supported C standard (C90 or C99) *)

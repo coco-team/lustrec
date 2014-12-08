@@ -212,7 +212,7 @@ let has_c_prototype funname dependencies =
 			       The order of evaluation of dependencies should be
 			       compatible with overloading. (Not checked yet) *) 
       List.fold_left
-	(fun res (_, _, decls) -> 
+	(fun res (Dep (_, _, decls, _)) -> 
 	  match res with
 	  | Some _ -> res
 	  | None -> 
@@ -421,7 +421,7 @@ let print_lib_c source_fmt basename prog machines dependencies =
     begin
       fprintf source_fmt "#include <stdlib.h>@.";
     end;
-  print_import_prototype source_fmt (true, basename, []);
+  print_import_prototype source_fmt (Dep (true, basename, [], true (* assuming it is stateful *)));
   pp_print_newline source_fmt ();
   (* Print the svn version number and the supported C standard (C90 or C99) *)
   print_version source_fmt;

@@ -158,7 +158,7 @@ let makefile_targets fmt basename nodename dependencies =
   C_backend_makefile.fprintf_dependencies fmt dependencies; 
   fprintf fmt "\t${GCC} -Wno-attributes -o %s_main_eacsl io_frontend.o %a %s %s_main_eacsl.o %a@." 
     basename 
-    (Utils.fprintf_list ~sep:" " (fun fmt (_, s, _) -> Format.fprintf fmt "%s.o" s)) 
+    (Utils.fprintf_list ~sep:" " (fun fmt (Dep (_, s, _, _)) -> Format.fprintf fmt "%s.o" s)) 
     (C_backend_makefile.compiled_dependencies dependencies)
     ("${FRAMACEACSL}/e_acsl.c " 
      ^ "${FRAMACEACSL}/memory_model/e_acsl_bittree.c " 

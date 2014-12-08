@@ -343,13 +343,14 @@ let print_stateless_C_prototype fmt (name, inputs, outputs) =
     
     
 
-let print_import_prototype fmt (_, s, _) =
+let print_import_prototype fmt (Dep (_, s, _, _)) =
   fprintf fmt "#include \"%s.h\"@," s
 
-let print_import_alloc_prototype fmt (_, s, _) =
-  fprintf fmt "#include \"%s_alloc.h\"@," s
+let print_import_alloc_prototype fmt (Dep (_, s, _, stateful)) =
+  if stateful then
+    fprintf fmt "#include \"%s_alloc.h\"@," s
 
-let print_extern_alloc_prototypes fmt (_,_, header) =
+let print_extern_alloc_prototypes fmt (Dep (_,_, header,_)) =
   List.iter (fun decl -> match decl.top_decl_desc with
   | ImportedNode ind when not ind.nodei_stateless ->
     let static = List.filter (fun v -> v.var_dec_const) ind.nodei_inputs

@@ -64,7 +64,7 @@ let gen_files funs basename prog machines dependencies header_file source_lib_fi
     end
   )
 
-let translate_to_c header source_lib source_main makefile basename prog machines dependencies =
+let translate_to_c header source_lib source_main makefile basename prog machines dependencies  =
 
   match !Options.spec with
   | "no" -> begin
@@ -78,8 +78,15 @@ let translate_to_c header source_lib source_main makefile basename prog machines
     let module SourceMain = C_backend_main.Main (SourceMainMod) in
     let module Makefile = C_backend_makefile.Main (MakefileMod) in
         
-    let funs = Header.print_alloc_header, Source.print_lib_c, SourceMain.print_main_c, Makefile.print_makefile in
-    gen_files funs basename prog machines dependencies header source_lib source_main makefile machines
+    let funs = 
+      Header.print_alloc_header, 
+      Source.print_lib_c, 
+      SourceMain.print_main_c, 
+      Makefile.print_makefile 
+    in
+    gen_files 
+      funs basename prog machines dependencies 
+      header source_lib source_main makefile machines
 
   end
   | "acsl" -> begin
@@ -94,8 +101,15 @@ let translate_to_c header source_lib source_main makefile basename prog machines
     let module SourceMain = C_backend_main.Main (SourceMainMod) in
     let module Makefile = C_backend_makefile.Main (MakefileMod) in
         
-    let funs = Header.print_alloc_header, Source.print_lib_c, SourceMain.print_main_c, Makefile.print_makefile in
-    gen_files funs basename prog machines dependencies header source_lib source_main makefile machines
+    let funs = 
+      Header.print_alloc_header, 
+      Source.print_lib_c,
+      SourceMain.print_main_c,
+      Makefile.print_makefile 
+    in
+    gen_files
+      funs basename prog machines dependencies
+      header source_lib source_main makefile machines
 
   end
   | "c" -> begin
