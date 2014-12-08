@@ -188,6 +188,11 @@ let check_compatibility (prog, computed_types_env, computed_clocks_env) (header,
       Stateless.pp_error err;
     raise exc
 
+let is_stateful topdecl =
+  match topdecl.top_decl_desc with
+  | Node nd -> (match nd.node_stateless with Some b -> not b | None -> not nd.node_dec_stateless)
+  | ImportedNode nd -> not nd.nodei_stateless 
+  | _ -> false
 
 
 let import_dependencies prog =
@@ -202,7 +207,9 @@ let import_dependencies prog =
       let lusic = Modules.import_dependency dep.top_decl_loc (local, s) in
       Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@]@ ");
       let (lusi_type_env, lusi_clock_env) = get_envs_from_top_decls lusic.Lusic.contents in
-      (local, s, lusic.Lusic.contents)::compilation_dep,
+      let is_stateful = List.exists is_stateful lusic.Lusic.contents in
+      let new_dep = Dep (local, s, lusic.Lusic.contents, is_stateful ) in
+      new_dep::compilation_dep,
       Env.overwrite type_env lusi_type_env,
       Env.overwrite clock_env lusi_clock_env)
     ([], Basic_library.type_env, Basic_library.clock_env)

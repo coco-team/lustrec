@@ -75,8 +75,6 @@ type constant =
 
 type quantifier_type = Exists | Forall
 
-
-
 (* The tag of an expression is a unique identifier used to distinguish
    different instances of the same node *)
 type expr =
@@ -208,6 +206,12 @@ type top_decl =
      top_decl_loc: Location.t}          (* the location where it is defined *)
 
 type program = top_decl list
+
+type dep_t = Dep of 
+    bool 
+  * ident
+  * (top_decl list) 
+  * bool (* is stateful *)
 
 type error =
     Main_not_found
