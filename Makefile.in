@@ -31,7 +31,8 @@ clean:
 	$(OCAMLBUILD) -clean
 
 dist-clean: clean
-	rm -f Makefile myocamlbuild.ml config.log config.status configure include/*.lusic include/math.h include/conv.h
+	rm -f Makefile myocamlbuild.ml config.log config.status configure
+	rm -f include/*.lusic include/math.h include/conv.h
 
 %.lusic: %.lusi
 	@echo Compiling $<
