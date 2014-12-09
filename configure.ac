@@ -85,7 +85,8 @@ AC_DEFINE_DIR([abs_datadir], [datadir])
 
 # Instanciation
 AC_CONFIG_FILES([Makefile
-                 myocamlbuild.ml
+		 src/Makefile
+                 src/myocamlbuild.ml
 		 src/version.ml])
 
 AC_OUTPUT
