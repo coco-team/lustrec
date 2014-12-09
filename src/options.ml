@@ -32,6 +32,7 @@ let global_inline = ref false
 let witnesses = ref false
 let optimization = ref 2
 let lusi = ref false
+let print_reuse = ref false
 
 let horntraces = ref false
 let horn_cex = ref false
@@ -55,6 +56,7 @@ let options =
     "-horn-traces", Arg.Unit (fun () -> output := "horn"; horntraces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
     "-horn-cex", Arg.Unit (fun () -> output := "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
     "-horn-queries", Arg.Unit (fun () -> output := "horn"; horn_queries:=true), "generate queries in generated Horn file. Enable the horn backend (work in progress)";
+    "-print_reuse", Arg.Set print_reuse, "prints variable reuse policy";
     "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";
     "-inline", Arg.Set global_inline, "inline all node calls (require a main node)";
     "-witnesses", Arg.Set witnesses, "enable production of witnesses during compilation";
