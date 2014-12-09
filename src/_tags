@@ -1,0 +1,10 @@
+"backends/C": include
+"backends/Horn": include
+<**/.svn>: -traverse
+<**/.svn>: not_hygienic
+"main_lustre_compiler.native": use_graph
+"main_lustre_compiler.native": use_str
+"main_lustre_compiler.native": use_unix
+<*.ml{,i}>: use_graph
+<*.ml{,i}>: use_str
+<*.ml{,i}>: use_unix
