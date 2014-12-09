@@ -153,18 +153,34 @@ let schedule_node n =
     let unused = Liveness.compute_unused_variables n gg in
     let fanin = Liveness.compute_fanin n gg in
  
-    let disjoint = Disjunction.clock_disjoint_map node_vars in
-    
-    Log.report ~level:3 
-      (fun fmt -> 
-	Format.fprintf fmt
-	  "clock disjoint map for node %s: %a" 
-	  n'.node_id
-	  Disjunction.pp_disjoint_map disjoint
-      );
+    let (disjoint, reuse) =
+      if !Options.optimization >= 3
+      then
+	let disjoint = Disjunction.clock_disjoint_map node_vars in
+	(disjoint,
+	 Liveness.compute_reuse_policy n sort disjoint gg)
+      else
+	(Hashtbl.create 1,
+	 Hashtbl.create 1) in
 
-    let reuse = Liveness.compute_reuse_policy n sort disjoint gg in
- 
+    if !Options.print_reuse
+    then
+      begin
+	Log.report ~level:0 
+	  (fun fmt -> 
+	    Format.fprintf fmt
+	      "OPT:clock disjoint map for node %s: %a" 
+	      n'.node_id
+	      Disjunction.pp_disjoint_map disjoint
+	  );
+	Log.report ~level:0 
+	  (fun fmt -> 
+	    Format.fprintf fmt
+	      "OPT:reuse policy for node %s: %a" 
+	      n'.node_id
+	      Liveness.pp_reuse_policy reuse
+	  );
+      end;
     n', { schedule = sort; unused_vars = unused; fanin_table = fanin; reuse_table = reuse }
   with (Causality.Cycle vl) as exc ->
     let vl = filter_original n vl in
