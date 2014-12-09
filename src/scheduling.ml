@@ -169,6 +169,11 @@ let schedule_node n =
 	Log.report ~level:0 
 	  (fun fmt -> 
 	    Format.fprintf fmt
+	      "OPT:%B@." (try (Hashtbl.iter (fun s1 v2 -> if s1 = v2.var_id then raise Not_found) reuse; false) with Not_found -> true)
+	  );
+	Log.report ~level:0 
+	  (fun fmt -> 
+	    Format.fprintf fmt
 	      "OPT:clock disjoint map for node %s: %a" 
 	      n'.node_id
 	      Disjunction.pp_disjoint_map disjoint
