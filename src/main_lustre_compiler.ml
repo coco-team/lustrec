@@ -84,7 +84,7 @@ let compile_source_to_header prog computed_types_env computed_clocks_env basenam
 
 (* compile a .lus source file *)
 let rec compile_source dirname basename extension =
-  let source_name = dirname ^ "/" ^ basename ^ extension in
+  let source_name = (*dirname ^ "/" ^ *) basename ^ extension in
 
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v>");
 
