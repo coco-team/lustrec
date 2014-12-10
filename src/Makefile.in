@@ -34,5 +34,8 @@ dist-clean: clean
 	rm -f Makefile myocamlbuild.ml config.log config.status configure
 	rm -f include/*.lusic include/math.h include/conv.h
 
+install:
+	make -C .. install
+
 .PHONY: compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean
 
