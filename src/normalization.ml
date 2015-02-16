@@ -358,15 +358,18 @@ let normalize_node node =
       let assert_expr = assert_.assert_expr in
       let (defs, vars'), expr = 
 	normalize_expr 
-	  ~alias:false 
+	  ~alias:true 
 	  node 
 	  [] (* empty offset for arrays *)
 	  ([], vars) (* defvar only contains vars *)
 	  assert_expr
       in
+      (* Format.eprintf "New assert vars: %a@.@?" (fprintf_list ~sep:", " Printers.pp_var) vars'; *)
       vars', defs@def_accu, {assert_ with assert_expr = expr}::assert_accu
     ) (vars, [], []) node.node_asserts in
   let new_locals = List.filter is_local vars in
+  (* Format.eprintf "New locals: %a@.@?" (fprintf_list ~sep:", " Printers.pp_var) new_locals; *)
+
   (* Compute traceability info: 
      - gather newly bound variables
      - compute the associated expression without aliases     
@@ -393,12 +396,17 @@ let normalize_node node =
     node_asserts = asserts;
     node_annot = norm_traceability::node.node_annot;
   }
-  in ((*Printers.pp_node Format.err_formatter node;*) node)
+  in ((*Printers.pp_node Format.err_formatter node;*) 
+    node
+)
+
 
 let normalize_decl decl =
   match decl.top_decl_desc with
   | Node nd ->
-    {decl with top_decl_desc = Node (normalize_node nd)}
+    let decl' = {decl with top_decl_desc = Node (normalize_node nd)} in
+    Hashtbl.replace Corelang.node_table nd.node_id decl';
+    decl'
   | Open _ | ImportedNode _ | Const _ | TypeDef _ -> decl
   
 let normalize_prog decls = 

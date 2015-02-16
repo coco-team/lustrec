@@ -285,7 +285,7 @@ let specialize_op expr =
   | _   -> expr
 
 let rec translate_expr node ((m, si, j, d, s) as args) expr =
- let expr = specialize_op expr in
+  let expr = specialize_op expr in
  match expr.expr_desc with
  | Expr_const v                     -> Cst v
  | Expr_ident x                     -> translate_ident node args x
@@ -323,7 +323,8 @@ let rec translate_act node ((m, si, j, d, s) as args) (y, expr) =
 			    conditional g [translate_act node args (y, t)]
                               [translate_act node args (y, e)]
   | Expr_merge (x, hl)   -> MBranch (translate_ident node args x, List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl)
-  | _                    -> MLocalAssign (y, translate_expr node args expr)
+  | _                    -> 
+    MLocalAssign (y, translate_expr node args expr)
 
 let reset_instance node args i r c =
   match r with
@@ -332,7 +333,7 @@ let reset_instance node args i r c =
                    [control_on_clock node args c (conditional g [MReset i] [])]
 
 let translate_eq node ((m, si, j, d, s) as args) eq =
-  (*Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock;*)
+  (* Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock; *)
   match eq.eq_lhs, eq.eq_rhs.expr_desc with
   | [x], Expr_arrow (e1, e2)                     ->
     let var_x = get_node_var x node in
