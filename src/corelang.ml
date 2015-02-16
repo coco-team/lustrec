@@ -475,7 +475,7 @@ let get_node_vars nd =
   nd.node_inputs @ nd.node_locals @ nd.node_outputs
 
 let get_var id var_list =
- List.find (fun v -> v.var_id = id) var_list
+    List.find (fun v -> v.var_id = id) var_list
 
 let get_node_var id node =
   get_var id (get_node_vars node)

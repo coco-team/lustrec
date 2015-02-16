@@ -181,7 +181,6 @@ let rec compile_source dirname basename extension =
     Normalization.unfold_arrow_active := false;
   let prog = Normalization.normalize_prog prog in
   Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
-
   (* Checking array accesses *)
   if !Options.check then
     begin
@@ -191,7 +190,7 @@ let rec compile_source dirname basename extension =
 
   (* Computation of node equation scheduling. It also breaks dependency cycles
      and warns about unused input or memory variables *)
-  Log.report ~level:1 (fun fmt -> fprintf fmt ".. scheduling@,");
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. scheduling@,@?");
   let prog, node_schs = Scheduling.schedule_prog prog in
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_warning_unused node_schs);
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_schedule node_schs);
@@ -208,7 +207,6 @@ let rec compile_source dirname basename extension =
     else
       prog
   in
-
   (* DFS with modular code generation *)
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,");
   let machine_code = Machine_code.translate_prog prog node_schs in
