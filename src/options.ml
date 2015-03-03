@@ -12,9 +12,9 @@
 let version = Version.number
 let include_path = Version.include_path
 
-let print_version () = 
+let print_version () =
   Format.printf "Lustrec compiler, version %s@." version;
-  Format.printf "Include directory: %s@." include_path  
+  Format.printf "Include directory: %s@." include_path
 
 let main_node = ref ""
 let static_mem = ref true
