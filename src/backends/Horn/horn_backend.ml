@@ -331,40 +331,66 @@ let print_machine machines fmt m =
 	 pp_machine_init_name m.mname.node_id
 	 (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m);
 
-       (* Rule for step *)
-       Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@."
-	 (pp_conj (pp_instr false m.mname.node_id)) m.mstep.step_instrs
-	 pp_machine_step_name m.mname.node_id
-	 (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
+       (* (\* Rule for step *\) *)
+       (* Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@." *)
+       (*   (pp_conj (pp_instr false m.mname.node_id)) m.mstep.step_instrs *)
+       (*   pp_machine_step_name m.mname.node_id *)
+       (*   (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m); *)
 
-       (* Adding assertions *)
+
+        (* Adding assertions *)
        (match m.mstep.step_asserts with
-       | [] -> ()
-       | assertsl -> begin
-	 let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id pp_var in
+       | [] ->
+          begin
+            Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@."
+                           (pp_conj (pp_instr false m.mname.node_id)) m.mstep.step_instrs
+                           pp_machine_step_name m.mname.node_id
+                           (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
+          end
+       | assertsl ->
+          begin
 
-	 Format.fprintf fmt "; Asserts@.";
-	 Format.fprintf fmt "(assert @[<v 2>%a@]@ )@.@.@."
-	   (pp_conj pp_val) assertsl;
-
-	 (** TEME: the following code is the one we described. But it generates a segfault in z3
-	 Format.fprintf fmt "; Asserts for init@.";
-	 Format.fprintf fmt "@[<v 2>(assert (=> @ (and @[<v 0>%a@]@ (%a %a))@ %a@]@.))@.@.@."
-	   (Utils.fprintf_list ~sep:"@ " (pp_instr true m.mname.node_id)) m.mstep.step_instrs
-	   pp_machine_init_name m.mname.node_id
-	   (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m)
-	   (pp_conj pp_val) assertsl;
-
-	 Format.fprintf fmt "; Asserts for step@.";
-	 Format.fprintf fmt "@[<v 2>(assert (=> @ (and @[<v 0>%a@]@ (%a %a))@ %a@]@.))@.@."
-	   (Utils.fprintf_list ~sep:"@ " (pp_instr false m.mname.node_id)) m.mstep.step_instrs
-
-	   pp_machine_step_name m.mname.node_id
-	   (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m)
-	   (pp_conj pp_val) assertsl
-      	 *)
-       end
+	    let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id pp_var in
+            (* print_string pp_val; *)
+            let instrs_concat = m.mstep.step_instrs in
+            Format.fprintf fmt "; With Asserts @.";
+            Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@."
+                           (pp_conj (pp_instr false m.mname.node_id)) instrs_concat
+                           pp_machine_step_name m.mname.node_id
+                           (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
+	    Format.fprintf fmt " @[<v 2>%a@]@ @.@.@."
+	                   (pp_conj pp_val) assertsl;
+          end
        );
+
+       (* (\* Adding assertions *\) *)
+       (* (match m.mstep.step_asserts with *)
+       (* | [] -> () *)
+       (* | assertsl -> begin *)
+       (*   let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id pp_var in *)
+
+       (*   Format.fprintf fmt "; Asserts@."; *)
+       (*   Format.fprintf fmt "(assert @[<v 2>%a@]@ )@.@.@." *)
+       (*     (pp_conj pp_val) assertsl; *)
+
+       (*   (\** TEME: the following code is the one we described. But it generates a segfault in z3 *)
+       (*   Format.fprintf fmt "; Asserts for init@."; *)
+       (*   Format.fprintf fmt "@[<v 2>(assert (=> @ (and @[<v 0>%a@]@ (%a %a))@ %a@]@.))@.@.@." *)
+       (*     (Utils.fprintf_list ~sep:"@ " (pp_instr true m.mname.node_id)) m.mstep.step_instrs *)
+       (*     pp_machine_init_name m.mname.node_id *)
+       (*     (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m) *)
+       (*     (pp_conj pp_val) assertsl; *)
+
+       (*   Format.fprintf fmt "; Asserts for step@."; *)
+       (*   Format.fprintf fmt "@[<v 2>(assert (=> @ (and @[<v 0>%a@]@ (%a %a))@ %a@]@.))@.@." *)
+       (*     (Utils.fprintf_list ~sep:"@ " (pp_instr false m.mname.node_id)) m.mstep.step_instrs *)
+
+       (*     pp_machine_step_name m.mname.node_id *)
+       (*     (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m) *)
+       (*     (pp_conj pp_val) assertsl *)
+       (*   *\) *)
+       (* end *)
+       (* ); *)
 
 (*
        match m.mspec with
