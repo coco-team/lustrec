@@ -353,13 +353,17 @@ let print_machine machines fmt m =
 	    let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id pp_var in
             (* print_string pp_val; *)
             let instrs_concat = m.mstep.step_instrs in
-            Format.fprintf fmt "; With Asserts @.";
-            Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@."
+            Format.fprintf fmt "; with Invariants @.";
+            Format.fprintf fmt "@[<v 2>(rule (=> @ (and @ %a@. %a)(%a %a)@]@.))@.@."
                            (pp_conj (pp_instr false m.mname.node_id)) instrs_concat
+                           (pp_conj pp_val) assertsl
                            pp_machine_step_name m.mname.node_id
                            (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
-	    Format.fprintf fmt " @[<v 2>%a@]@ @.@.@."
-	                   (pp_conj pp_val) assertsl;
+
+
+	    (* Format.fprintf fmt " @[<v 2>%a@]@ @.@.@." *)
+            (*                 (pp_conj pp_val) assertsl; *)
+
           end
        );
 
