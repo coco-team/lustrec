@@ -135,7 +135,7 @@ inline_compile_with_check () {
     popd > /dev/null
 	# Cheching witness
     pushd $build > /dev/null
-    $LUSTREC -verbose 0 -horn -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus 
+    $LUSTREC -verbose 0 -horn-traces -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus 
     popd > /dev/null
     z3="`z3 -T:10 $build/${name}_witnesses/inliner_witness.smt2 | xargs`"
     if [ "x`echo $z3 | grep unsat`" == "xunsat" ]; then
@@ -169,9 +169,9 @@ check_prop () {
 	
     # Checking horn backend
     if [ "$main" != "" ]; then
-	$LUSTREC -horn -d $build -verbose 0 $opts -node $main "$name".lus;
+	$LUSTREC -horn-traces -horn-queries -d $build -verbose 0 $opts -node $main "$name".lus;
     else
-	$LUSTREC -horn -d $build -verbose 0 $opts "$name".lus
+	$LUSTREC -horn-traces -horn-queries -d $build -verbose 0 $opts "$name".lus
     fi
     if [ $? -ne 0 ]; then
         rlustrec="INVALID";

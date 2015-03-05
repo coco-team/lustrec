@@ -127,7 +127,9 @@ let mk_expr_alias node (defs, vars) expr =
 	(Clocks.clock_list_of_clock expr.expr_clock) in
     let new_def =
       mkeq expr.expr_loc (List.map (fun v -> v.var_id) new_aliases, expr)
-    in (new_def::defs, new_aliases@vars), replace_expr new_aliases expr
+    in
+    (* Format.eprintf "Checkign def of alias: %a -> %a@." (fprintf_list ~sep:", " (fun fmt v -> Format.pp_print_string fmt v.var_id)) new_aliases Printers.pp_expr expr; *)
+    (new_def::defs, new_aliases@vars), replace_expr new_aliases expr
 
 (* Create an alias for [expr], if [expr] is not already an alias (i.e. an ident)
    and [opt] is true *)
@@ -383,8 +385,8 @@ let normalize_node node =
 	with Not_found -> (Format.eprintf "var not found %s@." v.var_id; assert false) in
       let expr = substitute_expr diff_vars defs eq.eq_rhs in
       let pair = mkeexpr expr.expr_loc (mkexpr expr.expr_loc (Expr_tuple [expr_of_ident v.var_id expr.expr_loc; expr])) in
-      (["horn_backend";"trace"], pair)
-    ) [] (*diff_vars*);
+      (["traceability"], pair)
+    ) diff_vars;
     annot_loc = Location.dummy_loc
   }
 
