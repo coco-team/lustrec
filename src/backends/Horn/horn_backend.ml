@@ -564,7 +564,6 @@ end
 
 let translate fmt basename prog machines =
   List.iter (print_machine machines fmt) (List.rev machines);
-
   main_print machines fmt
 
 
@@ -579,7 +578,7 @@ let traces_file fmt basename prog machines =
     let traces : (ident * expr) list=
       let all_annots = List.flatten (List.map (fun ann -> ann.annots) m.mannot) in
       let filtered =
-	List.filter (fun (kwds, _) -> kwds = ["horn_backend";"trace"]) all_annots
+	List.filter (fun (kwds, _) -> kwds = ["traceability"]) all_annots
       in
       let content = List.map snd filtered in
       (* Elements are supposed to be a pair (tuple): variable, expression *)
@@ -620,27 +619,31 @@ let traces_file fmt basename prog machines =
       List.map (fun (p, v) ->
 	let machine = match p with | [] -> m | (_,m')::_ -> m' in
 	let traces = List.assoc machine machines_traces in
-	if List.mem_assoc v.var_id traces then
+	if List.mem_assoc v.var_id traces then (
 	  (* We take the expression associated to variable v in the trace info *)
+	  (* Format.eprintf "Found variable %a in traces: %a@."  pp_var v Printers.pp_expr (List.assoc v.var_id traces); *)
 	  p, List.assoc v.var_id traces
-	else
+      )
+	else (
 	  (* We keep the variable as is: we create an expression v *)
+	  (* Format.eprintf "Unable to found variable %a in traces (%a)@."  pp_var v (Utils.fprintf_list ~sep:", " Format.pp_print_string) (List.map fst traces); *)
 	  p, mkexpr Location.dummy_loc (Expr_ident v.var_id)
+	)
 
       ) (compute_mems m)
     in
     let memories_next = (* We remove the topest pre in each expression *)
       List.map
-	(fun (prefix, ee) ->
-	  match ee.expr_desc with
-	  | Expr_pre e -> prefix, e
-	  | _ -> Format.eprintf
-	    "Mem Failure: (prefix: %a, eexpr: %a)@.@?"
-	    (Utils.fprintf_list ~sep:","
-	       (fun fmt (id,n) -> fprintf fmt "(%s,%s)" id n.mname.node_id ))
-	    (List.rev prefix)
-	    Printers.pp_expr ee;
-	    assert false)
+      	(fun (prefix, ee) ->
+      	  match ee.expr_desc with
+      	  | Expr_pre e -> prefix, e
+      	  | _ -> Format.eprintf
+      	    "Mem Failure: (prefix: %a, eexpr: %a)@.@?"
+      	    (Utils.fprintf_list ~sep:","
+      	       (fun fmt (id,n) -> fprintf fmt "(%s,%s)" id n.mname.node_id ))
+      	    (List.rev prefix)
+      	    Printers.pp_expr ee;
+      	    assert false)
 	memories_old
     in
 
@@ -680,5 +683,5 @@ let traces_file fmt basename prog machines =
 
 
 (* Local Variables: *)
-(* compile-command:"make -C .." *)
+(* compile-command:"make -C ../.." *)
 (* End: *)
