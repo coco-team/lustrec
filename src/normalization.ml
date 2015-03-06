@@ -372,31 +372,39 @@ let normalize_node node =
   let new_locals = List.filter is_local vars in
   (* Format.eprintf "New locals: %a@.@?" (fprintf_list ~sep:", " Printers.pp_var) new_locals; *)
 
-  (* Compute traceability info: 
-     - gather newly bound variables
-     - compute the associated expression without aliases     
-  *)
-  let diff_vars = List.filter (fun v -> not (List.mem v node.node_locals) ) new_locals in
-  let norm_traceability = {
-    annots = List.map (fun v ->
-      let eq =
-	try
-	  List.find (fun eq -> eq.eq_lhs = [v.var_id]) defs 
-	with Not_found -> (Format.eprintf "var not found %s@." v.var_id; assert false) in
-      let expr = substitute_expr diff_vars defs eq.eq_rhs in
-      let pair = mkeexpr expr.expr_loc (mkexpr expr.expr_loc (Expr_tuple [expr_of_ident v.var_id expr.expr_loc; expr])) in
-      (["traceability"], pair)
-    ) diff_vars;
-    annot_loc = Location.dummy_loc
-  }
-
+  let new_annots =
+    if !Options.traces then
+      begin
+	(* Compute traceability info: 
+	   - gather newly bound variables
+	   - compute the associated expression without aliases     
+	*)
+	let diff_vars = List.filter (fun v -> not (List.mem v node.node_locals) ) new_locals in
+	let norm_traceability = {
+	  annots = List.map (fun v ->
+	    let eq =
+	      try
+		List.find (fun eq -> eq.eq_lhs = [v.var_id]) defs 
+	      with Not_found -> (Format.eprintf "var not found %s@." v.var_id; assert false) in
+	    let expr = substitute_expr diff_vars defs eq.eq_rhs in
+	    let pair = mkeexpr expr.expr_loc (mkexpr expr.expr_loc (Expr_tuple [expr_of_ident v.var_id expr.expr_loc; expr])) in
+	    (["traceability"], pair)
+	  ) diff_vars;
+	  annot_loc = Location.dummy_loc
+	} 
+	in
+	norm_traceability::node.node_annot
+      end
+    else
+      node.node_annot
   in
+
   let node =
   { node with 
     node_locals = new_locals; 
     node_stmts = List.map (fun eq -> Eq eq) (defs @ assert_defs);
     node_asserts = asserts;
-    node_annot = norm_traceability::node.node_annot;
+    node_annot = new_annots;
   }
   in ((*Printers.pp_node Format.err_formatter node;*) 
     node
