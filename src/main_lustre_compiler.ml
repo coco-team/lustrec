@@ -267,7 +267,7 @@ let rec compile_source dirname basename extension =
 	let fmt = formatter_of_out_channel source_out in
 	Horn_backend.translate fmt basename prog machine_code;
 	(* Tracability file if option is activated *)
-	if !Options.horntraces then (
+	if !Options.traces then (
 	let traces_file = destname ^ ".traces" in (* Could be changed *)
 	let traces_out = open_out traces_file in
 	let fmt = formatter_of_out_channel traces_out in

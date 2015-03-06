@@ -33,6 +33,7 @@ let witnesses = ref false
 let optimization = ref 2
 let lusi = ref false
 let print_reuse = ref false
+let traces = ref false
 
 let horntraces = ref false
 let horn_cex = ref false
@@ -53,7 +54,7 @@ let options =
     "-c-spec", Arg.Unit (fun () -> spec := "c"), "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
     "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C";
     "-horn", Arg.Unit (fun () -> output := "horn"), "generates Horn clauses encoding output instead of C";
-    "-horn-traces", Arg.Unit (fun () -> output := "horn"; horntraces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
+    "-horn-traces", Arg.Unit (fun () -> output := "horn"; traces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
     "-horn-cex", Arg.Unit (fun () -> output := "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
     "-horn-queries", Arg.Unit (fun () -> output := "horn"; horn_queries:=true), "generate queries in generated Horn file. Enable the horn backend (work in progress)";
     "-print_reuse", Arg.Set print_reuse, "prints variable reuse policy";
