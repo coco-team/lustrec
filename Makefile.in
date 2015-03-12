@@ -12,31 +12,39 @@ LOCAL_DOCDIR=doc/manual
 
 lustrec:
 	@echo Compiling binary lustrec
-	@make -C src lustrec
+	@$(OCAMLBUILD) src/main_lustre_compiler.native
+	@mkdir -p $(LOCAL_BINDIR)
+	@mv _build/src/main_lustre_compiler.native $(LOCAL_BINDIR)/lustrec
 
 doc:
 	@echo Generating doc
-	@make -C src doc
+	@$(OCAMLBUILD) lustrec.docdir/index.html
+	@rm -rf $(LOCAL_DOCDIR)
+	@cp -rf _build/lustrec.docdir $(LOCAL_DOCDIR)
 
 dot: doc
-	@make -C src dot
+	$(OCAMLBUILD) lustrec.docdir/lustrec.dot
+	dot -T ps -o lustrec.dot _build/lustrec.docdir/lustrec.dot
+	mv _build/lustrec.docdir/lustrec.dot $(LOCAL_DOCDIR)
 
 clean:
-	@make -C src clean
+	$(OCAMLBUILD) -clean
 
 dist-clean: clean
+	rm -f Makefile myocamlbuild.ml config.log config.status configure include/*.lusic include/math.h include/conv.h
 
-%.lusic: %.lusi 
+%.lusic: %.lusi
 	@echo Compiling $<
 	@$(LOCAL_BINDIR)/lustrec -verbose 0 -d include $< 
 
-compile-lusi: lustrec $(LUSI_LIBS:%.lusi=%.lusic)
+compile-lusi: $(LUSI_LIBS:%.lusi=%.lusic)
 
 install: compile-lusi
 	mkdir -p ${bindir}
 	install -m 0755 $(LOCAL_BINDIR)/* ${bindir}
 	mkdir -p ${includedir}/lustrec
 	cp include/* ${includedir}/lustrec
+	install -m 0655 share/FindLustre.cmake ${datadir}
 
 .PHONY: compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean
 
