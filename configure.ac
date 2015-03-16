@@ -41,27 +41,27 @@ AC_PATH_PROG([OCAMLBUILD],[ocamlbuild],[:])
 
 # Checks for libraries. OCamlgraph
 AC_MSG_CHECKING(ocamlgraph library)
-   ocamlgraph_lib=`find $OCAMLGRAPH_PATH -iname graph.cmxa -nowarn | grep -m 1 -o "graph.cmxa"`
+   ocamlgraph_lib=`find $OCAMLGRAPH_PATH -iname graph.cmxa | grep -m 1 -o "graph.cmxa"`
    if (test "x$ocamlgraph_lib" = xgraph.cmxa ); then
-	ocamlgraph_lib_full=`find $OCAMLGRAPH_PATH -iname graph.cmxa -nowarn | grep -m 1 "graph.cmxa"`
+	ocamlgraph_lib_full=`find $OCAMLGRAPH_PATH -iname graph.cmxa  | grep -m 1 "graph.cmxa"`
       AC_MSG_RESULT(library detected: $ocamlgraph_lib_full )
-   else 
+   else
       AC_MSG_ERROR([ocamlgraph library not installed in $OCAMLGRAPH_PATH])
    fi
 
 
 # Workaround to solve an issue with ocamlbuild and C libraries.
-oCFLAGS="$CFLAGS"
-CFLAGS="$FLAGS -Wl,--no-as-needed"
-AC_MSG_CHECKING([whether we need to add --no-as-needed linking option])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], 
-                                     [[ 
-                                        int main(){ return 0; } 
-                                    ]])], 
-                  [AC_MSG_RESULT([yes]); CC_NOASNEEDED="true"],
-                  [AC_MSG_RESULT([no]); CC_NOASNEEDED="false"]) 
-CFLAGS=$oCFLAGS
-AC_SUBST(CC_NOASNEEDED)
+# oCFLAGS="$CFLAGS"
+# CFLAGS="$FLAGS -Wl,--no-as-needed"
+# AC_MSG_CHECKING([whether we need to add --no-as-needed linking option])
+# AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]],
+#                                      [[
+#                                         int main(){ return 0; }
+#                                     ]])],
+#                   [AC_MSG_RESULT([yes]); CC_NOASNEEDED="true"],
+#                   [AC_MSG_RESULT([no]); CC_NOASNEEDED="false"])
+# CFLAGS=$oCFLAGS
+# AC_SUBST(CC_NOASNEEDED)
 
 
 # End of config
@@ -94,4 +94,3 @@ AC_OUTPUT
 
 # summary
 dnl AC_MSG_NOTICE(******** Configuration ********)
-
