@@ -21,11 +21,11 @@ module OrdVarDecl:Map.OrderedType with type t=var_decl =
 
 module ISet = Set.Make(OrdVarDecl)
 
-type value_t = 
+type value_t =
   | Cst of constant
   | LocalVar of var_decl
   | StateVar of var_decl
-  | Fun of ident * value_t list 
+  | Fun of ident * value_t list
   | Array of value_t list
   | Access of value_t * value_t
   | Power of value_t * value_t
@@ -36,10 +36,10 @@ type instr_t =
   | MReset of ident
   | MStep of var_decl list * ident * value_t list
   | MBranch of value_t * (label * instr_t list) list
- 
+
 let rec pp_val fmt v =
   match v with
-    | Cst c         -> Printers.pp_const fmt c 
+    | Cst c         -> Printers.pp_const fmt c
     | LocalVar v    -> Format.pp_print_string fmt v.var_id
     | StateVar v    -> Format.pp_print_string fmt v.var_id
     | Array vl      -> Format.fprintf fmt "[%a]" (Utils.fprintf_list ~sep:", " pp_val)  vl
@@ -48,14 +48,14 @@ let rec pp_val fmt v =
     | Fun (n, vl)   -> Format.fprintf fmt "%s (%a)" n (Utils.fprintf_list ~sep:", " pp_val)  vl
 
 let rec pp_instr fmt i =
-  match i with 
+  match i with
     | MLocalAssign (i,v) -> Format.fprintf fmt "%s<-l- %a" i.var_id pp_val v
     | MStateAssign (i,v) -> Format.fprintf fmt "%s<-s- %a" i.var_id pp_val v
     | MReset i           -> Format.fprintf fmt "reset %s" i
     | MStep (il, i, vl)  ->
       Format.fprintf fmt "%a = %s (%a)"
 	(Utils.fprintf_list ~sep:", " (fun fmt v -> Format.pp_print_string fmt v.var_id)) il
-	i      
+	i
 	(Utils.fprintf_list ~sep:", " pp_val) vl
     | MBranch (g,hl)     ->
       Format.fprintf fmt "@[<v 2>case(%a) {@,%a@,}@]"
@@ -104,7 +104,7 @@ let pp_static_call fmt (node, args) =
    (Utils.fprintf_list ~sep:", " Dimension.pp_dimension) args
 
 let pp_machine fmt m =
-  Format.fprintf fmt 
+  Format.fprintf fmt
     "@[<v 2>machine %s@ mem      : %a@ instances: %a@ init     : %a@ step     :@   @[<v 2>%a@]@ @  spec : @[%t@]@  annot : @[%a@]@]@ "
     m.mname.node_id
     (Utils.fprintf_list ~sep:", " Printers.pp_var) m.mmemory
@@ -264,7 +264,7 @@ let join_guards_list insts =
  List.fold_right join_guards insts []
 
 (* specialize predefined (polymorphic) operators
-   wrt their instances, so that the C semantics 
+   wrt their instances, so that the C semantics
    is preserved *)
 let specialize_to_c expr =
  match expr.expr_desc with
@@ -293,7 +293,7 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
  | Expr_access (t, i)               -> Access (translate_expr node args t, translate_expr node args (expr_of_dimension i))
  | Expr_power  (e, n)               -> Power  (translate_expr node args e, translate_expr node args (expr_of_dimension n))
  | Expr_tuple _
- | Expr_arrow _ 
+ | Expr_arrow _
  | Expr_fby _
  | Expr_pre _                       -> (Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
  | Expr_when    (e1, _, _)          -> translate_expr node args e1
@@ -305,9 +305,9 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
    (* special treatment depending on the active backend. For horn backend, ite
       are preserved in expression. While they are removed for C or Java
       backends. *)
-   match !Options.output with | "horn" -> 
+   match !Options.output with | "horn" ->
      Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
-   | "C" | "java" | _ -> 
+   | "C" | "java" | _ ->
      (Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
  )
  | _                   -> raise NormalizationError
@@ -323,7 +323,7 @@ let rec translate_act node ((m, si, j, d, s) as args) (y, expr) =
 			    conditional g [translate_act node args (y, t)]
                               [translate_act node args (y, e)]
   | Expr_merge (x, hl)   -> MBranch (translate_ident node args x, List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl)
-  | _                    -> 
+  | _                    ->
     MLocalAssign (y, translate_expr node args expr)
 
 let reset_instance node args i r c =
@@ -367,7 +367,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
     let node_f = node_from_name f in
     let call_f =
       node_f,
-      NodeDep.filter_static_inputs (node_inputs node_f) el in 
+      NodeDep.filter_static_inputs (node_inputs node_f) el in
     let o = new_instance node node_f eq.eq_rhs.expr_tag in
     let env_cks = List.fold_right (fun arg cks -> arg.expr_clock :: cks) el [eq.eq_rhs.expr_clock] in
     let call_ck = Clock_calculus.compute_root_clock (Clock_predef.ck_tuple env_cks) in
@@ -386,22 +386,22 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
    (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
       are preserved. While they are replaced as if g then x = t else x = e in  C or Java
       backends. *)
-  | [x], Expr_ite   (c, t, e) 
+  | [x], Expr_ite   (c, t, e)
     when (match !Options.output with | "horn" -> true | "C" | "java" | _ -> false)
-      -> 
+      ->
     let var_x = get_node_var x node in
-    (m, 
-     si, 
-     j, 
-     d, 
-     (control_on_clock node args eq.eq_rhs.expr_clock 
+    (m,
+     si,
+     j,
+     d,
+     (control_on_clock node args eq.eq_rhs.expr_clock
 	(MLocalAssign (var_x, translate_expr node args eq.eq_rhs))::s)
     )
-      
+
   | [x], _                                       -> (
     let var_x = get_node_var x node in
-    (m, si, j, d, 
-     control_on_clock 
+    (m, si, j, d,
+     control_on_clock
        node
        args
        eq.eq_rhs.expr_clock
@@ -424,12 +424,12 @@ let find_eq xl eqs =
 	      Printers.pp_node_eqs eqs;
 	    assert false
 	  end
-	| hd::tl -> 
+	| hd::tl ->
 	  if List.exists (fun x -> List.mem x hd.eq_lhs) xl then hd, accu@tl else aux (hd::accu) tl
     in
     aux [] eqs
 
-(* Sort the set of equations of node [nd] according 
+(* Sort the set of equations of node [nd] according
    to the computed schedule [sch]
 *)
 let sort_equations_from_schedule nd sch =
@@ -438,17 +438,17 @@ let sort_equations_from_schedule nd sch =
 		 (Utils.fprintf_list ~sep:" ; " Scheduling.pp_eq_schedule) sch;*)
   let split_eqs = Splitting.tuple_split_eq_list (get_node_eqs nd) in
   let eqs_rev, remainder =
-    List.fold_left 
-      (fun (accu, node_eqs_remainder) vl -> 
+    List.fold_left
+      (fun (accu, node_eqs_remainder) vl ->
        if List.exists (fun eq -> List.exists (fun v -> List.mem v eq.eq_lhs) vl) accu
        then
 	 (accu, node_eqs_remainder)
        else
 	 let eq_v, remainder = find_eq vl node_eqs_remainder in
 	 eq_v::accu, remainder
-      ) 
-      ([], split_eqs) 
-      sch 
+      )
+      ([], split_eqs)
+      sch
   in
   begin
     if List.length remainder > 0 then (
@@ -491,7 +491,7 @@ let translate_decl nd sch =
 	| "horn" -> s
 	| "C" | "java" | _ -> join_guards_list s
       );
-      step_asserts = 
+      step_asserts =
 	let exprl = List.map (fun assert_ -> assert_.assert_expr ) nd.node_asserts in
 	List.map (translate_expr nd init_args) exprl
 	;
@@ -502,22 +502,22 @@ let translate_decl nd sch =
 
 (** takes the global delcarations and the scheduling associated to each node *)
 let translate_prog decls node_schs =
-  let nodes = get_nodes decls in 
-  List.map 
-    (fun decl -> 
+  let nodes = get_nodes decls in
+  List.map
+    (fun decl ->
      let node = node_of_top decl in
       let sch = (Utils.IMap.find node.node_id node_schs).Scheduling.schedule in
-      translate_decl node sch 
+      translate_decl node sch
     ) nodes
 
-let get_machine_opt name machines =  
-  List.fold_left 
-    (fun res m -> 
-      match res with 
-      | Some _ -> res 
+let get_machine_opt name machines =
+  List.fold_left
+    (fun res m ->
+      match res with
+      | Some _ -> res
       | None -> if m.mname.node_id = name then Some m else None)
     None machines
-    
+
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
