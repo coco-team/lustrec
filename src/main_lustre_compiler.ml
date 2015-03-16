@@ -42,7 +42,7 @@ let compile_header dirname  basename extension =
     ignore (Modules.load_header ISet.empty header);
     ignore (check_top_decls header);
     create_dest_dir ();
-    Log.report ~level:1 
+    Log.report ~level:1
       (fun fmt -> fprintf fmt ".. generating compiled header file %sc@," (destname ^ extension));
     Lusic.write_lusic true header destname lusic_ext;
     Lusic.print_lusic_to_h destname lusic_ext;
@@ -84,14 +84,14 @@ let compile_source_to_header prog computed_types_env computed_clocks_env basenam
 
 (* compile a .lus source file *)
 let rec compile_source dirname basename extension =
-  let source_name = (*dirname ^ "/" ^ *) basename ^ extension in
+  let source_name = dirname ^ "/" ^ basename ^ extension in
 
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v>");
 
   (* Parsing source *)
   let prog = parse_source source_name in
 
-  (* Removing automata *) 
+  (* Removing automata *)
   let prog = Automata.expand_decls prog in
 
   (* Importing source *)
@@ -105,7 +105,7 @@ let rec compile_source dirname basename extension =
 
   (* Typing *)
   let computed_types_env = type_decls type_env prog in
-  
+
   (* Clock calculus *)
   let computed_clocks_env = clock_decls clock_env prog in
 
@@ -124,7 +124,7 @@ let rec compile_source dirname basename extension =
 
   (* Perform global inlining *)
   let prog =
-    if !Options.global_inline && 
+    if !Options.global_inline &&
       (match !Options.main_node with | "" -> false | _ -> true) then
       Inliner.global_inline basename prog type_env clock_env
     else
@@ -197,13 +197,13 @@ let rec compile_source dirname basename extension =
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_fanin_table node_schs);
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
 
- (* Optimization of prog: 
-    - Unfold consts 
+ (* Optimization of prog:
+    - Unfold consts
     - eliminate trivial expressions
  *)
-  let prog = 
-    if !Options.optimization >= 4 then 
-      Optimize_prog.prog_unfold_consts prog 
+  let prog =
+    if !Options.optimization >= 4 then
+      Optimize_prog.prog_unfold_consts prog
     else
       prog
   in
@@ -212,7 +212,7 @@ let rec compile_source dirname basename extension =
   let machine_code = Machine_code.translate_prog prog node_schs in
 
   (* Optimize machine code *)
-  let machine_code = 
+  let machine_code =
     if !Options.optimization >= 2 && !Options.output <> "horn" then
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 1)@,");
@@ -220,9 +220,9 @@ let rec compile_source dirname basename extension =
       end
     else
       machine_code
- in  
+ in
   (* Optimize machine code *)
-  let machine_code = 
+  let machine_code =
     if !Options.optimization >= 3 && !Options.output <> "horn" then
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 2)@,");
@@ -239,14 +239,14 @@ let rec compile_source dirname basename extension =
   let basename    =  Filename.basename basename in
   let destname = !Options.dest_dir ^ "/" ^ basename in
   let _ = match !Options.output with
-      "C" -> 
+      "C" ->
 	begin
 	  let alloc_header_file = destname ^ "_alloc.h" in (* Could be changed *)
 	  let source_lib_file = destname ^ ".c" in (* Could be changed *)
 	  let source_main_file = destname ^ "_main.c" in (* Could be changed *)
 	  let makefile_file = destname ^ ".makefile" in (* Could be changed *)
 	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,");
-	  C_backend.translate_to_c 
+	  C_backend.translate_to_c
 	    alloc_header_file source_lib_file source_main_file makefile_file
 	    basename prog machine_code dependencies
 	end
@@ -271,10 +271,10 @@ let rec compile_source dirname basename extension =
 	let traces_file = destname ^ ".traces" in (* Could be changed *)
 	let traces_out = open_out traces_file in
 	let fmt = formatter_of_out_channel traces_out in
-	Horn_backend.traces_file fmt basename prog machine_code	  
+	Horn_backend.traces_file fmt basename prog machine_code
 	)
       end
-    | "lustre" -> 
+    | "lustre" ->
       begin
 	let source_file = destname ^ ".lustrec.lus" in (* Could be changed *)
 	let source_out = open_out source_file in
@@ -299,12 +299,12 @@ let compile dirname basename extension =
   | _        -> assert false
 
 let anonymous filename =
-  let ok_ext, ext = List.fold_left 
-    (fun (ok, ext) ext' -> 
-      if not ok && Filename.check_suffix filename ext' then 
-	true, ext' 
+  let ok_ext, ext = List.fold_left
+    (fun (ok, ext) ext' ->
+      if not ok && Filename.check_suffix filename ext' then
+	true, ext'
       else
-	ok, ext) 
+	ok, ext)
     (false, "") extensions in
   if ok_ext then
     let dirname = Filename.dirname filename in
@@ -319,9 +319,9 @@ let _ =
     Printexc.record_backtrace true;
     Arg.parse Options.options anonymous usage
   with
-  | Parse.Syntax_err _ | Lexer_lustre.Error _ 
+  | Parse.Syntax_err _ | Lexer_lustre.Error _
   | Types.Error (_,_) | Clocks.Error (_,_)
-  | Corelang.Error _ (*| Task_set.Error _*) 
+  | Corelang.Error _ (*| Task_set.Error _*)
   | Causality.Cycle _ -> exit 1
   | Sys_error msg -> (eprintf "Failure: %s@." msg)
   | exc -> (Utils.track_exception (); raise exc)

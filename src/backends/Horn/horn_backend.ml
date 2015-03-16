@@ -65,6 +65,7 @@ let rename_next_list = List.map rename_next
 let get_machine machines node_name =
   List.find (fun m  -> m.mname.node_id = node_name) machines
 
+
 let full_memory_vars machines machine =
   let rec aux fst prefix m =
     (rename_machine_list (if fst then prefix else concat prefix m.mname.node_id) m.mmemory) @
@@ -76,6 +77,7 @@ let full_memory_vars machines machine =
       ) [] (m.minstances)
   in
   aux true machine.mname.node_id machine
+
 
 let stateless_vars machines m =
   (rename_machine_list m.mname.node_id m.mstep.step_inputs)@
@@ -338,10 +340,16 @@ let print_machine machines fmt m =
        (*   (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m); *)
 
 
-        (* Adding assertions *)
+      (* Adding assertions *)
        (match m.mstep.step_asserts with
        | [] ->
           begin
+            (* Rule for init *)
+            Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@."
+	                   (pp_conj (pp_instr true m.mname.node_id)) m.mstep.step_instrs
+	                   pp_machine_init_name m.mname.node_id
+	                   (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m);
+            (* Rule for step*)
             Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@."
                            (pp_conj (pp_instr false m.mname.node_id)) m.mstep.step_instrs
                            pp_machine_step_name m.mname.node_id
@@ -349,64 +357,29 @@ let print_machine machines fmt m =
           end
        | assertsl ->
           begin
-
 	    let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id pp_var in
             (* print_string pp_val; *)
             let instrs_concat = m.mstep.step_instrs in
-            Format.fprintf fmt "; with Invariants @.";
+            Format.fprintf fmt "; with Assertions @.";
+            (*Rule for init*)
+            Format.fprintf fmt "@[<v 2>(rule (=> @ (and @ %a@. %a)(%a %a)@]@.))@.@."
+                           (pp_conj (pp_instr true m.mname.node_id)) instrs_concat
+                           (pp_conj pp_val) assertsl
+                           pp_machine_init_name m.mname.node_id
+                           (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m);
+            (*Rule for step*)
             Format.fprintf fmt "@[<v 2>(rule (=> @ (and @ %a@. %a)(%a %a)@]@.))@.@."
                            (pp_conj (pp_instr false m.mname.node_id)) instrs_concat
                            (pp_conj pp_val) assertsl
                            pp_machine_step_name m.mname.node_id
                            (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
-
-
 	    (* Format.fprintf fmt " @[<v 2>%a@]@ @.@.@." *)
             (*                 (pp_conj pp_val) assertsl; *)
 
           end
        );
 
-       (* (\* Adding assertions *\) *)
-       (* (match m.mstep.step_asserts with *)
-       (* | [] -> () *)
-       (* | assertsl -> begin *)
-       (*   let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id pp_var in *)
 
-       (*   Format.fprintf fmt "; Asserts@."; *)
-       (*   Format.fprintf fmt "(assert @[<v 2>%a@]@ )@.@.@." *)
-       (*     (pp_conj pp_val) assertsl; *)
-
-       (*   (\** TEME: the following code is the one we described. But it generates a segfault in z3 *)
-       (*   Format.fprintf fmt "; Asserts for init@."; *)
-       (*   Format.fprintf fmt "@[<v 2>(assert (=> @ (and @[<v 0>%a@]@ (%a %a))@ %a@]@.))@.@.@." *)
-       (*     (Utils.fprintf_list ~sep:"@ " (pp_instr true m.mname.node_id)) m.mstep.step_instrs *)
-       (*     pp_machine_init_name m.mname.node_id *)
-       (*     (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m) *)
-       (*     (pp_conj pp_val) assertsl; *)
-
-       (*   Format.fprintf fmt "; Asserts for step@."; *)
-       (*   Format.fprintf fmt "@[<v 2>(assert (=> @ (and @[<v 0>%a@]@ (%a %a))@ %a@]@.))@.@." *)
-       (*     (Utils.fprintf_list ~sep:"@ " (pp_instr false m.mname.node_id)) m.mstep.step_instrs *)
-
-       (*     pp_machine_step_name m.mname.node_id *)
-       (*     (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m) *)
-       (*     (pp_conj pp_val) assertsl *)
-       (*   *\) *)
-       (* end *)
-       (* ); *)
-
-(*
-       match m.mspec with
-	 None -> () (* No node spec; we do nothing *)
-       | Some {requires = []; ensures = [EnsuresExpr e]; behaviors = []} ->
-	 (
-       (* For the moment, we only deal with simple case: single ensures, no other parameters *)
-	   ()
-
-	 )
-       | _ -> () (* Other cases give nothing *)
-*)
      end
     end
 
@@ -472,8 +445,7 @@ let check_prop machines fmt node machine =
     (pp_conj pp_var) main_output
     (Utils.fprintf_list ~sep:" " pp_var) main_memory_next
     ;
-  if !Options.horn_queries then
-    Format.fprintf fmt "(query ERR)@."
+   Format.fprintf fmt "(query ERR)@."
 
 
 let cex_computation machines fmt node machine =
@@ -543,8 +515,7 @@ let get_cex machines fmt node machine =
     (pp_conj pp_var) cex_output
     (Utils.fprintf_list ~sep:" " pp_var) cex_memory_next
     ;
-  if !Options.horn_queries then
-    Format.fprintf fmt "(query CEXTRACE)@."
+  Format.fprintf fmt "(query CEXTRACE)@."
 
 
 let main_print machines fmt =
