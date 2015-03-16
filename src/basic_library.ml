@@ -23,15 +23,15 @@ let static_op ty =
   type_static (mkdim_var ()) ty
 
 let type_env =
-  List.fold_left 
+  List.fold_left
     (fun env (op, op_type) -> TE.add_value env op op_type)
     TE.initial
     [
       "true", (static_op type_bool);
       "false", (static_op type_bool);
       "+", (static_op type_bin_poly_op);
-      "uminus", (static_op type_unary_poly_op); 
-      "-", (static_op type_bin_poly_op); 
+      "uminus", (static_op type_unary_poly_op);
+      "-", (static_op type_bin_poly_op);
       "*", (static_op type_bin_poly_op);
       "/", (static_op type_bin_poly_op);
       "mod", (static_op type_bin_int_op);
@@ -48,7 +48,7 @@ let type_env =
       "=", (static_op type_bin_comp_op);
       "not", (static_op type_unary_bool_op)
 ]
- 
+
 module CE = Env
 
 let clock_env =
@@ -56,10 +56,10 @@ let clock_env =
   let env' =
     List.fold_right (fun op env -> CE.add_value env op ck_nullary_univ)
       ["true"; "false"] init_env in
-  let env' = 
+  let env' =
     List.fold_right (fun op env -> CE.add_value env op ck_unary_univ)
       ["uminus"; "not"] env' in
-  let env' = 
+  let env' =
     List.fold_right (fun op env -> CE.add_value env op ck_bin_univ)
       ["+"; "-"; "*"; "/"; "mod"; "&&"; "||"; "xor"; "equi"; "impl"; "<"; "<="; ">"; ">="; "!="; "="] env' in
   env'
@@ -74,10 +74,10 @@ let delay_env =
   let env' =
     List.fold_right (fun op env -> DE.add_value env op delay_unary_poly_op)
       ["uminus"; "not"] env' in
-  let env' = 
+  let env' =
     List.fold_right (fun op env -> DE.add_value env op delay_binary_poly_op)
       ["+"; "-"; "*"; "/"; "mod"; "&&"; "||"; "xor"; "equi"; "impl"; "<"; "<="; ">"; ">="; "!="; "="] env' in
-  let env' = 
+  let env' =
     List.fold_right (fun op env -> DE.add_value env op delay_ternary_poly_op)
       [] env' in
   env'
@@ -85,7 +85,7 @@ let delay_env =
 module VE = Env
 
 let eval_env =
-  let defs = [ 
+  let defs = [
     "uminus", (function [Dint a] -> Dint (-a)           | _ -> assert false);
     "not", (function [Dbool b] -> Dbool (not b)         | _ -> assert false);
     "+", (function [Dint a; Dint b] -> Dint (a+b)       | _ -> assert false);
@@ -106,7 +106,7 @@ let eval_env =
     "=", (function [a; b] -> Dbool (a=b)                | _ -> assert false);
   ]
   in
-  List.fold_left 
+  List.fold_left
     (fun env (op, op_eval) -> VE.add_value env op op_eval)
     VE.initial
     defs
@@ -120,45 +120,47 @@ let pp_c i pp_val fmt vl =
   match i, vl with
   (*  | "ite", [v1; v2; v3] -> Format.fprintf fmt "(%a?(%a):(%a))" pp_val v1 pp_val v2 pp_val v3 *)
     | "uminus", [v] -> Format.fprintf fmt "(- %a)" pp_val v
-    | "not", [v] -> Format.fprintf fmt "(!%a)" pp_val v 
-    | "impl", [v1; v2] -> Format.fprintf fmt "(!%a || %a)" pp_val v1 pp_val v2 
-    | "=", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2 
+    | "not", [v] -> Format.fprintf fmt "(!%a)" pp_val v
+    | "impl", [v1; v2] -> Format.fprintf fmt "(!%a || %a)" pp_val v1 pp_val v2
+    | "=", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2
     | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
     | "equi", [v1; v2] -> Format.fprintf fmt "(!%a == !%a)" pp_val v1 pp_val v2
     | "xor", [v1; v2] -> Format.fprintf fmt "(!%a != !%a)" pp_val v1 pp_val v2
-    | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2 
+    | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2
     | _ -> failwith i
 
 let pp_java i pp_val fmt vl =
   match i, vl with
   (*  | "ite", [v1; v2; v3] -> Format.fprintf fmt "(%a?(%a):(%a))" pp_val v1 pp_val v2 pp_val v3 *)
     | "uminus", [v] -> Format.fprintf fmt "(- %a)" pp_val v
-    | "not", [v] -> Format.fprintf fmt "(!%a)" pp_val v 
-    | "impl", [v1; v2] -> Format.fprintf fmt "(!%a || %a)" pp_val v1 pp_val v2 
-    | "=", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2 
+    | "not", [v] -> Format.fprintf fmt "(!%a)" pp_val v
+    | "impl", [v1; v2] -> Format.fprintf fmt "(!%a || %a)" pp_val v1 pp_val v2
+    | "=", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2
     | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
     | "equi", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2
     | "xor", [v1; v2] -> Format.fprintf fmt "(%a != %a)" pp_val v1 pp_val v2
-    | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2 
+    | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2
     | _ -> assert false
 
-let pp_horn i pp_val fmt vl = 
+let pp_horn i pp_val fmt vl =
   match i, vl with
-  | "ite", [v1; v2; v3] -> Format.fprintf fmt "(@[<hov 2>ite %a@ %a@ %a@])" pp_val v1 pp_val v2 pp_val v3 
+  | "ite", [v1; v2; v3] -> Format.fprintf fmt "(@[<hov 2>ite %a@ %a@ %a@])" pp_val v1 pp_val v2 pp_val v3
+
   | "uminus", [v] -> Format.fprintf fmt "(- %a)" pp_val v
-  | "not", [v] -> Format.fprintf fmt "(not %a)" pp_val v 
-  | "=", [v1; v2] -> Format.fprintf fmt "(= %a %a)" pp_val v1 pp_val v2 
-  | "&&", [v1; v2] -> Format.fprintf fmt "(and %a %a)" pp_val v1 pp_val v2 
-  | "||", [v1; v2] -> Format.fprintf fmt "(or %a %a)" pp_val v1 pp_val v2 
-  | "impl", [v1; v2] -> Format.fprintf fmt "(=> %a %a)" pp_val v1 pp_val v2 
+  | "not", [v] -> Format.fprintf fmt "(not %a)" pp_val v
+  | "=", [v1; v2] -> Format.fprintf fmt "(= %a %a)" pp_val v1 pp_val v2
+  | "&&", [v1; v2] -> Format.fprintf fmt "(and %a %a)" pp_val v1 pp_val v2
+  | "||", [v1; v2] -> Format.fprintf fmt "(or %a %a)" pp_val v1 pp_val v2
+  | "impl", [v1; v2] -> Format.fprintf fmt "(=> %a %a)" pp_val v1 pp_val v2
   | "mod", [v1; v2] -> Format.fprintf fmt "(mod %a %a)" pp_val v1 pp_val v2
   | "equi", [v1; v2] -> Format.fprintf fmt "(%a = %a)" pp_val v1 pp_val v2
   | "xor", [v1; v2] -> Format.fprintf fmt "(%a xor %a)" pp_val v1 pp_val v2
-  | "!=", [v1; v2] -> Format.fprintf fmt "(not (= %a %a))" pp_val v1 pp_val v2 
-  | _, [v1; v2] -> Format.fprintf fmt "(%s %a %a)" i pp_val v1 pp_val v2 
+  | "!=", [v1; v2] -> Format.fprintf fmt "(not (= %a %a))" pp_val v1 pp_val v2
+  | "/", [v1; v2] -> Format.fprintf fmt "(div %a %a)" pp_val v1 pp_val v2
+  | _, [v1; v2] -> Format.fprintf fmt "(%s %a %a)" i pp_val v1 pp_val v2
   | _ -> assert false
-(*  | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2 
-  
+(*  | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
+
 *)
 
 (* Local Variables: *)
