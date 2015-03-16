@@ -3,3 +3,4 @@
 /setup.data
 /setup.log
 /src/version.ml
+/myocamlbuild.ml
