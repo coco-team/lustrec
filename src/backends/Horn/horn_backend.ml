@@ -629,8 +629,11 @@ let traces_file fmt basename prog machines =
     Format.fprintf fmt "      <Init name=\"%a\">@."
                    pp_machine_init_name m.mname.node_id;
 
-    Format.fprintf fmt "\t<input name=\"%a\" type=\"\">%a</input> @."
-                   (Utils.fprintf_list ~sep:" | " pp_var) (rename_machine_list m.mname.node_id m.mstep.step_inputs)
+
+    let input_vars = rename_machine_list m.mname.node_id m.mstep.step_inputs in
+    Format.fprintf fmt "\t<input name=\"%a\" type=\"%a\">%a</input> @."
+                   (Utils.fprintf_list ~sep:" | " pp_var) input_vars
+		   (Utils.fprintf_list ~sep:" | " (fun fmt id -> pp_type fmt id.var_type)) input_vars
                    (Utils.fprintf_list ~sep:" | " pp_var) (m.mstep.step_inputs);
 
     Format.fprintf fmt "\t<output name=\"%a\" type=\"\">%a</output> @."
