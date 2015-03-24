@@ -626,46 +626,38 @@ let traces_file fmt basename prog machines =
       Utils.fprintf_list ~sep:"." (fun fmt (id,n) -> fprintf fmt "(%s,%s)" id n.mname.node_id) fmt (List.rev prefix)
     in
 
-    Format.fprintf fmt "      <Init name=\"%a\">@."
-                   pp_machine_init_name m.mname.node_id;
+  let pp_prefix_rev fmt prefix =
+      Utils.fprintf_list ~sep:"." (fun fmt (id,n) -> fprintf fmt "(%s,%s)" id n.mname.node_id) fmt (List.rev prefix)
+    in
 
-
-    let input_vars = rename_machine_list m.mname.node_id m.mstep.step_inputs in
-    Format.fprintf fmt "\t<input name=\"%a\" type=\"%a\">%a</input> @."
+    let input_vars = (rename_machine_list m.mname.node_id m.mstep.step_inputs) in
+    let output_vars = (rename_machine_list m.mname.node_id m.mstep.step_outputs) in
+     Format.fprintf fmt "     <input name=\"%a\" type=\"%a\">%a</input> @."
                    (Utils.fprintf_list ~sep:" | " pp_var) input_vars
-		   (Utils.fprintf_list ~sep:" | " (fun fmt id -> pp_type fmt id.var_type)) input_vars
+                   (Utils.fprintf_list ~sep:" | "  (fun fmt id -> pp_type fmt id.var_type)) input_vars
                    (Utils.fprintf_list ~sep:" | " pp_var) (m.mstep.step_inputs);
 
-    Format.fprintf fmt "\t<output name=\"%a\" type=\"\">%a</output> @."
-                   (Utils.fprintf_list ~sep:" | " pp_var) (rename_machine_list m.mname.node_id m.mstep.step_outputs)
+    Format.fprintf fmt "      <output name=\"%a\" type=\"%a\">%a</output> @."
+                   (Utils.fprintf_list ~sep:" | " pp_var)  output_vars
+                   (Utils.fprintf_list ~sep:" | "  (fun fmt id -> pp_type fmt id.var_type)) output_vars
                    (Utils.fprintf_list ~sep:" | " pp_var) (m.mstep.step_outputs);
 
-    Format.fprintf fmt "\t<local name=\"%a\" type=\"\">%t%a</local> @."
-                   (Utils.fprintf_list ~sep:" | " pp_var) (rename_next_list (full_memory_vars machines m))
-   (fun fmt -> match memories_next with [] -> () | _ -> fprintf fmt " ")
-   (Utils.fprintf_list ~sep:" " (fun fmt (prefix, ee) -> fprintf fmt "%a(%a)" pp_prefix_rev prefix Printers.pp_expr ee)) memories_next;
+    let init_local_vars = (rename_next_list (full_memory_vars machines m)) in
+    let step_local_vars = (rename_current_list (full_memory_vars machines m)) in
 
-    Format.fprintf fmt "      </Init>@.";
+    Format.fprintf fmt "      <localInit name=\"%a\" type=\"%a\">%t%a</localInit> @."
+                   (Utils.fprintf_list ~sep:" | " pp_var) init_local_vars
+                   (Utils.fprintf_list ~sep:" | "  (fun fmt id -> pp_type fmt id.var_type)) init_local_vars
+                   (fun fmt -> match memories_next with [] -> () | _ -> fprintf fmt "")
+                   (Utils.fprintf_list ~sep:" | " (fun fmt (prefix, ee) -> fprintf fmt "%a" Printers.pp_expr ee)) memories_next;
 
+    Format.fprintf fmt "      <localStep name=\"%a\" type=\"%a\">%t%a</localStep> @."
+                   (Utils.fprintf_list ~sep:" | " pp_var) step_local_vars
+                   (Utils.fprintf_list ~sep:" | "  (fun fmt id -> pp_type fmt id.var_type)) step_local_vars
+                   (fun fmt -> match memories_old with [] -> () | _ -> fprintf fmt "")
+                     (Utils.fprintf_list ~sep:" | " (fun fmt (prefix,ee) -> fprintf fmt "(%a)"
+                                    Printers.pp_expr ee)) (memories_old);
 
-    Format.fprintf fmt "      <Step name=\"%a\">@."
-                   pp_machine_step_name m.mname.node_id;
-
-    Format.fprintf fmt "\t<input name=\"%a\" type=\"\">%a</input> @."
-                   (Utils.fprintf_list ~sep:" | " pp_var) (rename_machine_list m.mname.node_id m.mstep.step_inputs)
-                   (Utils.fprintf_list ~sep:" | " pp_var) (m.mstep.step_inputs);
-
-    Format.fprintf fmt "\t<output name=\"%a\" type=\"\">%a</output> @."
-                   (Utils.fprintf_list ~sep:" | " pp_var) (rename_machine_list m.mname.node_id m.mstep.step_outputs)
-                   (Utils.fprintf_list ~sep:" | " pp_var) (m.mstep.step_outputs);
-
-    Format.fprintf fmt "\t<local name=\"%a\" type=\"\">%t%a</local> @."
-                   (Utils.fprintf_list ~sep:" | " pp_var) ((rename_current_list (full_memory_vars machines m)) @
-    (rename_next_list (full_memory_vars machines m)))
-                   (fun fmt -> match memories_old with [] -> () | _ -> fprintf fmt " ")
-                     (Utils.fprintf_list ~sep:" | " (fun fmt (prefix,ee) -> fprintf fmt "%a(%a)" pp_prefix_rev prefix Printers.pp_expr ee)) (memories_old@memories_next);
-
-    Format.fprintf fmt "      </Step>@.";
      Format.fprintf fmt "    </Node>@.";
 
   ) (List.rev machines);
