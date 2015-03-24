@@ -11,6 +11,16 @@
 
 open LustreSpec
 open Corelang
+open Utils
+
+(* Local annotations are declared with the following key /inlining/: true *)
+let keyword = ["inlining"]
+
+let is_inline_expr expr = 
+match expr.expr_annot with
+| Some ann -> 
+  List.exists (fun (key, value) -> key = keyword) ann.annots
+| None -> false
 
 let check_node_name id = (fun t -> 
   match t.top_decl_desc with 
@@ -90,7 +100,9 @@ let inline_call orig_expr args reset locals node =
    variables and the code of called node instance added to new_eqs
 
 *)
-let rec inline_expr expr locals nodes =
+let rec inline_expr ?(selection_on_annotation=false) expr locals nodes =
+  let inline_expr = inline_expr ~selection_on_annotation:selection_on_annotation in
+  let inline_node = inline_node ~selection_on_annotation:selection_on_annotation in
   let inline_tuple el = 
     List.fold_right (fun e (el_tail, locals, eqs, asserts) -> 
       let e', locals', eqs', asserts' = inline_expr e locals nodes in
@@ -109,13 +121,17 @@ let rec inline_expr expr locals nodes =
     | [e1'; e2'; e3'] -> e1', e2', e3', l', eqs', asserts'
     | _ -> assert false
   in
-    
+  
   match expr.expr_desc with
   | Expr_appl (id, args, reset) ->
     let args', locals', eqs', asserts' = inline_expr args locals nodes in 
-    if List.exists (check_node_name id) nodes then 
+    if List.exists (check_node_name id) nodes && (* the current node call is provided
+						    as arguments nodes *)
+      (not selection_on_annotation || is_inline_expr expr) (* and if selection on annotation is activated, 
+							      it is explicitely inlined here *)
+    then 
       (* The node should be inlined *)
-      (* let _ =     Format.eprintf "Inlining call to %s@." id in *)
+       let _ =     Format.eprintf "Inlining call to %s@." id in 
       let node = try List.find (check_node_name id) nodes 
 	with Not_found -> (assert false) in
       let node = node_of_top node in
@@ -164,7 +180,8 @@ let rec inline_expr expr locals nodes =
     let el, l', eqs', asserts' = inline_tuple (List.map snd branches) in
     let branches' = List.map2 (fun (label, _) v -> label, v) branches el in
     { expr with expr_desc = Expr_merge (id, branches') }, l', eqs', asserts'
-and inline_node nd nodes = 
+and inline_node ?(selection_on_annotation=false) nd nodes = 
+  let inline_expr = inline_expr ~selection_on_annotation:selection_on_annotation in
   let new_locals, eqs, asserts = 
     List.fold_left (fun (locals, eqs, asserts) eq ->
       let eq_rhs', locals', new_eqs', asserts' = 
@@ -318,6 +335,23 @@ let global_inline basename prog type_env clock_env =
       prog res type_env clock_env
   );
   res
+
+let local_inline basename prog type_env clock_env =
+  let local_anns = Annotations.get_expr_annotations keyword in
+  if local_anns != [] then (
+    let nodes_with_anns = List.fold_left (fun accu (k, _) -> ISet.add k accu) ISet.empty local_anns in
+    ISet.iter (fun node_id -> Format.eprintf "Node %s has local expression annotations@." node_id) nodes_with_anns;
+    List.fold_right (fun top accu -> 
+      ( match top.top_decl_desc with
+      | Node nd when ISet.mem nd.node_id nodes_with_anns ->
+	{ top with top_decl_desc = Node (inline_node ~selection_on_annotation:true nd prog) }
+      | _ -> top
+      )::accu) prog []
+    
+)
+ else
+  prog
+
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

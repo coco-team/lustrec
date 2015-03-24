@@ -167,7 +167,10 @@ let merge_expr_annot ann1 ann2 =
       annot_loc = ann1.annot_loc
     }
 
-let update_expr_annot e annot =
+let update_expr_annot node_id e annot =
+  List.iter (fun (key, _) -> 
+    Annotations.add_expr_ann node_id e.expr_tag key
+  ) annot.annots;
   { e with expr_annot = merge_expr_annot e.expr_annot (Some annot) }
 
 

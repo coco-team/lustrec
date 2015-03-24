@@ -73,7 +73,7 @@
 %nonassoc UMINUS
 
 %start lustre_annot
-%type <LustreSpec.expr_annot> lustre_annot
+%type <LustreSpec.ident -> LustreSpec.expr_annot> lustre_annot
 
 %start lustre_spec
 %type <LustreSpec.node_annot> lustre_spec
@@ -287,7 +287,7 @@ const:
 | STRING {Const_string $1}
 
 lustre_annot:
-lustre_annot_list EOF { $1 }
+lustre_annot_list EOF { fun node_id -> $1 }
 
 lustre_annot_list:
   { [] } 
