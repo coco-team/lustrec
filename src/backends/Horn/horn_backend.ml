@@ -328,10 +328,10 @@ let print_machine machines fmt m =
        Format.pp_print_newline fmt ();
 
        (* Rule for init *)
-       Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@."
-	 (pp_conj (pp_instr true m.mname.node_id)) m.mstep.step_instrs
-	 pp_machine_init_name m.mname.node_id
-	 (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m);
+       (* Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@." *)
+       (*   (pp_conj (pp_instr true m.mname.node_id)) m.mstep.step_instrs *)
+       (*   pp_machine_init_name m.mname.node_id *)
+       (*   (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m); *)
 
        (* (\* Rule for step *\) *)
        (* Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@." *)
