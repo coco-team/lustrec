@@ -37,6 +37,12 @@ let mkdim_ite i t e = mkdim_ite (get_loc ()) i t e
 
 let mkannots annots = { annots = annots; annot_loc = get_loc () }
 
+let node_stack : ident list ref = ref []
+let debug_calls () = Format.eprintf "call stack: %a@.@?" (Utils.fprintf_list ~sep:", " Format.pp_print_string) !node_stack
+let push_node nd =  node_stack:= nd :: !node_stack
+let pop_node () = try node_stack := List.tl !node_stack with _ -> assert false
+let get_current_node () = try List.hd !node_stack with _ -> assert false
+
 %}
 
 %token <int> INT
@@ -118,6 +124,9 @@ node_ident:
   UIDENT { $1 }
 | IDENT  { $1 }
 
+node_ident_decl:
+ node_ident { push_node $1; $1 }
+
 vdecl_ident:
   UIDENT { $1 }
 | IDENT  { $1 }
@@ -176,6 +185,7 @@ top_decl_header:
 				  nodei_prototype = $13;
 				  nodei_in_lib = $14;})
      in
+     pop_node ();
      (*add_imported_node $3 nd;*) [nd] }
 
 prototype_opt:
@@ -188,27 +198,35 @@ in_lib_opt:
 
 top_decl:
 | CONST cdecl_list { List.rev ($2 false) }
-| nodespec_list state_annot node_ident LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET stmt_list TEL 
-    {let stmts, asserts, annots = $16 in
-     let nd = mktop_decl false (Node
-				  {node_id = $3;
-				   node_type = Types.new_var ();
-				   node_clock = Clocks.new_var true;
-				   node_inputs = List.rev $5;
-				   node_outputs = List.rev $10;
-				   node_locals = List.rev $14;
-				   node_gencalls = [];
-				   node_checks = [];
-				   node_asserts = asserts; 
-				   node_stmts = stmts;
-				   node_dec_stateless = $2;
-				   node_stateless = None;
-				   node_spec = $1;
-				   node_annot = annots})
-     in
+| nodespec_list state_annot node_ident_decl LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET stmt_list TEL 
+    {
+      let stmts, asserts, annots = $16 in
+      (* Declaring eqs annots *)
+      List.iter (fun ann -> 
+	List.iter (fun (key, _) -> 
+	  Annotations.add_node_ann $3 key
+	) ann.annots
+      ) annots;
+     (* Building the node *)
+      let nd = mktop_decl false (Node
+				   {node_id = $3;
+				    node_type = Types.new_var ();
+				    node_clock = Clocks.new_var true;
+				    node_inputs = List.rev $5;
+				    node_outputs = List.rev $10;
+				    node_locals = List.rev $14;
+				    node_gencalls = [];
+				    node_checks = [];
+				    node_asserts = asserts; 
+				    node_stmts = stmts;
+				    node_dec_stateless = $2;
+				    node_stateless = None;
+				    node_spec = $1;
+				    node_annot = annots})
+      in
      (*add_node $3 nd;*) [nd] }
-
-nodespec_list:
+    
+ nodespec_list:
  { None }
 | NODESPEC nodespec_list { 
   (function 
@@ -350,7 +368,7 @@ expr:
 | IDENT { mkexpr (Expr_ident $1) }
 | tag_ident { mkexpr (Expr_ident $1) (*(Expr_const (Const_tag $1))*) }
 | LPAR ANNOT expr RPAR
-    {update_expr_annot $3 $2}
+    {update_expr_annot (get_current_node ()) $3 $2}
 | LPAR expr RPAR
     {$2}
 | LPAR tuple_expr RPAR

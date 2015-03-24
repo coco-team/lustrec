@@ -127,12 +127,12 @@ let rec compile_source dirname basename extension =
     if !Options.global_inline &&
       (match !Options.main_node with | "" -> false | _ -> true) then
       Inliner.global_inline basename prog type_env clock_env
-    else
-      prog
+    else (* if !Option.has_local_inline *)
+      Inliner.local_inline basename prog type_env clock_env
   in
 
   (* Delay calculus *)
-  (*
+  (* TO BE DONE LATER (Xavier)
     if(!Options.delay_calculus)
     then
     begin
@@ -146,18 +146,7 @@ let rec compile_source dirname basename extension =
     raise exc
     end;
   *)
-  (*
-    eprintf "Causality analysis@.@?";
-    (* Causality analysis *)
-    begin
-    try
-    Causality.check_causal_prog prog
-    with (Causality.Cycle v) as exc ->
-    Causality.pp_error err_formatter v;
-    raise exc
-    end;
-  *)
-
+  
   (* Creating destination directory if needed *)
   create_dest_dir ();
 
