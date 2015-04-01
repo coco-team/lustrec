@@ -46,6 +46,7 @@ val is_user_type: type_dec_desc -> bool
 val coretype_equal: type_dec_desc -> type_dec_desc -> bool
 val tag_true: label
 val tag_false: label
+val tag_default: label
 val tag_table: (label, top_decl) Hashtbl.t
 val field_table: (label, top_decl) Hashtbl.t
 

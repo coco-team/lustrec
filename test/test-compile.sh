@@ -53,7 +53,7 @@ base_compile() {
             rlustrec1="VALID"
         fi
 	pushd $build > /dev/null
-	if [ $ext = ".lus" ]; then
+	if [ $ext = ".lus" ] && [ "$opts" != "-lusi" ]; then
             gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ "$name".c > /dev/null
             if [ $? -ne 0 ]; then
 		rgcc1="INVALID";

@@ -297,6 +297,7 @@ let rec coretype_equal ty1 ty2 =
 
 let tag_true = "true"
 let tag_false = "false"
+let tag_default = "default"
 
 let const_is_bool c =
  match c with
