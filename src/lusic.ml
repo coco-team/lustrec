@@ -26,11 +26,13 @@ type lusic =
 module HeaderMod = C_backend_header.EmptyMod
 module Header = C_backend_header.Main (HeaderMod)
 
-(* extracts a header from a program representing module own *)
-let extract_header own prog =
+(* extracts a header from a program representing module owner = dirname/basename *)
+let extract_header dirname basename prog =
+  let owner = dirname ^ "/" ^ basename in
  List.fold_right
    (fun decl header ->
-     if decl.top_decl_itf || decl.top_decl_owner <> own then header else
+(*Format.eprintf "Lusic.extract_header: owner = %s decl_owner = %s@." owner decl.top_decl_owner;*)
+     if decl.top_decl_itf || decl.top_decl_owner <> owner then header else
     match decl.top_decl_desc with
     | Node nd        -> { decl with top_decl_desc = ImportedNode (Corelang.get_node_interface nd) } :: header 
     | ImportedNode _ -> header

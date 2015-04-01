@@ -185,7 +185,6 @@ top_decl_header:
 				  nodei_prototype = $13;
 				  nodei_in_lib = $14;})
      in
-     pop_node ();
      (*add_imported_node $3 nd;*) [nd] }
 
 prototype_opt:
@@ -224,6 +223,7 @@ top_decl:
 				    node_spec = $1;
 				    node_annot = annots})
       in
+      pop_node ();
      (*add_node $3 nd;*) [nd] }
     
  nodespec_list:
