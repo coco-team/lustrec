@@ -176,16 +176,19 @@ let check_compatibility (prog, computed_types_env, computed_clocks_env) (header,
     Stateless.check_compat header
   with
   | (Types.Error (loc,err)) as exc ->
-    eprintf "Type mismatch between computed type and declared type in lustre interface file: %a@."
-      Types.pp_error err;
+    eprintf "Type mismatch between computed type and declared type in lustre interface file: %a%a@."
+      Types.pp_error err
+      Location.pp_loc loc;
     raise exc
   | Clocks.Error (loc, err) as exc ->
-    eprintf "Clock mismatch between computed clock and declared clock in lustre interface file: %a@."
-      Clocks.pp_error err;
+    eprintf "Clock mismatch between computed clock and declared clock in lustre interface file: %a%a@."
+      Clocks.pp_error err
+      Location.pp_loc loc;
     raise exc
   | Stateless.Error (loc, err) as exc ->
-    eprintf "Stateless status mismatch between defined status and declared status in lustre interface file: %a@."
-      Stateless.pp_error err;
+    eprintf "Stateless status mismatch between defined status and declared status in lustre interface file: %a%a@."
+      Stateless.pp_error err
+      Location.pp_loc loc;
     raise exc
 
 let is_stateful topdecl =

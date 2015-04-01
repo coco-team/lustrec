@@ -745,7 +745,7 @@ let check_env_compat header declared computed =
 
 let check_typedef_top decl =
 (*Format.eprintf "check_typedef %a@." Printers.pp_short_decl decl;*)
-(*Printers.pp_var_type_dec_desc (typedef_of_top decl).tydef_id*)
+(*Format.eprintf "%a" Printers.pp_typedef (typedef_of_top decl);*)
 (*Format.eprintf "%a" Corelang.print_type_table ();*)
   match decl.top_decl_desc with
   | TypeDef ty ->
@@ -755,6 +755,7 @@ let check_typedef_top decl =
        try Hashtbl.find type_table (Tydec_const (typedef_of_top decl).tydef_id)
        with Not_found -> raise (Error (decl.top_decl_loc, Declared_but_undefined ("type "^ ty.tydef_id))) in
      let owner' = decl'.top_decl_owner in
+(*Format.eprintf "def owner = %s@.decl owner = %s@." owner' owner;*)
      let itf' = decl'.top_decl_itf in
      (match decl'.top_decl_desc with
      | Const _ | Node _ | ImportedNode _ -> assert false

@@ -21,9 +21,9 @@ let usage = "Usage: lustrec [options] <source-file>"
 let extensions = [".ec"; ".lus"; ".lusi"]
 
 (* print a .lusi header file from a source prog *)
-let print_lusi prog basename extension =
-  let header = Lusic.extract_header basename prog in
-  let header_name = basename ^ extension in
+let print_lusi prog dirname basename extension =
+  let header = Lusic.extract_header dirname basename prog in
+  let header_name = dirname ^ "/" ^ basename ^ extension in
   let h_out = open_out header_name in
   let h_fmt = formatter_of_out_channel h_out in
   begin
@@ -51,7 +51,7 @@ let compile_header dirname  basename extension =
 
 (* check whether a source file has a compiled header,
    if not, generate the compiled header *)
-let compile_source_to_header prog computed_types_env computed_clocks_env basename extension =
+let compile_source_to_header prog computed_types_env computed_clocks_env dirname basename extension =
   let destname = !Options.dest_dir ^ "/" ^ basename in
   let lusic_ext = extension ^ "c" in
   let header_name = destname ^ lusic_ext in
@@ -59,7 +59,7 @@ let compile_source_to_header prog computed_types_env computed_clocks_env basenam
     if not (Sys.file_exists header_name) then
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating compiled header file %s@," header_name);
-	Lusic.write_lusic false (Lusic.extract_header basename prog) destname lusic_ext;
+	Lusic.write_lusic false (Lusic.extract_header dirname basename prog) destname lusic_ext;
 	Lusic.print_lusic_to_h destname lusic_ext
       end
     else
@@ -67,7 +67,7 @@ let compile_source_to_header prog computed_types_env computed_clocks_env basenam
       if not lusic.Lusic.from_lusi then
 	begin
 	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating compiled header file %s@," header_name);
-       	  Lusic.write_lusic false (Lusic.extract_header basename prog) destname lusic_ext;
+       	  Lusic.write_lusic false (Lusic.extract_header dirname basename prog) destname lusic_ext;
 (*List.iter (fun top_decl -> Format.eprintf "lusic: %a@." Printers.pp_decl top_decl) lusic.Lusic.contents;*)
 	  Lusic.print_lusic_to_h destname lusic_ext
 	end
@@ -85,12 +85,10 @@ let compile_source_to_header prog computed_types_env computed_clocks_env basenam
 (* compile a .lus source file *)
 let rec compile_source dirname basename extension =
 
-  let source_name = (* dirname ^ "/" ^*) basename ^ extension in
-
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v>");
 
   (* Parsing source *)
-  let prog = parse_source source_name in
+  let prog = parse_source (dirname ^ "/" ^ basename ^ extension) in
 
   (* Removing automata *)
   let prog = Automata.expand_decls prog in
@@ -117,8 +115,8 @@ let rec compile_source dirname basename extension =
   if !Options.lusi then
     begin
       let lusi_ext = extension ^ "i" in
-      Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating interface file %s@," (basename ^ lusi_ext));
-      print_lusi prog basename lusi_ext;
+      Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating interface file %s@," (dirname ^ "/" ^ basename ^ lusi_ext));
+      print_lusi prog dirname basename lusi_ext;
       Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
       exit 0
     end;
@@ -154,7 +152,7 @@ let rec compile_source dirname basename extension =
   (* Compatibility with Lusi *)
   (* Checking the existence of a lusi (Lustre Interface file) *)
   let extension = ".lusi" in
-  compile_source_to_header prog computed_types_env computed_clocks_env basename extension;
+  compile_source_to_header prog computed_types_env computed_clocks_env dirname basename extension;
 
   Typing.uneval_prog_generics prog;
   Clock_calculus.uneval_prog_generics prog;
@@ -180,7 +178,7 @@ let rec compile_source dirname basename extension =
 
   (* Computation of node equation scheduling. It also breaks dependency cycles
      and warns about unused input or memory variables *)
-  Log.report ~level:1 (fun fmt -> fprintf fmt ".. scheduling@,@?");
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. scheduling@,");
   let prog, node_schs = Scheduling.schedule_prog prog in
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_warning_unused node_schs);
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_schedule node_schs);
