@@ -27,6 +27,8 @@ let print_lusi prog dirname basename extension =
   let h_out = open_out header_name in
   let h_fmt = formatter_of_out_channel h_out in
   begin
+    Typing.uneval_prog_generics header;
+    Clock_calculus.uneval_prog_generics header;
     Printers.pp_lusi_header h_fmt basename header;
     close_out h_out
   end
