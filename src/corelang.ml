@@ -376,6 +376,16 @@ let ident_of_expr expr =
  | Expr_ident id -> id
  | _             -> assert false
 
+(* Generate a new ident expression from a declared variable *)
+let expr_of_vdecl v =
+  { expr_tag = Utils.new_tag ();
+    expr_desc = Expr_ident v.var_id;
+    expr_type = v.var_type;
+    expr_clock = v.var_clock;
+    expr_delay = Delay.new_var ();
+    expr_annot = None;
+    expr_loc = v.var_loc }
+
 (* Caution, returns an untyped and unclocked expression *)
 let expr_of_ident id loc =
   {expr_tag = Utils.new_tag ();
@@ -429,7 +439,7 @@ let rec expr_of_dimension dim =
      mkexpr dim.dim_loc (Expr_appl (id, expr_of_expr_list dim.dim_loc (List.map expr_of_dimension args), None))
  | Dlink dim'       -> expr_of_dimension dim'
  | Dvar
- | Dunivar          -> (Format.eprintf "internal error: expr_of_dimension %a@." Dimension.pp_dimension dim;
+ | Dunivar          -> (Format.eprintf "internal error: Corelang.expr_of_dimension %a@." Dimension.pp_dimension dim;
 			assert false)
 
 let dimension_of_const loc const =
@@ -477,6 +487,11 @@ let rec is_eq_expr e1 e2 = match e1.expr_desc, e2.expr_desc with
 
 let get_node_vars nd =
   nd.node_inputs @ nd.node_locals @ nd.node_outputs
+
+let mk_new_node_name nd id =
+  let used_vars = get_node_vars nd in
+  let used v = List.exists (fun vdecl -> vdecl.var_id = v) used_vars in
+  mk_new_name used id
 
 let get_var id var_list =
     List.find (fun v -> v.var_id = id) var_list

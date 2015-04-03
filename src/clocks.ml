@@ -72,6 +72,55 @@ exception Scope_carrier of carrier_expr
 exception Scope_clock of clock_expr
 exception Error of Location.t * error
 
+let print_ckset fmt s =
+  match s with
+  | CSet_all -> ()
+  | CSet_pck (k,q) ->
+      let (a,b) = simplify_rat q in
+      if k = 1 && a = 0 then
+        fprintf fmt "<:P"
+      else
+        fprintf fmt "<:P_(%i,%a)" k print_rat (a,b)
+
+let rec print_carrier fmt cr =
+ (* (if cr.carrier_scoped then fprintf fmt "[%t]" else fprintf fmt "%t") (fun fmt -> *)
+  match cr.carrier_desc with
+  | Carry_const id -> fprintf fmt "%s" id
+  | Carry_name ->
+      fprintf fmt "_%s" (name_of_carrier cr.carrier_id)
+  | Carry_var ->
+    fprintf fmt "'%s" (name_of_carrier cr.carrier_id)
+  | Carry_link cr' ->
+    print_carrier fmt cr'
+
+(* Simple pretty-printing, performs no simplifications. Linear
+   complexity. For debug mainly. *)
+let rec print_ck_long fmt ck =
+  match ck.cdesc with
+  | Carrow (ck1,ck2) ->
+      fprintf fmt "%a->%a" print_ck_long ck1 print_ck_long ck2
+  | Ctuple cklist ->
+    fprintf fmt "(%a)"
+      (fprintf_list ~sep:" * " print_ck_long) cklist
+  | Con (ck,c,l) ->
+    fprintf fmt "%a on %s(%a)" print_ck_long ck l print_carrier c
+  | Pck_up (ck,k) ->
+    fprintf fmt "%a*^%i" print_ck_long ck k
+  | Pck_down (ck,k) ->
+    fprintf fmt "%a/^%i" print_ck_long ck k
+  | Pck_phase (ck,q) ->
+    fprintf fmt "%a~>%a" print_ck_long ck print_rat (simplify_rat q)
+  | Pck_const (n,p) ->
+    fprintf fmt "(%i,%a)" n print_rat (simplify_rat p)
+  | Cvar cset ->
+    fprintf fmt "'_%i%a" ck.cid print_ckset cset
+  | Cunivar cset ->
+    fprintf fmt "'%i%a" ck.cid print_ckset cset
+  | Clink ck' ->
+    fprintf fmt "link %a" print_ck_long ck'
+  | Ccarrying (cr,ck') ->
+    fprintf fmt "(%a:%a)" print_carrier cr print_ck_long ck'
+
 let new_id = ref (-1)
 
 let new_ck desc scoped =
@@ -116,6 +165,17 @@ let get_carrier_name ck =
  match (repr ck).cdesc with
  | Ccarrying (cr, _) -> Some cr
  | _                 -> None
+
+let rename_carrier_static rename cr =
+  match (carrier_repr cr).carrier_desc with
+  | Carry_const id -> { cr with carrier_desc = Carry_const (rename id) }
+  | _              -> (Format.eprintf "internal error: Clocks.rename_carrier_static %a@." print_carrier cr; assert false)
+
+let rec rename_static rename ck =
+ match (repr ck).cdesc with
+ | Ccarrying (cr, ck') -> { ck with cdesc = Ccarrying (rename_carrier_static rename cr, rename_static rename ck') }
+ | Con (ck', cr, l)    -> { ck with cdesc = Con (rename_static rename ck', rename_carrier_static rename cr, l) }
+ | _                   -> ck
 
 let uncarrier ck =
  match ck.cdesc with
@@ -256,55 +316,6 @@ let rec constrained_vars_of_clock ck =
     | Ccarrying (_,ck') -> aux vars ck'
   in
   aux [] ck
-
-let print_ckset fmt s =
-  match s with
-  | CSet_all -> ()
-  | CSet_pck (k,q) ->
-      let (a,b) = simplify_rat q in
-      if k = 1 && a = 0 then
-        fprintf fmt "<:P"
-      else
-        fprintf fmt "<:P_(%i,%a)" k print_rat (a,b)
-
-let rec print_carrier fmt cr =
- (* (if cr.carrier_scoped then fprintf fmt "[%t]" else fprintf fmt "%t") (fun fmt -> *)
-  match cr.carrier_desc with
-  | Carry_const id -> fprintf fmt "%s" id
-  | Carry_name ->
-      fprintf fmt "_%s" (name_of_carrier cr.carrier_id)
-  | Carry_var ->
-    fprintf fmt "'%s" (name_of_carrier cr.carrier_id)
-  | Carry_link cr' ->
-    print_carrier fmt cr'
-
-(* Simple pretty-printing, performs no simplifications. Linear
-   complexity. For debug mainly. *)
-let rec print_ck_long fmt ck =
-  match ck.cdesc with
-  | Carrow (ck1,ck2) ->
-      fprintf fmt "%a->%a" print_ck_long ck1 print_ck_long ck2
-  | Ctuple cklist ->
-    fprintf fmt "(%a)"
-      (fprintf_list ~sep:" * " print_ck_long) cklist
-  | Con (ck,c,l) ->
-    fprintf fmt "%a on %s(%a)" print_ck_long ck l print_carrier c
-  | Pck_up (ck,k) ->
-    fprintf fmt "%a*^%i" print_ck_long ck k
-  | Pck_down (ck,k) ->
-    fprintf fmt "%a/^%i" print_ck_long ck k
-  | Pck_phase (ck,q) ->
-    fprintf fmt "%a~>%a" print_ck_long ck print_rat (simplify_rat q)
-  | Pck_const (n,p) ->
-    fprintf fmt "(%i,%a)" n print_rat (simplify_rat p)
-  | Cvar cset ->
-    fprintf fmt "'_%i%a" ck.cid print_ckset cset
-  | Cunivar cset ->
-    fprintf fmt "'%i%a" ck.cid print_ckset cset
-  | Clink ck' ->
-    fprintf fmt "link %a" print_ck_long ck'
-  | Ccarrying (cr,ck') ->
-    fprintf fmt "(%a:%a)" print_carrier cr print_ck_long ck'
 
 (** [period ck] returns the period of [ck]. Expects a constant pclock
     expression belonging to the correct clock set. *)

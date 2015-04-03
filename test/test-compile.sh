@@ -14,6 +14,23 @@ LUSTREC=lustrec
 mkdir -p build
 build=`pwd`"/build"
 
+gcc_compile() {
+    gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ "$1".c > /dev/null;
+    if [ $? -ne 0 ]; then
+	rgcc="INVALID";
+    else
+	rgcc="VALID"
+    fi
+}
+
+lustrec_compile() {
+    $LUSTREC "$@";
+    if [ $? -ne 0 ]; then
+        rlustrec="INVALID";
+    else
+        rlustrec="VALID"
+    fi
+}
 
 base_compile() {
     while IFS=, read -r file main opts
@@ -26,51 +43,27 @@ base_compile() {
 	fi
         dir=${SRC_PREFIX}/`dirname "$file"`
 	pushd $dir > /dev/null
-    if [ "$main" != "" ]; then
-	$LUSTREC -d $build -verbose 0 $opts -node $main "$name""$ext";
-        if [ $? -ne 0 ]; then
-            rlustrec1="INVALID";
-        else
-            rlustrec1="VALID"
-	fi
-	pushd $build > /dev/null
-	if [ $ext = ".lus" ]; then
-            gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ "$name".c > /dev/null
-            if [ $? -ne 0 ]; then
-		rgcc1="INVALID";
-            else
-		rgcc1="VALID"
-	    fi
+
+	if [ "$main" != "" ]; then
+	    lustrec_compile -d $build -verbose 0 $opts -node $main $name$ext;
 	else
-	    rgcc1="NONE"
+	    lustrec_compile -d $build -verbose 0 $opts $name$ext
 	fi
-	popd > /dev/null
-    else
-	$LUSTREC -d $build -verbose 0 $opts "$name""$ext";
-        if [ $? -ne 0 ]; then
-            rlustrec1="INVALID";
-        else
-            rlustrec1="VALID"
-        fi
 	pushd $build > /dev/null
+
 	if [ $ext = ".lus" ] && [ "$opts" != "-lusi" ]; then
-            gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ "$name".c > /dev/null
-            if [ $? -ne 0 ]; then
-		rgcc1="INVALID";
-            else
-		rgcc1="VALID"
-            fi
+            gcc_compile "$name";
 	else
-	    rgcc1="NONE"
+	    rgcc="NONE"
 	fi
 	popd > /dev/null
-    fi
-    popd > /dev/null
-    if [ $verbose -gt 0 ]; then
-	echo "lustrec ($rlustrec1), gcc($rgcc1), $dir, ${name}${ext}, node $main" | column -t -s',' | tee -a $report;
-    else
-	echo "lustrec ($rlustrec1), gcc($rgcc1), $dir, ${name}${ext}, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
-    fi;
+	popd > /dev/null
+
+	if [ $verbose -gt 0 ]; then
+	    echo "lustrec ($rlustrec), gcc($rgcc), $dir, ${name}${ext}, node $main" | column -t -s',' | tee -a $report;
+	else
+	    echo "lustrec ($rlustrec), gcc($rgcc), $dir, ${name}${ext}, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+	fi;
     done < $file_list
 }
 
@@ -78,35 +71,40 @@ inline_compile () {
     while IFS=, read -r file main opts
     do
 	name=`basename "$file" .lus`
+	ext=".lus"
 	if [ `dirname "$file"`/"$name" = "$file" ]; then
-	    return 0
+	    name=`basename "$file" .lusi`
+	    ext=".lusi"
 	fi
 	dir=${SRC_PREFIX}/`dirname "$file"`
-
 	pushd $dir > /dev/null
 
-# Checking inlining
-    $LUSTREC -d $build -verbose 0 $opts -inline -witnesses -node $main "$name".lus;
-    if [ $? -ne 0 ]; then
-        rlustrec2="INVALID";
-    else
-        rlustrec2="VALID"
-    fi
-    pushd $build > /dev/null
-    gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ "$name".c > /dev/null
-    if [ $? -ne 0 ]; then
-        rgcc2="INVALID";
-    else
-        rgcc2="VALID"
-    fi
-    popd > /dev/null
-    if [ $verbose -gt 0 ]; then
-	echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
-    else
-	echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
-    fi;
-    popd > /dev/null
-done < $file_list
+	if [ "$main" != "" ]; then
+	    lustrec_compile -d $build -verbose 0 $opts -inline -witnesses -node $main $name$ext;
+	else
+	    if [ "$ext" = ".lusi" ]; then
+		lustrec_compile -d $build -verbose 0 $opts $name$ext;
+	    else
+		rlustrec="NONE"
+		rgcc="NONE"
+	    fi
+	fi
+	pushd $build > /dev/null
+
+	if [ "$main" != "" ] && [ $ext = ".lus" ] && [ "$opts" != "-lusi" ]; then
+	    gcc_compile "$name";
+	else
+	    rgcc="NONE"
+	fi
+	popd > /dev/null
+	popd > /dev/null
+
+	if [ $verbose -gt 0 ]; then
+	    echo "lustrec inlined ($rlustrec), gcc ($rgcc), $dir, ${name}${ext}, node $main" | column -t -s',' | tee -a $report;
+	else
+	    echo "lustrec inlined ($rlustrec), gcc ($rgcc), $dir, ${name}${ext}, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+	fi;
+    done < $file_list
 }
 
 inline_compile_with_check () {
@@ -119,23 +117,15 @@ inline_compile_with_check () {
 	fi
 	dir=${SRC_PREFIX}/`dirname "$file"`
 	pushd $dir > /dev/null
-    $LUSTREC -d $build -verbose 0 $opts -inline -witnesses -node $main "$name".lus;
-    if [ $? -ne 0 ]; then
-        rlustrec2="INVALID";
-    else
-        rlustrec2="VALID"
-    fi
+    lustrec_compile -d $build -verbose 0 $opts -inline -witnesses -node $main $name".lus"
+
     pushd $build > /dev/null
-    gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ "$name".c > /dev/null
-    if [ $? -ne 0 ]; then
-        rgcc2="INVALID";
-    else
-        rgcc2="VALID"
-    fi	
+    gcc_compile "$name"
+	
     popd > /dev/null
 	# Cheching witness
     pushd $build > /dev/null
-    $LUSTREC -verbose 0 -horn-traces -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus 
+    lustrec_compile -verbose 0 -horn-traces -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus 
     popd > /dev/null
     z3="`z3 -T:10 $build/${name}_witnesses/inliner_witness.smt2 | xargs`"
     if [ "x`echo $z3 | grep unsat`" == "xunsat" ]; then
@@ -148,9 +138,9 @@ inline_compile_with_check () {
 	rinlining="INVALID/TIMEOUT"
     fi  
     if [ $verbose -gt 0 ]; then
-	echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), inlining valid ($rinlining), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
+	echo "lustrec inlined ($rlustrec), gcc ($rgcc), inlining valid ($rinlining), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
     else
-	echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), inlining valid ($rinlining), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+	echo "lustrec inlined ($rlustrec), gcc ($rgcc), inlining valid ($rinlining), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
     fi
     popd > /dev/null
 done < $file_list
@@ -169,15 +159,11 @@ check_prop () {
 	
     # Checking horn backend
     if [ "$main" != "" ]; then
-	$LUSTREC -horn-traces -horn-queries -d $build -verbose 0 $opts -node $main "$name".lus;
+	lustrec_compile -horn-traces -horn-queries -d $build -verbose 0 $opts -node $main $name".lus";
     else
-	$LUSTREC -horn-traces -horn-queries -d $build -verbose 0 $opts "$name".lus
+	lustrec_compile -horn-traces -horn-queries -d $build -verbose 0 $opts $name".lus"
     fi
-    if [ $? -ne 0 ]; then
-        rlustrec="INVALID";
-    else
-        rlustrec="VALID"
-    fi
+
     # echo "z3 $build/$name".smt2 
     # TODO: This part of the script has to be optimized
     z3 -T:10 "$build/$name".smt2 | grep unsat > /dev/null
@@ -230,6 +216,12 @@ if [ ${#files} -eq 0 ] ; then
     usage
     exit 1
 fi
+
+# cleaning directory $build
+
+rm -f "$build"/* 2> /dev/null
+
+# executing tests
 
 [ ! -z "$c" ] && base_compile
 [ ! -z "$i" ] && inline_compile

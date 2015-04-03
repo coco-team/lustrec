@@ -27,7 +27,7 @@ val mkassert: Location.t -> expr -> assert_t
 val mktop_decl: Location.t -> ident -> bool -> top_decl_desc -> top_decl
 val mkpredef_call: Location.t -> ident -> expr list -> expr
 val mk_new_name: (ident -> bool) -> ident -> ident
-
+val mk_new_node_name: node_desc -> ident -> ident
 
 val node_table : (ident, top_decl) Hashtbl.t
 val print_node_table:  Format.formatter -> unit -> unit
@@ -81,6 +81,7 @@ val pp_error :  Format.formatter -> error -> unit
 (* Caution, returns an untyped, unclocked, etc, expression *)
 val is_tuple_expr : expr -> bool
 val ident_of_expr : expr -> ident
+val expr_of_vdecl : var_decl -> expr
 val expr_of_ident : ident -> Location.t -> expr
 val expr_list_of_expr : expr -> expr list
 val expr_of_expr_list : Location.t -> expr list -> expr
