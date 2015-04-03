@@ -339,8 +339,8 @@ let unify ?(semi=false) dim1 dim2 =
   in unif dim1 dim2
 
 let rec expr_replace_var fvar e = 
- { e with dim_desc = expr_replace_desc fvar e.dim_desc }
-and expr_replace_desc fvar e =
+ { e with dim_desc = expr_replace_var_desc fvar e.dim_desc }
+and expr_replace_var_desc fvar e =
   let re = expr_replace_var fvar in
   match e with
   | Dvar
@@ -348,6 +348,20 @@ and expr_replace_desc fvar e =
   | Dbool _
   | Dint _ -> e
   | Dident v -> Dident (fvar v)
+  | Dappl (id, el) -> Dappl (id, List.map re el)
+  | Dite (g,t,e) -> Dite (re g, re t, re e)
+  | Dlink e -> Dlink (re e)
+
+let rec expr_replace_expr fvar e = 
+ { e with dim_desc = expr_replace_expr_desc fvar e.dim_desc }
+and expr_replace_expr_desc fvar e =
+  let re = expr_replace_expr fvar in
+  match e with
+  | Dvar
+  | Dunivar
+  | Dbool _
+  | Dint _ -> e
+  | Dident v -> (fvar v).dim_desc
   | Dappl (id, el) -> Dappl (id, List.map re el)
   | Dite (g,t,e) -> Dite (re g, re t, re e)
   | Dlink e -> Dlink (re e)

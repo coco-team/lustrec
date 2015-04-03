@@ -566,6 +566,7 @@ let rec check_type_declaration loc cty =
  | _                   -> ()
 
 let type_var_decl vd_env env vdecl =
+(*Format.eprintf "Typing.type_var_decl START %a@." Printers.pp_var vdecl;*)
   check_type_declaration vdecl.var_loc vdecl.var_dec_type.ty_dec_desc;
   let eval_const id = Types.get_static_value (Env.lookup_value env id) in
   let type_dim d =
@@ -581,6 +582,7 @@ let type_var_decl vd_env env vdecl =
   let new_env = Env.add_value env vdecl.var_id ty_status in
   type_coreclock (new_env,vd_env) vdecl.var_dec_clock vdecl.var_id vdecl.var_loc;
   vdecl.var_type <- ty_status;
+(*Format.eprintf "END@.";*)
   new_env
 
 let type_var_decl_list vd_env env l =

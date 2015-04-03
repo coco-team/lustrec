@@ -193,6 +193,13 @@ let get_static_value ty =
   | Tstatic (d, _) -> Some d
   | _              -> None
 
+let rec rename_static rename ty =
+ match (repr ty).tdesc with
+ | Tstatic (d, ty') -> { ty with tdesc = Tstatic (Dimension.expr_replace_expr rename d, rename_static rename ty') }
+ | Tarray  (d, ty') -> { ty with tdesc = Tarray  (Dimension.expr_replace_expr rename d, rename_static rename ty') }
+ | _                -> ty
+(*Format.eprintf "Types.rename_static %a = %a@." print_ty ty print_ty res; res*)
+
 let get_field_type ty label =
   match (repr ty).tdesc with
   | Tstruct fl -> (try Some (List.assoc label fl) with Not_found -> None)
@@ -254,7 +261,7 @@ let rec is_array_type ty =
 let array_type_dimension ty =
   match (dynamic_type ty).tdesc with
   | Tarray (d, _) -> d
-  | _             -> assert false
+  | _             -> (Format.eprintf "internal error: Types.array_type_dimension %a@." print_ty ty; assert false)
 
 let rec array_type_multi_dimension ty =
   match (dynamic_type ty).tdesc with
@@ -264,7 +271,7 @@ let rec array_type_multi_dimension ty =
 let array_element_type ty =
   match (dynamic_type ty).tdesc with
   | Tarray (_, ty') -> ty'
-  | _               -> assert false
+  | _               -> (Format.eprintf "internal error: Types.array_element_type %a@." print_ty ty; assert false)
 
 let rec array_base_type ty =
   let ty = repr ty in

@@ -123,15 +123,6 @@ let rec compile_source dirname basename extension =
       exit 0
     end;
 
-  (* Perform global inlining *)
-  let prog =
-    if !Options.global_inline &&
-      (match !Options.main_node with | "" -> false | _ -> true) then
-      Inliner.global_inline basename prog type_env clock_env
-    else (* if !Option.has_local_inline *)
-      Inliner.local_inline basename prog type_env clock_env
-  in
-
   (* Delay calculus *)
   (* TO BE DONE LATER (Xavier)
     if(!Options.delay_calculus)
@@ -159,6 +150,15 @@ let rec compile_source dirname basename extension =
   Typing.uneval_prog_generics prog;
   Clock_calculus.uneval_prog_generics prog;
 
+  (* Perform global inlining *)
+  let prog =
+    if !Options.global_inline &&
+      (match !Options.main_node with | "" -> false | _ -> true) then
+      Inliner.global_inline basename prog type_env clock_env
+    else (* if !Option.has_local_inline *)
+      Inliner.local_inline basename prog type_env clock_env
+  in
+(*Format.eprintf "Inliner.global_inline<<@.%a@.>>@." Printers.pp_prog prog;*)
   (* Computes and stores generic calls for each node,
      only useful for ANSI C90 compliant generic node compilation *)
   if !Options.ansi then Causality.NodeDep.compute_generic_calls prog;
@@ -170,6 +170,7 @@ let rec compile_source dirname basename extension =
   if !Options.output = "lustre" then
     Normalization.unfold_arrow_active := false;
   let prog = Normalization.normalize_prog prog in
+
   Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
   (* Checking array accesses *)
   if !Options.check then

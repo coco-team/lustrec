@@ -75,16 +75,6 @@ let mk_fresh_var node loc ty ck =
   }
   in aux ()
 
-(* Generate a new ident expression from a declared variable *)
-let mk_ident_expr v =
-  { expr_tag = new_tag ();
-    expr_desc = Expr_ident v.var_id;
-    expr_type = v.var_type;
-    expr_clock = v.var_clock;
-    expr_delay = Delay.new_var ();
-    expr_annot = None;
-    expr_loc = v.var_loc }
-
 (* Get the equation in [defs] with [expr] as rhs, if any *)
 let get_expr_alias defs expr =
  try Some (List.find (fun eq -> is_eq_expr eq.eq_rhs expr) defs)
@@ -100,16 +90,19 @@ let replace_expr locals expr =
    expr_desc = Expr_ident v.var_id }
  | _   -> { expr with
    expr_tag = Utils.new_tag ();
-   expr_desc = Expr_tuple (List.map mk_ident_expr locals) }
+   expr_desc = Expr_tuple (List.map expr_of_vdecl locals) }
 
 let unfold_offsets e offsets =
   let add_offset e d =
-(*Format.eprintf "add_offset %a %a@." Dimension.pp_dimension (Types.array_type_dimension e.expr_type) Dimension.pp_dimension d;*)
+(*Format.eprintf "add_offset %a(%a) %a @." Printers.pp_expr e Types.print_ty e.expr_type Dimension.pp_dimension d;
+    let res = *)
     { e with
       expr_tag = Utils.new_tag ();
       expr_loc = d.Dimension.dim_loc;
       expr_type = Types.array_element_type e.expr_type;
-      expr_desc = Expr_access (e, d) } in
+      expr_desc = Expr_access (e, d) }
+(*in (Format.eprintf "= %a @." Printers.pp_expr res; res) *)
+  in
  List.fold_left add_offset e offsets
 
 (* Create an alias for [expr], if none exists yet *)
@@ -128,7 +121,7 @@ let mk_expr_alias node (defs, vars) expr =
     let new_def =
       mkeq expr.expr_loc (List.map (fun v -> v.var_id) new_aliases, expr)
     in
-    (* Format.eprintf "Checkign def of alias: %a -> %a@." (fprintf_list ~sep:", " (fun fmt v -> Format.pp_print_string fmt v.var_id)) new_aliases Printers.pp_expr expr; *)
+    (* Format.eprintf "Checking def of alias: %a -> %a@." (fprintf_list ~sep:", " (fun fmt v -> Format.pp_print_string fmt v.var_id)) new_aliases Printers.pp_expr expr; *)
     (new_def::defs, new_aliases@vars), replace_expr new_aliases expr
 
 (* Create an alias for [expr], if [expr] is not already an alias (i.e. an ident)
@@ -149,6 +142,7 @@ let mk_expr_alias_opt opt node defvars expr =
    taking propagated [offsets] into account 
    in order to change expression type *)
 let mk_norm_expr offsets ref_e norm_d =
+(*Format.eprintf "mk_norm_expr %a %a @." Printers.pp_expr ref_e Printers.pp_expr { ref_e with expr_desc = norm_d};*)
   let drop_array_type ty =
     Types.map_tuple_type Types.array_element_type ty in
   { ref_e with
@@ -301,7 +295,7 @@ let decouple_outputs node defvars eq =
 			    if List.exists (fun o -> o.var_id = v) node.node_outputs
 			    then
 			      let newvar = mk_fresh_var node eq.eq_loc t c in
-			      let neweq  = mkeq eq.eq_loc ([v], mk_ident_expr newvar) in
+			      let neweq  = mkeq eq.eq_loc ([v], expr_of_vdecl newvar) in
 			      (neweq :: defs_q, newvar :: vars_q), newvar.var_id :: lhs_q
 			    else
 			      (defs_q, vars_q), v::lhs_q
