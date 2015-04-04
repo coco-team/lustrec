@@ -3,7 +3,7 @@ OCAMLBUILD=@OCAMLBUILD@ -classic-display -no-links
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 bindir=@bindir@
-datarootdir = ${prefix}/share
+datadir = ${prefix}/share
 includedir = ${prefix}/include
 
 LUSI_LIBS=include/math.lusi include/conv.lusi
@@ -12,7 +12,7 @@ LOCAL_DOCDIR=doc/manual
 
 lustrec:
 	@echo Compiling binary lustrec
-	@$(OCAMLBUILD) src/main_lustre_compiler.native
+	@$(OCAMLBUILD) -cflags -I,@OCAMLGRAPH_PATH@ -lflag @OCAMLGRAPH_PATH@/graph.cmxa -I src -I src/backends/C src/main_lustre_compiler.native
 	@mkdir -p $(LOCAL_BINDIR)
 	@mv _build/src/main_lustre_compiler.native $(LOCAL_BINDIR)/lustrec
 
