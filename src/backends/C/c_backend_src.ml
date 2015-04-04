@@ -150,7 +150,7 @@ let pp_assign_rec pp_var var_type var_name value =
 *)
 let pp_assign m self pp_var fmt var_type var_name value =
   let depth = expansion_depth value in
-(*eprintf "pp_assign %a %a %d@." Types.print_ty var_type pp_val value depth;*)
+(*Format.eprintf "pp_assign %a %a %a %d@." Types.print_ty var_type pp_val var_name pp_val value depth;*)
   let loop_vars = mk_loop_variables m var_type depth in
   let reordered_loop_vars = reorder_loop_variables loop_vars in
   let rec aux fmt vars =
