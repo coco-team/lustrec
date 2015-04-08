@@ -24,6 +24,9 @@ type aut_state =
       actual_s : var_decl
     }
 
+let cpvar_decl var_decl =
+ mkvar_decl var_decl.var_loc ~orig:var_decl.var_orig (var_decl.var_id, var_decl.var_dec_type, var_decl.var_dec_clock, var_decl.var_dec_const, var_decl.var_dec_value)
+
 let as_clock var_decl =
   let tydec = var_decl.var_dec_type in
   { var_decl with var_dec_type = { ty_dec_desc = Tydec_clock tydec.ty_dec_desc; ty_dec_loc = tydec.ty_dec_loc } }
@@ -99,12 +102,12 @@ let mkautomata_state used typedef loc id =
   let actual_r = mk_new_name used (id ^ "__restart_act") in
   let actual_s = mk_new_name used (id ^ "__state_act") in
   {
-    incoming_r' = mkvar_decl loc (incoming_r', tydec_bool, ckdec_any, false);
-    incoming_s' = mkvar_decl loc (incoming_s', tydec_state typedef.tydef_id, ckdec_any, false);
-    incoming_r = mkvar_decl loc (incoming_r, tydec_bool, ckdec_any, false);
-    incoming_s = mkvar_decl loc (incoming_s, tydec_state typedef.tydef_id, ckdec_any, false);
-    actual_r = mkvar_decl loc (actual_r  , tydec_bool, ckdec_any, false);
-    actual_s = mkvar_decl loc (actual_s  , tydec_state typedef.tydef_id, ckdec_any, false)
+    incoming_r' = mkvar_decl loc (incoming_r', tydec_bool, ckdec_any, false, None);
+    incoming_s' = mkvar_decl loc (incoming_s', tydec_state typedef.tydef_id, ckdec_any, false, None);
+    incoming_r = mkvar_decl loc (incoming_r, tydec_bool, ckdec_any, false, None);
+    incoming_s = mkvar_decl loc (incoming_s, tydec_state typedef.tydef_id, ckdec_any, false, None);
+    actual_r = mkvar_decl loc (actual_r  , tydec_bool, ckdec_any, false, None);
+    actual_s = mkvar_decl loc (actual_s  , tydec_state typedef.tydef_id, ckdec_any, false, None)
   }
 
 let vars_of_aut_state aut_state =
@@ -123,8 +126,8 @@ let node_of_unless nused used node aut_id aut_state handler =
     node_id = node_id;
     node_type = Types.new_var ();
     node_clock = Clocks.new_var true;
-    node_inputs = var_inputs;
-    node_outputs = var_outputs;
+    node_inputs = List.map cpvar_decl var_inputs;
+    node_outputs = List.map cpvar_decl var_outputs;
     node_locals = [];
     node_gencalls = [];
     node_checks = [];
@@ -173,9 +176,9 @@ let node_of_assign_until nused used node aut_id aut_state handler =
     node_id = node_id;
     node_type = Types.new_var ();
     node_clock = Clocks.new_var true;
-    node_inputs = var_inputs;
-    node_outputs = aut_state.incoming_r :: aut_state.incoming_s :: new_var_outputs;
-    node_locals = new_var_locals @ handler.hand_locals;
+    node_inputs = List.map cpvar_decl var_inputs;
+    node_outputs = List.map cpvar_decl (aut_state.incoming_r :: aut_state.incoming_s :: new_var_outputs);
+    node_locals = List.map cpvar_decl (new_var_locals @ handler.hand_locals);
     node_gencalls = [];
     node_checks = [];
     node_asserts = handler.hand_asserts; 

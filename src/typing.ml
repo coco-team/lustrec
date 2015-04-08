@@ -111,6 +111,7 @@ let rec type_coretype type_dim cty =
   | Tydec_struct fl -> Type_predef.type_struct (List.map (fun (f, ty) -> (f, type_coretype type_dim ty)) fl)
   | Tydec_array (d, ty) ->
     begin
+      let d = Dimension.copy (ref []) d in
       type_dim d;
       Type_predef.type_array d (type_coretype type_dim ty)
     end
@@ -311,6 +312,7 @@ let check_constant loc const_expected const_real =
   then raise (Error (loc, Not_a_constant))
 
 let rec type_add_const env const arg targ =
+(*Format.eprintf "Typing.type_add_const %a %a@." Printers.pp_expr arg Types.print_ty targ;*)
   if const
   then let d =
 	 if is_dimension_type targ
@@ -357,6 +359,7 @@ and type_appl env in_main loc const f args =
 
 (* type a call with possible dependent types. [targs] is here a list of (argument, type) pairs. *)
 and type_dependent_call env in_main loc const f targs =
+(*Format.eprintf "Typing.type_dependent_call %s@." f;*)
   let tins, touts = new_var (), new_var () in
   let tfun = Type_predef.type_arrow tins touts in
   type_subtyping_arg env in_main const (expr_of_ident f loc) tfun;
@@ -367,8 +370,10 @@ and type_dependent_call env in_main loc const f targs =
     begin
       List.iter2 (fun (a,t) ti ->
 	let t' = type_add_const env (const || Types.get_static_value ti <> None) a t
-	in try_unify ~sub:true ti t' a.expr_loc) targs tins;
-      touts
+	in try_unify ~sub:true ti t' a.expr_loc;
+      ) targs tins;
+(*Format.eprintf "Typing.type_dependent_call END@.";*)
+      touts;
     end
 
 (* type a simple call without dependent types 
@@ -506,16 +511,15 @@ and type_branches env in_main loc const hl =
 
 (** [type_eq env eq] types equation [eq] in environment [env] *)
 let type_eq env in_main undefined_vars eq =
+(*Format.eprintf "Typing.type_eq %a@." Printers.pp_node_eq eq;*)
   (* Check undefined variables, type lhs *)
   let expr_lhs = expr_of_expr_list eq.eq_loc (List.map (fun v -> expr_of_ident v eq.eq_loc) eq.eq_lhs) in
   let ty_lhs = type_expr env in_main false expr_lhs in
   (* Check multiple variable definitions *)
   let define_var id uvars =
-    try
-      ignore(IMap.find id uvars);
-      IMap.remove id uvars
-    with Not_found ->
-      raise (Error (eq.eq_loc, Already_defined id))
+    if ISet.mem id uvars
+    then ISet.remove id uvars
+    else raise (Error (eq.eq_loc, Already_defined id))
   in
   (* check assignment of declared constant, assignment of clock *)
   let ty_lhs =
@@ -566,23 +570,28 @@ let rec check_type_declaration loc cty =
  | _                   -> ()
 
 let type_var_decl vd_env env vdecl =
-(*Format.eprintf "Typing.type_var_decl START %a@." Printers.pp_var vdecl;*)
+(*Format.eprintf "Typing.type_var_decl START %a:%a@." Printers.pp_var vdecl Printers.print_dec_ty vdecl.var_dec_type.ty_dec_desc;*)
   check_type_declaration vdecl.var_loc vdecl.var_dec_type.ty_dec_desc;
   let eval_const id = Types.get_static_value (Env.lookup_value env id) in
   let type_dim d =
     begin
       type_subtyping_arg (env, vd_env) false true (expr_of_dimension d) Type_predef.type_int;
+
       Dimension.eval Basic_library.eval_env eval_const d;
     end in
   let ty = type_coretype type_dim vdecl.var_dec_type.ty_dec_desc in
-  let ty_status =
+
+  let ty_static =
     if vdecl.var_dec_const
-    then Type_predef.type_static (Dimension.mkdim_var ()) ty
+    then  Type_predef.type_static (Dimension.mkdim_var ()) ty
     else ty in
-  let new_env = Env.add_value env vdecl.var_id ty_status in
+  (match vdecl.var_dec_value with
+  | None   -> ()
+  | Some v -> type_subtyping_arg (env, vd_env) false ~sub:false true v ty_static);
+  try_unify ty_static vdecl.var_type vdecl.var_loc;
+  let new_env = Env.add_value env vdecl.var_id ty_static in
   type_coreclock (new_env,vd_env) vdecl.var_dec_clock vdecl.var_id vdecl.var_loc;
-  vdecl.var_type <- ty_status;
-(*Format.eprintf "END@.";*)
+(*Format.eprintf "END %a@." Types.print_ty ty_static;*)
   new_env
 
 let type_var_decl_list vd_env env l =
@@ -614,8 +623,8 @@ let type_node env nd loc =
   let new_env = Env.overwrite env delta_env in
   let undefined_vars_init =
     List.fold_left
-      (fun uvs v -> IMap.add v.var_id () uvs)
-      IMap.empty vd_env_ol in
+      (fun uvs v -> ISet.add v.var_id uvs)
+      ISet.empty vd_env_ol in
   let undefined_vars =
     List.fold_left (type_eq (new_env, vd_env) is_main) undefined_vars_init (get_node_eqs nd)
   in
@@ -626,7 +635,9 @@ let type_node env nd loc =
   )  nd.node_asserts;
   
   (* check that table is empty *)
-  if (not (IMap.is_empty undefined_vars)) then
+  let local_consts = List.fold_left (fun res vdecl -> if vdecl.var_dec_const then ISet.add vdecl.var_id res else res) ISet.empty nd.node_locals in
+  let undefined_vars = ISet.diff undefined_vars local_consts in
+  if (not (ISet.is_empty undefined_vars)) then
     raise (Error (loc, Undefined_var undefined_vars));
   let ty_ins = type_of_vlist nd.node_inputs in
   let ty_outs = type_of_vlist nd.node_outputs in
@@ -673,10 +684,10 @@ let rec type_top_decl env decl =
       try
 	type_node env nd decl.top_decl_loc
       with Error (loc, err) as exc -> (
-	if !Options.global_inline then
+	(*if !Options.global_inline then
 	  Format.eprintf "Type error: failing node@.%a@.@?"
 	    Printers.pp_node nd
-	;
+	;*)
 	raise exc)
   )
   | ImportedNode nd ->

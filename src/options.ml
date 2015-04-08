@@ -67,6 +67,7 @@ let options =
     "-verbose", Arg.Set_int verbose_level, " changes verbose level <default: 1>";
     "-version", Arg.Unit print_version, " displays the version";]
 
+
 let get_witness_dir filename =
   (* Make sure the directory exists *)
   let dir = !dest_dir ^ "/" ^ (Filename.basename filename) ^ "_witnesses" in

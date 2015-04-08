@@ -51,6 +51,7 @@ let mk_call_var_decl loc id =
     var_dec_type = mktyp Location.dummy_loc Tydec_any;
     var_dec_clock = mkclock Location.dummy_loc Ckdec_any;
     var_dec_const = false;
+    var_dec_value = None;
     var_type = Type_predef.type_arrow (Types.new_var ()) (Types.new_var ());
     var_clock = Clocks.new_var true;
     var_loc = loc }
@@ -133,49 +134,39 @@ let rec pp_c_initialize fmt t =
       (Utils.duplicate 0 (Dimension.size_const_dimension d))
   | _ -> assert false
 
-(* Declaration of an input variable:
-   - if its type is array/matrix/etc, then declare it as a mere pointer,
-     in order to cope with unknown/parametric array dimensions, 
-     as it is the case for generics
-*)
-let pp_c_decl_input_var fmt id =
-  if !Options.ansi && Types.is_address_type id.var_type
-  then pp_c_type (sprintf "(*%s)" id.var_id) fmt (Types.array_base_type id.var_type)
-  else pp_c_type id.var_id fmt id.var_type
 
-(* Declaration of an output variable:
-   - if its type is scalar, then pass its address
-   - if its type is array/matrix/struct/etc, then declare it as a mere pointer,
-     in order to cope with unknown/parametric array dimensions, 
-     as it is the case for generics
-*)
-let pp_c_decl_output_var fmt id =
-  if (not !Options.ansi) && Types.is_address_type id.var_type
-  then pp_c_type                  id.var_id  fmt id.var_type
-  else pp_c_type (sprintf "(*%s)" id.var_id) fmt (Types.array_base_type id.var_type)
+let pp_c_tag fmt t =
+ pp_print_string fmt (if t = tag_true then "1" else if t = tag_false then "0" else t)
 
-(* Declaration of a local/mem variable:
-   - if it's an array/matrix/etc, its size(s) should be
-     known in order to statically allocate memory, 
-     so we print the full type
-*)
-let pp_c_decl_local_var fmt id =
-  pp_c_type id.var_id fmt id.var_type
+(* Prints a constant value *)
+let rec pp_c_const fmt c =
+  match c with
+    | Const_int i     -> pp_print_int fmt i
+    | Const_real r    -> pp_print_string fmt r
+    | Const_float r   -> pp_print_float fmt r
+    | Const_tag t     -> pp_c_tag fmt t
+    | Const_array ca  -> fprintf fmt "{%a }" (Utils.fprintf_list ~sep:", " pp_c_const) ca
+    | Const_struct fl -> fprintf fmt "{%a }" (Utils.fprintf_list ~sep:", " (fun fmt (f, c) -> pp_c_const fmt c)) fl
+    | Const_string _ -> assert false (* string occurs in annotations not in C *)
 
-let pp_c_decl_array_mem self fmt id =
-  fprintf fmt "%a = (%a) (%s->_reg.%s)"
-    (pp_c_type (sprintf "(*%s)" id.var_id)) id.var_type
-    (pp_c_type "(*)") id.var_type
-    self
-    id.var_id
-
-(* Declaration of a struct variable:
-   - if it's an array/matrix/etc, we declare it as a pointer
+(* Prints a value expression [v], with internal function calls only.
+   [pp_var] is a printer for variables (typically [pp_c_var_read]),
+   but an offset suffix may be added for array variables
 *)
-let pp_c_decl_struct_var fmt id =
-  if Types.is_array_type id.var_type
-  then pp_c_type (sprintf "(*%s)" id.var_id) fmt (Types.array_base_type id.var_type)
-  else pp_c_type                  id.var_id  fmt id.var_type
+let rec pp_c_val self pp_var fmt v =
+  match v with
+  | Cst c         -> pp_c_const fmt c
+  | Array vl      -> fprintf fmt "{%a}" (Utils.fprintf_list ~sep:", " (pp_c_val self pp_var)) vl
+  | Access (t, i) -> fprintf fmt "%a[%a]" (pp_c_val self pp_var) t (pp_c_val self pp_var) i
+  | Power (v, n)  -> assert false
+  | LocalVar v    -> pp_var fmt v
+  | StateVar v    ->
+    (* array memory vars are represented by an indirection to a local var with the right type,
+       in order to avoid casting everywhere. *)
+    if Types.is_array_type v.var_type
+    then fprintf fmt "%a" pp_var v
+    else fprintf fmt "%s->_reg.%a" self pp_var v
+  | Fun (n, vl)   -> Basic_library.pp_c n (pp_c_val self pp_var) fmt vl
 
 (* Access to the value of a variable:
    - if it's not a scalar output, then its name is enough
@@ -210,41 +201,59 @@ let pp_c_var_write m fmt id =
     else
       fprintf fmt "&%s" id.var_id
 
+(* Declaration of an input variable:
+   - if its type is array/matrix/etc, then declare it as a mere pointer,
+     in order to cope with unknown/parametric array dimensions, 
+     as it is the case for generics
+*)
+let pp_c_decl_input_var fmt id =
+  if !Options.ansi && Types.is_address_type id.var_type
+  then pp_c_type (sprintf "(*%s)" id.var_id) fmt (Types.array_base_type id.var_type)
+  else pp_c_type id.var_id fmt id.var_type
+
+(* Declaration of an output variable:
+   - if its type is scalar, then pass its address
+   - if its type is array/matrix/struct/etc, then declare it as a mere pointer,
+     in order to cope with unknown/parametric array dimensions, 
+     as it is the case for generics
+*)
+let pp_c_decl_output_var fmt id =
+  if (not !Options.ansi) && Types.is_address_type id.var_type
+  then pp_c_type                  id.var_id  fmt id.var_type
+  else pp_c_type (sprintf "(*%s)" id.var_id) fmt (Types.array_base_type id.var_type)
+
+(* Declaration of a local/mem variable:
+   - if it's an array/matrix/etc, its size(s) should be
+     known in order to statically allocate memory, 
+     so we print the full type
+*)
+let pp_c_decl_local_var m fmt id =
+  if id.var_dec_const
+  then
+    Format.fprintf fmt "%a = %a"
+      (pp_c_type id.var_id) id.var_type
+      (pp_c_val "" (pp_c_var_read m)) (get_const_assign m id)
+  else
+    Format.fprintf fmt "%a"
+      (pp_c_type id.var_id) id.var_type
+
+let pp_c_decl_array_mem self fmt id =
+  fprintf fmt "%a = (%a) (%s->_reg.%s)"
+    (pp_c_type (sprintf "(*%s)" id.var_id)) id.var_type
+    (pp_c_type "(*)") id.var_type
+    self
+    id.var_id
+
+(* Declaration of a struct variable:
+   - if it's an array/matrix/etc, we declare it as a pointer
+*)
+let pp_c_decl_struct_var fmt id =
+  if Types.is_array_type id.var_type
+  then pp_c_type (sprintf "(*%s)" id.var_id) fmt (Types.array_base_type id.var_type)
+  else pp_c_type                  id.var_id  fmt id.var_type
+
 let pp_c_decl_instance_var fmt (name, (node, static)) = 
   fprintf fmt "%a *%s" pp_machine_memtype_name (node_name node) name
-
-let pp_c_tag fmt t =
- pp_print_string fmt (if t = tag_true then "1" else if t = tag_false then "0" else t)
-
-(* Prints a constant value *)
-let rec pp_c_const fmt c =
-  match c with
-    | Const_int i     -> pp_print_int fmt i
-    | Const_real r    -> pp_print_string fmt r
-    | Const_float r   -> pp_print_float fmt r
-    | Const_tag t     -> pp_c_tag fmt t
-    | Const_array ca  -> fprintf fmt "{%a }" (Utils.fprintf_list ~sep:", " pp_c_const) ca
-    | Const_struct fl -> fprintf fmt "{%a }" (Utils.fprintf_list ~sep:", " (fun fmt (f, c) -> pp_c_const fmt c)) fl
-    | Const_string _ -> assert false (* string occurs in annotations not in C *)
-
-(* Prints a value expression [v], with internal function calls only.
-   [pp_var] is a printer for variables (typically [pp_c_var_read]),
-   but an offset suffix may be added for array variables
-*)
-let rec pp_c_val self pp_var fmt v =
-  match v with
-  | Cst c         -> pp_c_const fmt c
-  | Array vl      -> fprintf fmt "{%a}" (Utils.fprintf_list ~sep:", " (pp_c_val self pp_var)) vl
-  | Access (t, i) -> fprintf fmt "%a[%a]" (pp_c_val self pp_var) t (pp_c_val self pp_var) i
-  | Power (v, n)  -> assert false
-  | LocalVar v    -> pp_var fmt v
-  | StateVar v    ->
-    (* array memory vars are represented by an indirection to a local var with the right type,
-       in order to avoid casting everywhere. *)
-    if Types.is_array_type v.var_type
-    then fprintf fmt "%a" pp_var v
-    else fprintf fmt "%s->_reg.%a" self pp_var v
-  | Fun (n, vl)   -> Basic_library.pp_c n (pp_c_val self pp_var) fmt vl
 
 let pp_c_checks self fmt m =
   Utils.fprintf_list ~sep:"" 

@@ -117,15 +117,25 @@ let name_dependency (local, dep) =
   ((if local then !Options.dest_dir else Version.include_path) ^ "/") ^ dep
 
 let import_dependency loc (local, dep) =
-  let basename = name_dependency (local, dep) in
-  let extension = ".lusic" in 
   try
-    Lusic.read_lusic basename extension
-  with Sys_error msg ->
-    begin
+    let basename = name_dependency (local, dep) in
+    let extension = ".lusic" in 
+    try
+      let lusic = Lusic.read_lusic basename extension in
+      Lusic.check_obsolete lusic basename;
+      lusic
+    with Sys_error msg ->
+      begin
       (*Format.eprintf "Error: %s@." msg;*)
-      raise (Error (loc, Unknown_library basename))
-    end
+	raise (Error (loc, Unknown_library basename))
+      end
+  with
+  | Corelang.Error (loc, err) as exc -> (
+    Format.eprintf "Library error: %a%a@."
+      Corelang.pp_error err
+      Location.pp_loc loc;
+    raise exc
+  )
 
 let rec load_header_rec imported header =
   List.fold_left (fun imp decl ->

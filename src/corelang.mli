@@ -19,7 +19,8 @@ val dummy_clock_dec: clock_dec
 
 val mktyp: Location.t -> type_dec_desc -> type_dec
 val mkclock: Location.t -> clock_dec_desc -> clock_dec
-val mkvar_decl: Location.t -> ?orig:bool -> ident * type_dec * clock_dec * bool (* is const *) -> var_decl
+val mkvar_decl: Location.t -> ?orig:bool -> ident * type_dec * clock_dec * bool (* is const *) * expr option (* value *) -> var_decl
+
 val var_decl_of_const: const_desc -> var_decl
 val mkexpr: Location.t ->  expr_desc -> expr
 val mkeq: Location.t -> ident list * expr -> eq
@@ -41,6 +42,7 @@ val consts_table: (ident, top_decl) Hashtbl.t
 val print_consts_table:  Format.formatter -> unit -> unit
 val type_table: (type_dec_desc, top_decl) Hashtbl.t
 val print_type_table:  Format.formatter -> unit -> unit
+val is_clock_dec_type: type_dec_desc -> bool
 val get_repr_type: type_dec_desc -> type_dec_desc
 val is_user_type: type_dec_desc -> bool
 val coretype_equal: type_dec_desc -> type_dec_desc -> bool
@@ -111,15 +113,22 @@ val get_typedefs: program -> top_decl list
 val get_dependencies : program -> top_decl list
 (* val prog_unfold_consts: program -> program *)
 
+val rename_static: (ident -> Dimension.dim_expr) -> type_dec_desc -> type_dec_desc
+val rename_carrier: (ident -> ident) -> clock_dec_desc -> clock_dec_desc
+
 val get_expr_vars: Utils.ISet.t -> expr -> Utils.ISet.t
 val expr_replace_var: (ident -> ident) -> expr -> expr
 val eq_replace_rhs_var: (ident -> bool) -> (ident -> ident) -> eq -> eq
 
 (** rename_prog f_node f_var f_const prog *)
 val rename_prog: (ident -> ident) -> (ident -> ident) -> (ident -> ident) -> program -> program
-
-
 val substitute_expr: var_decl list -> eq list -> expr -> expr
+
+val copy_var_decl: var_decl -> var_decl
+val copy_const: const_desc -> const_desc
+val copy_node: node_desc -> node_desc
+val copy_top: top_decl -> top_decl
+val copy_prog: top_decl list -> top_decl list
 
 (** Annotation expression related functions *)
 val mkeexpr: Location.t ->  expr -> eexpr

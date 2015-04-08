@@ -293,6 +293,12 @@ let print_alloc_instance fmt (i, (m, static)) =
     pp_machine_alloc_name (node_name m)
     (Utils.fprintf_list ~sep:", " Dimension.pp_dimension) static
 
+let print_alloc_const fmt m =
+  let const_locals = List.filter (fun vdecl -> vdecl.var_dec_const) m.mstep.step_locals in
+  fprintf fmt "%a%t"
+    (Utils.fprintf_list ~sep:";@," (pp_c_decl_local_var m)) const_locals
+    (Utils.pp_final_char_if_non_empty ";@," const_locals)
+
 let print_alloc_array fmt vdecl =
   let base_type = Types.array_base_type vdecl.var_type in
   let size_types = Types.array_type_multi_dimension vdecl.var_type in
@@ -321,7 +327,7 @@ let print_stateless_code dependencies fmt m =
     fprintf fmt "@[<v 2>%a {@,%a%t@,%a%a%t%t@]@,}@.@."
       print_stateless_prototype (m.mname.node_id, m.mstep.step_inputs, m.mstep.step_outputs)
       (* locals *)
-      (Utils.fprintf_list ~sep:";@," pp_c_decl_local_var) m.mstep.step_locals
+      (Utils.fprintf_list ~sep:";@," (pp_c_decl_local_var m)) m.mstep.step_locals
       (Utils.pp_final_char_if_non_empty ";@," m.mstep.step_locals)
       (* check assertions *)
       (pp_c_checks self) m
@@ -336,7 +342,7 @@ let print_stateless_code dependencies fmt m =
     fprintf fmt "@[<v 2>%a {@,%a%t@,%a%a%t%t@]@,}@.@."
       print_stateless_prototype (m.mname.node_id, (m.mstep.step_inputs@gen_locals@gen_calls), m.mstep.step_outputs)
       (* locals *)
-      (Utils.fprintf_list ~sep:";@," pp_c_decl_local_var) base_locals
+      (Utils.fprintf_list ~sep:";@," (pp_c_decl_local_var m)) base_locals
       (Utils.pp_final_char_if_non_empty ";" base_locals)
       (* check assertions *)
       (pp_c_checks self) m
@@ -346,8 +352,13 @@ let print_stateless_code dependencies fmt m =
       (fun fmt -> fprintf fmt "return;")
 
 let print_reset_code dependencies fmt m self =
-  fprintf fmt "@[<v 2>%a {@,%a%treturn;@]@,}@.@."
+  let const_locals = List.filter (fun vdecl -> vdecl.var_dec_const) m.mstep.step_locals in
+  fprintf fmt "@[<v 2>%a {@,%a%t@,%a%treturn;@]@,}@.@."
     (print_reset_prototype self) (m.mname.node_id, m.mstatic)
+    (* constant locals decl *)
+    (Utils.fprintf_list ~sep:";@," (pp_c_decl_local_var m)) const_locals
+    (Utils.pp_final_char_if_non_empty ";" const_locals)
+    (* instrs *)
     (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) m.minit
     (Utils.pp_newline_if_non_empty m.minit)
 
@@ -359,7 +370,7 @@ let print_step_code dependencies fmt m self =
     fprintf fmt "@[<v 2>%a {@,%a%t%a%t@,%a%a%t%t@]@,}@.@."
       (print_step_prototype self) (m.mname.node_id, m.mstep.step_inputs, m.mstep.step_outputs)
       (* locals *)
-      (Utils.fprintf_list ~sep:";@," pp_c_decl_local_var) m.mstep.step_locals
+      (Utils.fprintf_list ~sep:";@," (pp_c_decl_local_var m)) m.mstep.step_locals
       (Utils.pp_final_char_if_non_empty ";@," m.mstep.step_locals)
       (* array mems *)
       (Utils.fprintf_list ~sep:";@," (pp_c_decl_array_mem self)) array_mems
@@ -377,7 +388,7 @@ let print_step_code dependencies fmt m self =
     fprintf fmt "@[<v 2>%a {@,%a%t@,%a%a%t%t@]@,}@.@."
       (print_step_prototype self) (m.mname.node_id, (m.mstep.step_inputs@gen_locals@gen_calls), m.mstep.step_outputs)
       (* locals *)
-      (Utils.fprintf_list ~sep:";@," pp_c_decl_local_var) base_locals
+      (Utils.fprintf_list ~sep:";@," (pp_c_decl_local_var m)) base_locals
       (Utils.pp_final_char_if_non_empty ";" base_locals)
       (* check assertions *)
       (pp_c_checks self) m
@@ -402,8 +413,9 @@ let print_machine dependencies fmt m =
       (* Alloc function, only if non static mode *)
       if (not !Options.static_mem) then  
 	begin
-	  fprintf fmt "@[<v 2>%a {@,%a@]@,}@.@."
+	  fprintf fmt "@[<v 2>%a {@,%a%a@]@,}@.@."
 	    print_alloc_prototype (m.mname.node_id, m.mstatic)
+	    print_alloc_const m
 	    print_alloc_code m;
 	end;
       let self = mk_self m in
@@ -435,6 +447,7 @@ let print_lib_c source_fmt basename prog machines dependencies =
   fprintf source_fmt "@[<v>";
   List.iter (fun c -> print_const_def source_fmt (const_of_top c)) (get_consts prog);
   fprintf source_fmt "@]@.";
+
   if not !Options.static_mem then
     begin
       fprintf source_fmt "/* External allocation function prototypes */@.";
@@ -446,6 +459,7 @@ let print_lib_c source_fmt basename prog machines dependencies =
       List.iter (fun m -> fprintf source_fmt "%a;@." print_alloc_prototype (m.mname.node_id, m.mstatic)) machines;
       fprintf source_fmt "@]@.";
     end;
+
   (* Print the struct definitions of all machines. *)
   fprintf source_fmt "/* Struct definitions */@.";
   fprintf source_fmt "@[<v>";

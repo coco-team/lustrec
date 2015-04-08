@@ -220,7 +220,7 @@ let rec eval eval_op eval_const dim =
   | Dident id ->
     (match eval_const id with
     | Some val_dim -> dim.dim_desc <- Dlink val_dim
-    | None         -> raise InvalidDimension)
+    | None         -> (Format.eprintf "invalid %a@." pp_dimension dim; raise InvalidDimension))
   | Dite (c, t, e) ->
     begin
       eval eval_op eval_const c;
@@ -243,7 +243,14 @@ let rec eval eval_op eval_const dim =
     end
   | Dvar -> ()
   | Dunivar -> assert false
-
+(*
+in
+begin
+  Format.eprintf "Dimension.eval %a = " pp_dimension dim; 
+  eval eval_op eval_const dim;
+  Format.eprintf "%a@." pp_dimension dim
+end
+*)
 let uneval const univar =
   let univar = repr univar in
   match univar.dim_desc with

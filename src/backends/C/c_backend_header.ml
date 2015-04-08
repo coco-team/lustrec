@@ -36,34 +36,65 @@ struct
 let print_import_standard fmt =
   fprintf fmt "#include \"%s/arrow.h\"@.@." Version.include_path
 
-let print_static_declare_instance attr fmt (i, (m, static)) =
+let rec print_static_val pp_var fmt v =
+  match v with
+  | Cst c         -> pp_c_const fmt c
+  | LocalVar v    -> pp_var fmt v
+  | Fun (n, vl)   -> Basic_library.pp_c n (print_static_val pp_var) fmt vl
+  | _             -> (Format.eprintf "Internal error: C_backend_header.print_static_val"; assert false)
+
+let print_constant m pp_var fmt v =
+  Format.fprintf fmt "inst ## %s = %a"
+    v.var_id
+    (print_static_val pp_var) (Machine_code.get_const_assign m v)
+
+let print_static_constant (m, attr, inst) fmt const_locals =
+  let pp_var fmt v =
+    if List.mem v const_locals
+    then
+      Format.fprintf fmt "%s ## %s" inst v.var_id
+    else 
+      Format.fprintf fmt "%s" v.var_id in
+  Format.fprintf fmt "%a%t"
+    (Utils.fprintf_list ~sep:";\\@," (print_constant m pp_var)) const_locals
+    (Utils.pp_final_char_if_non_empty ";\\@," const_locals)
+
+let print_static_declare_instance (m, attr, inst) const_locals fmt (i, (n, static)) =
+  let pp_var fmt v =
+    if List.mem v const_locals
+    then
+      Format.fprintf fmt "%s ## %s" inst v.var_id
+    else 
+      Format.fprintf fmt "%s" v.var_id in
+  let values = List.map (Machine_code.value_of_dimension m) static in
   fprintf fmt "%a(%s, %a%t%s)"
-    pp_machine_static_declare_name (node_name m)
+    pp_machine_static_declare_name (node_name n)
     attr
-    (Utils.fprintf_list ~sep:", " Dimension.pp_dimension) static
+    (Utils.fprintf_list ~sep:", " (print_static_val pp_var)) values
     (Utils.pp_final_char_if_non_empty ", " static)
     i
 
-let print_static_declare_macro fmt m =
+let print_static_declare_macro fmt (m, attr, inst) =
+  let const_locals = List.filter (fun vdecl -> vdecl.var_dec_const) m.mstep.step_locals in
   let array_mem = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
-  let inst = mk_instance m in
-  let attr = mk_attribute m in
-  fprintf fmt "@[<v 2>#define %a(%s, %a%t%s)\\@,%s %a %s;\\@,%a%t%a;@,@]"
+  fprintf fmt "@[<v 2>#define %a(%s, %a%t%s)\\@,%a%s %a %s;\\@,%a%t%a;@,@]"
     pp_machine_static_declare_name m.mname.node_id
     attr
     (Utils.fprintf_list ~sep:", " (pp_c_var_read m)) m.mstatic
     (Utils.pp_final_char_if_non_empty ", " m.mstatic)
     inst
+    (* constants *)
+    (print_static_constant (m, attr, inst)) const_locals
     attr
     pp_machine_memtype_name m.mname.node_id
     inst
-    (Utils.fprintf_list ~sep:";\\@," pp_c_decl_local_var) array_mem
+    (Utils.fprintf_list ~sep:";\\@," (pp_c_decl_local_var m)) array_mem
     (Utils.pp_final_char_if_non_empty ";\\@," array_mem)
     (Utils.fprintf_list ~sep:";\\@,"
        (fun fmt (i',m') ->
-	 let path = sprintf "inst ## _%s" i' in
+	 let path = sprintf "%s ## _%s" inst i' in
 	 fprintf fmt "%a"
-	   (print_static_declare_instance attr) (path,m')
+	   (print_static_declare_instance (m, attr, inst) const_locals) (path, m')
        )) m.minstances
 
       
@@ -73,13 +104,15 @@ let print_static_link_instance fmt (i, (m, _)) =
 (* Allocation of a node struct:
    - if node memory is an array/matrix/etc, we cast it to a pointer (see pp_registers_struct)
 *)
-let print_static_link_macro fmt m =
+let print_static_link_macro fmt (m, attr, inst) =
   let array_mem = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
-  fprintf fmt "@[<v>@[<v 2>#define %a(inst) do {\\@,%a%t%a;\\@]@,} while (0)@.@]"
+  fprintf fmt "@[<v>@[<v 2>#define %a(%s) do {\\@,%a%t%a;\\@]@,} while (0)@.@]"
     pp_machine_static_link_name m.mname.node_id
+    inst
     (Utils.fprintf_list ~sep:";\\@,"
        (fun fmt v ->
-	 fprintf fmt "inst._reg.%s = (%a*) &%s"
+	 fprintf fmt "%s._reg.%s = (%a*) &%s"
+	   inst
 	   v.var_id
            (fun fmt v -> pp_c_type "" fmt (Types.array_base_type v.var_type)) v
 	   v.var_id
@@ -87,24 +120,29 @@ let print_static_link_macro fmt m =
     (Utils.pp_final_char_if_non_empty ";\\@," array_mem)
     (Utils.fprintf_list ~sep:";\\@,"
        (fun fmt (i',m') ->
-	 let path = sprintf "inst ## _%s" i' in
-	 fprintf fmt "%a;\\@,inst.%s = &%s"
+	 let path = sprintf "%s ## _%s" inst i' in
+	 fprintf fmt "%a;\\@,%s.%s = &%s"
 	   print_static_link_instance (path,m')
+	   inst
 	   i'
 	   path
        )) m.minstances
-      
-let print_static_alloc_macro fmt m =
-  fprintf fmt "@[<v>@[<v 2>#define %a(attr,%a%tinst)\\@,%a(attr,%a%tinst);\\@,%a(inst);@]@,@]@."
-    pp_machine_static_alloc_name m.mname.node_id
-    (Utils.fprintf_list ~sep:", " (pp_c_var_read m)) m.mstatic
-    (Utils.pp_final_char_if_non_empty ", " m.mstatic)
-    pp_machine_static_declare_name m.mname.node_id
-    (Utils.fprintf_list ~sep:", " (pp_c_var_read m)) m.mstatic
-    (Utils.pp_final_char_if_non_empty ", " m.mstatic)
-    pp_machine_static_link_name m.mname.node_id
 
- 
+let print_static_alloc_macro fmt (m, attr, inst) =
+  fprintf fmt "@[<v>@[<v 2>#define %a(%s, %a%t%s)\\@,%a(%s, %a%t%s);\\@,%a(%s);@]@,@]@."
+    pp_machine_static_alloc_name m.mname.node_id
+    attr
+    (Utils.fprintf_list ~sep:", " (pp_c_var_read m)) m.mstatic
+    (Utils.pp_final_char_if_non_empty ", " m.mstatic)
+    inst
+    pp_machine_static_declare_name m.mname.node_id
+    attr
+    (Utils.fprintf_list ~sep:", " (pp_c_var_read m)) m.mstatic
+    (Utils.pp_final_char_if_non_empty ", " m.mstatic)
+    inst
+    pp_machine_static_link_name m.mname.node_id
+    inst
+
 let print_machine_decl fmt m =
   Mod.print_machine_decl_prefix fmt m;
   if fst (get_stateless_status m) then
@@ -117,17 +155,21 @@ let print_machine_decl fmt m =
     begin
       (* Static allocation *)
       if !Options.static_mem
-      then (
-	fprintf fmt "%a@.%a@.%a@."
-	  print_static_declare_macro m
-	  print_static_link_macro m
-	  print_static_alloc_macro m
-      )
-      else ( 
+      then
+	begin
+	  let inst = mk_instance m in
+	  let attr = mk_attribute m in
+	  fprintf fmt "%a@.%a@.%a@."
+	    print_static_declare_macro (m, attr, inst)
+	    print_static_link_macro (m, attr, inst)
+	    print_static_alloc_macro (m, attr, inst)
+	end
+      else
+	begin 
         (* Dynamic allocation *)
-	fprintf fmt "extern %a;@.@."
-	  print_alloc_prototype (m.mname.node_id, m.mstatic)
-      );
+	  fprintf fmt "extern %a;@.@."
+	    print_alloc_prototype (m.mname.node_id, m.mstatic)
+	end;
       let self = mk_self m in
       fprintf fmt "extern %a;@.@."
 	(print_reset_prototype self) (m.mname.node_id, m.mstatic);
@@ -148,10 +190,12 @@ let print_machine_alloc_decl fmt m =
       then
 	begin
 	  (* Static allocation *)
+	  let inst = mk_instance m in
+	  let attr = mk_attribute m in
 	  fprintf fmt "%a@.%a@.%a@."
-		  print_static_declare_macro m
-		  print_static_link_macro m
-		  print_static_alloc_macro m
+		  print_static_declare_macro (m, attr, inst)
+		  print_static_link_macro (m, attr, inst)
+		  print_static_alloc_macro (m, attr, inst)
 	end
       else
 	begin 

@@ -31,7 +31,7 @@ struct
 (********************************************************************************************)
 
 let print_get_input fmt v =
-  match v.var_type.Types.tdesc with
+  match (Types.repr v.var_type).Types.tdesc with
     | Types.Tint -> fprintf fmt "_get_int(\"%s\")" v.var_id
     | Types.Tbool -> fprintf fmt "_get_bool(\"%s\")" v.var_id
     | Types.Treal -> fprintf fmt "_get_double(\"%s\")" v.var_id
@@ -39,7 +39,7 @@ let print_get_input fmt v =
 
 let print_put_outputs fmt ol = 
   let po fmt o =
-    match o.var_type.Types.tdesc with
+    match (Types.repr o.var_type).Types.tdesc with
     | Types.Tint -> fprintf fmt "_put_int(\"%s\", %s)" o.var_id o.var_id
     | Types.Tbool -> fprintf fmt "_put_bool(\"%s\", %s)" o.var_id o.var_id
     | Types.Treal -> fprintf fmt "_put_double(\"%s\", %s)" o.var_id o.var_id

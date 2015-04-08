@@ -19,7 +19,9 @@ open Corelang
 (********************************************************************************************)
 
 type lusic =
-{ from_lusi : bool;
+{
+  obsolete  : bool;
+  from_lusi : bool;
   contents  : top_decl list;
 }
 
@@ -41,12 +43,27 @@ let extract_header dirname basename prog =
     | Open _         -> decl :: header)
    prog []
 
+let check_obsolete lusic basename =
+  if lusic.obsolete then raise (Error (Location.dummy_loc, Wrong_number basename))
+
+let check_lusic lusic basename =
+  try
+    check_obsolete lusic basename
+  with
+  | Corelang.Error (loc, err) as exc -> (
+    eprintf "Library error: %a%a@."
+      Corelang.pp_error err
+      Location.pp_loc loc;
+    raise exc
+  )
+
 (* encode and write a header in a file *)
 let write_lusic lusi (header : top_decl list) basename extension =
   let target_name = basename ^ extension in
   let outchan = open_out_bin target_name in
   begin
-    Marshal.to_channel outchan {from_lusi = lusi; contents = header} [];
+    Marshal.to_channel outchan (Version.number, lusi : string * bool) [];
+    Marshal.to_channel outchan (header : top_decl list) [];
     close_out outchan
   end
 
@@ -54,11 +71,27 @@ let write_lusic lusi (header : top_decl list) basename extension =
 let read_lusic basename extension =
   let source_name = basename ^ extension in
   let inchan = open_in_bin source_name in
-  let lusic = (Marshal.from_channel inchan : lusic) in
-  begin
-    close_in inchan;
-    lusic
-  end
+  let number, from_lusi = (Marshal.from_channel inchan : string * bool) in
+  if number <> Version.number
+  then
+    begin
+      close_in inchan;
+      {
+	obsolete  = true;
+	from_lusi = from_lusi;
+	contents  = [];
+      }
+    end
+  else    
+    begin
+      let lusic = (Marshal.from_channel inchan : top_decl list) in
+      close_in inchan;
+      {
+	obsolete  = false;
+	from_lusi = from_lusi;
+	contents  = lusic;
+      }
+    end
 
 let print_lusic_to_h basename extension =
   let lusic = read_lusic basename extension in
@@ -66,6 +99,7 @@ let print_lusic_to_h basename extension =
   let h_out = open_out header_name in
   let h_fmt = formatter_of_out_channel h_out in
   begin
+    check_lusic lusic basename;
     Typing.uneval_prog_generics lusic.contents;
     Clock_calculus.uneval_prog_generics lusic.contents;
     Header.print_header_from_header h_fmt (Filename.basename basename) lusic.contents;
