@@ -46,17 +46,6 @@ let extract_header dirname basename prog =
 let check_obsolete lusic basename =
   if lusic.obsolete then raise (Error (Location.dummy_loc, Wrong_number basename))
 
-let check_lusic lusic basename =
-  try
-    check_obsolete lusic basename
-  with
-  | Corelang.Error (loc, err) as exc -> (
-    eprintf "Library error: %a%a@."
-      Corelang.pp_error err
-      Location.pp_loc loc;
-    raise exc
-  )
-
 (* encode and write a header in a file *)
 let write_lusic lusi (header : top_decl list) basename extension =
   let target_name = basename ^ extension in
@@ -99,7 +88,7 @@ let print_lusic_to_h basename extension =
   let h_out = open_out header_name in
   let h_fmt = formatter_of_out_channel h_out in
   begin
-    check_lusic lusic basename;
+    assert (not lusic.obsolete);
     Typing.uneval_prog_generics lusic.contents;
     Clock_calculus.uneval_prog_generics lusic.contents;
     Header.print_header_from_header h_fmt (Filename.basename basename) lusic.contents;

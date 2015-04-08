@@ -76,7 +76,7 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
       else
 	begin
 	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. loading compiled header file %s@," header_name);
-	  Lusic.check_lusic lusic destname;
+	  Modules.check_dependency lusic destname;
 	  let header = lusic.Lusic.contents in
 	  let (declared_types_env, declared_clocks_env) = get_envs_from_top_decls header in
 	  check_compatibility
@@ -233,7 +233,7 @@ let rec compile_source dirname basename extension =
       end
     else
       machine_code
- in
+  in
   (* Optimize machine code *)
   let machine_code =
     if !Options.optimization >= 3 && !Options.output <> "horn" then
