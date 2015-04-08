@@ -1,10 +1,14 @@
-To compile
+To compile Lustrec:
+------------------
 
+# autoconf
 # ./configure
 # make
 # make install
 
-To use it
+
+To use lustrec:
+--------------
 
 In a modular setting:
 # lustrec <filename.lus>
@@ -12,20 +16,23 @@ will generate filename.c and filename.h
 
 With a main node:
 # lustrec -node <main_node> <filename.lus>
-will generate the same two files, but filename.c will contains a main function
+will generate the same two files,
+but also filename_main.c that contains a main function
+and filename_alloc.h that contains the node allocation macros 
 
 With a main node, with a static memory allocation scheme:
-# lustrec -node <main_node> -static <filename.lus>
-same as above, but main function will statically allocate memory
+# lustrec -node <main_node> -dynamic <filename.lus>
+same as above, but main function will dynamically allocate node memory
 
 To compile it:
 # gcc -Iinclude filename.c
+# gcc -Iinclude filename_main.c
 where include links to the include folder
 
 To run it with the generated main function:
 - compile the io_frontend.o
 # gcc -c include/io_frontend.c
-# gcc -Iinclude -o target_name io_frontend.c filename.c
+# gcc -Iinclude -o target_name io_frontend.o filename.o filename_main.o
 # ./target_name
 
 To analyze it with frama-c
