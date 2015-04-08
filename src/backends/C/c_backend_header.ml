@@ -43,12 +43,13 @@ let rec print_static_val pp_var fmt v =
   | Fun (n, vl)   -> Basic_library.pp_c n (print_static_val pp_var) fmt vl
   | _             -> (Format.eprintf "Internal error: C_backend_header.print_static_val"; assert false)
 
-let print_constant m pp_var fmt v =
-  Format.fprintf fmt "inst ## %s = %a"
-    v.var_id
+let print_constant_decl (m, attr, inst) pp_var fmt v =
+  Format.fprintf fmt "%s %a = %a"
+    attr
+    (pp_c_type (Format.sprintf "%s ## %s" inst v.var_id)) v.var_type
     (print_static_val pp_var) (Machine_code.get_const_assign m v)
 
-let print_static_constant (m, attr, inst) fmt const_locals =
+let print_static_constant_decl (m, attr, inst) fmt const_locals =
   let pp_var fmt v =
     if List.mem v const_locals
     then
@@ -56,7 +57,7 @@ let print_static_constant (m, attr, inst) fmt const_locals =
     else 
       Format.fprintf fmt "%s" v.var_id in
   Format.fprintf fmt "%a%t"
-    (Utils.fprintf_list ~sep:";\\@," (print_constant m pp_var)) const_locals
+    (Utils.fprintf_list ~sep:";\\@," (print_constant_decl (m, attr, inst) pp_var)) const_locals
     (Utils.pp_final_char_if_non_empty ";\\@," const_locals)
 
 let print_static_declare_instance (m, attr, inst) const_locals fmt (i, (n, static)) =
@@ -84,7 +85,7 @@ let print_static_declare_macro fmt (m, attr, inst) =
     (Utils.pp_final_char_if_non_empty ", " m.mstatic)
     inst
     (* constants *)
-    (print_static_constant (m, attr, inst)) const_locals
+    (print_static_constant_decl (m, attr, inst)) const_locals
     attr
     pp_machine_memtype_name m.mname.node_id
     inst
