@@ -37,7 +37,7 @@ let traces = ref false
 
 let horntraces = ref false
 let horn_cex = ref false
-let horn_queries = ref false
+let horn_queries = ref true
 
 
 let options =
