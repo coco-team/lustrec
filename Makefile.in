@@ -37,9 +37,12 @@ dist-clean: clean
 	@echo Compiling $<
 	@$(LOCAL_BINDIR)/lustrec -verbose 0 -d include $< 
 
+clean-lusic:
+	rm $(LUSI_LIBS:%.lusi=%.lusic)
+
 compile-lusi: $(LUSI_LIBS:%.lusi=%.lusic)
 
-install: compile-lusi
+install: clean-lusic compile-lusi
 	mkdir -p ${bindir}
 	install -m 0755 $(LOCAL_BINDIR)/* ${bindir}
 	mkdir -p ${includedir}/lustrec
