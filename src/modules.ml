@@ -116,22 +116,38 @@ let add_const itf name value =
 let name_dependency (local, dep) =
   ((if local then !Options.dest_dir else Version.include_path) ^ "/") ^ dep
 
+let import_dependency_aux loc (local, dep) =
+  let basename = name_dependency (local, dep) in
+  let extension = ".lusic" in 
+  try
+    let lusic = Lusic.read_lusic basename extension in
+    Lusic.check_obsolete lusic basename;
+    lusic
+  with
+  | Sys_error msg ->
+    begin
+      (*Format.eprintf "Error: %s@." msg;*)
+      raise (Error (loc, Unknown_library basename))
+    end
+  | Corelang.Error (_, msg) as exc -> raise (Corelang.Error (loc, msg))
+
 let import_dependency loc (local, dep) =
   try
-    let basename = name_dependency (local, dep) in
-    let extension = ".lusic" in 
-    try
-      let lusic = Lusic.read_lusic basename extension in
-      Lusic.check_obsolete lusic basename;
-      lusic
-    with Sys_error msg ->
-      begin
-      (*Format.eprintf "Error: %s@." msg;*)
-	raise (Error (loc, Unknown_library basename))
-      end
+    import_dependency_aux loc (local, dep)
+  with
+  | Corelang.Error (_, err) as exc -> (
+    Format.eprintf "Import error: %a%a@."
+      Corelang.pp_error err
+      Location.pp_loc loc;
+    raise exc
+  )
+
+let check_dependency lusic basename =
+  try
+    Lusic.check_obsolete lusic basename
   with
   | Corelang.Error (loc, err) as exc -> (
-    Format.eprintf "Library error: %a%a@."
+    Format.eprintf "Import error: %a%a@."
       Corelang.pp_error err
       Location.pp_loc loc;
     raise exc
@@ -147,7 +163,7 @@ let rec load_header_rec imported header =
     | Open (local, dep) ->
        let basename = name_dependency (local, dep) in
        if ISet.mem basename imported then imp else
-	 let lusic = import_dependency decl.top_decl_loc (local, dep)
+	 let lusic = import_dependency_aux decl.top_decl_loc (local, dep)
 	 in load_header_rec (ISet.add basename imported) lusic.Lusic.contents
 		 ) imported header
 
@@ -172,7 +188,7 @@ let rec load_program_rec imported program =
     | Open (local, dep) ->
        let basename = name_dependency (local, dep) in
        if ISet.mem basename imported then imp else
-	 let lusic = import_dependency decl.top_decl_loc (local, dep)
+	 let lusic = import_dependency_aux decl.top_decl_loc (local, dep)
 	 in load_header_rec (ISet.add basename imported) lusic.Lusic.contents
 		 ) imported program
 
