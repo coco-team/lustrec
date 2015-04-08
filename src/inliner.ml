@@ -27,20 +27,6 @@ let check_node_name id = (fun t ->
   | Node nd -> nd.node_id = id 
   | _ -> false) 
 
-let get_static_inputs node args =
-  List.fold_right2 (fun vdecl arg static ->
-    if vdecl.var_dec_const then (vdecl.var_id, Corelang.dimension_of_expr arg) :: static else static)
-    node.node_inputs
-    (Corelang.expr_list_of_expr args)
-    []
-
-let get_carrier_inputs node args =
-  List.fold_right2 (fun vdecl arg carrier ->
-    if Types.get_clock_base_type vdecl.var_type <> None then (vdecl.var_id, ident_of_expr arg) :: carrier else carrier)
-    node.node_inputs
-    (Corelang.expr_list_of_expr args)
-    []
-
 let is_node_var node v =
  try
    ignore (Corelang.get_node_var v node); true
@@ -53,7 +39,21 @@ let rename_eq rename eq =
     eq_lhs = List.map rename eq.eq_lhs; 
     eq_rhs = rename_expr rename eq.eq_rhs
   }
+(*
+let get_static_inputs input_arg_list =
+ List.fold_right (fun (vdecl, arg) res ->
+   if vdecl.var_dec_const
+   then (vdecl.var_id, Corelang.dimension_of_expr arg) :: res
+   else res)
+   input_arg_list []
 
+let get_carrier_inputs input_arg_list =
+ List.fold_right (fun (vdecl, arg) res ->
+   if Corelang.is_clock_dec_type vdecl.var_dec_type.ty_dec_desc
+   then (vdecl.var_id, ident_of_expr arg) :: res
+   else res)
+   input_arg_list []
+*)
 (* 
     expr, locals', eqs = inline_call id args' reset locals node nodes
 
@@ -73,30 +73,49 @@ let inline_call node orig_expr args reset locals caller =
     if v = tag_true || v = tag_false || not (is_node_var node v) then v else
       Corelang.mk_new_node_name caller (Format.sprintf "%s_%i_%s" node.node_id uid v)
   in
-  let eqs' = List.map (rename_eq rename) (get_node_eqs node)
-  in
-  let static_inputs = get_static_inputs node args in
-  let carrier_inputs = get_carrier_inputs node args in
+  let eqs' = List.map (rename_eq rename) (get_node_eqs node) in
+  let input_arg_list = List.combine node.node_inputs (Corelang.expr_list_of_expr args) in
+  let static_inputs, dynamic_inputs = List.partition (fun (vdecl, arg) -> vdecl.var_dec_const) input_arg_list in
+  let static_inputs = List.map (fun (vdecl, arg) -> vdecl, Corelang.dimension_of_expr arg) static_inputs in
+  let carrier_inputs, other_inputs = List.partition (fun (vdecl, arg) -> Corelang.is_clock_dec_type vdecl.var_dec_type.ty_dec_desc) dynamic_inputs in
+  let carrier_inputs = List.map (fun (vdecl, arg) -> vdecl, Corelang.ident_of_expr arg) carrier_inputs in
   let rename_static v =
     try
-      List.assoc v static_inputs
-    with Not_found -> Dimension.mkdim_ident loc v
-    (*Format.eprintf "Inliner.rename_static %s = %a@." v Dimension.pp_dimension res; res*)
-  in
+      snd (List.find (fun (vdecl, _) -> v = vdecl.var_id) static_inputs)
+    with Not_found -> Dimension.mkdim_ident loc v in
   let rename_carrier v =
     try
-      List.assoc v carrier_inputs
+      snd (List.find (fun (vdecl, _) -> v = vdecl.var_id) carrier_inputs)
     with Not_found -> v in
   let rename_var v =
-  (*Format.eprintf "Inliner.rename_var %a@." Printers.pp_var v;*)
-    { v with
-      var_id = rename v.var_id;
-      var_type = Types.rename_static rename_static v.var_type;
-      var_clock = Clocks.rename_static rename_carrier v.var_clock;
-    } in
-  let inputs' = List.map rename_var node.node_inputs in
+    let vdecl =
+      Corelang.mkvar_decl v.var_loc
+	(rename v.var_id,
+	 { v.var_dec_type  with ty_dec_desc = Corelang.rename_static rename_static v.var_dec_type.ty_dec_desc },
+	 { v.var_dec_clock with ck_dec_desc = Corelang.rename_carrier rename_carrier v.var_dec_clock.ck_dec_desc },
+	 v.var_dec_const,
+	 Utils.option_map (rename_expr rename) v.var_dec_value) in
+    begin
+(*
+      (try
+	 Format.eprintf "Inliner.inline_call unify %a %a@." Types.print_ty vdecl.var_type Dimension.pp_dimension (List.assoc v.var_id static_inputs);
+	 Typing.unify vdecl.var_type (Type_predef.type_static (List.assoc v.var_id static_inputs) (Types.new_var ()))
+       with Not_found -> ());
+      (try
+Clock_calculus.unify vdecl.var_clock (Clock_predef.ck_carrier (List.assoc v.var_id carrier_inputs) (Clocks.new_var true))
+       with Not_found -> ());
+(*Format.eprintf "Inliner.inline_call res=%a@." Printers.pp_var vdecl;*)
+*)
+      vdecl
+    end
+    (*Format.eprintf "Inliner.rename_var %a@." Printers.pp_var v;*)
+  in
+  let inputs' = List.map (fun (vdecl, _) -> rename_var vdecl) dynamic_inputs in
   let outputs' = List.map rename_var node.node_outputs in
-  let locals' = List.map rename_var node.node_locals in
+  let locals' =
+      (List.map (fun (vdecl, arg) -> let vdecl' = rename_var vdecl in { vdecl' with var_dec_value = Some (Corelang.expr_of_dimension arg) }) static_inputs)
+    @ (List.map rename_var node.node_locals) 
+in
   (* checking we are at the appropriate (early) step: node_checks and
      node_gencalls should be empty (not yet assigned) *)
   assert (node.node_checks = []);
@@ -105,7 +124,7 @@ let inline_call node orig_expr args reset locals caller =
   (* Bug included: todo deal with reset *)
   assert (reset = None);
 
-  let assign_inputs = mkeq loc (List.map (fun v -> v.var_id) inputs', args) in
+  let assign_inputs = mkeq loc (List.map (fun v -> v.var_id) inputs', expr_of_expr_list args.expr_loc (List.map snd dynamic_inputs)) in
   let expr = expr_of_expr_list loc (List.map expr_of_vdecl outputs')
   in
   let asserts' = (* We rename variables in assert expressions *)
@@ -215,7 +234,7 @@ let rec inline_expr ?(selection_on_annotation=false) expr locals node nodes =
     { expr with expr_desc = Expr_merge (id, branches') }, l', eqs', asserts'
 
 and inline_node ?(selection_on_annotation=false) node nodes =
-  try Hashtbl.find inline_table node.node_id
+  try copy_node (Hashtbl.find inline_table node.node_id)
   with Not_found ->
   let inline_expr = inline_expr ~selection_on_annotation:selection_on_annotation in
   let new_locals, eqs, asserts = 
@@ -269,24 +288,26 @@ let witness filename main_name orig inlined type_env clock_env =
 
   (* One ok_i boolean variable  per output var *)
   let nb_outputs = List.length main_orig_node.node_outputs in
+  let ok_ident = "OK" in
   let ok_i = List.map (fun id ->
     mkvar_decl 
       loc 
-      ("OK" ^ string_of_int id,
+      (Format.sprintf "%s_%i" ok_ident id,
        {ty_dec_desc=Tydec_bool; ty_dec_loc=loc},
        {ck_dec_desc=Ckdec_any; ck_dec_loc=loc},
-       false)
+       false,
+       None)
   ) (Utils.enumerate nb_outputs) 
   in
 
   (* OK = ok_1 and ok_2 and ... ok_n-1 *)
-  let ok_ident = "OK" in
   let ok_output = mkvar_decl 
     loc 
     (ok_ident,
      {ty_dec_desc=Tydec_bool; ty_dec_loc=loc},
      {ck_dec_desc=Ckdec_any; ck_dec_loc=loc},
-     false)
+     false,
+     None)
   in
   let main_ok_expr =
     let mkv x = mkexpr loc (Expr_ident x) in
@@ -342,42 +363,35 @@ let witness filename main_name orig inlined type_env clock_env =
   in
   let main = [{ top_decl_desc = Node main_node; top_decl_loc = loc; top_decl_owner = filename; top_decl_itf = false }] in
   let new_prog = others@nodes_origs@nodes_inlined@main in
-
-  let _ = Typing.type_prog type_env new_prog in
-  let _ = Clock_calculus.clock_prog clock_env new_prog in
-
-   
   let witness_file = (Options.get_witness_dir filename) ^ "/" ^ "inliner_witness.lus" in
   let witness_out = open_out witness_file in
   let witness_fmt = Format.formatter_of_out_channel witness_out in
-  Format.fprintf witness_fmt
-    "(* Generated lustre file to check validity of inlining process *)@.";
-  Printers.pp_prog witness_fmt new_prog;
-  Format.fprintf witness_fmt "@.";
-  () (* xx *)
+  begin
+    List.iter (fun vdecl -> Typing.try_unify Type_predef.type_bool vdecl.var_type vdecl.var_loc) (ok_output::ok_i);
+    Format.fprintf witness_fmt
+      "(* Generated lustre file to check validity of inlining process *)@.";
+    Printers.pp_prog witness_fmt new_prog;
+    Format.fprintf witness_fmt "@.";
+    ()
+  end (* xx *)
 
 let global_inline basename prog type_env clock_env =
   (* We select the main node desc *)
   let main_node, other_nodes, other_tops = 
-    List.fold_left 
-      (fun (main_opt, nodes, others) top -> 
+    List.fold_right
+      (fun top (main_opt, nodes, others) -> 
 	match top.top_decl_desc with 
 	| Node nd when nd.node_id = !Options.main_node -> 
 	  Some top, nodes, others
 	| Node _ -> main_opt, top::nodes, others
 	| _ -> main_opt, nodes, top::others) 
-      (None, [], []) prog 
+      prog (None, [], []) 
   in
+
   (* Recursively each call of a node in the top node is replaced *)
   let main_node = Utils.desome main_node in
   let main_node' = inline_all_calls main_node other_nodes in
-  let res = main_node'::other_tops in
-  if !Options.witnesses then (
-    witness 
-      basename
-      (match main_node.top_decl_desc  with Node nd -> nd.node_id | _ -> assert false) 
-      prog res type_env clock_env
-  );
+  let res = List.map (fun top -> if check_node_name !Options.main_node top then main_node' else top) prog in
   res
 
 let local_inline basename prog type_env clock_env =

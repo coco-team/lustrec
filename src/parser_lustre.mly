@@ -78,6 +78,7 @@ let get_current_node () = try List.hd !node_stack with _ -> assert false
 
 %nonassoc prec_exists prec_forall
 %nonassoc COMMA
+%nonassoc EVERY
 %left MERGE IF
 %nonassoc ELSE
 %right ARROW FBY
@@ -533,20 +534,33 @@ dim:
 
 locals:
   {[]}
-| VAR vdecl_list SCOL {$2}
+| VAR local_vdecl_list SCOL {$2}
 
 vdecl_list:
-    vdecl {$1}
+  vdecl {$1}
 | vdecl_list SCOL vdecl {$3 @ $1}
 
 vdecl:
-/* Useless no ?*/    ident_list
-    { List.map (fun id -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, false)) $1 }
-
-| ident_list COL typeconst clock 
-    { List.map (fun id -> mkvar_decl (id, mktyp $3, $4, false)) $1 }
+  ident_list COL typeconst clock 
+    { List.map (fun id -> mkvar_decl (id, mktyp $3, $4, false, None)) $1 }
+| CONST ident_list /* static parameters don't have clocks */
+    { List.map (fun id -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, true, None)) $2 }
 | CONST ident_list COL typeconst /* static parameters don't have clocks */
-    { List.map (fun id -> mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true)) $2 }
+    { List.map (fun id -> mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true, None)) $2 }
+
+local_vdecl_list:
+  local_vdecl {$1}
+| local_vdecl_list SCOL local_vdecl {$3 @ $1}
+
+local_vdecl:
+/* Useless no ?*/    ident_list
+    { List.map (fun id -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, false, None)) $1 }
+| ident_list COL typeconst clock 
+    { List.map (fun id -> mkvar_decl (id, mktyp $3, $4, false, None)) $1 }
+| CONST vdecl_ident EQ expr /* static parameters don't have clocks */
+    { [ mkvar_decl ($2, mktyp Tydec_any, mkclock Ckdec_any, true, Some $4) ] }
+| CONST vdecl_ident COL typeconst EQ expr /* static parameters don't have clocks */
+    { [ mkvar_decl ($2, mktyp $4, mkclock Ckdec_any, true, Some $6) ] }
 
 cdecl_list:
   cdecl SCOL { (fun itf -> [$1 itf]) }

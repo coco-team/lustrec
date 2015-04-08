@@ -26,18 +26,19 @@ let makefile_opt print basename dependencies makefile_fmt machines =
 *)
 
 let gen_files funs basename prog machines dependencies header_file source_lib_file source_main_file makefile_file machines =
+
   let header_out = open_out header_file in
   let header_fmt = formatter_of_out_channel header_out in
   let source_lib_out = open_out source_lib_file in
   let source_lib_fmt = formatter_of_out_channel source_lib_out in
-  
+
   let print_header, print_lib_c, print_main_c, print_makefile = funs in
   (* Generating H file *)
   print_header header_fmt basename prog machines dependencies;
-  
+ 
   (* Generating Lib C file *)
   print_lib_c source_lib_fmt basename prog machines dependencies;
-
+ 
   close_out header_out;
   close_out source_lib_out;
 
@@ -64,8 +65,7 @@ let gen_files funs basename prog machines dependencies header_file source_lib_fi
     end
   )
 
-let translate_to_c header source_lib source_main makefile basename prog machines dependencies  =
-
+let translate_to_c header source_lib source_main makefile basename prog machines dependencies =
   match !Options.spec with
   | "no" -> begin
     let module HeaderMod = C_backend_header.EmptyMod in
@@ -77,7 +77,7 @@ let translate_to_c header source_lib source_main makefile basename prog machines
     let module Source = C_backend_src.Main (SourceMod) in
     let module SourceMain = C_backend_main.Main (SourceMainMod) in
     let module Makefile = C_backend_makefile.Main (MakefileMod) in
-        
+
     let funs = 
       Header.print_alloc_header, 
       Source.print_lib_c, 
@@ -100,7 +100,7 @@ let translate_to_c header source_lib source_main makefile basename prog machines
     let module Source = C_backend_src.Main (SourceMod) in
     let module SourceMain = C_backend_main.Main (SourceMainMod) in
     let module Makefile = C_backend_makefile.Main (MakefileMod) in
-        
+
     let funs = 
       Header.print_alloc_header, 
       Source.print_lib_c,

@@ -152,7 +152,7 @@ let schedule_node n =
     let sort = topological_sort eq_equiv g in
     let unused = Liveness.compute_unused_variables n gg in
     let fanin = Liveness.compute_fanin n gg in
- 
+
     let (disjoint, reuse) =
       if !Options.optimization >= 3
       then

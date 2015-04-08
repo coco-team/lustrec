@@ -76,6 +76,7 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
       else
 	begin
 	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. loading compiled header file %s@," header_name);
+	  Lusic.check_lusic lusic destname;
 	  let header = lusic.Lusic.contents in
 	  let (declared_types_env, declared_clocks_env) = get_envs_from_top_decls header in
 	  check_compatibility
@@ -104,14 +105,24 @@ let rec compile_source dirname basename extension =
   (* Sorting nodes *)
   let prog = SortProg.sort prog in
 
+  (* Perform inlining before any analysis *)
+  let orig, prog =
+    if !Options.global_inline && !Options.main_node <> "" then
+      (if !Options.witnesses then prog else []),
+      Inliner.global_inline basename prog type_env clock_env
+    else (* if !Option.has_local_inline *)
+      [],
+      Inliner.local_inline basename prog type_env clock_env
+  in
+
+  (* Checking stateless/stateful status *)
+  check_stateless_decls prog;
+
   (* Typing *)
   let computed_types_env = type_decls type_env prog in
 
   (* Clock calculus *)
   let computed_clocks_env = clock_decls clock_env prog in
-
-  (* Checking stateless/stateful status *)
-  check_stateless_decls prog;
 
   (* Generating a .lusi header file only *)
   if !Options.lusi then
@@ -150,14 +161,22 @@ let rec compile_source dirname basename extension =
   Typing.uneval_prog_generics prog;
   Clock_calculus.uneval_prog_generics prog;
 
-  (* Perform global inlining *)
-  let prog =
-    if !Options.global_inline &&
-      (match !Options.main_node with | "" -> false | _ -> true) then
-      Inliner.global_inline basename prog type_env clock_env
-    else (* if !Option.has_local_inline *)
-      Inliner.local_inline basename prog type_env clock_env
-  in
+  if !Options.global_inline && !Options.main_node <> "" && !Options.witnesses then
+    begin
+      let orig = Corelang.copy_prog orig in
+      Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating witness file !@,");
+      check_stateless_decls orig;
+      let _ = Typing.type_prog type_env orig in
+      let _ = Clock_calculus.clock_prog clock_env orig in
+      Typing.uneval_prog_generics orig;
+      Clock_calculus.uneval_prog_generics orig;
+      Inliner.witness 
+	basename
+	!Options.main_node
+	orig prog type_env clock_env;
+      Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@,");
+    end;
+
 (*Format.eprintf "Inliner.global_inline<<@.%a@.>>@." Printers.pp_prog prog;*)
   (* Computes and stores generic calls for each node,
      only useful for ANSI C90 compliant generic node compilation *)
@@ -194,7 +213,10 @@ let rec compile_source dirname basename extension =
  *)
   let prog =
     if !Options.optimization >= 4 then
-      Optimize_prog.prog_unfold_consts prog
+      begin
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. constants elimination@,");
+	Optimize_prog.prog_unfold_consts prog
+      end
     else
       prog
   in
@@ -221,7 +243,7 @@ let rec compile_source dirname basename extension =
       end
     else
       machine_code
- in
+  in
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
   (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
   machine_code);
@@ -230,8 +252,8 @@ let rec compile_source dirname basename extension =
   let basename    =  Filename.basename basename in
   let destname = !Options.dest_dir ^ "/" ^ basename in
   let _ = match !Options.output with
-      "C" ->
-	begin
+    | "C" ->
+      begin
 	  let alloc_header_file = destname ^ "_alloc.h" in (* Could be changed *)
 	  let source_lib_file = destname ^ ".c" in (* Could be changed *)
 	  let source_main_file = destname ^ "_main.c" in (* Could be changed *)

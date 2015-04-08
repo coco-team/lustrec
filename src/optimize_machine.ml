@@ -14,6 +14,7 @@ open LustreSpec
 open Corelang
 open Causality
 open Machine_code 
+open Dimension
 
 let pp_elim fmt elim =
   begin
@@ -46,6 +47,9 @@ and eliminate_expr elim expr =
   | Access(v1, v2) -> Access(eliminate_expr elim v1, eliminate_expr elim v2)
   | Power(v1, v2) -> Power(eliminate_expr elim v1, eliminate_expr elim v2)
   | Cst _ | StateVar _ -> expr
+
+let eliminate_dim elim dim =
+  Dimension.expr_replace_expr (fun v -> try dimension_of_value (IMap.find v elim) with Not_found -> mkdim_ident dim.dim_loc v) dim
 
 let is_scalar_const c =
   match c with
@@ -116,27 +120,40 @@ and instr_unfold fanin instrs elim instr =
     2. local assigns then rewrite occurrences of the lhs in the computed accumulator
 *)
 
+let static_call_unfold elim (inst, (n, args)) =
+  let replace v =
+    try
+      Machine_code.dimension_of_value (IMap.find v elim)
+    with Not_found -> Dimension.mkdim_ident Location.dummy_loc v
+  in (inst, (n, List.map (Dimension.expr_replace_expr replace) args))
+
 (** Perform optimization on machine code:
     - iterate through step instructions and remove simple local assigns
     
 *)
 let machine_unfold fanin elim machine =
   (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "machine_unfold %a@." pp_elim elim);*)
-  let eliminated_vars, new_instrs = instrs_unfold fanin elim machine.mstep.step_instrs in
-  let new_locals = List.filter (fun v -> not (IMap.mem v.var_id eliminated_vars)) machine.mstep.step_locals 
+  let elim_consts, mconst = instrs_unfold fanin elim machine.mconst in
+  let elim_vars, instrs = instrs_unfold fanin elim_consts machine.mstep.step_instrs in
+  let locals = List.filter (fun v -> not (IMap.mem v.var_id elim_vars)) machine.mstep.step_locals in
+  let minstances = List.map (static_call_unfold elim_consts) machine.minstances in
+  let mcalls = List.map (static_call_unfold elim_consts) machine.mcalls
   in
   {
     machine with
       mstep = { 
 	machine.mstep with 
-	  step_locals = new_locals;
-	  step_instrs = new_instrs
-      }
+	  step_locals = locals;
+	  step_instrs = instrs
+      };
+      mconst = mconst;
+      minstances = minstances;
+      mcalls = mcalls;
   }
 
 let instr_of_const top_const =
   let const = const_of_top top_const in
-  let vdecl = mkvar_decl Location.dummy_loc (const.const_id, mktyp Location.dummy_loc Tydec_any, mkclock Location.dummy_loc Ckdec_any, true) in
+  let vdecl = mkvar_decl Location.dummy_loc (const.const_id, mktyp Location.dummy_loc Tydec_any, mkclock Location.dummy_loc Ckdec_any, true, None) in
   let vdecl = { vdecl with var_type = const.const_type }
   in MLocalAssign (vdecl, Cst const.const_value)
 

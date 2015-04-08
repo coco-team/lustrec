@@ -48,22 +48,6 @@ and clock_dec_desc =
   | Ckdec_bool of (ident * ident) list 
   | Ckdec_pclock of int * rat
 
-type var_decl = 
-    {var_id: ident;
-     var_orig:bool;
-     var_dec_type: type_dec;
-     var_dec_clock: clock_dec;
-     var_dec_const: bool;
-     mutable var_type: Types.type_expr;
-     mutable var_clock: Clocks.clock_expr;
-     var_loc: Location.t}
-
-(** The core language and its ast. Every element of the ast contains its
-    location in the program text. The type and clock of an ast element
-    is mutable (and initialized to dummy values). This avoids to have to
-    duplicate ast structures (e.g. ast, typed_ast, clocked_ast). *)
-
-
 type constant =
   | Const_int of int
   | Const_real of string
@@ -75,9 +59,27 @@ type constant =
 
 type quantifier_type = Exists | Forall
 
+type var_decl = 
+    {var_id: ident;
+     var_orig:bool;
+     var_dec_type: type_dec;
+     var_dec_clock: clock_dec;
+     var_dec_const: bool;
+     var_dec_value: expr option;
+     mutable var_type: Types.type_expr;
+     mutable var_clock: Clocks.clock_expr;
+     var_loc: Location.t}
+
+(** The core language and its ast. Every element of the ast contains its
+    location in the program text. The type and clock of an ast element
+    is mutable (and initialized to dummy values). This avoids to have to
+    duplicate ast structures (e.g. ast, typed_ast, clocked_ast). *)
+
+
+
 (* The tag of an expression is a unique identifier used to distinguish
    different instances of the same node *)
-type expr =
+and expr =
     {expr_tag: tag;
      expr_desc: expr_desc;
      mutable expr_type: Types.type_expr;
@@ -220,6 +222,7 @@ type error =
   | Unbound_symbol of ident
   | Already_bound_symbol of ident
   | Unknown_library of ident
+  | Wrong_number of ident
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

@@ -83,6 +83,7 @@ type machine_t = {
   minstances: (ident * static_call) list; (* sub-map of mcalls, from stateful instance to node *)
   minit: instr_t list;
   mstatic: var_decl list; (* static inputs only *)
+  mconst: instr_t list; (* assignments of node constant locals *)
   mstep: step_t;
   mspec: node_annot option;
   mannot: expr_annot list;
@@ -105,11 +106,12 @@ let pp_static_call fmt (node, args) =
 
 let pp_machine fmt m =
   Format.fprintf fmt
-    "@[<v 2>machine %s@ mem      : %a@ instances: %a@ init     : %a@ step     :@   @[<v 2>%a@]@ @  spec : @[%t@]@  annot : @[%a@]@]@ "
+    "@[<v 2>machine %s@ mem      : %a@ instances: %a@ init     : %a@ const    : %a@ step     :@   @[<v 2>%a@]@ @  spec : @[%t@]@  annot : @[%a@]@]@ "
     m.mname.node_id
     (Utils.fprintf_list ~sep:", " Printers.pp_var) m.mmemory
     (Utils.fprintf_list ~sep:", " (fun fmt (o1, o2) -> Format.fprintf fmt "(%s, %a)" o1 pp_static_call o2)) m.minstances
     (Utils.fprintf_list ~sep:"@ " pp_instr) m.minit
+    (Utils.fprintf_list ~sep:"@ " pp_instr) m.mconst
     pp_step m.mstep
     (fun fmt -> match m.mspec with | None -> () | Some spec -> Printers.pp_spec fmt spec)
     (Utils.fprintf_list ~sep:"@ " Printers.pp_expr_annot) m.mannot
@@ -137,6 +139,7 @@ let dummy_var_decl name typ =
     var_dec_type = dummy_type_dec;
     var_dec_clock = dummy_clock_dec;
     var_dec_const = false;
+    var_dec_value = None;
     var_type =  typ;
     var_clock = Clocks.new_ck (Clocks.Cvar Clocks.CSet_all) true;
     var_loc = Location.dummy_loc
@@ -183,6 +186,7 @@ let arrow_machine =
     mcalls = [];
     minstances = [];
     minit = [MStateAssign(var_state, Cst (const_of_bool true))];
+    mconst = [];
     mstatic = [];
     mstep = {
       step_inputs = arrow_desc.node_inputs;
@@ -214,6 +218,7 @@ let new_instance =
 	else o in
       o
     end
+
 
 (* translate_<foo> : node -> context -> <foo> -> machine code/expression *)
 (* the context contains  m : state aka memory variables  *)
@@ -284,7 +289,7 @@ let specialize_op expr =
   | "C" -> specialize_to_c expr
   | _   -> expr
 
-let rec translate_expr node ((m, si, j, d, s) as args) expr =
+let rec translate_expr ?(ite=false) node ((m, si, j, d, s) as args) expr =
   let expr = specialize_op expr in
  match expr.expr_desc with
  | Expr_const v                     -> Cst v
@@ -305,9 +310,11 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
    (* special treatment depending on the active backend. For horn backend, ite
       are preserved in expression. While they are removed for C or Java
       backends. *)
-   match !Options.output with | "horn" ->
+   match !Options.output with
+   | "horn"
+   | ("C" | "java") when ite ->
      Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
-   | "C" | "java" | _ ->
+   | _ ->
      (Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
  )
  | _                   -> raise NormalizationError
@@ -433,7 +440,7 @@ let find_eq xl eqs =
    to the computed schedule [sch]
 *)
 let sort_equations_from_schedule nd sch =
-(*  Format.eprintf "%s schedule: %a@."
+(*Format.eprintf "%s schedule: %a@."
 		 nd.node_id
 		 (Utils.fprintf_list ~sep:" ; " Scheduling.pp_eq_schedule) sch;*)
   let split_eqs = Splitting.tuple_split_eq_list (get_node_eqs nd) in
@@ -459,6 +466,17 @@ let sort_equations_from_schedule nd sch =
     List.rev eqs_rev
   end
 
+let constant_equations nd =
+ List.fold_right (fun vdecl eqs ->
+   if vdecl.var_dec_const
+   then
+     { eq_lhs = [vdecl.var_id];
+       eq_rhs = Utils.desome vdecl.var_dec_value;
+       eq_loc = vdecl.var_loc
+     } :: eqs
+   else eqs)
+   nd.node_locals []
+
 let translate_eqs node args eqs =
   List.fold_right (fun eq args -> translate_eq node args eq) eqs args;;
 
@@ -466,10 +484,15 @@ let translate_decl nd sch =
   (*Log.report ~level:1 (fun fmt -> Printers.pp_node fmt nd);*)
 
   let sorted_eqs = sort_equations_from_schedule nd sch in
-
+  let constant_eqs = constant_equations nd in
+  
   let init_args = ISet.empty, [], Utils.IMap.empty, List.fold_right (fun l -> ISet.add l) nd.node_locals ISet.empty, [] in
   (* memories, init instructions, node calls, local variables (including memories), step instrs *)
-  let m, init, j, locals, s = translate_eqs nd init_args sorted_eqs in
+  let m0, init0, j0, locals0, s0 = translate_eqs nd init_args constant_eqs in
+  assert (ISet.is_empty m0);
+  assert (init0 = []);
+  assert (Utils.IMap.is_empty j0);
+  let m, init, j, locals, s = translate_eqs nd (m0, init0, j0, locals0, s0) sorted_eqs in
   let mmap = Utils.IMap.fold (fun i n res -> (i, n)::res) j [] in
   {
     mname = nd;
@@ -477,6 +500,7 @@ let translate_decl nd sch =
     mcalls = mmap;
     minstances = List.filter (fun (_, (n,_)) -> not (Stateless.check_node n)) mmap;
     minit = init;
+    mconst = s0;
     mstatic = List.filter (fun v -> v.var_dec_const) nd.node_inputs;
     mstep = {
       step_inputs = nd.node_inputs;
@@ -500,7 +524,7 @@ let translate_decl nd sch =
     mannot = nd.node_annot;
   }
 
-(** takes the global delcarations and the scheduling associated to each node *)
+(** takes the global declarations and the scheduling associated to each node *)
 let translate_prog decls node_schs =
   let nodes = get_nodes decls in
   List.map
@@ -518,6 +542,46 @@ let get_machine_opt name machines =
       | None -> if m.mname.node_id = name then Some m else None)
     None machines
 
+let get_const_assign m id =
+  try
+    match (List.find (fun instr -> match instr with MLocalAssign (v, _) -> v == id | _ -> false) m.mconst) with
+    | MLocalAssign (_, e) -> e
+    | _                   -> assert false
+  with Not_found -> assert false
+
+
+let value_of_ident m id =
+  (* is is a state var *)
+  try
+    StateVar (List.find (fun v -> v.var_id = id) m.mmemory)
+  with Not_found ->
+  try (* id is a node var *)
+    LocalVar (get_node_var id m.mname)
+  with Not_found ->
+    try (* id is a constant *)
+      LocalVar (Corelang.var_decl_of_const (const_of_top (Hashtbl.find Corelang.consts_table id)))
+    with Not_found ->
+      (* id is a tag *)
+      Cst (Const_tag id)
+
+let rec value_of_dimension m dim =
+  match dim.Dimension.dim_desc with
+  | Dimension.Dbool b         -> Cst (Const_tag (if b then Corelang.tag_true else Corelang.tag_false))
+  | Dimension.Dint i          -> Cst (Const_int i)
+  | Dimension.Dident v        -> value_of_ident m v
+  | Dimension.Dappl (f, args) -> Fun (f, List.map (value_of_dimension m) args)
+  | Dimension.Dite (i, t, e)  -> Fun ("ite", List.map (value_of_dimension m) [i; t; e])
+  | Dimension.Dlink dim'      -> value_of_dimension m dim'
+  | _                         -> assert false
+
+let rec dimension_of_value value =
+  match value with
+  | Cst (Const_tag t) when t = Corelang.tag_true  -> Dimension.mkdim_bool  Location.dummy_loc true
+  | Cst (Const_tag t) when t = Corelang.tag_false -> Dimension.mkdim_bool  Location.dummy_loc false
+  | Cst (Const_int i)                             -> Dimension.mkdim_int   Location.dummy_loc i
+  | LocalVar v                                    -> Dimension.mkdim_ident Location.dummy_loc v.var_id
+  | Fun (f, args)                                 -> Dimension.mkdim_appl  Location.dummy_loc f (List.map dimension_of_value args)
+  | _                                             -> assert false
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

@@ -69,6 +69,7 @@ let mk_fresh_var node loc ty ck =
     var_dec_type = dummy_type_dec;
     var_dec_clock = dummy_clock_dec;
     var_dec_const = false;
+    var_dec_value = None;
     var_type = ty;
     var_clock = ck;
     var_loc = loc

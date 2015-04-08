@@ -24,16 +24,28 @@ let pp_as_c_macro pp_fun fmt v =
     pp_set_all_formatter_output_functions fmt out flush newline spaces;
   end
 
+let rec print_dec_struct_ty_field fmt (label, cty) =
+  fprintf fmt "%a : %a" pp_print_string label print_dec_ty cty
+and print_dec_ty fmt cty =
+  match (*get_repr_type*) cty with
+  | Tydec_any -> fprintf fmt "Any"
+  | Tydec_int -> fprintf fmt "int"
+  | Tydec_real 
+  | Tydec_float -> fprintf fmt "real"
+  | Tydec_bool -> fprintf fmt "bool"
+  | Tydec_clock cty' -> fprintf fmt "%a clock" print_dec_ty cty'
+  | Tydec_const c -> fprintf fmt "%s" c
+  | Tydec_enum taglist -> fprintf fmt "enum {%a }"
+      (Utils.fprintf_list ~sep:", " pp_print_string) taglist
+  | Tydec_struct fieldlist -> fprintf fmt "struct {%a }"
+      (Utils.fprintf_list ~sep:"; " print_dec_struct_ty_field) fieldlist
+  | Tydec_array (d, cty') -> fprintf fmt "%a^%a" print_dec_ty cty' Dimension.pp_dimension d
 
 let pp_var_name fmt id = fprintf fmt "%s" id.var_id
 
 let pp_eq_lhs = fprintf_list ~sep:", " pp_print_string
 
 let pp_var fmt id = fprintf fmt "%s%s: %a" (if id.var_dec_const then "const " else "") id.var_id Types.print_ty id.var_type
-
-let pp_node_var fmt id = fprintf fmt "%s%s: %a%a" (if id.var_dec_const then "const " else "") id.var_id Types.print_node_ty id.var_type Clocks.print_ck_suffix id.var_clock
-
-let pp_node_args = fprintf_list ~sep:"; " pp_node_var 
 
 let pp_quantifiers fmt (q, vars) =
   match q with
@@ -125,7 +137,19 @@ and pp_expr_annot fmt expr_ann =
   in
   fprintf_list ~sep:"@ " pp_annot fmt expr_ann.annots
     
-	
+(*
+let pp_node_var fmt id = fprintf fmt "%s%s: %a(%a)%a" (if id.var_dec_const then "const " else "") id.var_id print_dec_ty id.var_dec_type.ty_dec_desc Types.print_ty id.var_type Clocks.print_ck_suffix id.var_clock
+*)
+let pp_node_var fmt id =
+  begin
+    fprintf fmt "%s%s: %a%a" (if id.var_dec_const then "const " else "") id.var_id Types.print_node_ty id.var_type Clocks.print_ck_suffix id.var_clock;
+    match id.var_dec_value with
+    | None -> () 
+    | Some v -> fprintf fmt " = %a" pp_expr v
+  end 
+
+let pp_node_args = fprintf_list ~sep:"; " pp_node_var 
+
 let pp_node_eq fmt eq = 
   fprintf fmt "%a = %a;" 
     pp_eq_lhs eq.eq_lhs

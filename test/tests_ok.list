@@ -904,6 +904,7 @@
 ./tests/arrays_arnaud/generic1.lusi
 ./tests/arrays_arnaud/generic1.lus
 ./tests/arrays_arnaud/generic2.lus
+./tests/arrays_arnaud/generic3.lus,top,-dynamic -check-access
 ./tests/clocks/clocks1.lus,,-lusi
 ./tests/clocks/clocks1.lusi
 ./tests/clocks/clocks1.lus
