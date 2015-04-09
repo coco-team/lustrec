@@ -98,7 +98,7 @@ let rec print_carrier fmt cr =
 let rec print_ck_long fmt ck =
   match ck.cdesc with
   | Carrow (ck1,ck2) ->
-      fprintf fmt "%a->%a" print_ck_long ck1 print_ck_long ck2
+      fprintf fmt "%a -> %a" print_ck_long ck1 print_ck_long ck2
   | Ctuple cklist ->
     fprintf fmt "(%a)"
       (fprintf_list ~sep:" * " print_ck_long) cklist
@@ -529,7 +529,7 @@ let print_ck fmt ck =
     let ck = simplify ck in
     match ck.cdesc with
     | Carrow (ck1,ck2) ->
-      fprintf fmt "%a->%a" aux ck1 aux ck2
+      fprintf fmt "%a -> %a" aux ck1 aux ck2
     | Ctuple cklist ->
       fprintf fmt "(%a)" 
 	(fprintf_list ~sep:" * " aux) cklist

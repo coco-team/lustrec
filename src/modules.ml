@@ -129,7 +129,7 @@ let import_dependency_aux loc (local, dep) =
       (*Format.eprintf "Error: %s@." msg;*)
       raise (Error (loc, Unknown_library basename))
     end
-  | Corelang.Error (_, msg) as exc -> raise (Corelang.Error (loc, msg))
+  | Corelang.Error (_, msg) -> raise (Corelang.Error (loc, msg))
 
 let import_dependency loc (local, dep) =
   try
