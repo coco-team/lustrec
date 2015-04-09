@@ -192,9 +192,11 @@ let compute_reuse node ctx heads var =
   try
     let disjoint_live = Disjunction.CISet.inter disjoint live in
     let reuse = Disjunction.CISet.max_elt disjoint_live in
+    let reuse' = Hashtbl.find ctx.policy reuse.var_id in
     begin
       IdentDepGraph.add_edge ctx.dep_graph var.var_id reuse.var_id;
-      Hashtbl.add ctx.policy var.var_id (Hashtbl.find ctx.policy reuse.var_id);
+      if reuse != reuse' then IdentDepGraph.add_edge ctx.dep_graph reuse.var_id reuse'.var_id;
+      Hashtbl.add ctx.policy var.var_id reuse';
       ctx.evaluated <- Disjunction.CISet.add var ctx.evaluated;
       (*Format.eprintf "%s reused by live@." var.var_id;*)
     end
@@ -202,9 +204,11 @@ let compute_reuse node ctx heads var =
   try
     let dead = Disjunction.CISet.filter (fun v -> is_graph_root v.var_id ctx.dep_graph) quasi_dead in
     let reuse = Disjunction.CISet.choose dead in
+    let reuse' = Hashtbl.find ctx.policy reuse.var_id in
     begin
       IdentDepGraph.add_edge ctx.dep_graph var.var_id reuse.var_id;
-      Hashtbl.add ctx.policy var.var_id (Hashtbl.find ctx.policy reuse.var_id);
+      if reuse != reuse' then IdentDepGraph.add_edge ctx.dep_graph reuse.var_id reuse'.var_id;
+      Hashtbl.add ctx.policy var.var_id reuse';
       ctx.evaluated <- Disjunction.CISet.add var ctx.evaluated;
       (*Format.eprintf "%s reused by dead %a@." var.var_id Disjunction.pp_ciset dead;*)
     end

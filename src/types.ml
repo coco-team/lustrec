@@ -83,7 +83,7 @@ and print_ty fmt ty =
     fprintf fmt "%a -> %a" print_ty ty1 print_ty ty2
   | Ttuple tylist ->
     fprintf fmt "(%a)"
-      (Utils.fprintf_list ~sep:"*" print_ty) tylist
+      (Utils.fprintf_list ~sep:" * " print_ty) tylist
   | Tenum taglist ->
     fprintf fmt "enum {%a }"
       (Utils.fprintf_list ~sep:", " pp_print_string) taglist
