@@ -24,9 +24,6 @@ type aut_state =
       actual_s : var_decl
     }
 
-let cpvar_decl var_decl =
- mkvar_decl var_decl.var_loc ~orig:var_decl.var_orig (var_decl.var_id, var_decl.var_dec_type, var_decl.var_dec_clock, var_decl.var_dec_const, var_decl.var_dec_value)
-
 let as_clock var_decl =
   let tydec = var_decl.var_dec_type in
   { var_decl with var_dec_type = { ty_dec_desc = Tydec_clock tydec.ty_dec_desc; ty_dec_loc = tydec.ty_dec_loc } }
@@ -37,8 +34,14 @@ let mkbool loc b =
 let mkident loc id =
  mkexpr loc (Expr_ident id)
 
+let mkconst loc id =
+ mkexpr loc (Expr_const (Const_tag id))
+
 let mkfby loc e1 e2 =
  mkexpr loc (Expr_arrow (e1, mkexpr loc (Expr_pre e2)))
+
+let mkpair loc e1 e2 =
+ mkexpr loc (Expr_tuple [e1; e2])
 
 let mkidentpair loc restart state =
  mkexpr loc (Expr_tuple [mkident loc restart; mkident loc state])
@@ -126,8 +129,8 @@ let node_of_unless nused used node aut_id aut_state handler =
     node_id = node_id;
     node_type = Types.new_var ();
     node_clock = Clocks.new_var true;
-    node_inputs = List.map cpvar_decl var_inputs;
-    node_outputs = List.map cpvar_decl var_outputs;
+    node_inputs = List.map copy_var_decl var_inputs;
+    node_outputs = List.map copy_var_decl var_outputs;
     node_locals = [];
     node_gencalls = [];
     node_checks = [];
@@ -176,9 +179,9 @@ let node_of_assign_until nused used node aut_id aut_state handler =
     node_id = node_id;
     node_type = Types.new_var ();
     node_clock = Clocks.new_var true;
-    node_inputs = List.map cpvar_decl var_inputs;
-    node_outputs = List.map cpvar_decl (aut_state.incoming_r :: aut_state.incoming_s :: new_var_outputs);
-    node_locals = List.map cpvar_decl (new_var_locals @ handler.hand_locals);
+    node_inputs = List.map copy_var_decl var_inputs;
+    node_outputs = List.map copy_var_decl (aut_state.incoming_r :: aut_state.incoming_s :: new_var_outputs);
+    node_locals = List.map copy_var_decl (new_var_locals @ handler.hand_locals);
     node_gencalls = [];
     node_checks = [];
     node_asserts = handler.hand_asserts; 
@@ -209,7 +212,7 @@ let expand_automata nused used owner typedef node aut =
   let assign_until_expr = mkexpr aut.aut_loc (Expr_merge (aut_state.actual_s.var_id, assign_until_handlers)) in
   let assign_until_vars = [aut_state.incoming_r'.var_id; aut_state.incoming_s'.var_id] @ (ISet.elements all_outputs) in
   let assign_until_eq = mkeq aut.aut_loc (assign_until_vars, assign_until_expr) in
-  let fby_incoming_expr = mkfby aut.aut_loc (mkidentpair aut.aut_loc tag_false initial) (mkidentpair aut.aut_loc aut_state.incoming_r'.var_id aut_state.incoming_s'.var_id) in
+  let fby_incoming_expr = mkfby aut.aut_loc (mkpair aut.aut_loc (mkconst aut.aut_loc tag_false) (mkconst aut.aut_loc initial)) (mkidentpair aut.aut_loc aut_state.incoming_r'.var_id aut_state.incoming_s'.var_id) in
   let incoming_eq = mkeq aut.aut_loc ([aut_state.incoming_r.var_id; aut_state.incoming_s.var_id], fby_incoming_expr) in
   let locals' = vars_of_aut_state aut_state in
   let eqs' = [Eq unless_eq; Eq assign_until_eq; Eq incoming_eq] in
