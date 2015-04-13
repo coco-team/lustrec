@@ -164,7 +164,7 @@ let rec compile_source dirname basename extension =
   if !Options.global_inline && !Options.main_node <> "" && !Options.witnesses then
     begin
       let orig = Corelang.copy_prog orig in
-      Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating witness file !@,");
+      Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating witness file@,");
       check_stateless_decls orig;
       let _ = Typing.type_prog type_env orig in
       let _ = Clock_calculus.clock_prog clock_env orig in
@@ -173,8 +173,7 @@ let rec compile_source dirname basename extension =
       Inliner.witness 
 	basename
 	!Options.main_node
-	orig prog type_env clock_env;
-      Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@,");
+	orig prog type_env clock_env
     end;
 
 (*Format.eprintf "Inliner.global_inline<<@.%a@.>>@." Printers.pp_prog prog;*)

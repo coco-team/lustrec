@@ -214,6 +214,12 @@ let get_clock_base_type ty =
  | Tclock ty -> Some ty
  | _         -> None
 
+let unclock_type ty =
+  let ty = repr ty in
+  match ty.tdesc with
+  | Tclock ty' -> ty'
+  | _          -> ty
+
 let rec is_dimension_type ty =
  match (repr ty).tdesc with
  | Tint
