@@ -149,14 +149,19 @@ let rec compile_source dirname basename extension =
     raise exc
     end;
   *)
-  
+
   (* Creating destination directory if needed *)
   create_dest_dir ();
 
   (* Compatibility with Lusi *)
   (* Checking the existence of a lusi (Lustre Interface file) *)
-  let extension = ".lusi" in
-  compile_source_to_header prog computed_types_env computed_clocks_env dirname basename extension;
+  match !Options.output with
+    "C" ->
+      begin
+        let extension = ".lusi" in
+        compile_source_to_header prog computed_types_env computed_clocks_env dirname basename extension;
+      end
+   |_ -> ();
 
   Typing.uneval_prog_generics prog;
   Clock_calculus.uneval_prog_generics prog;
@@ -170,7 +175,7 @@ let rec compile_source dirname basename extension =
       let _ = Clock_calculus.clock_prog clock_env orig in
       Typing.uneval_prog_generics orig;
       Clock_calculus.uneval_prog_generics orig;
-      Inliner.witness 
+      Inliner.witness
 	basename
 	!Options.main_node
 	orig prog type_env clock_env
@@ -234,7 +239,7 @@ let rec compile_source dirname basename extension =
       machine_code
   in
 
-  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
+  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
   (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
   machine_code);
 
@@ -258,6 +263,7 @@ let rec compile_source dirname basename extension =
     else
       machine_code
   in
+
 
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
   (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
@@ -289,7 +295,7 @@ let rec compile_source dirname basename extension =
       Java_backend.translate_to_java source_fmt basename normalized_prog machine_code;*)
       end
     | "horn" ->
-      begin
+       begin
 	let source_file = destname ^ ".smt2" in (* Could be changed *)
 	let source_out = open_out source_file in
 	let fmt = formatter_of_out_channel source_out in
