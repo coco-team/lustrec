@@ -1,0 +1,41 @@
+OCAMLBUILD=@OCAMLBUILD@ -classic-display -no-links 
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+bindir=@bindir@
+datarootdir = ${prefix}/share
+includedir = ${prefix}/include
+
+LUSI_LIBS=include/math.lusi include/conv.lusi
+LOCAL_BINDIR=../bin
+LOCAL_DOCDIR=../doc/manual
+
+lustrec:
+	@echo Compiling binary lustrec
+	@$(OCAMLBUILD) main_lustre_compiler.native
+	@mkdir -p $(LOCAL_BINDIR)
+	@mv _build/main_lustre_compiler.native $(LOCAL_BINDIR)/lustrec
+
+doc:
+	@echo Generating doc
+	@$(OCAMLBUILD) lustrec.docdir/index.html
+	@rm -rf $(LOCAL_DOCDIR)
+	@cp -rf _build/lustrec.docdir $(LOCAL_DOCDIR)
+
+dot: doc
+	$(OCAMLBUILD) lustrec.docdir/lustrec.dot
+	dot -T ps -o lustrec.dot _build/lustrec.docdir/lustrec.dot
+	mv _build/lustrec.docdir/lustrec.dot $(LOCAL_DOCDIR)
+
+clean:
+	$(OCAMLBUILD) -clean
+
+dist-clean: clean
+	rm -f Makefile myocamlbuild.ml config.log config.status configure
+	rm -f include/*.lusic include/math.h include/conv.h
+
+install:
+	make -C .. install
+
+.PHONY: compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean
+

@@ -1,0 +1,429 @@
+Lustre annotation/specification language
+#+AUTHORS: Pierre-Loic Garoche, Rémi Delmas, Temesghen Kahsai
+#+LATEX_HEADER: \usepackage{tikz,listings,stmaryrd,pgfplots,mathrsfs,syntax}
+#+LATEX_HEADER: \input{lustre_lst}
+
+This document intends to define the bases of a specification language for
+Lustre. Such specifications' role are threefold:
+1. Precise the required behavior of a Lustre model, ie. the behavior of Lustre
+   nodes. Those specifications could then ease the application of tools.
+2. Enrich the Lustre code itself with non functionnal annotations; for example
+   parametrization of tools to be applied on the Lustre model, or for
+   documentation purpose.
+3. Enable the compilation of the annotation/specification as C code ACSL
+   annotations.
+
+* Syntax
+
+** Comments
+All specifications and annotations are expressed within lustre comments starting
+with the character "@".
+
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+--@ line comment
+(*@ multi line 
+    block comment
+*)
+\end{lstlisting}
+#+end_latex
+
+** Extended lustre/arithmethic expressions
+
+We introduce here an extended flavour of lustre expressions: lustre expressions extended with quantification over basic datatypes and
+  string constants.
+
+These expressions will be used to express preconditions and
+postconditions over nodes input and output flows. Those conditions have to apply
+on any non nil value of the flow ie. when the flow is defined.
+
+The figure\ref{fig:expr} gives a BNF for such extended expressions 
+
+#+begin_latex
+\begin{figure}
+\begin{grammar}
+<expression> ::= <constant> 
+\alt <ident>
+\alt <int> | <float> | <bool> | <string>
+\alt <unop> <expression>
+\alt if <expression> then <expression> else <expression>
+\alt <expression> <binop> <expression>
+\alt '(' <expression> ( ',' <expression> )*')'
+\alt <ident> '(' <expression> ( ',' <expression> )* ')'
+\alt <quantifier> <var decl> ';' <expression> 
+
+<int> ::= ['0'-'9']+
+
+<float> ::= ['0'-'9']+'.'['0'-'9']+
+
+<bool> ::= 'true' | 'false'
+
+<string> ::= '\"' .* '\"' 
+
+<unop> ::= '-' | 'pre' | 'current' | 'not'
+
+<binop> ::= <temporal ops> | <logical ops> | <arithm ops>
+
+<temporal ops> ::= '->' | 'when' 
+
+<logical ops> ::= 'xor' | '=>' | 'or' | 'and' | '=' | '\textless\textgreater' | '\textless' | '\textless =' | '\textgreater' | '\textgreater =' 
+
+<arithm ops> ::= '*' | '/' | 'mod' | 'div' | '+' | '-'
+
+<quantifier> ::= 'forall' | 'exists'
+
+<var decl> ::= 'const'? <ident> (',' <ident>)* ':' <type> ( ';' 'const'? <ident> ':' <type> )*
+
+<type> ::= 'int' | 'bool' | 'float'
+\end{grammar}
+\caption{Definition of extended lustre expressions}
+\label{fig:expr}
+\end{figure}
+#+end_latex
+
+*** String constants
+
+String constants are part of the language. A valid expression could then be the
+tuple
+
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+"blue", if x then y + 1 else node1 (x, y, z), 3.2 + z
+\end{lstlisting}
+#+end_latex
+
+Those new string constants will be used to define parameters within annotations.
+
+*** Quantifications
+
+Lustre expression are lift to first order. The syntax to declare quantified
+variables follow the variable declaration in node inputs and outputs:
+
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+ident: type
+\end{lstlisting}
+#+end_latex
+
+The keywork const express the additional constraint: 
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+ident = pre ident
+\end{lstlisting}
+#+end_latex
+
+Quantified variables denote typed flows.
+
+
+** Annotation identifiers
+
+Annotation identifiers are usual alphanumeric identifiers extended with '.'.
+
+** Key paths in annotation bindings
+
+Keys in annotation declaration are either simple identifier or sequence of them
+separated by "/":
+
+/key/(key/)+ or key
+
+* Node specification
+
+Node specification are inspired from ACSL function contracts. A node will be
+associated to a set of requirements and expected properties on the resulting
+flows. 
+
+Scope: inputs, outputs
+
+** Basic contracts
+Requirements are expressed on input flows using the keyword /requires/
+while expected behavior can either be defined
+- with a first order boolean expression over the input flows and the output flows using the
+  keyword /ensures/ or
+- with a synchronous observer specified in a separate lustre node, using the
+  keyword /observer/.
+
+Synchronous observers allow more complex behavior specification since they
+usually encode a safety property (or bounded liveness) composed with the system
+state machine. For example, the use of observers allow to declare new variables
+to express the property.
+
+** Synchronous observers
+
+The node associated to the keywork /observer/ should only produce boolean
+output flows. The specification /oberver observer\_node(...)/ should be
+interpreted as
+\(
+\bigwedge_{1 \leq i \leq n} o_i
+\)
+where /observer\_node/ is defined as 
+\[
+observer\_node (...) \ returns\ (o_1, .., o_n); 
+\]
+
+** Multiple definitions
+Multiple definitions of /requires/ or /ensures/ / /observer/ are interpreted as
+syntactic sugar for conjunctions.
+Eg, the following function specification 
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+--@ requires e1(...);
+--@ requires e2(...);
+--@ ensures e3(...);
+--@ ensures e4(...);
+node node1 (...) returns (...);
+\end{lstlisting}
+#+end_latex
+ is equivalent to
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+--@ requires e1(...) and e2(...);
+--@ ensures e3(...) and e4(...);
+node node1 (...) returns (...);
+\end{lstlisting}
+#+end_latex
+
+** Clocks
+ Those pre- and post-conditions are only defined for the node
+clock.  Those conditions have to apply on any non nil value of the flow ie. when
+the flow is defined.
+
+TODO: give an example using when/current
+
+** Extension: Behaviors
+
+Similarly to ACSL function contracts, the node specifications could be defined
+with sub behaviors. 
+
+TODO: expliquer context du assumes
+
+TODO: concrete example with forall
+ 
+#+begin_latex
+\begin{figure}
+\begin{lstlisting}[language=lustre]
+--@ requires lustre_expression(i1, ..., in);
+--@ ensures lustre_expression(i1, ..., in,o1, .., om);
+--@ behavior b_name1:
+--@   assumes lustre_expression(i1, ..., in);
+--@   ensures lustre_expression(i1, ..., in,o1, .., om);
+--@ behavior b_name2:
+--@   assumes lustre_expression(i1, ..., in);
+--@   ensures lustre_expression(i1, ..., in,o1, .., om);
+node lustre_node_name (i1: t_i1, ..., in: tn) 
+     returns (o1: t1, ..., om: t_o m));
+let
+...
+tel
+
+--@ requires lustre_expression(i1, ..., in);
+--@ observer lustre_node(i1, ..., in, o1, .., om);
+--@ behavior b_name1:
+--@   assumes lustre_expression(i1, ..., in);
+--@   observer lustre_node(i1, ..., in,o1, .., om);
+--@ behavior b_name2:
+--@   assumes lustre_expression(i1, ..., in);
+--@   observer lustre_node(i1, ..., in,o1, .., om);
+node lustre_node_name (i1: t_i1, ..., in: tn) 
+     returns (o1: t1, ..., om: t_o m));
+let
+...
+tel
+\end{lstlisting}
+\end{figure}
+#+end_latex
+
+** Grammar
+
+TODO
+
+* Local node annotations
+
+Annotations could denote functionnal properties such as invariants or non
+functional ones, eg. heuristics, tool specific parameters ...
+
+Scope: inputs, outputs, local variables, locally defined variables, internal
+flows.
+
+** Assigning names to subexpression
+
+Annotations could be used within expression to allocate a new
+identifier to a sub-expression using the keyword /id/.
+
+For example, in the equation defining $z$:
+
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+z = pre y and b and ((*@ id -> subexpr1 *)c or x >= y)
+\end{lstlisting}
+#+end_latex
+
+This new identifier /subexpr1/ will be associated to the data flow expression (c
+or x >= y) and could be used within other annotations.
+
+One can also use single annotations
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+z = pre y and b and ( --@ id -> subexpr1
+      c or x >= y)
+\end{lstlisting}
+#+end_latex
+
+** Assigning identifiers to node instances
+
+A node /foo/ can be used multiple times in a given node. It can appear in
+different equations:
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+x = foo(...);
+y = 2 + foo(...);
+\end{lstlisting}
+#+end_latex
+
+Or multiple times in the same equation:
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+x = foo(2) + (if g then foo(3) else (foo(4) + foo(1)))
+\end{lstlisting}
+#+end_latex
+
+Names could be associated to a subexpression denoting a node instance:
+
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+x = foo(2) + 
+     (if g then ( (*@ id foo_instance_1 *) foo(3) ) 
+           else ( foo(4) + foo(1) ) 
+     )     
+\end{lstlisting}
+#+end_latex
+
+Numerical identifier could also be assigned to specific instances using the "#"
+key
+
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+x = foo(2) + (if g then ( (*@ # 1 *) foo(3) ) 
+                   else (( (*@ # 2 *) foo(4) ) + foo(1))
+             )
+\end{lstlisting}
+#+end_latex
+
+In the expression above and in all the current node, the identifier "foo1" will
+refer to the instance defined as foo(3) and "foo2" to the instance defined as
+foo(4).
+
+
+** Generic Tree based annotations
+
+Annotations can be defined in function body between the /let/ and the /tel/
+construct. They can either be associated to the node when placed between
+flow definitions, ie. equations, or locally to a sub-expression.
+Similarly to node specification, annotations are defined using single line
+comments "--@ ...." or multi-lines ones "(*@ .... *)"
+
+Annotations are defined as pairs key -> value where key denotes a path in a tree
+of alphanumeric identifiers and value is an extended lustre expression (cf
+section syntax). The key denotes a path in a hierarchy of identifiers. Values
+are accumulated through annotation definitions and associated to key paths.
+
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+node node_name (...) returns (...);
+var ...
+let
+--@ /key1/key2/key3/ -> value1
+eq1 = ...;
+(*@ /key1/key2/key4/ -> value2
+    /key5/key6/ -> value3
+    /key1/key2/key3/ -> value4
+*)
+eq2 = ...;
+
+tel
+\end{lstlisting}
+#+end_latex
+
+In the example above, annotations are not specifically linked to their nearest
+equation but rather summarized at node level. Together, they define the
+following tree of values
+
+#+begin_latex
+\begin{figure}
+\begin{tikzpicture}
+\node (n1) {key1};
+\node [right of=n1] (n2) {key5};
+\node [below of=n1] (n3) {key2};
+\node [right of=n3] (n9) {key6};
+
+\node [below of=n3,,xshift=-.5cm] (n4) {key3};
+\node [right of=n4] (n5) {key4};
+
+
+\node [below of=n4] (n6) {[value1, value4]};
+\node [right of=n6,xshift=1.2cm] (n7) {[value2]};
+\node [right of=n7,xshift=.8cm] (n8) {[value3]};
+
+\path (n1) edge (n3) 
+      (n3) edge (n4) edge (n5)
+      (n4) edge (n6) 
+      (n5) edge (n7) 
+      (n2) edge (n9) 
+      (n9) edge (n8);
+\end{tikzpicture}
+\end{figure}
+#+end_latex
+
+Multiple annotations assigning a value to the same key will be gathered. 
+The value is extended lustre expression as introduced in Section syntax. It can
+range from the simpliest string value, eg. the pair color -> "blue" to complex
+tuples of extended lustre expressions.
+
+** Default keys
+
+Key are not pre-specified and can be associated to each Lustre tool feature.
+However the keywords /invariant/ and /observers/ should be used to define proof objectives or
+rely on existing expected properties. They act as the /ensures/ contract of
+node specifications but allow to access local flows and internal ones.
+
+* Advanced features
+
+** Addressing internal flows
+
+Internal flows are usually innaccessible in Lustre. However in order to ease
+some annotation definition, the value of all local flow of a node instance are
+available through named paths.
+
+Let us consider a node foo with a local variable x, and the following expression
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+z = 3 + ( (*@ # 5 *) foo(4) )
+\end{lstlisting}
+#+end_latex
+
+Then the variable x of this specific instance of the node foo could be accessed
+through the identifier expression foo5.x
+
+Recursively, if the node foo relies on an instance of node bar, identified as
+"bar3", the local variable y of the instance bar3 of the node bar used in the
+instance foo5 of node foo could be accessed through the expression:
+
+#+begin_latex
+\begin{lstlisting}[language=lustre]
+foo5.bar3.y
+\end{lstlisting}
+#+end_latex
+
+Either numerical identifiers of node instances bound with '#' or names defined
+with the 'id' key - again only for node instances - could be used to describe
+such internal flows.
+
+
+Example 1
+
+Example 2
+
+
+
+
+
+* Grammar

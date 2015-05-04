@@ -1,0 +1,24 @@
+
+node PFS_Side
+  (TS, OSPF : bool;
+   Primary_Side : bool)
+
+returns 
+  (PFS : bool);
+
+var
+  PFSL_PFS : bool;
+  riseTS_O : bool;
+  riseOSPF_O : bool;
+  
+let
+assert Primary_Side = (Primary_Side -> pre(Primary_Side));
+  PFSL_PFS = riseTS_O or  riseOSPF_O or Primary_Side;
+  
+  riseTS_O = true;
+
+  riseOSPF_O = false;
+
+  PFS = PFSL_PFS;
+
+tel;
