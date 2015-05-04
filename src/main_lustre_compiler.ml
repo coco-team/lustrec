@@ -211,7 +211,7 @@ let rec compile_source dirname basename extension =
     - eliminate trivial expressions
  *)
   let prog =
-    if !Options.optimization >= 4 then
+    if !Options.optimization >= 5 then
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. constants elimination@,");
 	Optimize_prog.prog_unfold_consts prog
@@ -222,6 +222,21 @@ let rec compile_source dirname basename extension =
   (* DFS with modular code generation *)
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,");
   let machine_code = Machine_code.translate_prog prog node_schs in
+
+  (* Optimize machine code *)
+  let machine_code =
+    if !Options.optimization >= 4 && !Options.output <> "horn" then
+      begin
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 3)@,");
+	Optimize_machine.machines_cse machine_code
+      end
+    else
+      machine_code
+  in
+
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
+  (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
+  machine_code);
 
   (* Optimize machine code *)
   let machine_code =
@@ -243,6 +258,7 @@ let rec compile_source dirname basename extension =
     else
       machine_code
   in
+
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
   (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
   machine_code);

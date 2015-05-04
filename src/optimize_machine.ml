@@ -41,12 +41,13 @@ let rec eliminate elim instr =
     
 and eliminate_expr elim expr =
   match expr with
+  | StateVar v
   | LocalVar v -> (try IMap.find v.var_id elim with Not_found -> expr)
   | Fun (id, vl) -> Fun (id, List.map (eliminate_expr elim) vl)
   | Array(vl) -> Array(List.map (eliminate_expr elim) vl)
   | Access(v1, v2) -> Access(eliminate_expr elim v1, eliminate_expr elim v2)
   | Power(v1, v2) -> Power(eliminate_expr elim v1, eliminate_expr elim v2)
-  | Cst _ | StateVar _ -> expr
+  | Cst _ -> expr
 
 let eliminate_dim elim dim =
   Dimension.expr_replace_expr (fun v -> try dimension_of_value (IMap.find v elim) with Not_found -> mkdim_ident dim.dim_loc v) dim
@@ -59,14 +60,19 @@ let is_scalar_const c =
   | Const_tag _   -> true
   | _             -> false
 
+let basic_unfoldable_expr expr =
+  match expr with
+  | Cst c when is_scalar_const c -> true
+  | LocalVar _
+  | StateVar _                   -> true
+  | _                            -> false
+
 let unfoldable_assign fanin v expr =
   try
     let d = Hashtbl.find fanin v.var_id
-    in match expr with
-    | Cst c when is_scalar_const c -> true
-    | Cst c when d < 2             -> true
-    | LocalVar _
-    | StateVar _                   -> true
+    in basic_unfoldable_expr expr ||
+    match expr with
+    | Cst c when d < 2                                           -> true
     | Fun (id, _) when d < 2 && Basic_library.is_internal_fun id -> true
     | _                                                          -> false
   with Not_found -> false
@@ -163,6 +169,127 @@ let machines_unfold consts node_schs machines =
       let fanin = (IMap.find m.mname.node_id node_schs).Scheduling.fanin_table in
       let elim_consts, _ = instrs_unfold fanin IMap.empty (List.map instr_of_const consts)
       in machine_unfold fanin elim_consts m)
+    machines
+
+let get_assign_lhs instr =
+  match instr with
+  | MLocalAssign(v, _) -> LocalVar v
+  | MStateAssign(v, _) -> StateVar v
+  | _                  -> assert false
+
+let get_assign_rhs instr =
+  match instr with
+  | MLocalAssign(_, e)
+  | MStateAssign(_, e) -> e
+  | _                  -> assert false
+
+let is_assign instr =
+  match instr with
+  | MLocalAssign _
+  | MStateAssign _ -> true
+  | _              -> false
+
+let mk_assign v e =
+ match v with
+ | LocalVar v -> MLocalAssign(v, e)
+ | StateVar v -> MStateAssign(v, e)
+ | _          -> assert false
+
+let rec assigns_instr instr assign =
+  match instr with  
+  | MLocalAssign (i,_)
+  | MStateAssign (i,_) -> ISet.add i assign
+  | MStep (ol, _, _)   -> List.fold_right ISet.add ol assign
+  | MBranch (_,hl)     -> List.fold_right (fun (_, il) -> assigns_instrs il) hl assign
+  | _                  -> assign
+
+and assigns_instrs instrs assign =
+  List.fold_left (fun assign instr -> assigns_instr instr assign) assign instrs
+
+(*    
+and substitute_expr subst expr =
+  match expr with
+  | StateVar v
+  | LocalVar v -> (try IMap.find expr subst with Not_found -> expr)
+  | Fun (id, vl) -> Fun (id, List.map (substitute_expr subst) vl)
+  | Array(vl) -> Array(List.map (substitute_expr subst) vl)
+  | Access(v1, v2) -> Access(substitute_expr subst v1, substitute_expr subst v2)
+  | Power(v1, v2) -> Power(substitute_expr subst v1, substitute_expr subst v2)
+  | Cst _  -> expr
+*)
+(** Finds a substitute for [instr] in [instrs], 
+   i.e. another instr' with the same rhs expression.
+   Then substitute this expression with the first assigned var
+*)
+let subst_instr subst instrs instr =
+  (*Format.eprintf "subst instr: %a@." Machine_code.pp_instr instr;*)
+  let instr = eliminate subst instr in
+  let v = get_assign_lhs instr in
+  let e = get_assign_rhs instr in
+  try
+    let instr' = List.find (fun instr' -> is_assign instr' && get_assign_rhs instr' = e) instrs in
+    match v with
+    | LocalVar v ->
+      IMap.add v.var_id (get_assign_lhs instr') subst, instrs
+    | StateVar v ->
+      (match get_assign_lhs instr' with
+      | LocalVar v' ->
+	let instr = eliminate subst (mk_assign (StateVar v) (LocalVar v')) in
+	subst, instr :: instrs
+      | StateVar v' ->
+	let subst_v' = IMap.add v'.var_id (StateVar v) IMap.empty in
+	let instrs' = snd (List.fold_right (fun instr (ok, instrs) -> (ok || instr = instr', if ok then instr :: instrs else if instr = instr' then instrs else eliminate subst_v' instr :: instrs)) instrs (false, [])) in
+	IMap.add v'.var_id (StateVar v) subst, instr :: instrs'
+      | _           -> assert false)
+    | _          -> assert false
+  with Not_found -> subst, instr :: instrs
+ 
+(** Common sub-expression elimination for machine instructions *)
+(* - [subst] : hashtable from ident to (simple) definition
+               it is an equivalence table
+   - [elim]   : set of eliminated variables
+   - [instrs] : previous instructions, which [instr] is compared against
+   - [instr] : current instruction, normalized by [subst]
+*)
+let rec instr_cse (subst, instrs) instr =
+  match instr with
+  (* Simple cases*)
+  | MStep([v], id, vl) when Basic_library.is_internal_fun id
+      -> instr_cse (subst, instrs) (MLocalAssign (v, Fun (id, vl)))
+  | MLocalAssign(v, expr) when basic_unfoldable_expr expr
+      -> (IMap.add v.var_id expr subst, instr :: instrs)
+  | _ when is_assign instr
+      -> subst_instr subst instrs instr
+  | _ -> (subst, instr :: instrs)
+
+(** Apply common sub-expression elimination to a sequence of instrs
+*)
+let rec instrs_cse subst instrs =
+  let subst, rev_instrs = 
+    List.fold_left instr_cse (subst, []) instrs
+  in subst, List.rev rev_instrs
+
+(** Apply common sub-expression elimination to a machine
+    - iterate through step instructions and remove simple local assigns
+*)
+let machine_cse subst machine =
+  (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "machine_cse %a@." pp_elim subst);*)
+  let subst, instrs = instrs_cse subst machine.mstep.step_instrs in
+  let assigned = assigns_instrs instrs ISet.empty
+  in
+  {
+    machine with
+      mmemory = List.filter (fun vdecl -> ISet.mem vdecl assigned) machine.mmemory;
+      mstep = { 
+	machine.mstep with 
+	  step_locals = List.filter (fun vdecl -> ISet.mem vdecl assigned) machine.mstep.step_locals;
+	  step_instrs = instrs
+      }
+  }
+
+let machines_cse machines =
+  List.map
+    (machine_cse IMap.empty)
     machines
 
 (* variable substitution for optimizing purposes *)

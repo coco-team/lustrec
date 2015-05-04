@@ -65,6 +65,9 @@ let rec pp_instr fmt i =
 and pp_branch fmt (t, h) =
   Format.fprintf fmt "@[<v 2>%s:@,%a@]" t (Utils.fprintf_list ~sep:"@," pp_instr) h
 
+and pp_instrs fmt il =
+  Format.fprintf fmt "@[<v 2>%a@]" (Utils.fprintf_list ~sep:"@," pp_instr) il
+
 type step_t = {
   step_checks: (Location.t * value_t) list;
   step_inputs: var_decl list;
@@ -311,11 +314,12 @@ let rec translate_expr ?(ite=false) node ((m, si, j, d, s) as args) expr =
       are preserved in expression. While they are removed for C or Java
       backends. *)
    match !Options.output with
-   | "horn"
+   | "horn" ->
+     Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
    | ("C" | "java") when ite ->
      Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
    | _ ->
-     (Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
+     (Format.eprintf "option:%s@." !Options.output; Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
  )
  | _                   -> raise NormalizationError
 
