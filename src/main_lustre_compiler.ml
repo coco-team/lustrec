@@ -70,7 +70,7 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
 	begin
 	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating compiled header file %s@," header_name);
        	  Lusic.write_lusic false (Lusic.extract_header dirname basename prog) destname lusic_ext;
-(*List.iter (fun top_decl -> Format.eprintf "lusic: %a@." Printers.pp_decl top_decl) lusic.Lusic.contents;*)
+	  (*List.iter (fun top_decl -> Format.eprintf "lusic: %a@." Printers.pp_decl top_decl) lusic.Lusic.contents;*)
 	  Lusic.print_lusic_to_h destname lusic_ext
 	end
       else
@@ -155,13 +155,13 @@ let rec compile_source dirname basename extension =
 
   (* Compatibility with Lusi *)
   (* Checking the existence of a lusi (Lustre Interface file) *)
-  match !Options.output with
+  (match !Options.output with
     "C" ->
       begin
         let extension = ".lusi" in
         compile_source_to_header prog computed_types_env computed_clocks_env dirname basename extension;
       end
-   |_ -> ();
+   |_ -> ());
 
   Typing.uneval_prog_generics prog;
   Clock_calculus.uneval_prog_generics prog;

@@ -11,7 +11,10 @@
 
 let report ~level:level p =
 if !Options.verbose_level >= level then
-  Format.eprintf "%t" p
+  begin
+    Format.eprintf "%t" p;
+    Format.pp_print_flush Format.err_formatter ()
+  end
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
