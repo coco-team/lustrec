@@ -27,7 +27,8 @@ script:
   - autoconf
   - ./configure
   - make
-  - ./test/regression.sh -r -v 2 horn_regression.list
+  - cd test
+  - ./regression.sh -r -v 2 horn_regression.list
 
 
 
