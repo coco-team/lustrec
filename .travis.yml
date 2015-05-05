@@ -15,8 +15,8 @@ env:
 
 before_install:
   - OPAM_DEPENDS="ocamlgraph ocamlfind"
-  - chmod +x .ocaml-config.sh
-  - sudo -E .ocaml-config.sh
+  - chmod +x ./.ocaml-config.sh
+  - sudo -E ./.ocaml-config.sh
 
 install:
   - sudo apt-get update -qq
