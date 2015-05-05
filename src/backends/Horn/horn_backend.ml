@@ -522,7 +522,6 @@ end
 
 
 let translate fmt basename prog machines =
-  Log.report ~level:1 (fun fmt -> fprintf fmt ".. hornification");
   List.iter (print_machine machines fmt) (List.rev machines);
   main_print machines fmt
 

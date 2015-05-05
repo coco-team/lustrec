@@ -299,12 +299,14 @@ let rec compile_source dirname basename extension =
 	let source_file = destname ^ ".smt2" in (* Could be changed *)
 	let source_out = open_out source_file in
 	let fmt = formatter_of_out_channel source_out in
-	Horn_backend.translate fmt basename prog machine_code;
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. hornification@,");
+        Horn_backend.translate fmt basename prog machine_code;
 	(* Tracability file if option is activated *)
 	if !Options.traces then (
 	let traces_file = destname ^ ".traces.xml" in (* Could be changed *)
 	let traces_out = open_out traces_file in
 	let fmt = formatter_of_out_channel traces_out in
+        Log.report ~level:1 (fun fmt -> fprintf fmt ".. tracing info@,");
 	Horn_backend.traces_file fmt basename prog machine_code;
 	)
       end
@@ -321,7 +323,7 @@ let rec compile_source dirname basename extension =
     | _ -> assert false
   in
   begin
-    Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
+    Log.report ~level:1 (fun fmt -> fprintf fmt ".. done @ @]@.");
   (* We stop the process here *)
     exit 0
   end
