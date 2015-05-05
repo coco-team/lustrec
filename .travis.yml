@@ -1,12 +1,37 @@
 language: c
-script: bash -ex .travis-ci.sh
+
 env:
-  - OCAML_VERSION=4.01.0 OPAM_VERSION=1.0.0
+  - OCAML_VERSION=4.02.1 OPAM_VERSION=1.2.0
+  - OCAML_VERSION=4.02.1 OPAM_VERSION=1.1.0
+  - OCAML_VERSION=4.01.0 OPAM_VERSION=1.2.0
   - OCAML_VERSION=4.01.0 OPAM_VERSION=1.1.0
-  - OCAML_VERSION=4.00.1 OPAM_VERSION=1.0.0
+  - OCAML_VERSION=4.01.0 OPAM_VERSION=1.0.0
+  - OCAML_VERSION=4.00.1 OPAM_VERSION=1.2.0
   - OCAML_VERSION=4.00.1 OPAM_VERSION=1.1.0
-  - OCAML_VERSION=3.12.1 OPAM_VERSION=1.0.0
+  - OCAML_VERSION=4.00.1 OPAM_VERSION=1.0.0
+  - OCAML_VERSION=3.12.1 OPAM_VERSION=1.2.0
   - OCAML_VERSION=3.12.1 OPAM_VERSION=1.1.0
+  - OCAML_VERSION=3.12.1 OPAM_VERSION=1.0.0
+
+before_install:
+  - OPAM_DEPENDS="ocamlgraph ocamlfind"
+
+install:
+  - sudo apt-get update -qq
+  - sudo apt-get install -qq ocaml opam
+  - export OPAMYES=1
+  - opam init
+  - opam install ${OPAM_DEPENDS}
+  - eval `opam config env`
+
+before_script:
+  - ocaml -version
+  - opam --version
+
+script:
+  - autoconf
+  - ./configure
+  - make
 
 notifications:
   email:
