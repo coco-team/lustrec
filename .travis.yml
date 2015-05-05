@@ -27,10 +27,13 @@ script:
   - autoconf
   - ./configure
   - make
+  - ./test/regression.sh -r -v 2 horn_regression.list
+
+
 
 notifications:
   email:
     recipients:
-     - lememta@gmail.com
+     - lustrec-build@googlegroups.com
     on_success: always
     on_failure: always

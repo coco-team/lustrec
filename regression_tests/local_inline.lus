@@ -55,8 +55,8 @@ var
 let
 
   -- MAIN;
-  -- assert Primary_Side = (Primary_Side -> pre( Primary_Side));
-  -- assert PFS_Initial_Value =  (PFS_Initial_Value -> pre( PFS_Initial_Value));
+  assert Primary_Side = (Primary_Side -> pre( Primary_Side));
+  assert PFS_Initial_Value =  (PFS_Initial_Value -> pre( PFS_Initial_Value));
   assert State>=0 and State <=5;
   assert  Inhibit_count>=0 and  Inhibit_count <=2;
   
@@ -400,7 +400,7 @@ tel;
 
 
 
-node PFS_contract_R2
+node top
   (TS, CLK1, CLK3, CLK2, CLK4 : bool)
 returns
   (OK : bool) ;

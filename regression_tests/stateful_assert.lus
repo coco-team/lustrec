@@ -1,5 +1,5 @@
 
-node PFS_Side
+node top
   (TS, OSPF : bool;
    Primary_Side : bool)
 

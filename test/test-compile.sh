@@ -131,11 +131,11 @@ inline_compile_with_check () {
         rgcc2="INVALID";
     else
         rgcc2="VALID"
-    fi	
+    fi
     popd > /dev/null
 	# Cheching witness
     pushd $build > /dev/null
-    $LUSTREC -verbose 0 -horn-traces -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus 
+    $LUSTREC -verbose 0 -horn-traces -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus
     popd > /dev/null
     z3="`z3 -T:10 $build/${name}_witnesses/inliner_witness.smt2 | xargs`"
     if [ "x`echo $z3 | grep unsat`" == "xunsat" ]; then
@@ -146,7 +146,7 @@ inline_compile_with_check () {
 	rinlining="UNKNOWN";
     else
 	rinlining="INVALID/TIMEOUT"
-    fi  
+    fi
     if [ $verbose -gt 0 ]; then
 	echo "lustrec inlined ($rlustrec2), gcc ($rgcc2), inlining valid ($rinlining), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
     else
@@ -166,7 +166,7 @@ check_prop () {
 	fi
 	dir=${SRC_PREFIX}/`dirname "$file"`
 	pushd $dir > /dev/null
-	
+
     # Checking horn backend
     if [ "$main" != "" ]; then
 	$LUSTREC -horn-traces -horn-queries -d $build -verbose 0 $opts -node $main "$name".lus;
@@ -178,7 +178,7 @@ check_prop () {
     else
         rlustrec="VALID"
     fi
-    # echo "z3 $build/$name".smt2 
+    # echo "z3 $build/$name".smt2
     # TODO: This part of the script has to be optimized
     z3 -T:10 "$build/$name".smt2 | grep unsat > /dev/null
     if [ $? -ne 0 ]; then
@@ -195,6 +195,36 @@ check_prop () {
 done < $file_list
 }
 
+check_horn () {
+    while IFS=, read -r file main opts
+    do
+	name=`basename "$file" .lus`
+	if [ "$name" = "$file" ]; then
+	    return 0
+	fi
+	dir=${SRC_PREFIX}/`dirname "$file"`
+	pushd $dir > /dev/null
+
+    # Checking horn backend
+    if [ "$main" != "" ]; then
+	$LUSTREC -horn-traces -horn-queries -d $build -verbose 0 $opts -node $main "$name".lus;
+    else
+	$LUSTREC -horn-traces -horn-queries -d $build -verbose 0 $opts "$name".lus
+    fi
+    if [ $? -ne 0 ]; then
+        rlustrec="INVALID";
+    else
+        rlustrec="VALID"
+    fi
+    if [ $verbose -gt 0 ]; then
+	echo "lustrec ($rlustrec), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
+    else
+	echo "lustrec ($rlustrec), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
+    fi
+    popd > /dev/null
+done < $file_list
+}
+
 usage () {
 echo "usage: $0 [-aciwh] file_list"
 echo "-a: perform all steps"
@@ -202,6 +232,7 @@ echo "-c: basic compilation"
 echo "-i: compile with inline mode"
 echo "-w: compile with inline mode. Check the inlining with z3"
 echo "-h: check files with the horn-pdf backend (requires z3)"
+echo "-r: regression test for horn backend"
 echo "-v <int>: verbose level"
 }
 
@@ -215,6 +246,7 @@ while [ $# -gt 0 ] ; do
                 -c) nobehavior=0; c=1 ; shift ;;
                 -i) nobehavior=0; i=1 ; shift ;;
                 -w) nobehavior=0; w=1 ; shift ;;
+                -r) nobehavior=0; r=1 ; shift ;;
                 -h) nobehavior=0; h=1 ; shift ;;
                 --) shift ;;
                 -*) echo "bad option '$1'" ; exit 1 ;;
@@ -235,6 +267,7 @@ fi
 [ ! -z "$i" ] && inline_compile
 [ ! -z "$w" ] && inline_compile_with_check
 [ ! -z "$h" ] && check_prop
+[ ! -z "$r" ] && check_horn
 [ "$nobehavior" -eq 1 ] && echo "Must provide an argument in [aciwh]" && usage
 
 
@@ -243,4 +276,3 @@ fi
 	#if [ $? -ne 1 ];then
 	#  rm ../${file}i
 	#fi
-

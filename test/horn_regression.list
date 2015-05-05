@@ -1,0 +1,5 @@
+../regression_tests/check_validity.lus,top
+../regression_tests/local_inline.lus,top
+../regression_tests/stateful_assert.lus,top
+../regression_tests/traffic.lus,top
+

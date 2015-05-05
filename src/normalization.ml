@@ -379,9 +379,9 @@ let normalize_node node =
 	  annots = List.map (fun v ->
 	    let eq =
 	      try
-		List.find (fun eq -> eq.eq_lhs = [v.var_id]) defs
+		List.find (fun eq -> eq.eq_lhs = [v.var_id]) (defs@assert_defs) 
 	      with Not_found -> (Format.eprintf "var not found %s@." v.var_id; assert false) in
-	    let expr = substitute_expr diff_vars defs eq.eq_rhs in
+	    let expr = substitute_expr diff_vars (defs@assert_defs) eq.eq_rhs in
 	    let pair = mkeexpr expr.expr_loc (mkexpr expr.expr_loc (Expr_tuple [expr_of_ident v.var_id expr.expr_loc; expr])) in
 	    (["traceability"], pair)
 	  ) diff_vars;
