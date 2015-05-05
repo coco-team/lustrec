@@ -76,3 +76,4 @@ fi
 [ ! -z "$r" ] && check_horn
 mv $report $build
 [ "$nobehavior" -eq 1 ] && echo "Must provide an argument in [aciwh]" && usage
+echo "DONE"
