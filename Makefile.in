@@ -44,6 +44,7 @@ install: compile-lusi
 	install -m 0755 $(LOCAL_BINDIR)/* ${bindir}
 	mkdir -p ${includedir}/lustrec
 	cp include/* ${includedir}/lustrec
+	mkdir -p ${datadir}
 	install -m 0655 share/FindLustre.cmake ${datadir}
 
 .PHONY: compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean
