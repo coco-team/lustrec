@@ -43,6 +43,12 @@ let push_node nd =  node_stack:= nd :: !node_stack
 let pop_node () = try node_stack := List.tl !node_stack with _ -> assert false
 let get_current_node () = try List.hd !node_stack with _ -> assert false
 
+let rec fby expr n init =
+  if n<=1 then
+    mkexpr (Expr_arrow (init, mkexpr (Expr_pre expr)))
+  else
+    mkexpr (Expr_arrow (init, mkexpr (Expr_pre (fby expr (n-1) init))))
+  
 %}
 
 %token <int> INT
@@ -403,9 +409,28 @@ expr:
 | node_ident LPAR expr RPAR EVERY expr
     {mkexpr (Expr_appl ($1, $3, Some $6))}
 | node_ident LPAR tuple_expr RPAR
-    {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), None))}
+    {
+      let id=$1 in
+      let args=List.rev $3 in
+      match id, args with
+      | "fbyn", [expr;n;init] ->
+	let n = match n.expr_desc with
+	  | Expr_const (Const_int n) -> n
+	  | _ -> assert false
+	in
+	fby expr n init
+      | _ -> mkexpr (Expr_appl ($1, mkexpr (Expr_tuple args), None))
+    }
 | node_ident LPAR tuple_expr RPAR EVERY expr
-    {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), Some $6)) }
+    {
+      let id=$1 in
+      let args=List.rev $3 in
+      let clock=$6 in
+      if id="fby" then
+	assert false (* TODO Ca veut dire quoi fby (e,n,init) every c *)
+      else
+	mkexpr (Expr_appl (id, mkexpr (Expr_tuple args), Some clock)) 
+    }
 
 /* Boolean expr */
 | expr AND expr 
