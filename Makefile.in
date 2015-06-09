@@ -31,14 +31,14 @@ clean:
 	$(OCAMLBUILD) -clean
 
 dist-clean: clean
-	rm -f Makefile myocamlbuild.ml config.log config.status configure include/*.lusic include/math.h include/conv.h
+	@rm -f Makefile myocamlbuild.ml config.log config.status configure include/*.lusic include/math.h include/conv.h
 
 %.lusic: %.lusi
 	@echo Compiling $<
 	@$(LOCAL_BINDIR)/lustrec -verbose 0 -d include $< 
 
 clean-lusic:
-	rm $(LUSI_LIBS:%.lusi=%.lusic)
+	@rm -f $(LUSI_LIBS:%.lusi=%.lusic)
 
 compile-lusi: $(LUSI_LIBS:%.lusi=%.lusic)
 
