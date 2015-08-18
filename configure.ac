@@ -1,5 +1,5 @@
 define([svnversion], esyscmd([sh -c "svnversion|sed "s/:.*//"|tr -d '\n'"]))dnl
-AC_INIT([lustrec], [1.1], [ploc@garoche.net])
+AC_INIT([lustrec], [1.1-svnversion], [ploc@garoche.net])
 
 
 AC_DEFINE(SVN_REVISION, "svnversion", [SVN Revision])
