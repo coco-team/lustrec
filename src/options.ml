@@ -13,7 +13,7 @@ let version = Version.number
 let include_path = Version.include_path
 
 let print_version () =
-  Format.printf "Lustrec compiler, version %s@." version;
+  Format.printf "Lustrec compiler, version %s (dev)@." version;
   Format.printf "Include directory: %s@." include_path
 
 let main_node = ref ""
@@ -37,7 +37,7 @@ let traces = ref false
 
 let horntraces = ref false
 let horn_cex = ref false
-let horn_query = ref false
+let horn_query = ref true
 
 
 let options =
@@ -66,6 +66,7 @@ let options =
     "-O", Arg.Set_int optimization, " changes optimization level <default: 2>";
     "-verbose", Arg.Set_int verbose_level, " changes verbose level <default: 1>";
     "-version", Arg.Unit print_version, " displays the version";]
+
 
 let get_witness_dir filename =
   (* Make sure the directory exists *)

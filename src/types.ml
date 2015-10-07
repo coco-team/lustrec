@@ -41,7 +41,7 @@ type error =
     Unbound_value of ident  
   | Already_bound of ident
   | Already_defined of ident
-  | Undefined_var of (unit IMap.t)
+  | Undefined_var of ISet.t
   | Declared_but_undefined of ident
   | Unbound_type of ident
   | Not_a_dimension
@@ -83,7 +83,7 @@ and print_ty fmt ty =
     fprintf fmt "%a -> %a" print_ty ty1 print_ty ty2
   | Ttuple tylist ->
     fprintf fmt "(%a)"
-      (Utils.fprintf_list ~sep:"*" print_ty) tylist
+      (Utils.fprintf_list ~sep:" * " print_ty) tylist
   | Tenum taglist ->
     fprintf fmt "enum {%a }"
       (Utils.fprintf_list ~sep:", " pp_print_string) taglist
@@ -158,10 +158,10 @@ let pp_error fmt = function
     fprintf fmt "Expecting %d argument(s) for homomorphic extension, found %d@." ar1 ar2
   | Type_mismatch id ->
     fprintf fmt "Definition and declaration of type %s don't agree@." id
-  | Undefined_var vmap ->
+  | Undefined_var vset ->
     fprintf fmt "No definition provided for variable(s): %a@."
       (Utils.fprintf_list ~sep:"," pp_print_string)
-      (fst (Utils.list_of_imap vmap))
+      (ISet.elements vset)
   | Declared_but_undefined id ->
      fprintf fmt "%s is declared but not defined@." id
   | Type_clash (ty1,ty2) ->
@@ -214,6 +214,12 @@ let get_clock_base_type ty =
  | Tclock ty -> Some ty
  | _         -> None
 
+let unclock_type ty =
+  let ty = repr ty in
+  match ty.tdesc with
+  | Tclock ty' -> ty'
+  | _          -> ty
+
 let rec is_dimension_type ty =
  match (repr ty).tdesc with
  | Tint
@@ -254,7 +260,7 @@ let rec is_array_type ty =
 let array_type_dimension ty =
   match (dynamic_type ty).tdesc with
   | Tarray (d, _) -> d
-  | _             -> assert false
+  | _             -> (Format.eprintf "internal error: Types.array_type_dimension %a@." print_ty ty; assert false)
 
 let rec array_type_multi_dimension ty =
   match (dynamic_type ty).tdesc with
@@ -264,7 +270,7 @@ let rec array_type_multi_dimension ty =
 let array_element_type ty =
   match (dynamic_type ty).tdesc with
   | Tarray (_, ty') -> ty'
-  | _               -> assert false
+  | _               -> (Format.eprintf "internal error: Types.array_element_type %a@." print_ty ty; assert false)
 
 let rec array_base_type ty =
   let ty = repr ty in

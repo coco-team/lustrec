@@ -28,7 +28,7 @@ module IdentDepGraph = Graph.Imperative.Digraph.ConcreteBidirectional (IdentModu
    by duplication of some mem vars into local node vars.
    Thus, cylic dependency errors may only arise between no-mem vars.
    non-mem variables are:
-   - inputs: not needed for causality/scheduling, needed only for detecting useless vars
+   - constants/inputs: not needed for causality/scheduling, needed only for detecting useless vars
    - read mems (fake vars): same remark as above.
    - outputs: decoupled from mems, if necessary
    - locals
@@ -132,6 +132,9 @@ let node_input_variables nd =
 
 let node_local_variables nd =
  List.fold_left (fun locals v -> ISet.add v.var_id locals) ISet.empty nd.node_locals
+
+let node_constant_variables nd =
+  List.fold_left (fun locals v -> if v.var_dec_const then ISet.add v.var_id locals else locals) ISet.empty nd.node_locals
 
 let node_output_variables nd =
  List.fold_left (fun outputs v -> ISet.add v.var_id outputs) ISet.empty nd.node_outputs
@@ -533,7 +536,10 @@ let add_external_dependency outputs mems g =
 
 let global_dependency node =
   let mems = ExprDep.node_memory_variables node in
-  let inputs = ExprDep.node_input_variables node in
+  let inputs =
+    ISet.union
+      (ExprDep.node_input_variables node)
+      (ExprDep.node_constant_variables node) in
   let outputs = ExprDep.node_output_variables node in
   let node_vars = ExprDep.node_variables node in
   let (g_non_mems, g_mems) = ExprDep.dependence_graph mems inputs node_vars node in

@@ -31,7 +31,7 @@ type schedule_report =
    For variables still unrelated, standard compare is used to choose the minimal element.
    This priority is used since it helps a lot in factorizing generated code.
    Moreover, the dependency graph is browsed in a depth-first manner whenever possible,
-   to improve the behavior of optimization algorithms applied in forthcoming compilation steps.
+   to improve the behavior of optimization algorithms applied in forthcoming compilation steps. 
    In the following functions:
    - [eq_equiv] is the equivalence relation between vars of the same equation lhs
    - [g] the (imperative) graph to be topologically sorted
@@ -46,17 +46,17 @@ let is_call_output choice g =
  List.exists ExprDep.is_instance_var (IdentDepGraph.succ g choice)
 
 (* Adds successors of [v] in graph [g] in [pending] or [frontier] sets, wrt [eq_equiv],
-   then removes [v] from [g]
+   then removes [v] from [g] 
 *)
 let add_successors eq_equiv g v pending frontier =
   let succs_v = IdentDepGraph.succ g v in
   begin
     IdentDepGraph.remove_vertex g v;
-    List.iter
-      (fun v' ->
-	if is_graph_root v' g then
-	  (if eq_equiv v v' then
-	      pending := ISet.add v' !pending
+    List.iter 
+      (fun v' -> 
+	if is_graph_root v' g then 
+	  (if eq_equiv v v' then 
+	      pending := ISet.add v' !pending 
 	   else
 	      frontier := ISet.add v' !frontier)
       ) succs_v;
@@ -134,14 +134,14 @@ let schedule_node n =
       with Not_found -> false in
 
     let n', g = global_dependency n in
-    Log.report ~level:5
-      (fun fmt ->
+    Log.report ~level:5 
+      (fun fmt -> 
 	Format.fprintf fmt
-	  "dependency graph for node %s: %a"
+	  "dependency graph for node %s: %a" 
 	  n'.node_id
 	  pp_dep_graph g
       );
-
+    
     (* TODO X: extend the graph with inputs (adapt the causality analysis to deal with inputs
      compute: coi predecessors of outputs
      warning (no modification) when memories are non used (do not impact output) or when inputs are not used (do not impact output)
@@ -166,22 +166,22 @@ let schedule_node n =
     if !Options.print_reuse
     then
       begin
-	Log.report ~level:0
-	  (fun fmt ->
+	Log.report ~level:0 
+	  (fun fmt -> 
 	    Format.fprintf fmt
 	      "OPT:%B@." (try (Hashtbl.iter (fun s1 v2 -> if s1 = v2.var_id then raise Not_found) reuse; false) with Not_found -> true)
 	  );
-	Log.report ~level:0
-	  (fun fmt ->
+	Log.report ~level:0 
+	  (fun fmt -> 
 	    Format.fprintf fmt
-	      "OPT:clock disjoint map for node %s: %a"
+	      "OPT:clock disjoint map for node %s: %a" 
 	      n'.node_id
 	      Disjunction.pp_disjoint_map disjoint
 	  );
-	Log.report ~level:0
-	  (fun fmt ->
+	Log.report ~level:0 
+	  (fun fmt -> 
 	    Format.fprintf fmt
-	      "OPT:reuse policy for node %s: %a"
+	      "OPT:reuse policy for node %s: %a" 
 	      n'.node_id
 	      Liveness.pp_reuse_policy reuse
 	  );
@@ -196,12 +196,12 @@ let schedule_prog prog =
   List.fold_right (
     fun top_decl (accu_prog, sch_map)  ->
       match top_decl.top_decl_desc with
-	| Node nd ->
+	| Node nd -> 
 	  let nd', report = schedule_node nd in
-	  {top_decl with top_decl_desc = Node nd'}::accu_prog,
+	  {top_decl with top_decl_desc = Node nd'}::accu_prog, 
 	  IMap.add nd.node_id report sch_map
 	| _ -> top_decl::accu_prog, sch_map
-    )
+    ) 
     prog
     ([],IMap.empty)
 
@@ -210,7 +210,7 @@ let pp_eq_schedule fmt vl =
   | []  -> assert false
   | [v] -> Format.fprintf fmt "%s" v
   | _   -> Format.fprintf fmt "(%a)" (fprintf_list ~sep:" , " (fun fmt v -> Format.fprintf fmt "%s" v)) vl
-
+ 
 let pp_schedule fmt node_schs =
  IMap.iter
    (fun nd report ->

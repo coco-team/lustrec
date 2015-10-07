@@ -73,7 +73,7 @@ let parse_source source_name =
     Parse.report_error err;
     raise exc
   | Corelang.Error (loc, err) as exc ->
-    eprintf "Parsing error %a%a@."
+    eprintf "Parsing error: %a%a@."
       Corelang.pp_error err
       Location.pp_loc loc;
     raise exc
@@ -83,7 +83,7 @@ let check_stateless_decls decls =
   try
     Stateless.check_prog decls
   with (Stateless.Error (loc, err)) as exc ->
-    eprintf "Stateless status error %a%a@."
+    eprintf "Stateless status error: %a%a@."
       Stateless.pp_error err
       Location.pp_loc loc;
     raise exc
@@ -95,7 +95,7 @@ let type_decls env decls =
       try
 	Typing.type_prog env decls
       with (Types.Error (loc,err)) as exc ->
-	eprintf "Typing error %a%a@."
+	eprintf "Typing error: %a%a@."
 	  Types.pp_error err
 	  Location.pp_loc loc;
 	raise exc
@@ -112,7 +112,7 @@ let clock_decls env decls =
       try
 	Clock_calculus.clock_prog env decls
       with (Clocks.Error (loc,err)) as exc ->
-	eprintf "Clock calculus error %a%a@." Clocks.pp_error err Location.pp_loc loc;
+	eprintf "Clock calculus error: %a%a@." Clocks.pp_error err Location.pp_loc loc;
 	raise exc
     end
   in
@@ -176,16 +176,19 @@ let check_compatibility (prog, computed_types_env, computed_clocks_env) (header,
     Stateless.check_compat header
   with
   | (Types.Error (loc,err)) as exc ->
-    eprintf "Type mismatch between computed type and declared type in lustre interface file: %a@."
-      Types.pp_error err;
+    eprintf "Type mismatch between computed type and declared type in lustre interface file: %a%a@."
+      Types.pp_error err
+      Location.pp_loc loc;
     raise exc
   | Clocks.Error (loc, err) as exc ->
-    eprintf "Clock mismatch between computed clock and declared clock in lustre interface file: %a@."
-      Clocks.pp_error err;
+    eprintf "Clock mismatch between computed clock and declared clock in lustre interface file: %a%a@."
+      Clocks.pp_error err
+      Location.pp_loc loc;
     raise exc
   | Stateless.Error (loc, err) as exc ->
-    eprintf "Stateless status mismatch between defined status and declared status in lustre interface file: %a@."
-      Stateless.pp_error err;
+    eprintf "Stateless status mismatch between defined status and declared status in lustre interface file: %a%a@."
+      Stateless.pp_error err
+      Location.pp_loc loc;
     raise exc
 
 let is_stateful topdecl =

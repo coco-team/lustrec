@@ -121,7 +121,11 @@ let is_aliasable_input node var =
     | None           -> []
     | Some (_, args) -> List.fold_right (fun e r -> match e.expr_desc with Expr_ident id -> id::r | _ -> r) args [] in
   fun v -> is_aliasable v && List.mem v.var_id inputs_var
-
+(*
+    let res =
+is_aliasable v && List.mem v.var_id inputs_var
+    in (Format.eprintf "aliasable %s by %s = %B@." var v.var_id res; res)
+*)
 (* replace variable [v] by [v'] in graph [g].
    [v'] is a dead variable
 *)
@@ -171,40 +175,50 @@ let compute_evaluated heads ctx =
   end
 
 (* tests whether a variable [v] may be (re)used instead of [var]. The conditions are:
+   - [v] has been really used ([v] is its own representative)
    - same type
    - [v] is not an aliasable input of the equation defining [var]
    - [v] is not one of the current heads (which contain [var])
-   - the representative of [v] is not currently in use
+   - [v] is not currently in use
  *)
 let eligible node ctx heads var v =
-     Typing.eq_ground var.var_type v.var_type
+     Hashtbl.find ctx.policy v.var_id == v
+  && Typing.eq_ground (Types.unclock_type var.var_type) (Types.unclock_type v.var_type)
   && not (is_aliasable_input node var.var_id v)
   && not (List.exists (fun h -> h.var_id = v.var_id) heads)
-  && let repr_v = Hashtbl.find ctx.policy v.var_id
-     in not (Disjunction.CISet.exists (fun p -> IdentDepGraph.mem_edge ctx.dep_graph p.var_id repr_v.var_id) ctx.evaluated)
+  && (*let repr_v = Hashtbl.find ctx.policy v.var_id*)
+     not (Disjunction.CISet.exists (fun p -> IdentDepGraph.mem_edge ctx.dep_graph p.var_id v.var_id) ctx.evaluated)
 
 let compute_reuse node ctx heads var =
   let disjoint = Hashtbl.find ctx.disjoint var.var_id in
   let locally_reusable v =
     IdentDepGraph.fold_pred (fun p r -> r && Disjunction.CISet.exists (fun d -> p = d.var_id) disjoint) ctx.dep_graph v.var_id true in
   let eligibles = Disjunction.CISet.filter (eligible node ctx heads var) ctx.evaluated in
+  Log.report ~level:7 (fun fmt -> Format.fprintf fmt "eligibles:%a@." Disjunction.pp_ciset eligibles);
   let quasi_dead, live = Disjunction.CISet.partition locally_reusable eligibles in
+  Log.report ~level:7 (fun fmt -> Format.fprintf fmt "live:%a@." Disjunction.pp_ciset live);
   try
     let disjoint_live = Disjunction.CISet.inter disjoint live in
+    Log.report ~level:7 (fun fmt -> Format.fprintf fmt "disjoint live:%a@." Disjunction.pp_ciset disjoint_live);
     let reuse = Disjunction.CISet.max_elt disjoint_live in
+    (*let reuse' = Hashtbl.find ctx.policy reuse.var_id in*)
     begin
       IdentDepGraph.add_edge ctx.dep_graph var.var_id reuse.var_id;
-      Hashtbl.add ctx.policy var.var_id (Hashtbl.find ctx.policy reuse.var_id);
+      (*if reuse != reuse' then IdentDepGraph.add_edge ctx.dep_graph reuse.var_id reuse'.var_id;*)
+      Hashtbl.add ctx.policy var.var_id reuse;
       ctx.evaluated <- Disjunction.CISet.add var ctx.evaluated;
       (*Format.eprintf "%s reused by live@." var.var_id;*)
     end
   with Not_found ->
   try
     let dead = Disjunction.CISet.filter (fun v -> is_graph_root v.var_id ctx.dep_graph) quasi_dead in
+    Log.report ~level:7 (fun fmt -> Format.fprintf fmt "dead:%a@." Disjunction.pp_ciset dead);
     let reuse = Disjunction.CISet.choose dead in
+    (*let reuse' = Hashtbl.find ctx.policy reuse.var_id in*)
     begin
       IdentDepGraph.add_edge ctx.dep_graph var.var_id reuse.var_id;
-      Hashtbl.add ctx.policy var.var_id (Hashtbl.find ctx.policy reuse.var_id);
+      (*if reuse != reuse' then IdentDepGraph.add_edge ctx.dep_graph reuse.var_id reuse'.var_id;*)
+      Hashtbl.add ctx.policy var.var_id reuse;
       ctx.evaluated <- Disjunction.CISet.add var ctx.evaluated;
       (*Format.eprintf "%s reused by dead %a@." var.var_id Disjunction.pp_ciset dead;*)
     end
@@ -225,7 +239,7 @@ let compute_reuse_policy node schedule disjoint g =
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "new context:%a@." pp_context ctx);
     let heads = List.map (fun v -> get_node_var v node) (List.hd !sort) in
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "NEW HEADS:");
-    List.iter (fun head -> Log.report ~level:6 (fun fmt -> Format.fprintf fmt "%s " head.var_id)) heads;
+    List.iter (fun head -> Log.report ~level:6 (fun fmt -> Format.fprintf fmt "%s (%a)" head.var_id Printers.pp_node_eq (get_node_eq head.var_id node))) heads;
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "@.");
     Log.report ~level:6 (fun fmt -> Format.fprintf fmt "COMPUTE_DEPENDENCIES@.");
     compute_dependencies heads ctx;

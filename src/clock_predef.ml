@@ -42,6 +42,8 @@ let ck_clock_to_bool =
   let cuniv = new_carrier Carry_var false in
   new_ck (Carrow (new_ck (Ccarrying (cuniv, univ)) false, univ))
 
+let ck_carrier id ck =
+ new_ck (Ccarrying (new_carrier (Carry_const id) true, ck)) true
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

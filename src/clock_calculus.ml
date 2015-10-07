@@ -779,7 +779,15 @@ let clock_var_decl scoped env vdecl =
       if Types.get_clock_base_type vdecl.var_type <> None
       then new_ck (Ccarrying ((new_carrier Carry_name scoped),ck)) scoped
       else ck in
-  vdecl.var_clock <- ck;
+  (if vdecl.var_dec_const
+   then match vdecl.var_dec_value with
+   | None   -> ()
+   | Some v ->
+     begin
+       let ck_static = clock_expr env v in
+       try_unify ck ck_static v.expr_loc
+     end);
+  try_unify ck vdecl.var_clock vdecl.var_loc;
   Env.add_value env vdecl.var_id ck
 
 (* Clocks a variable declaration list *)
