@@ -31,14 +31,14 @@ clean:
 	$(OCAMLBUILD) -clean
 
 dist-clean: clean
-	rm -f Makefile myocamlbuild.ml config.log config.status configure include/*.lusic include/math.h include/conv.h
+	@rm -f Makefile myocamlbuild.ml config.log config.status configure include/*.lusic include/math.h include/conv.h
 
 %.lusic: %.lusi
 	@echo Compiling $<
 	@$(LOCAL_BINDIR)/lustrec -verbose 0 -d include $< 
 
 clean-lusic:
-	rm $(LUSI_LIBS:%.lusi=%.lusic)
+	@rm -f $(LUSI_LIBS:%.lusi=%.lusic)
 
 compile-lusi: $(LUSI_LIBS:%.lusi=%.lusic)
 
@@ -47,6 +47,7 @@ install: clean-lusic compile-lusi
 	install -m 0755 $(LOCAL_BINDIR)/* ${bindir}
 	mkdir -p ${includedir}/lustrec
 	cp include/* ${includedir}/lustrec
+	mkdir -p ${datadir}
 	install -m 0655 share/FindLustre.cmake ${datadir}
 
 .PHONY: compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean
