@@ -292,6 +292,19 @@ let specialize_op expr =
   | "C" -> specialize_to_c expr
   | _   -> expr
 
+let rec merge_to_ite g hl =
+  let loc = Location.dummy_loc in
+  let mkcst x = mkexpr loc (Expr_const (Const_tag x)) in
+  let g_expr = mkcst g in
+  match hl with
+  | [] -> assert false
+  | [_, e] -> e
+  | (l_c,l_e)::tl -> 
+    let cond_expr = 
+      mkpredef_call loc "=" [g_expr; mkcst l_c]
+    in
+    mkexpr loc (Expr_ite (cond_expr, l_e, merge_to_ite g tl))
+      
 let rec translate_expr ?(ite=false) node ((m, si, j, d, s) as args) expr =
   let expr = specialize_op expr in
  match expr.expr_desc with
@@ -305,7 +318,16 @@ let rec translate_expr ?(ite=false) node ((m, si, j, d, s) as args) expr =
  | Expr_fby _
  | Expr_pre _                       -> (Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
  | Expr_when    (e1, _, _)          -> translate_expr node args e1
- | Expr_merge   (x, _)              -> raise NormalizationError
+ | Expr_merge   (g, hl)              -> (
+   (* Special treatment for functional backends. Is transformed into Ite *)
+   match !Options.output with
+   | "horn" -> translate_expr node  args (merge_to_ite g hl)
+   | ("C" | "java")          -> raise NormalizationError (* should have been replaced by MBranch *)
+   | _ ->
+     (Format.eprintf "option:%s@." !Options.output; Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
+
+ )
+  
  | Expr_appl (id, e, _) when Basic_library.is_internal_fun id ->
    let nd = node_from_name id in
    Fun (node_name nd, List.map (translate_expr node args) (expr_list_of_expr e))
@@ -397,8 +419,12 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
    (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
       are preserved. While they are replaced as if g then x = t else x = e in  C or Java
       backends. *)
-  | [x], Expr_ite   (c, t, e)
+  | [x], Expr_ite   _
+  (* similar treatment for merge, avoid generating MBranch instructions when using Horn backend *)
+  | [x], Expr_merge _ 
     when (match !Options.output with | "horn" -> true | "C" | "java" | _ -> false)
+
+      (* Remark for Ocaml: the when is shared among the two patterns *)
       ->
     let var_x = get_node_var x node in
     (m,
@@ -409,6 +435,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
 	(MLocalAssign (var_x, translate_expr node args eq.eq_rhs))::s)
     )
 
+ 
   | [x], _                                       -> (
     let var_x = get_node_var x node in
     (m, si, j, d,

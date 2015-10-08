@@ -22,15 +22,15 @@ let pp_machine_init_name fmt id = fprintf fmt "%s_init" id
 let pp_machine_step_name fmt id = fprintf fmt "%s_step" id
 let pp_machine_stateless_name fmt id = fprintf fmt "%s" id
 
-let pp_type fmt t =
+let rec pp_type fmt t =
   match (Types.repr t).Types.tdesc with
-  | Types.Tbool           -> Format.fprintf fmt "Bool"
-  | Types.Tint            -> Format.fprintf fmt "Int"
-  | Types.Treal           -> Format.fprintf fmt "Real"
-  | Types.Tclock _
+  | Types.Tbool           -> fprintf fmt "Bool"
+  | Types.Tint            -> fprintf fmt "Int"
+  | Types.Treal           -> fprintf fmt "Real"
+  | Types.Tconst ty       -> pp_print_string fmt ty
+  | Types.Tclock t        -> pp_type fmt t
   | Types.Tarray _
   | Types.Tstatic _
-  | Types.Tconst _
   | Types.Tarrow _
   | _                     -> Format.eprintf "internal error: pp_type %a@."
     Types.print_ty t; assert false
@@ -231,15 +231,29 @@ let pp_machine_init (m: machine_t) self fmt inst =
     (Utils.pp_final_char_if_non_empty " " static)
     self inst
 
-(* TODO *)
-let rec pp_conditional machines ?(init=false)  (m: machine_t) self fmt c tl el =
+
+let rec pp_bool_conditional machines ?(init=false)  (m: machine_t) self fmt c tl el =
   fprintf fmt "@[<v 2>if (%a) {%t%a@]@,@[<v 2>} else {%t%a@]@,}"
     (pp_horn_val self (pp_horn_var m)) c
     (Utils.pp_newline_if_non_empty tl)
     (Utils.fprintf_list ~sep:"@," (pp_machine_instr machines ~init:init  m self)) tl
     (Utils.pp_newline_if_non_empty el)
     (Utils.fprintf_list ~sep:"@," (pp_machine_instr machines ~init:init  m self)) el
-
+(* and pp_enum_conditional machines ?(init=false)  (m: machine_t) self fmt g hl = *)
+(* (\* TODO: check that the enum has all its constructor defined: Xavier how have you handled that, could we have partial definition? *\) *)
+(*   match hl with *)
+(*   | [] -> assert false *)
+(*   | [el] -> Utils.fprintf_list ~sep:"@," (pp_machine_instr machines ~init:init  m self) fmt el *)
+(*   | hd::tl -> *)
+(*   fprintf fmt "@[<v 2>if (= %a %a) {%t%a@]@,@[<v 2>} else {@.(%a)xxxx@]@,}" *)
+(*     (pp_horn_val self (pp_horn_var m)) c *)
+(*     TODOg *)
+(*     (Utils.pp_newline_if_non_empty tl) *)
+(*     (Utils.fprintf_list ~sep:"@," (pp_machine_instr machines ~init:init  m self)) hd *)
+(*     pp_print_newline fmt; *)
+    
+    
+(* fprintf fmt  *)
 and pp_machine_instr machines ?(init=false) (m: machine_t) self fmt instr =
   match instr with
   | MReset i ->
@@ -256,14 +270,18 @@ and pp_machine_instr machines ?(init=false) (m: machine_t) self fmt instr =
     assert false (* This should not happen anymore *)
   | MStep (il, i, vl) ->
     pp_instance_call machines ~init:init m self fmt i vl il
-  | MBranch (g,hl) ->
-    if hl <> [] && let t = fst (List.hd hl) in t = tag_true || t = tag_false
-    then (* boolean case, needs special treatment in C because truth value is not unique *)
-      (* may disappear if we optimize code by replacing last branch test with default *)
-      let tl = try List.assoc tag_true  hl with Not_found -> [] in
-      let el = try List.assoc tag_false hl with Not_found -> [] in
-      pp_conditional machines ~init:init m self fmt g tl el
-    else assert false (* enum type case *)
+  | MBranch (g,hl) -> (* should not be produced *)
+    assert false
+
+    (* if hl <> [] && let t = fst (List.hd hl) in t = tag_true || t = tag_false *)
+    (* then (\* boolean case, needs special treatment in C because truth value is not unique *\) *)
+    (*   (\* may disappear if we optimize code by replacing last branch test with default *\) *)
+    (*   let tl = try List.assoc tag_true  hl with Not_found -> [] in *)
+    (*   let el = try List.assoc tag_false hl with Not_found -> [] in *)
+    (*   pp_bool_conditional machines ~init:init m self fmt g tl el *)
+    (* else (\* enum type case *\) *)
+
+    (*   pp_enum_conditional machines ~init:init m self fmt g hl  *)
 
 
 (**************************************************************)
@@ -520,8 +538,30 @@ if !Options.main_node <> "" then
       get_cex machines fmt node machine)
 end
 
+let print_type_definitions fmt =
+  let cpt_type = ref 0 in
+  Hashtbl.iter (fun typ decl ->
+		match typ with
+		| Tydec_const var ->
+		   (match decl.top_decl_desc with
+		    | TypeDef tdef -> (
+		      match tdef.tydef_desc with
+		      | Tydec_enum tl ->
+			incr cpt_type;
+			fprintf fmt "(declare-datatypes () ((%s %a));@.@."
+			  var
+			  (Utils.fprintf_list ~sep:" " pp_print_string) tl
+		      | _ -> assert false
+		    )
+		    | _ -> assert false
+		   )
+		| _        -> ()) type_table
+
 
 let translate fmt basename prog machines =
+  (* We print typedef *)
+  print_type_definitions fmt;
+
   List.iter (print_machine machines fmt) (List.rev machines);
   main_print machines fmt
 

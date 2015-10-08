@@ -29,3 +29,11 @@
 ** clock calculus
 *** extension from named clocks to valued clocks ?
 *** static inputs should be polymorphic, as global constants are: done
+
+* Horn backend
+** enum types for automaton
+   - issues with MBranches and clocks
+     - control-on-clock generates a "if cond then expr else nothing
+     - it has to be expressed in a functional way to enable its expression as
+       horn
+
