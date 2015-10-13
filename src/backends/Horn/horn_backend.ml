@@ -1,4 +1,3 @@
-te(********************************************************************)
 (*                                                                  *)
 (*  The LustreC compiler toolset   /  The LustreC Development Team  *)
 (*  Copyright 2012 -    --   ONERA - CNRS - INPT                    *)
