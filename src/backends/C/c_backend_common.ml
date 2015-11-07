@@ -92,8 +92,22 @@ let pp_machine_static_alloc_name fmt id = fprintf fmt "%s_ALLOC" id
 let pp_machine_reset_name fmt id = fprintf fmt "%s_reset" id
 let pp_machine_step_name fmt id = fprintf fmt "%s_step" id
 
-let pp_c_dimension fmt d =
- fprintf fmt "%a" Dimension.pp_dimension d
+let rec pp_c_dimension fmt dim =
+  match dim.Dimension.dim_desc with
+  | Dident id       ->
+    fprintf fmt "%s" id
+  | Dint i          ->
+    fprintf fmt "%d" i
+  | Dbool b         ->
+    fprintf fmt "%B" b
+  | Dite (i, t, e)  ->
+    fprintf fmt "((%a)?%a:%a)"
+       pp_c_dimension i pp_c_dimension t pp_c_dimension e
+ | Dappl (f, args) ->
+     fprintf fmt "%a" (Basic_library.pp_c f pp_c_dimension) args
+ | Dlink dim' -> fprintf fmt "%a" pp_c_dimension dim'
+ | Dvar       -> fprintf fmt "_%s" (Utils.name_of_dimension dim.dim_id)
+ | Dunivar    -> fprintf fmt "'%s" (Utils.name_of_dimension dim.dim_id)
 
 let is_basic_c_type t =
   match (Types.repr t).Types.tdesc with
@@ -119,7 +133,7 @@ let pp_c_type var fmt t =
     | Types.Tstatic (_, t') -> fprintf fmt "const "; aux t' pp_suffix
     | Types.Tconst ty       -> fprintf fmt "%s %s" ty var
     | Types.Tarrow (_, _)   -> fprintf fmt "void (*%s)()" var
-    | _                     -> eprintf "internal error: pp_c_type %a@." Types.print_ty t; assert false
+    | _                     -> eprintf "internal error: C_backend_common.pp_c_type %a@." Types.print_ty t; assert false
   in aux t (fun fmt () -> ())
 
 let rec pp_c_initialize fmt t = 
