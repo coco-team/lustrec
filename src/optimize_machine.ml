@@ -16,29 +16,7 @@ open Causality
 open Machine_code 
 open Dimension
 
-(* Some optimizations may yield denormalized values. Similar to normalize_expr *)
-(*
-let normalize_value v =
-  let rec norm_cst offset cst =
-    match cst, offset with
-    | Const_int   _   , _
-    | Const_real  _   , _ 
-    | Const_float _   , _          -> cst
-    | Const_array args, Index i::q -> if Dimension.is_dimension_const 
-    | Const_tag of label
-    | Const_string of string (* used only for annotations *)
-    | Const_struct of (label * constant) list
-  let rec norm_value offset v =
-    match v with
-    | Cst _ 
-    | LocalVar _
-    | StateVar _ -> v
-    | Fun (id, args) -> Fun (id, List.map normalize_value args)
-    | Array args -> Array List.map normalize_value args
-    | Access of value_t * value_t
-    | Power of value_t * value_t
-  in norm [] v
-*)
+
 let pp_elim fmt elim =
   begin
     Format.fprintf fmt "{ /* elim table: */@.";
