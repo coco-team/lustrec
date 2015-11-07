@@ -251,6 +251,14 @@ let rec is_struct_type ty =
  | Tstatic (_, ty') -> is_struct_type ty'
  | _                -> false
 
+let struct_field_type ty field =
+  match (dynamic_type ty).tdesc with
+  | Tstruct fields ->
+    (try
+       List.assoc field fields
+     with Not_found -> assert false)
+  | _              -> assert false
+
 let rec is_array_type ty =
  match (repr ty).tdesc with
  | Tarray _         -> true

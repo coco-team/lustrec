@@ -132,6 +132,11 @@ type node_annot = {
   behaviors: (string * eexpr list * eexpr list * Location.t) list;
   spec_loc: Location.t;
 }
+
+type offset =
+| Index of Dimension.dim_expr
+| Field of label
+
 type assert_t = 
     {
       assert_expr: expr;

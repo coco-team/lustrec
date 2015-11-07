@@ -216,8 +216,8 @@ let add_eq_dependencies mems inputs node_vars eq (g, g') =
     | Expr_fby (e1, e2)  -> add_dep true lhs e2 (add_dep false lhs e1 g)
     | Expr_pre e      -> add_dep true lhs e g
     | Expr_ident x -> add_var lhs_is_mem lhs x (add_clock lhs_is_mem lhs rhs.expr_clock g)
-    | Expr_access (e1, _)
-    | Expr_power (e1, _) -> add_dep lhs_is_mem lhs e1 g
+    | Expr_access (e1, d)
+    | Expr_power (e1, d) -> add_dep lhs_is_mem lhs e1 (add_dep lhs_is_mem lhs (expr_of_dimension d) g)
     | Expr_array a -> List.fold_right (add_dep lhs_is_mem lhs) a g
     | Expr_tuple t -> List.fold_right2 (fun l r -> add_dep lhs_is_mem [l] r) lhs t g
     | Expr_merge (c, hl) -> add_var lhs_is_mem lhs c (List.fold_right (fun (_, h) -> add_dep lhs_is_mem lhs h) hl g)
