@@ -297,19 +297,19 @@ let rec compile_source dirname basename extension =
       Java_backend.translate_to_java source_fmt basename normalized_prog machine_code;*)
       end
     | "horn" ->
-       begin
+      begin
 	let source_file = destname ^ ".smt2" in (* Could be changed *)
 	let source_out = open_out source_file in
 	let fmt = formatter_of_out_channel source_out in
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. hornification@,");
-        Horn_backend.translate fmt basename prog machine_code;
+        Horn_backend.translate fmt basename prog (Machine_code.arrow_machine::machine_code);
 	(* Tracability file if option is activated *)
 	if !Options.traces then (
 	let traces_file = destname ^ ".traces.xml" in (* Could be changed *)
 	let traces_out = open_out traces_file in
 	let fmt = formatter_of_out_channel traces_out in
         Log.report ~level:1 (fun fmt -> fprintf fmt ".. tracing info@,");
-	Horn_backend.traces_file fmt basename prog machine_code;
+	Horn_backend_traces.traces_file fmt basename prog machine_code;
 	)
       end
     | "lustre" ->

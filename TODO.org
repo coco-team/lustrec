@@ -37,3 +37,29 @@
      - it has to be expressed in a functional way to enable its expression as
        horn
 
+
+-  The issue seems mainly to lie in the out = f(in) every cond
+   this generates the follwoingg imperative statements
+   if cond then f_reset(*mem) else {(nothing, ie. not reset)}
+   f_step(in,*put,*mem)
+
+   In the machine code, this is done by generating the sequence of 2 instructions
+   1. if cond then MReset() else {}  (* creation of a conditional statement *)
+   2. MStep()
+
+- For Xavier: Syntactically, how could you "reset" an arrow? When we see an
+  Expr_arrow, we introduce a MReset instance to the set of instruction on the
+  reset function of the current node, but is there any mean to do it with
+  "every" ?
+
+
+
+
+x = expr when c
+
+if c then
+  x= expr
+
+else {}
+
+x = if c then expr else x
