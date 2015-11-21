@@ -332,7 +332,12 @@ let pp_lusi_header fmt basename prog =
   fprintf fmt "(* by Lustre-C compiler version %s, %a *)@." Version.number pp_date (Unix.gmtime (Unix.time ()));
   fprintf fmt "(* Feel free to mask some of the definitions by removing them from this file. *)@.@.";
   List.iter (fprintf fmt "%a@." pp_lusi) prog    
-  
+
+let pp_offset fmt offset =
+  match offset with
+  | Index i -> fprintf fmt "[%a]" Dimension.pp_dimension i
+  | Field f -> fprintf fmt ".%s" f
+
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

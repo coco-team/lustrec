@@ -336,9 +336,6 @@ and type_subtyping_arg env in_main ?(sub=true) const real_arg formal_type =
   (*Format.eprintf "subtyping const %B real %a:%a vs formal %a@." const Printers.pp_expr real_arg Types.print_ty real_type Types.print_ty formal_type;*)
   try_unify ~sub:sub formal_type real_type loc
 
-and type_ident env in_main loc const id =
-  type_expr env in_main const (expr_of_ident id loc)
-
 (* typing an application implies:
    - checking that const formal parameters match real const (maybe symbolic) arguments
    - checking type adequation between formal and real arguments
@@ -452,7 +449,9 @@ and type_expr env in_main const expr =
     | Some c -> 
       check_constant expr.expr_loc const false;	
       type_subtyping_arg env in_main const c Type_predef.type_bool);
-    let touts = type_appl env in_main expr.expr_loc const id (expr_list_of_expr args) in
+    let args_list = expr_list_of_expr args in
+    let touts = type_appl env in_main expr.expr_loc const id args_list in
+    args.expr_type <- new_ty (Ttuple (List.map (fun a -> a.expr_type) args_list));
     expr.expr_type <- touts;
     touts
   | Expr_fby (e1,e2)
@@ -696,6 +695,16 @@ let rec type_top_decl env decl =
       type_top_const env c
   | TypeDef _ -> List.fold_left type_top_decl env (consts_of_enum_type decl)
   | Open _  -> env
+
+let get_type_of_call decl =
+  match decl.top_decl_desc with
+  | Node nd         ->
+    let (in_typ, out_typ) = split_arrow nd.node_type in
+    type_list_of_type in_typ, type_list_of_type out_typ
+  | ImportedNode nd ->
+    let (in_typ, out_typ) = split_arrow nd.nodei_type in
+    type_list_of_type in_typ, type_list_of_type out_typ
+  | _               -> assert false
 
 let type_prog env decls =
 try

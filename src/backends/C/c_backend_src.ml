@@ -147,6 +147,9 @@ let rec pp_value_suffix self var_type loop_vars pp_value fmt value =
  | loop_var    :: q, Array vl      ->
    let var_type = Types.array_element_type var_type in
    Format.fprintf fmt "(%a[]){%a }%a" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_value_suffix self var_type q pp_value)) vl pp_suffix [loop_var]
+ | []              , Array vl      ->
+   let var_type = Types.array_element_type var_type in
+   Format.fprintf fmt "(%a[]){%a }" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_value_suffix self var_type [] pp_value)) vl
  | _           :: q, Power (v, n)  ->
    pp_value_suffix self var_type q pp_value fmt v
  | _               , Fun (n, vl)   ->
@@ -163,6 +166,13 @@ let rec pp_value_suffix self var_type loop_vars pp_value fmt value =
    else Format.fprintf fmt "%s->_reg.%a%a" self pp_value v pp_suffix loop_vars
  | _               , Cst cst       -> pp_c_const_suffix var_type fmt cst
  | _               , _             -> (Format.eprintf "internal error: C_backend_src.pp_value_suffix %a %a %a@." Types.print_ty var_type Machine_code.pp_val value pp_suffix loop_vars; assert false)
+
+(* Subsumes C_backend_common.pp_c_val to cope with aggressive substitution
+   which may yield constant arrays in expressions.
+   Type is needed to correctly print constant arrays.
+ *)
+let pp_c_val self pp_var fmt (t, v) =
+  pp_value_suffix self t [] pp_var fmt v
 
 (* type_directed assignment: array vs. statically sized type
    - [var_type]: type of variable to be assigned
@@ -213,36 +223,6 @@ let pp_assign m self pp_var fmt var_type var_name value =
     aux fmt reordered_loop_vars
   end
 
-let pp_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list) =
- try (* stateful node instance *)
-   let (n,_) = List.assoc i m.minstances in
-   fprintf fmt "%a (%a%t%a%t%s->%s);"
-     pp_machine_step_name (node_name n)
-     (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
-     (Utils.pp_final_char_if_non_empty ", " inputs) 
-     (Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs
-     (Utils.pp_final_char_if_non_empty ", " outputs)
-     self
-     i
- with Not_found -> (* stateless node instance *)
-   let (n,_) = List.assoc i m.mcalls in
-   fprintf fmt "%a (%a%t%a);"
-     pp_machine_step_name (node_name n)
-     (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
-     (Utils.pp_final_char_if_non_empty ", " inputs) 
-     (Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs 
-
-let pp_machine_reset (m: machine_t) self fmt inst =
-  let (node, static) =
-    try
-      List.assoc inst m.minstances
-    with Not_found -> (Format.eprintf "pp_machine_reset %s %s %s: internal error@," m.mname.node_id self inst; raise Not_found) in
-  fprintf fmt "%a(%a%t%s->%s);"
-    pp_machine_reset_name (node_name node)
-    (Utils.fprintf_list ~sep:", " Dimension.pp_dimension) static
-    (Utils.pp_final_char_if_non_empty ", " static)
-    self inst
-
 let has_c_prototype funname dependencies =
   let imported_node_opt = (* We select the last imported node with the name funname.
 			       The order of evaluation of dependencies should be
@@ -268,9 +248,51 @@ let has_c_prototype funname dependencies =
     | None -> false
     | Some nd -> (match nd.nodei_prototype with Some "C" -> true | _ -> false)
 
+let pp_instance_call dependencies m self fmt i (inputs: value_t list) (outputs: var_decl list) =
+  try (* stateful node instance *)
+    let (n,_) = List.assoc i m.minstances in
+    let (input_types, _) = Typing.get_type_of_call n in
+    let inputs = List.combine input_types inputs in
+    fprintf fmt "%a (%a%t%a%t%s->%s);"
+      pp_machine_step_name (node_name n)
+      (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
+      (Utils.pp_final_char_if_non_empty ", " inputs) 
+      (Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs
+      (Utils.pp_final_char_if_non_empty ", " outputs)
+      self
+      i
+  with Not_found -> (* stateless node instance *)
+    let (n,_) = List.assoc i m.mcalls in
+    let (input_types, output_types) = Typing.get_type_of_call n in
+    let inputs = List.combine input_types inputs in
+    if has_c_prototype i dependencies
+    then (* external C function *)
+      let outputs = List.map2 (fun t v -> t, LocalVar v) output_types outputs in
+      fprintf fmt "%a = %s(%a);"
+	(Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) outputs
+	i
+	(Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
+    else
+      fprintf fmt "%a (%a%t%a);"
+	pp_machine_step_name (node_name n)
+	(Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
+	(Utils.pp_final_char_if_non_empty ", " inputs) 
+	(Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs 
+
+let pp_machine_reset (m: machine_t) self fmt inst =
+  let (node, static) =
+    try
+      List.assoc inst m.minstances
+    with Not_found -> (Format.eprintf "pp_machine_reset %s %s %s: internal error@," m.mname.node_id self inst; raise Not_found) in
+  fprintf fmt "%a(%a%t%s->%s);"
+    pp_machine_reset_name (node_name node)
+    (Utils.fprintf_list ~sep:", " Dimension.pp_dimension) static
+    (Utils.pp_final_char_if_non_empty ", " static)
+    self inst
+
 let rec pp_conditional dependencies (m: machine_t) self fmt c tl el =
   fprintf fmt "@[<v 2>if (%a) {%t%a@]@,@[<v 2>} else {%t%a@]@,}"
-    (pp_c_val self (pp_c_var_read m)) c
+    (pp_c_val self (pp_c_var_read m)) (Type_predef.type_bool, c)
     (Utils.pp_newline_if_non_empty tl)
     (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) tl
     (Utils.pp_newline_if_non_empty el)
@@ -290,23 +312,20 @@ and pp_machine_instr dependencies (m: machine_t) self fmt instr =
       i.var_type (StateVar i) v
   | MStep ([i0], i, vl) when Basic_library.is_internal_fun i  ->
     pp_machine_instr dependencies m self fmt (MLocalAssign (i0, Fun (i, vl)))
-  | MStep ([i0], i, vl) when has_c_prototype i dependencies -> 
-    fprintf fmt "%a = %s(%a);" 
-      (pp_c_val self (pp_c_var_read m)) (LocalVar i0) 
-      i
-      (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) vl
   | MStep (il, i, vl) ->
-    pp_instance_call m self fmt i vl il
-  | MBranch (g,hl) ->
-    if hl <> [] && let t = fst (List.hd hl) in t = tag_true || t = tag_false
+    pp_instance_call dependencies m self fmt i vl il
+  | MBranch (_, []) -> (Format.eprintf "internal error: C_backend_src.pp_machine_instr %a@." pp_instr instr; assert false)
+  | MBranch (g, hl) ->
+    if let t = fst (List.hd hl) in t = tag_true || t = tag_false
     then (* boolean case, needs special treatment in C because truth value is not unique *)
 	 (* may disappear if we optimize code by replacing last branch test with default *)
       let tl = try List.assoc tag_true  hl with Not_found -> [] in
       let el = try List.assoc tag_false hl with Not_found -> [] in
       pp_conditional dependencies m self fmt g tl el
     else (* enum type case *)
+      let g_typ = Typing.type_const Location.dummy_loc (Const_tag (fst (List.hd hl))) in
       fprintf fmt "@[<v 2>switch(%a) {@,%a@,}@]"
-	(pp_c_val self (pp_c_var_read m)) g
+	(pp_c_val self (pp_c_var_read m)) (g_typ, g)
 	(Utils.fprintf_list ~sep:"@," (pp_machine_branch dependencies m self)) hl
 
 and pp_machine_branch dependencies m self fmt (t, h) =

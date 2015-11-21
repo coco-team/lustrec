@@ -268,14 +268,10 @@ let rec compile_source dirname basename extension =
 
   if !Options.optimization >= 2 then
     begin
-      Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
+      Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
 	(Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
 	machine_code);
     end;
-
-  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
-  (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
-  machine_code);
 
   (* Printing code *)
   let basename    =  Filename.basename basename in

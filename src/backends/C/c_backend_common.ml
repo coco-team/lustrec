@@ -94,20 +94,20 @@ let pp_machine_step_name fmt id = fprintf fmt "%s_step" id
 
 let rec pp_c_dimension fmt dim =
   match dim.Dimension.dim_desc with
-  | Dident id       ->
+  | Dimension.Dident id       ->
     fprintf fmt "%s" id
-  | Dint i          ->
+  | Dimension.Dint i          ->
     fprintf fmt "%d" i
-  | Dbool b         ->
+  | Dimension.Dbool b         ->
     fprintf fmt "%B" b
-  | Dite (i, t, e)  ->
+  | Dimension.Dite (i, t, e)  ->
     fprintf fmt "((%a)?%a:%a)"
        pp_c_dimension i pp_c_dimension t pp_c_dimension e
- | Dappl (f, args) ->
+ | Dimension.Dappl (f, args) ->
      fprintf fmt "%a" (Basic_library.pp_c f pp_c_dimension) args
- | Dlink dim' -> fprintf fmt "%a" pp_c_dimension dim'
- | Dvar       -> fprintf fmt "_%s" (Utils.name_of_dimension dim.dim_id)
- | Dunivar    -> fprintf fmt "'%s" (Utils.name_of_dimension dim.dim_id)
+ | Dimension.Dlink dim' -> fprintf fmt "%a" pp_c_dimension dim'
+ | Dimension.Dvar       -> fprintf fmt "_%s" (Utils.name_of_dimension dim.Dimension.dim_id)
+ | Dimension.Dunivar    -> fprintf fmt "'%s" (Utils.name_of_dimension dim.Dimension.dim_id)
 
 let is_basic_c_type t =
   match (Types.repr t).Types.tdesc with
@@ -152,6 +152,7 @@ let rec pp_c_initialize fmt t =
 let pp_c_tag fmt t =
  pp_print_string fmt (if t = tag_true then "1" else if t = tag_false then "0" else t)
 
+
 (* Prints a constant value *)
 let rec pp_c_const fmt c =
   match c with
@@ -168,11 +169,12 @@ let rec pp_c_const fmt c =
    but an offset suffix may be added for array variables
 *)
 let rec pp_c_val self pp_var fmt v =
+  (*Format.eprintf "C_backend_common.pp_c_val %a@." pp_val v;*)
   match v with
   | Cst c         -> pp_c_const fmt c
   | Array vl      -> fprintf fmt "{%a}" (Utils.fprintf_list ~sep:", " (pp_c_val self pp_var)) vl
   | Access (t, i) -> fprintf fmt "%a[%a]" (pp_c_val self pp_var) t (pp_c_val self pp_var) i
-  | Power (v, n)  -> assert false
+  | Power (v, n)  -> (Format.eprintf "internal error: C_backend_common.pp_c_val %a@." pp_val v; assert false)
   | LocalVar v    -> pp_var fmt v
   | StateVar v    ->
     (* array memory vars are represented by an indirection to a local var with the right type,
