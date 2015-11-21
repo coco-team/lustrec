@@ -81,6 +81,9 @@ let node_reusable_variables node =
     Disjunction.CISet.empty
     node.node_locals
 
+let kill_instance_variables ctx inst =
+  IdentDepGraph.remove_vertex ctx.dep_graph inst
+
 let kill_root ctx head =
   IdentDepGraph.iter_succ (IdentDepGraph.remove_edge ctx.dep_graph head.var_id) ctx.dep_graph head.var_id
 
@@ -89,6 +92,7 @@ let kill_root ctx head =
    - [evaluated] is the set of already evaluated variables,
      wrt the scheduling
    - does only remove edges, not variables themselves
+   - yet, instance variables are removed
 *)
 let remove_roots ctx =
   let rem = ref true in
@@ -97,10 +101,12 @@ let remove_roots ctx =
   do
     rem := false;
     let all_roots = graph_roots ctx.dep_graph in
-    let frontier_roots = Disjunction.CISet.filter (fun v -> List.mem v.var_id all_roots) !remaining in
-    if not (Disjunction.CISet.is_empty frontier_roots) then
+    let inst_roots, var_roots = List.partition (fun v -> ExprDep.is_instance_var v && v <> Causality.world) all_roots in
+    let frontier_roots = Disjunction.CISet.filter (fun v -> List.mem v.var_id var_roots) !remaining in
+    if not (Disjunction.CISet.is_empty frontier_roots && inst_roots = []) then
       begin
 	rem := true;
+	List.iter (kill_instance_variables ctx) inst_roots;
 	Disjunction.CISet.iter (kill_root ctx) frontier_roots;
 	remaining := Disjunction.CISet.diff !remaining frontier_roots
       end
