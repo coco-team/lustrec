@@ -526,12 +526,13 @@ let merge_with g1 g2 =
     IdentDepGraph.iter_edges (fun s t -> IdentDepGraph.add_edge g1 s t) g2
   end
 
+let world = "!!_world"
+
 let add_external_dependency outputs mems g =
-  let caller ="!!_world" in
   begin
-    IdentDepGraph.add_vertex g caller;
-    ISet.iter (fun o -> IdentDepGraph.add_edge g caller o) outputs;
-    ISet.iter (fun m -> IdentDepGraph.add_edge g caller m) mems;
+    IdentDepGraph.add_vertex g world;
+    ISet.iter (fun o -> IdentDepGraph.add_edge g world o) outputs;
+    ISet.iter (fun m -> IdentDepGraph.add_edge g world m) mems;
   end
 
 let global_dependency node =
