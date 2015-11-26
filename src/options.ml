@@ -43,22 +43,22 @@ let horn_queries = ref false
 
 
 let set_mpfr prec =
-  if prec > 0 then (
+  if prec > 2 then (
     mpfr := true;
     mpfr_prec := prec;
     (* salsa_enabled := false; (* We deactivate salsa *) TODO *)
   )
   else
-    failwith "mpfr requires a positive integer"
+    failwith "mpfr requires an integer > 2"
 			
 let options =
   [ "-d", Arg.Set_string dest_dir,
-    "uses the specified directory \x1b[4mdir\x1b[0m as root for generated/imported object and C files <default: .>";
+    "uses the specified \x1b[4mdirectory\x1b[0m as root for generated/imported object and C files <default: .>";
     "-node", Arg.Set_string main_node, "specifies the \x1b[4mmain\x1b[0m node";
     "-init", Arg.Set delay_calculus, "performs an initialisation analysis for Lustre nodes <default: no analysis>";
     "-dynamic", Arg.Clear static_mem, "specifies a dynamic allocation scheme for main Lustre node <default: static>";
     "-check-access", Arg.Set check, "checks at runtime that array accesses always lie within bounds <default: no check>";
-    "-mpfr", Arg.Int set_mpfr, "replaces FP numbers by the MPFR library multiple precision numbers with a precision of \x1b[4mprec\x1b[0m bits <default: keep FP numbers>";
+    "-mpfr", Arg.Int set_mpfr, "replaces FP numbers by the MPFR library multiple precision numbers using \x1b[4mprecision\x1b[0m bits <default: keep FP numbers>";
     "-lusi", Arg.Set lusi, "only generates a .lusi interface source file from a Lustre source <default: no generation>";
     "-no-spec", Arg.Unit (fun () -> spec := "no"), "do not generate any specification";
     "-acsl-spec", Arg.Unit (fun () -> spec := "acsl"), "generates an ACSL encoding of the specification. Only meaningful for the C backend <default>";
@@ -76,7 +76,7 @@ let options =
     "-print_clocks", Arg.Set print_clocks, "prints node clocks";
     "-O", Arg.Set_int optimization, "changes optimization \x1b[4mlevel\x1b[0m <default: 2>";
     "-verbose", Arg.Set_int verbose_level, "changes verbose \x1b[4mlevel\x1b[0m <default: 1>";
-    "-version", Arg.Unit print_version, " displays the version";]
+    "-version", Arg.Unit print_version, "displays the version";]
 
 
 let plugin_opt (name, activate, options) =

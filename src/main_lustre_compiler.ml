@@ -18,7 +18,7 @@ open Compiler_common
  
 exception StopPhase1 of program
 
-let usage = "Usage: lustrec [options] \x1b[4msource file\x1b[0m"
+let usage = "Usage: lustrec [options] \x1b[4msource-file\x1b[0m"
 
 let extensions = [".ec"; ".lus"; ".lusi"]
 
@@ -356,7 +356,7 @@ let compile_source dirname basename extension =
     with StopPhase1 prog -> (
       if !Options.lusi then
 	begin
-	  let lusi_ext = "lusi" (* extension ^ "i" *) in
+	  let lusi_ext = ".lusi" (* extension ^ "i" *) in
 	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating interface file %s@," (dirname ^ "/" ^ basename ^ lusi_ext));
 	  print_lusi prog dirname basename lusi_ext;
 	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
