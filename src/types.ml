@@ -198,14 +198,30 @@ let get_field_type ty label =
   | Tstruct fl -> (try Some (List.assoc label fl) with Not_found -> None)
   | _          -> None
 
-let is_numeric_type ty =
+let rec is_scalar_type ty =
+  match (repr ty).tdesc with
+  | Tstatic (_, ty) -> is_scalar_type ty
+  | Tbool
+  | Tint
+  | Treal -> true
+  | _     -> false
+
+let rec is_numeric_type ty =
  match (repr ty).tdesc with
+ | Tstatic (_, ty) -> is_numeric_type ty
  | Tint
  | Treal -> true
  | _     -> false
 
-let is_bool_type ty =
+let rec is_real_type ty =
  match (repr ty).tdesc with
+ | Tstatic (_, ty) -> is_real_type ty
+ | Treal -> true
+ | _     -> false
+
+let rec is_bool_type ty =
+ match (repr ty).tdesc with
+ | Tstatic (_, ty) -> is_bool_type ty
  | Tbool -> true
  | _     -> false
 
@@ -288,7 +304,7 @@ let rec array_base_type ty =
   | _                -> ty
 
 let is_address_type ty =
-  is_array_type ty || is_struct_type ty
+  is_array_type ty || is_struct_type ty || (is_real_type ty && !Options.mpfr)
 
 let rec is_generic_type ty =
  match (dynamic_type ty).tdesc with
@@ -313,10 +329,11 @@ let type_of_type_list tyl =
   else
     List.hd tyl
 
-let type_list_of_type ty =
+let rec type_list_of_type ty =
  match (repr ty).tdesc with
- | Ttuple tl -> tl
- | _         -> [ty]
+ | Tstatic (_, ty) -> type_list_of_type ty
+ | Ttuple tl       -> tl
+ | _               -> [ty]
 
 (** [is_polymorphic ty] returns true if [ty] is polymorphic. *)
 let rec is_polymorphic ty =

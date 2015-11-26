@@ -90,6 +90,8 @@ let pp_machine_static_declare_name fmt id = fprintf fmt "%s_DECLARE" id
 let pp_machine_static_link_name fmt id = fprintf fmt "%s_LINK" id
 let pp_machine_static_alloc_name fmt id = fprintf fmt "%s_ALLOC" id
 let pp_machine_reset_name fmt id = fprintf fmt "%s_reset" id
+let pp_machine_init_name fmt id = fprintf fmt "%s_init" id
+let pp_machine_clear_name fmt id = fprintf fmt "%s_clear" id
 let pp_machine_step_name fmt id = fprintf fmt "%s_step" id
 
 let rec pp_c_dimension fmt dim =
@@ -116,16 +118,17 @@ let is_basic_c_type t =
 
 let pp_basic_c_type fmt t =
   match (Types.repr t).Types.tdesc with
-  | Types.Tbool           -> fprintf fmt "_Bool"
-  | Types.Treal           -> fprintf fmt "double"
-  | Types.Tint            -> fprintf fmt "int"
+  | Types.Tbool                    -> fprintf fmt "_Bool"
+  | Types.Treal when !Options.mpfr -> fprintf fmt "%s" Mpfr.mpfr_t
+  | Types.Treal                    -> fprintf fmt "double"
+  | Types.Tint                     -> fprintf fmt "int"
   | _ -> assert false (* Not a basic C type. Do not handle arrays or pointers *)
 
 let pp_c_type var fmt t =
   let rec aux t pp_suffix =
     match (Types.repr t).Types.tdesc with
     | Types.Tclock t'       -> aux t' pp_suffix
-    | Types.Tbool | Types.Treal | Types.Tint 
+    | Types.Tbool | Types.Tint | Types.Treal
                             -> fprintf fmt "%a %s%a" pp_basic_c_type t var pp_suffix ()
     | Types.Tarray (d, t')  ->
       let pp_suffix' fmt () = fprintf fmt "%a[%a]" pp_suffix () pp_c_dimension d in
@@ -135,30 +138,29 @@ let pp_c_type var fmt t =
     | Types.Tarrow (_, _)   -> fprintf fmt "void (*%s)()" var
     | _                     -> eprintf "internal error: C_backend_common.pp_c_type %a@." Types.print_ty t; assert false
   in aux t (fun fmt () -> ())
-
+(*
 let rec pp_c_initialize fmt t = 
   match (Types.repr t).Types.tdesc with
   | Types.Tint -> pp_print_string fmt "0"
   | Types.Tclock t' -> pp_c_initialize fmt t'
   | Types.Tbool -> pp_print_string fmt "0" 
-  | Types.Treal -> pp_print_string fmt "0."
+  | Types.Treal when not !Options.mpfr -> pp_print_string fmt "0."
   | Types.Tarray (d, t') when Dimension.is_dimension_const d ->
     fprintf fmt "{%a}"
       (Utils.fprintf_list ~sep:"," (fun fmt _ -> pp_c_initialize fmt t'))
       (Utils.duplicate 0 (Dimension.size_const_dimension d))
   | _ -> assert false
-
+ *)
 
 let pp_c_tag fmt t =
  pp_print_string fmt (if t = tag_true then "1" else if t = tag_false then "0" else t)
-
 
 (* Prints a constant value *)
 let rec pp_c_const fmt c =
   match c with
     | Const_int i     -> pp_print_int fmt i
-    | Const_real r    -> pp_print_string fmt r
-    | Const_float r   -> pp_print_float fmt r
+    | Const_real (c,e,s)-> pp_print_string fmt s (* Format.fprintf fmt "%ie%i" c e*)
+    (* | Const_float r   -> pp_print_float fmt r *)
     | Const_tag t     -> pp_c_tag fmt t
     | Const_array ca  -> fprintf fmt "{%a }" (Utils.fprintf_list ~sep:", " pp_c_const) ca
     | Const_struct fl -> fprintf fmt "{%a }" (Utils.fprintf_list ~sep:", " (fun fmt (f, c) -> pp_c_const fmt c)) fl
@@ -169,17 +171,16 @@ let rec pp_c_const fmt c =
    but an offset suffix may be added for array variables
 *)
 let rec pp_c_val self pp_var fmt v =
-  (*Format.eprintf "C_backend_common.pp_c_val %a@." pp_val v;*)
-  match v with
+  match v.value_desc with
   | Cst c         -> pp_c_const fmt c
   | Array vl      -> fprintf fmt "{%a}" (Utils.fprintf_list ~sep:", " (pp_c_val self pp_var)) vl
   | Access (t, i) -> fprintf fmt "%a[%a]" (pp_c_val self pp_var) t (pp_c_val self pp_var) i
-  | Power (v, n)  -> (Format.eprintf "internal error: C_backend_common.pp_c_val %a@." pp_val v; assert false)
+  | Power (v, n)  -> assert false
   | LocalVar v    -> pp_var fmt v
   | StateVar v    ->
     (* array memory vars are represented by an indirection to a local var with the right type,
        in order to avoid casting everywhere. *)
-    if Types.is_array_type v.var_type
+    if Types.is_array_type v.var_type && not (Types.is_real_type v.var_type && !Options.mpfr)
     then fprintf fmt "%a" pp_var v
     else fprintf fmt "%s->_reg.%a" self pp_var v
   | Fun (n, vl)   -> Basic_library.pp_c n (pp_c_val self pp_var) fmt vl
@@ -191,9 +192,10 @@ let rec pp_c_val self pp_var fmt v =
    - moreover, dereference memory array variables.
 *)
 let pp_c_var_read m fmt id =
+  (* mpfr_t is a static array, not treated as general arrays *)
   if Types.is_address_type id.var_type
   then
-    if is_memory m id
+    if is_memory m id && not (Types.is_real_type id.var_type && !Options.mpfr)
     then fprintf fmt "(*%s)" id.var_id
     else fprintf fmt "%s" id.var_id
   else
@@ -289,9 +291,9 @@ let pp_c_checks self fmt m =
 let pp_registers_struct fmt m =
   if m.mmemory <> []
   then
-    fprintf fmt "@[%a {@[%a; @]}@] _reg; "
+    fprintf fmt "@[%a {@[<v>%a;@ @]}@] _reg; "
       pp_machine_regtype_name m.mname.node_id
-      (Utils.fprintf_list ~sep:"; " pp_c_decl_struct_var) m.mmemory
+      (Utils.fprintf_list ~sep:";@ " pp_c_decl_struct_var) m.mmemory
   else
     ()
 
@@ -302,11 +304,12 @@ let print_machine_struct fmt m =
   else
     begin
       (* Define struct *)
-      fprintf fmt "@[%a {@[%a%a%t@]};@]@."
+      fprintf fmt "@[%a {@[<v>%a%t%a%t@]};@]@."
 	pp_machine_memtype_name m.mname.node_id
 	pp_registers_struct m
-	(Utils.fprintf_list ~sep:"; " pp_c_decl_instance_var) m.minstances
-	(Utils.pp_final_char_if_non_empty "; " m.minstances)
+	(Utils.pp_final_char_if_non_empty "@ " m.mmemory)
+	(Utils.fprintf_list ~sep:";@ " pp_c_decl_instance_var) m.minstances
+	(Utils.pp_final_char_if_non_empty ";@ " m.minstances)
     end
 
 let print_machine_struct_from_header fmt inode =
@@ -333,6 +336,22 @@ let print_alloc_prototype fmt (name, static) =
 let print_reset_prototype self fmt (name, static) =
   fprintf fmt "void %a (@[<v>%a%t%a *%s@])"
     pp_machine_reset_name name
+    (Utils.fprintf_list ~sep:",@ " pp_c_decl_input_var) static
+    (Utils.pp_final_char_if_non_empty ",@," static) 
+    pp_machine_memtype_name name
+    self
+
+let print_init_prototype self fmt (name, static) =
+  fprintf fmt "void %a (@[<v>%a%t%a *%s@])"
+    pp_machine_init_name name
+    (Utils.fprintf_list ~sep:",@ " pp_c_decl_input_var) static
+    (Utils.pp_final_char_if_non_empty ",@," static) 
+    pp_machine_memtype_name name
+    self
+
+let print_clear_prototype self fmt (name, static) =
+  fprintf fmt "void %a (@[<v>%a%t%a *%s@])"
+    pp_machine_clear_name name
     (Utils.fprintf_list ~sep:",@ " pp_c_decl_input_var) static
     (Utils.pp_final_char_if_non_empty ",@," static) 
     pp_machine_memtype_name name
@@ -382,6 +401,156 @@ let print_extern_alloc_prototypes fmt (Dep (_,_, header,_)) =
     in fprintf fmt "extern %a;@." print_alloc_prototype (ind.nodei_id, static)
   | _                -> ()
   ) header
+
+
+let pp_c_main_var_input fmt id =  
+  fprintf fmt "%s" id.var_id
+
+let pp_c_main_var_output fmt id =
+  if Types.is_address_type id.var_type
+  then
+    fprintf fmt "%s" id.var_id
+  else
+    fprintf fmt "&%s" id.var_id
+
+let pp_main_call mname self fmt m (inputs: value_t list) (outputs: var_decl list) =
+  if m.mmemory = []
+  then
+    fprintf fmt "%a (%a%t%a);"
+      pp_machine_step_name mname
+      (Utils.fprintf_list ~sep:", " (pp_c_val self pp_c_main_var_input)) inputs
+      (Utils.pp_final_char_if_non_empty ", " inputs) 
+      (Utils.fprintf_list ~sep:", " pp_c_main_var_output) outputs
+  else
+    fprintf fmt "%a (%a%t%a%t%s);"
+      pp_machine_step_name mname
+      (Utils.fprintf_list ~sep:", " (pp_c_val self pp_c_main_var_input)) inputs
+      (Utils.pp_final_char_if_non_empty ", " inputs) 
+      (Utils.fprintf_list ~sep:", " pp_c_main_var_output) outputs
+      (Utils.pp_final_char_if_non_empty ", " outputs)
+      self
+
+let pp_c_var m self pp_var fmt var =
+  if is_memory m var
+  then
+    pp_c_val self pp_var fmt (mk_val (StateVar var) var.var_type)
+  else
+    pp_c_val self pp_var fmt (mk_val (LocalVar var) var.var_type)
+
+let pp_array_suffix fmt loop_vars =
+  Utils.fprintf_list ~sep:"" (fun fmt v -> fprintf fmt "[%s]" v) fmt loop_vars
+
+(* type directed initialization: useless wrt the lustre compilation model,
+   except for MPFR injection, where values are dynamically allocated
+*)
+let pp_initialize m self pp_var fmt var =
+  let rec aux indices fmt typ =
+    if Types.is_array_type typ
+    then
+      let dim = Types.array_type_dimension typ in
+      let idx = mk_loop_var m () in
+      fprintf fmt "@[<v 2>{@,int %s;@,for(%s=0;%s<%a;%s++)@,%a @]@,}"
+	idx idx idx pp_c_dimension dim idx
+	(aux (idx::indices)) (Types.array_element_type typ)
+    else
+      let pp_var_suffix fmt var =
+	fprintf fmt "%a%a" (pp_c_var m self pp_var) var pp_array_suffix indices in
+      Mpfr.pp_inject_init pp_var_suffix fmt var
+  in
+  if Types.is_real_type (Types.array_base_type var.var_type) && !Options.mpfr
+  then
+    begin
+      reset_loop_counter ();
+      aux [] fmt var.var_type
+    end
+
+(* type directed clear: useless wrt the lustre compilation model,
+   except for MPFR injection, where values are dynamically allocated
+*)
+let pp_clear m self pp_var fmt var =
+  let rec aux indices fmt typ =
+    if Types.is_array_type typ
+    then
+      let dim = Types.array_type_dimension typ in
+      let idx = mk_loop_var m () in
+      fprintf fmt "@[<v 2>{@,int %s;@,for(%s=0;%s<%a;%s++)@,%a @]@,}"
+	idx idx idx pp_c_dimension dim idx
+	(aux (idx::indices)) (Types.array_element_type typ)
+    else
+      let pp_var_suffix fmt var =
+	fprintf fmt "%a%a" (pp_c_var m self pp_var) var pp_array_suffix indices in
+      Mpfr.pp_inject_clear pp_var_suffix fmt var
+  in
+  if Types.is_real_type (Types.array_base_type var.var_type) && !Options.mpfr
+  then
+    begin
+      reset_loop_counter ();
+      aux [] fmt var.var_type
+    end
+
+let pp_call m self pp_read pp_write fmt i (inputs: value_t list) (outputs: var_decl list) =
+ try (* stateful node instance *)
+   let (n,_) = List.assoc i m.minstances in
+   fprintf fmt "%a (%a%t%a%t%s->%s);"
+     pp_machine_step_name (node_name n)
+     (Utils.fprintf_list ~sep:", " (pp_c_val self pp_read)) inputs
+     (Utils.pp_final_char_if_non_empty ", " inputs) 
+     (Utils.fprintf_list ~sep:", " pp_write) outputs
+     (Utils.pp_final_char_if_non_empty ", " outputs)
+     self
+     i
+ with Not_found -> (* stateless node instance *)
+   let (n,_) = List.assoc i m.mcalls in
+   fprintf fmt "%a (%a%t%a);"
+     pp_machine_step_name (node_name n)
+     (Utils.fprintf_list ~sep:", " (pp_c_val self pp_read)) inputs
+     (Utils.pp_final_char_if_non_empty ", " inputs) 
+     (Utils.fprintf_list ~sep:", " pp_write) outputs 
+
+let pp_basic_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list) =
+  pp_call m self (pp_c_var_read m) (pp_c_var_write m) fmt i inputs outputs
+(*
+ try (* stateful node instance *)
+   let (n,_) = List.assoc i m.minstances in
+   fprintf fmt "%a (%a%t%a%t%s->%s);"
+     pp_machine_step_name (node_name n)
+     (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
+     (Utils.pp_final_char_if_non_empty ", " inputs) 
+     (Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs
+     (Utils.pp_final_char_if_non_empty ", " outputs)
+     self
+     i
+ with Not_found -> (* stateless node instance *)
+   let (n,_) = List.assoc i m.mcalls in
+   fprintf fmt "%a (%a%t%a);"
+     pp_machine_step_name (node_name n)
+     (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
+     (Utils.pp_final_char_if_non_empty ", " inputs) 
+     (Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs 
+*)
+
+let pp_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list) =
+  let pp_offset pp_var indices fmt var =
+    match indices with
+    | [] -> fprintf fmt "%a" pp_var var
+    | _  -> fprintf fmt "%a[%a]" pp_var var (Utils.fprintf_list ~sep:"][" pp_print_string) indices in
+  let rec aux indices fmt typ =
+    if Types.is_array_type typ
+    then
+      let dim = Types.array_type_dimension typ in
+      let idx = mk_loop_var m () in
+      fprintf fmt "@[<v 2>{@,int %s;@,for(%s=0;%s<%a;%s++)@,%a @]@,}"
+	idx idx idx pp_c_dimension dim idx
+	(aux (idx::indices)) (Types.array_element_type typ)
+    else
+      let pp_read  = pp_offset (pp_c_var_read  m) indices in
+      let pp_write = pp_offset (pp_c_var_write m) indices in
+      pp_call m self pp_read pp_write fmt i inputs outputs
+  in
+  begin
+    reset_loop_counter ();
+    aux [] fmt (List.hd inputs).value_type
+  end
 
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)

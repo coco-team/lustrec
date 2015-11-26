@@ -14,6 +14,13 @@ open Format
 open LustreSpec
 open Corelang
 
+let check_main () =
+  if !Options.main_node = "" then
+    begin
+      eprintf "Code generation error: %a@." pp_error No_main_specified;
+      raise (Error (Location.dummy_loc, No_main_specified))
+    end
+
 let create_dest_dir () =
   begin
     if not (Sys.file_exists !Options.dest_dir) then
@@ -82,6 +89,16 @@ let check_stateless_decls decls =
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. checking stateless/stateful status@ ");
   try
     Stateless.check_prog decls
+  with (Stateless.Error (loc, err)) as exc ->
+    eprintf "Stateless status error: %a%a@."
+      Stateless.pp_error err
+      Location.pp_loc loc;
+    raise exc
+
+let force_stateful_decls decls =
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. forcing stateful status@ ");
+  try
+    Stateless.force_prog decls
   with (Stateless.Error (loc, err)) as exc ->
     eprintf "Stateless status error: %a%a@."
       Stateless.pp_error err

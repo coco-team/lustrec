@@ -18,7 +18,7 @@ let header_has_code header =
     (fun top -> 
       match top.top_decl_desc with
       | Const _ -> true 
-      | ImportedNode nd -> nd.nodei_in_lib = None
+      | ImportedNode nd -> nd.nodei_in_lib = []
       | _ -> false
     )
     header
@@ -26,9 +26,7 @@ let header_has_code header =
 let header_libs header =
   List.fold_left (fun accu top ->
     match top.top_decl_desc with
-      | ImportedNode nd -> (match nd.nodei_in_lib with 
-	| None -> accu 
-	| Some lib -> Utils.list_union [lib] accu)
+      | ImportedNode nd -> Utils.list_union nd.nodei_in_lib accu
       | _ -> accu 
   ) [] header 
     
@@ -86,6 +84,8 @@ let print_makefile basename nodename (dependencies:  dep_t list) fmt =
  fprintf fmt "@.";
  fprintf fmt "clean:@.";
  fprintf fmt "\t\\rm -f *.o %s_%s@." basename nodename;
+ fprintf fmt "@.";
+ fprintf fmt ".PHONY: %s_%s@." basename nodename;
  fprintf fmt "@.";
  Mod.other_targets fmt basename nodename dependencies;
  fprintf fmt "@.";

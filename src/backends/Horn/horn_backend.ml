@@ -111,8 +111,8 @@ let pp_horn_tag fmt t =
 let rec pp_horn_const fmt c =
   match c with
     | Const_int i    -> pp_print_int fmt i
-    | Const_real r   -> pp_print_string fmt r
-    | Const_float r  -> pp_print_float fmt r
+    | Const_real (c,e,s)   -> assert false (* TODO rational pp_print_string fmt r *)
+    (* | Const_float r  -> pp_print_float fmt r *)
     | Const_tag t    -> pp_horn_tag fmt t
     | _              -> assert false
 
@@ -121,7 +121,7 @@ let rec pp_horn_const fmt c =
    but an offset suffix may be added for array variables
 *)
 let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
-  match v with
+  match v.value_desc with
     | Cst c         -> pp_horn_const fmt c
     | Array _
     | Access _ -> assert false (* no arrays *)
@@ -135,7 +135,7 @@ let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
 
 (* Prints a [value] indexed by the suffix list [loop_vars] *)
 let rec pp_value_suffix self pp_value fmt value =
- match value with
+ match value.value_desc with
  | Fun (n, vl)  ->
    Basic_library.pp_horn n (pp_value_suffix self pp_value) fmt vl
  |  _            ->
@@ -163,12 +163,12 @@ let pp_instance_call
    	    self
    	    (pp_horn_var m)
 	    fmt
-   	    o.var_type (LocalVar o) i1
+   	    o.var_type (mk_val (LocalVar o) o.var_type) i1
         else
           pp_assign
    	    m self (pp_horn_var m) fmt
-   	    o.var_type (LocalVar o) i2
-
+   	    o.var_type (mk_val (LocalVar o) o.var_type) i2
+	    
       end
       | name, _, _ ->
 	begin
@@ -181,8 +181,8 @@ let pp_instance_call
 	      inputs
 	      (Utils.pp_final_char_if_non_empty " " inputs)
 	      (* outputs *)
-	      (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m)))
-	      (List.map (fun v -> LocalVar v) outputs)
+	      (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) 
+	      (List.map (fun v -> mk_val (LocalVar v) v.var_type) outputs)
 	      (Utils.pp_final_char_if_non_empty " " outputs)
 	      (* memories (next) *)
 	      (Utils.fprintf_list ~sep:" " pp_var) (
@@ -195,9 +195,9 @@ let pp_instance_call
 	    Format.fprintf fmt "(%a %a%t%a%t%a)"
 	      pp_machine_step_name (node_name n)
 	      (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) inputs
-	      (Utils.pp_final_char_if_non_empty " " inputs)
-	      (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m)))
-	      (List.map (fun v -> LocalVar v) outputs)
+	      (Utils.pp_final_char_if_non_empty " " inputs) 
+	      (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) 
+	      (List.map (fun v -> mk_val (LocalVar v) v.var_type) outputs)
 	      (Utils.pp_final_char_if_non_empty " " outputs)
 	      (Utils.fprintf_list ~sep:" " pp_var) (
 		(rename_machine_list
@@ -218,9 +218,9 @@ let pp_instance_call
 	(node_name n)
 	(Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m)))
 	inputs
-	(Utils.pp_final_char_if_non_empty " " inputs)
-	(Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m)))
-	(List.map (fun v -> LocalVar v) outputs)
+	(Utils.pp_final_char_if_non_empty " " inputs) 
+	(Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) 
+	(List.map (fun v -> mk_val (LocalVar v) v.var_type) outputs)
     )
 
 let pp_machine_init (m: machine_t) self fmt inst =
@@ -247,12 +247,12 @@ and pp_machine_instr machines ?(init=false) (m: machine_t) self fmt instr =
   | MLocalAssign (i,v) ->
     pp_assign
       m self (pp_horn_var m) fmt
-      i.var_type (LocalVar i) v
+      i.var_type (mk_val (LocalVar i) i.var_type) v
   | MStateAssign (i,v) ->
     pp_assign
       m self (pp_horn_var m) fmt
-      i.var_type (StateVar i) v
-  | MStep ([i0], i, vl) when Basic_library.is_internal_fun i  ->
+      i.var_type (mk_val (StateVar i) i.var_type) v
+  | MStep ([i0], i, vl) when Basic_library.is_value_internal_fun (mk_val (Fun (i, vl)) i0.var_type)  -> 
     assert false (* This should not happen anymore *)
   | MStep (il, i, vl) ->
     pp_instance_call machines ~init:init m self fmt i vl il
@@ -264,6 +264,7 @@ and pp_machine_instr machines ?(init=false) (m: machine_t) self fmt instr =
       let el = try List.assoc tag_false hl with Not_found -> [] in
       pp_conditional machines ~init:init m self fmt g tl el
     else assert false (* enum type case *)
+  | MComment _ -> ()
 
 
 (**************************************************************)
@@ -362,6 +363,18 @@ let print_machine machines fmt m =
                            (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
           end
        );
+       
+(*
+       match m.mspec with
+	 None -> () (* No node spec; we do nothing *)
+       | Some {requires = []; ensures = [EnsuresExpr e]; behaviors = []} -> 
+	 ( 
+       (* For the moment, we only deal with simple case: single ensures, no other parameters *)
+	   ()
+	     
+	 )
+       | _ -> () (* Other cases give nothing *)
+*)      
      end
     end
 
@@ -427,7 +440,8 @@ let check_prop machines fmt node machine =
     (pp_conj pp_var) main_output
     (Utils.fprintf_list ~sep:" " pp_var) main_memory_next
     ;
-   if !Options.horn_query then Format.fprintf fmt "(query ERR)@."
+  if !Options.horn_queries then
+    Format.fprintf fmt "(query ERR)@."
 
 
 let cex_computation machines fmt node machine =

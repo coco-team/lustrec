@@ -29,9 +29,8 @@ let rec print_dec_struct_ty_field fmt (label, cty) =
 and print_dec_ty fmt cty =
   match (*get_repr_type*) cty with
   | Tydec_any -> fprintf fmt "Any"
-  | Tydec_int -> fprintf fmt "int"
-  | Tydec_real 
-  | Tydec_float -> fprintf fmt "real"
+  | Tydec_int -> fprintf fmt "int" 
+  | Tydec_real -> fprintf fmt "real"
   | Tydec_bool -> fprintf fmt "bool"
   | Tydec_clock cty' -> fprintf fmt "%a clock" print_dec_ty cty'
   | Tydec_const c -> fprintf fmt "%s" c
@@ -57,8 +56,8 @@ let rec pp_struct_const_field fmt (label, c) =
 and pp_const fmt c = 
   match c with
     | Const_int i -> pp_print_int fmt i
-    | Const_real r -> pp_print_string fmt r
-    | Const_float r -> pp_print_float fmt r
+    | Const_real (c,e,s) -> pp_print_string fmt s (*if e = 0 then pp_print_int fmt c else if e < 0 then Format.fprintf fmt "%ie%i" c (-e) else Format.fprintf fmt "%ie-%i" c e *)
+    (* | Const_float r -> pp_print_float fmt r *)
     | Const_tag  t -> pp_print_string fmt t
     | Const_array ca -> Format.fprintf fmt "[%a]" (Utils.fprintf_list ~sep:"," pp_const) ca
     | Const_struct fl -> Format.fprintf fmt "{%a }" (Utils.fprintf_list ~sep:" " pp_struct_const_field) fl
@@ -131,7 +130,7 @@ and pp_eexpr fmt e =
 
 and pp_expr_annot fmt expr_ann =
   let pp_annot fmt (kwds, ee) =
-    Format.fprintf fmt "(*! %t: %a *)"
+    Format.fprintf fmt "(*! %t: %a; *)"
       (fun fmt -> match kwds with | [] -> assert false | [x] -> Format.pp_print_string fmt x | _ -> Format.fprintf fmt "/%a/" (fprintf_list ~sep:"/" Format.pp_print_string) kwds)
       pp_eexpr ee
   in
@@ -205,7 +204,7 @@ and pp_var_type_dec_desc fmt tdesc =
   | Tydec_any -> fprintf fmt "<any>"
   | Tydec_int -> fprintf fmt "int"
   | Tydec_real -> fprintf fmt "real"
-  | Tydec_float -> fprintf fmt "float"
+  (* | Tydec_float -> fprintf fmt "float" *)
   | Tydec_bool -> fprintf fmt "bool"
   | Tydec_clock t -> fprintf fmt "%a clock" pp_var_type_dec_desc t
   | Tydec_const t -> fprintf fmt "%s" t

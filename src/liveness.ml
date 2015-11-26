@@ -115,7 +115,7 @@ let remove_roots ctx =
 (* checks whether a variable is aliasable,
    depending on its (address) type *)
 let is_aliasable var =
- Types.is_address_type var.var_type
+  (not (!Options.mpfr && Types.is_real_type var.var_type)) && Types.is_address_type var.var_type
  
 (* checks whether a variable [v] is an input of the [var] equation, with an address type.
    if so, [var] could not safely reuse/alias [v], should [v] be dead in the caller node,
@@ -127,11 +127,7 @@ let is_aliasable_input node var =
     | None           -> []
     | Some (_, args) -> List.fold_right (fun e r -> match e.expr_desc with Expr_ident id -> id::r | _ -> r) args [] in
   fun v -> is_aliasable v && List.mem v.var_id inputs_var
-(*
-    let res =
-is_aliasable v && List.mem v.var_id inputs_var
-    in (Format.eprintf "aliasable %s by %s = %B@." var v.var_id res; res)
-*)
+
 (* replace variable [v] by [v'] in graph [g].
    [v'] is a dead variable
 *)
@@ -207,10 +203,8 @@ let compute_reuse node ctx heads var =
     let disjoint_live = Disjunction.CISet.inter disjoint live in
     Log.report ~level:7 (fun fmt -> Format.fprintf fmt "disjoint live:%a@." Disjunction.pp_ciset disjoint_live);
     let reuse = Disjunction.CISet.max_elt disjoint_live in
-    (*let reuse' = Hashtbl.find ctx.policy reuse.var_id in*)
     begin
       IdentDepGraph.add_edge ctx.dep_graph var.var_id reuse.var_id;
-      (*if reuse != reuse' then IdentDepGraph.add_edge ctx.dep_graph reuse.var_id reuse'.var_id;*)
       Hashtbl.add ctx.policy var.var_id reuse;
       ctx.evaluated <- Disjunction.CISet.add var ctx.evaluated;
       (*Format.eprintf "%s reused by live@." var.var_id;*)
@@ -220,13 +214,11 @@ let compute_reuse node ctx heads var =
     let dead = Disjunction.CISet.filter (fun v -> is_graph_root v.var_id ctx.dep_graph) quasi_dead in
     Log.report ~level:7 (fun fmt -> Format.fprintf fmt "dead:%a@." Disjunction.pp_ciset dead);
     let reuse = Disjunction.CISet.choose dead in
-    (*let reuse' = Hashtbl.find ctx.policy reuse.var_id in*)
     begin
       IdentDepGraph.add_edge ctx.dep_graph var.var_id reuse.var_id;
-      (*if reuse != reuse' then IdentDepGraph.add_edge ctx.dep_graph reuse.var_id reuse'.var_id;*)
       Hashtbl.add ctx.policy var.var_id reuse;
       ctx.evaluated <- Disjunction.CISet.add var ctx.evaluated;
-      (*Format.eprintf "%s reused by dead %a@." var.var_id Disjunction.pp_ciset dead;*)
+      (*Format.eprintf "%s reused by dead %s@." var.var_id reuse.var_id;*)
     end
       with Not_found ->
     begin

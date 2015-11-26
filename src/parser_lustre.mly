@@ -18,9 +18,10 @@ open Parse
 
 let get_loc () = Location.symbol_rloc ()
 
+let mkident x = x, get_loc ()
 let mktyp x = mktyp (get_loc ()) x
 let mkclock x = mkclock (get_loc ()) x
-let mkvar_decl x = mkvar_decl (get_loc ()) ~orig:true x
+let mkvar_decl x loc = mkvar_decl loc ~orig:true x
 let mkexpr x = mkexpr (get_loc ()) x
 let mkeexpr x = mkeexpr (get_loc ()) x 
 let mkeq x = mkeq (get_loc ()) x
@@ -52,8 +53,8 @@ let rec fby expr n init =
 %}
 
 %token <int> INT
-%token <string> REAL
-%token <float> FLOAT
+%token <Num.num * int * string> REAL
+
 %token <string> STRING
 %token AUTOMATON STATE UNTIL UNLESS RESTART RESUME LAST
 %token STATELESS ASSERT OPEN QUOTE FUNCTION
@@ -69,7 +70,7 @@ let rec fby expr n init =
 %token MERGE FBY WHEN WHENNOT EVERY
 %token NODE LET TEL RETURNS VAR IMPORTED SENSOR ACTUATOR WCET TYPE CONST
 %token STRUCT ENUM
-%token TINT TFLOAT TREAL TBOOL TCLOCK
+%token TINT TREAL TBOOL TCLOCK
 %token RATE DUE
 %token EQ LT GT LTE GTE NEQ
 %token AND OR XOR IMPL
@@ -116,6 +117,9 @@ let rec fby expr n init =
 %start lustre_spec
 %type <LustreSpec.node_annot> lustre_spec
 
+%start signed_const
+%type <LustreSpec.constant> signed_const
+
 %%
 
 module_ident:
@@ -135,8 +139,8 @@ node_ident_decl:
  node_ident { push_node $1; $1 }
 
 vdecl_ident:
-  UIDENT { $1 }
-| IDENT  { $1 }
+  UIDENT { mkident $1 }
+| IDENT  { mkident $1 }
 
 const_ident:
   UIDENT { $1 }
@@ -180,7 +184,7 @@ state_annot:
 
 top_decl_header:
 | CONST cdecl_list { List.rev ($2 true) }
-| nodespec_list state_annot node_ident LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR  prototype_opt in_lib_opt SCOL
+| nodespec_list state_annot node_ident LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR  prototype_opt in_lib_list SCOL
     {let nd = mktop_decl true (ImportedNode
 				 {nodei_id = $3;
 				  nodei_type = Types.new_var ();
@@ -198,9 +202,9 @@ prototype_opt:
  { None }
 | PROTOTYPE node_ident { Some $2}
 
-in_lib_opt:
-{ None }
-| LIB module_ident {Some $2} 
+in_lib_list:
+{ [] }
+| LIB module_ident in_lib_list { $2::$3 } 
 
 top_decl:
 | CONST cdecl_list { List.rev ($2 false) }
@@ -232,8 +236,8 @@ top_decl:
       in
       pop_node ();
      (*add_node $3 nd;*) [nd] }
-    
- nodespec_list:
+
+nodespec_list:
  { None }
 | NODESPEC nodespec_list { 
   (function 
@@ -264,7 +268,7 @@ typeconst:
   TINT array_typ_decl   { $2 Tydec_int }
 | TBOOL array_typ_decl  { $2 Tydec_bool  }
 | TREAL array_typ_decl  { $2 Tydec_real  }
-| TFLOAT array_typ_decl { $2 Tydec_float }
+/* | TFLOAT array_typ_decl { $2 Tydec_float } */
 | type_ident array_typ_decl  { $2 (Tydec_const $1) }
 | TBOOL TCLOCK          { Tydec_clock Tydec_bool }
 | IDENT TCLOCK          { Tydec_clock (Tydec_const $1) }
@@ -313,8 +317,8 @@ assert_:
 | ASSERT expr SCOL {mkassert ($2)}
 
 eq:
-       ident_list      EQ expr SCOL {mkeq (List.rev $1,$3)}
-| LPAR ident_list RPAR EQ expr SCOL {mkeq (List.rev $2,$5)}
+       ident_list      EQ expr SCOL {mkeq (List.rev (List.map fst $1), $3)}
+| LPAR ident_list RPAR EQ expr SCOL {mkeq (List.rev (List.map fst $2), $5)}
 
 lustre_spec:
 | contract EOF { $1 }
@@ -369,8 +373,8 @@ dim_list:
 expr:
 /* constants */
   INT {mkexpr (Expr_const (Const_int $1))}
-| REAL {mkexpr (Expr_const (Const_real $1))}
-| FLOAT {mkexpr (Expr_const (Const_float $1))}
+| REAL {let c,e,s = $1 in mkexpr (Expr_const (Const_real (c,e,s)))}
+/* | FLOAT {mkexpr (Expr_const (Const_float $1))}*/
 /* Idents or type enum tags */
 | IDENT { mkexpr (Expr_ident $1) }
 | tag_ident { mkexpr (Expr_ident $1) (*(Expr_const (Const_tag $1))*) }
@@ -395,13 +399,13 @@ expr:
     {(*mkexpr (Expr_fby ($1,$3))*)
       mkexpr (Expr_arrow ($1, mkexpr (Expr_pre $3)))}
 | expr WHEN vdecl_ident
-    {mkexpr (Expr_when ($1,$3,tag_true))}
+    {mkexpr (Expr_when ($1,fst $3,tag_true))}
 | expr WHENNOT vdecl_ident
-    {mkexpr (Expr_when ($1,$3,tag_false))}
+    {mkexpr (Expr_when ($1,fst $3,tag_false))}
 | expr WHEN tag_ident LPAR vdecl_ident RPAR
-    {mkexpr (Expr_when ($1, $5, $3))}
+    {mkexpr (Expr_when ($1, fst $5, $3))}
 | MERGE vdecl_ident handler_expr_list
-    {mkexpr (Expr_merge ($2,$3))}
+    {mkexpr (Expr_merge (fst $2,$3))}
 
 /* Applications */
 | node_ident LPAR expr RPAR
@@ -409,28 +413,9 @@ expr:
 | node_ident LPAR expr RPAR EVERY expr
     {mkexpr (Expr_appl ($1, $3, Some $6))}
 | node_ident LPAR tuple_expr RPAR
-    {
-      let id=$1 in
-      let args=List.rev $3 in
-      match id, args with
-      | "fbyn", [expr;n;init] ->
-	let n = match n.expr_desc with
-	  | Expr_const (Const_int n) -> n
-	  | _ -> assert false
-	in
-	fby expr n init
-      | _ -> mkexpr (Expr_appl ($1, mkexpr (Expr_tuple args), None))
-    }
+    {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), None))}
 | node_ident LPAR tuple_expr RPAR EVERY expr
-    {
-      let id=$1 in
-      let args=List.rev $3 in
-      let clock=$6 in
-      if id="fby" then
-	assert false (* TODO Ca veut dire quoi fby (e,n,init) every c *)
-      else
-	mkexpr (Expr_appl (id, mkexpr (Expr_tuple args), Some clock)) 
-    }
+    {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), Some $6)) }
 
 /* Boolean expr */
 | expr AND expr 
@@ -497,12 +482,12 @@ signed_const_struct:
 
 signed_const:
   INT {Const_int $1}
-| REAL {Const_real $1}
-| FLOAT {Const_float $1}
+| REAL {let c,e,s =$1 in Const_real (c,e,s)}
+/* | FLOAT {Const_float $1} */
 | tag_ident {Const_tag $1}
 | MINUS INT {Const_int (-1 * $2)}
-| MINUS REAL {Const_real ("-" ^ $2)}
-| MINUS FLOAT {Const_float (-1. *. $2)}
+| MINUS REAL {let c,e,s = $2 in Const_real (Num.minus_num c, e, "-" ^ s)}
+/* | MINUS FLOAT {Const_float (-1. *. $2)} */
 | LCUR signed_const_struct RCUR { Const_struct $2 }
 | LBRACKET signed_const_array RBRACKET { Const_array $2 }
 
@@ -567,11 +552,11 @@ vdecl_list:
 
 vdecl:
   ident_list COL typeconst clock 
-    { List.map (fun id -> mkvar_decl (id, mktyp $3, $4, false, None)) $1 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $3, $4, false, None) loc) $1 }
 | CONST ident_list /* static parameters don't have clocks */
-    { List.map (fun id -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, true, None)) $2 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, true, None) loc) $2 }
 | CONST ident_list COL typeconst /* static parameters don't have clocks */
-    { List.map (fun id -> mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true, None)) $2 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true, None) loc) $2 }
 
 local_vdecl_list:
   local_vdecl {$1}
@@ -579,13 +564,13 @@ local_vdecl_list:
 
 local_vdecl:
 /* Useless no ?*/    ident_list
-    { List.map (fun id -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, false, None)) $1 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, false, None) loc) $1 }
 | ident_list COL typeconst clock 
-    { List.map (fun id -> mkvar_decl (id, mktyp $3, $4, false, None)) $1 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $3, $4, false, None) loc) $1 }
 | CONST vdecl_ident EQ expr /* static parameters don't have clocks */
-    { [ mkvar_decl ($2, mktyp Tydec_any, mkclock Ckdec_any, true, Some $4) ] }
+    { let (id, loc) = $2 in [ mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, true, Some $4) loc ] }
 | CONST vdecl_ident COL typeconst EQ expr /* static parameters don't have clocks */
-    { [ mkvar_decl ($2, mktyp $4, mkclock Ckdec_any, true, Some $6) ] }
+    { let (id, loc) = $2 in [ mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true, Some $6) loc ] }
 
 cdecl_list:
   cdecl SCOL { (fun itf -> [$1 itf]) }

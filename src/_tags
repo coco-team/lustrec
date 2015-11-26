@@ -1,10 +1,15 @@
 "backends/C": include
 "backends/Horn": include
+"plugins/salsa": include
+"plugins/scopes": include
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic
 "main_lustre_compiler.native": use_graph
 "main_lustre_compiler.native": use_str
 "main_lustre_compiler.native": use_unix
-<*.ml{,i}>: use_graph
-<*.ml{,i}>: use_str
-<*.ml{,i}>: use_unix
+"main_lustre_compiler.native": use_num, package(salsa)
+#<*.ml{,i}>: package(salsa)
+<**/*.cm?>: use_graph
+#<*.ml{,i}>: use_str
+#<*.ml{,i}>: use_unix
+<**/*.cm?>: package(salsa)

@@ -34,7 +34,7 @@ let rec check_expr expr =
   | Expr_merge (i, hl) -> List.for_all (fun (t, h) -> check_expr h) hl 
   | Expr_appl (i, e', i') ->
     check_expr e' &&
-      (Basic_library.is_internal_fun i || check_node (node_from_name i))
+      (Basic_library.is_stateless_fun i || check_node (node_from_name i))
 and compute_node nd =
  List.for_all (fun eq -> check_expr eq.eq_rhs) (get_node_eqs nd)
 and check_node td =
@@ -55,6 +55,17 @@ and check_node td =
 
 let check_prog decls =
   List.iter (fun td -> ignore (check_node td)) decls
+
+
+let force_prog decls =
+  let force_node td =
+    match td.top_decl_desc with 
+    | Node nd         -> (
+      nd.node_dec_stateless <- false;
+      nd.node_stateless <- Some false)
+    | _ -> ()
+  in
+  List.iter (fun td -> ignore (force_node td)) decls
 
 let check_compat_decl decl =
  match decl.top_decl_desc with
