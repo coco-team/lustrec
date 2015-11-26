@@ -41,13 +41,12 @@ let horntraces = ref false
 let horn_cex = ref false
 let horn_queries = ref false
 
-let salsa_enabled = ref false
 
 let set_mpfr prec =
   if prec > 0 then (
     mpfr := true;
     mpfr_prec := prec;
-    salsa_enabled := false; (* We deactivate salsa *)
+    (* salsa_enabled := false; (* We deactivate salsa *) TODO *)
   )
   else
     failwith "mpfr requires a positive integer"
@@ -69,8 +68,6 @@ let options =
     "-horn-traces", Arg.Unit (fun () -> output := "horn"; horntraces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
     "-horn-cex", Arg.Unit (fun () -> output := "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
     "-horn-queries", Arg.Unit (fun () -> output := "horn"; horn_queries:=true), "generate queries in generated Horn file. Enable the horn backend (work in progress)";
-    "-salsa", Arg.Set salsa_enabled, "activate Salsa optimization <default>";
-    "-no-salsa", Arg.Clear salsa_enabled, "deactivate Salsa optimization";
     "-print_reuse", Arg.Set print_reuse, "prints variable reuse policy";
     "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";
     "-inline", Arg.Unit (fun () -> global_inline := true; const_unfold := true), "inline all node calls (require a main node). Implies constant unfolding";

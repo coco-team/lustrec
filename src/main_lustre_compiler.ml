@@ -112,7 +112,7 @@ let stage1 prog dirname basename =
   in
 
   (* Checking stateless/stateful status *)
-  if Scopes.Plugin.is_active () then
+  if Plugins.check_force_stateful () then
     force_stateful_decls prog
   else
     check_stateless_decls prog;
@@ -275,27 +275,6 @@ let stage2 prog =
   in
   
   (* Salsa optimize machine code *)
-  let machine_code = 
-    if !Options.salsa_enabled then
-      begin
-	check_main ();
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. salsa machines optimization (phase 3)@ ");
-	(* Selecting float constants for Salsa *)
-	let constEnv = List.fold_left (
-	  fun accu c_topdecl ->
-	    match c_topdecl.top_decl_desc with
-	    | Const c when Types.is_real_type c.const_type  ->
-	      (c.const_id, c.const_value) :: accu
-	    | _ -> accu
-	) [] (Corelang.get_consts prog) 
-	in
-	List.map 
-	  (Machine_salsa_opt.machine_t2machine_t_optimized_by_salsa constEnv) 
-	  machine_code 
-      end
-    else
-      machine_code
-  in
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@ "
     (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
     machine_code);
@@ -391,23 +370,8 @@ let compile_source dirname basename extension =
   let machine_code = 
     stage2 prog 
   in
-  if Scopes.Plugin.show_scopes () then
-    begin
-      let all_scopes = Scopes.compute_scopes prog !Options.main_node in
-      (* Printing scopes *)
-      if !Options.verbose_level >= 1 then
-	Format.printf "Possible scopes are:@   ";
-      Format.printf "@[<v>%a@ @]@.@?" Scopes.print_scopes all_scopes;
-      exit 0
-	
-    end;
 
-  let machine_code = 
-    if Scopes.Plugin.is_active () then
-      Scopes.Plugin.process_scopes !Options.main_node prog machine_code
-    else
-      machine_code
-  in
+  let machine_code = Plugins.refine_machine_code prog machine_code in
   
   stage3 prog machine_code dependencies basename;
   begin
@@ -443,13 +407,7 @@ let _ =
   try
     Printexc.record_backtrace true;
 
-    let options = Options.options @ 
-      List.flatten (
-	List.map Options.plugin_opt [
-	  Scopes.Plugin.name, Scopes.Plugin.activate, Scopes.Plugin.options
-	]
-      )
-    in
+    let options = Options.options @ (Plugins.options ()) in
     
     Arg.parse options anonymous usage
   with

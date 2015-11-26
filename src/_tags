@@ -2,6 +2,7 @@
 "backends/Horn": include
 "plugins/salsa": include
 "plugins/scopes": include
+"plugins/mpfr": include
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic
 "main_lustre_compiler.native": use_graph
