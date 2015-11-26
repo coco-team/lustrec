@@ -297,7 +297,7 @@ let rec rewrite_instrs nodename constEnv  vars_env m instrs ranges formalEnv pri
 	    if debug then Format.eprintf "Registering and producing state assign %a@ " MC.pp_instr hd_instr;
 	    let formalEnv' = FormalEnv.def formalEnv vd vt in (* formelEnv updated with vd = vt *) 
 	    let instrs', ranges' = (* printing vd = optimized vt *)
-	      assign_vars printed_vars ranges formalEnv (Vars.singleton vd)  
+	      assign_vars printed_vars ranges formalEnv' (Vars.singleton vd)  
 	    in
 	    instrs',
 	    ranges',                          (* no new range computed *)

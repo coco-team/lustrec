@@ -32,7 +32,7 @@ struct
 
 let print_get_inputs fmt m =
   let pi fmt (v', v) =
-  match v.var_type.Types.tdesc with
+  match (Types.repr v.var_type).Types.tdesc with
     | Types.Tint -> fprintf fmt "%s = _get_int(\"%s\")" v.var_id v'.var_id
     | Types.Tbool -> fprintf fmt "%s = _get_bool(\"%s\")" v.var_id v'.var_id
     | Types.Treal when !Options.mpfr -> fprintf fmt "mpfr_set_d(%s, _get_double(\"%s\"), %i)" v.var_id v'.var_id (Mpfr.mpfr_prec ())
@@ -50,7 +50,7 @@ let print_get_inputs fmt m =
 
 let print_put_outputs fmt m = 
   let po fmt (o', o) =
-    match o.var_type.Types.tdesc with
+    match (Types.repr o.var_type).Types.tdesc with
     | Types.Tint -> fprintf fmt "_put_int(\"%s\", %s)" o'.var_id o.var_id
     | Types.Tbool -> fprintf fmt "_put_bool(\"%s\", %s)" o'.var_id o.var_id
     | Types.Treal when !Options.mpfr -> fprintf fmt "_put_double(\"%s\", mpfr_get_d(%s, %s))" o'.var_id o.var_id (Mpfr.mpfr_rnd ())
