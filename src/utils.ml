@@ -326,7 +326,7 @@ let pp_longident lid =
   pp_list lid pp_fun "" "." "."  
 
 let pp_date fmt tm =
-  Format.fprintf fmt "%i/%i/%i, %i:%i:%i"
+  Format.fprintf fmt "%i/%i/%i, %02i:%02i:%02i"
     (tm.Unix.tm_year + 1900)
     tm.Unix.tm_mon
     tm.Unix.tm_mday

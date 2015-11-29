@@ -313,7 +313,7 @@ struct
 
   let pp fmt = pp_scopes fmt !scopes_map
 
-  let check_force_stateful () = true
+  let check_force_stateful () = !option_scopes
 
   let refine_machine_code prog machine_code =
     if show_scopes () then

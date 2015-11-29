@@ -154,15 +154,15 @@ let check_dependency lusic basename =
   )
 
 let rec load_header_rec imported header =
-  List.fold_left (fun imp decl ->
+  List.fold_left (fun imported decl ->
     match decl.top_decl_desc with
     | Node nd -> assert false
-    | ImportedNode ind -> (add_imported_node ind.nodei_id decl; imp)
-    | Const c -> (add_const true c.const_id decl; imp)
-    | TypeDef tdef -> (add_type true tdef.tydef_id decl; imp)
+    | ImportedNode ind -> (add_imported_node ind.nodei_id decl; imported)
+    | Const c -> (add_const true c.const_id decl; imported)
+    | TypeDef tdef -> (add_type true tdef.tydef_id decl; imported)
     | Open (local, dep) ->
        let basename = name_dependency (local, dep) in
-       if ISet.mem basename imported then imp else
+       if ISet.mem basename imported then imported else
 	 let lusic = import_dependency_aux decl.top_decl_loc (local, dep)
 	 in load_header_rec (ISet.add basename imported) lusic.Lusic.contents
 		 ) imported header
@@ -179,15 +179,15 @@ let load_header imported header =
     );;
 
 let rec load_program_rec imported program =
-  List.fold_left (fun imp decl ->
+  List.fold_left (fun imported decl ->
     match decl.top_decl_desc with
-    | Node nd -> (add_node nd.node_id decl; imp)
+    | Node nd -> (add_node nd.node_id decl; imported)
     | ImportedNode ind -> assert false
-    | Const c -> (add_const false c.const_id decl; imp)
-    | TypeDef tdef -> (add_type false tdef.tydef_id decl; imp)
+    | Const c -> (add_const false c.const_id decl; imported)
+    | TypeDef tdef -> (add_type false tdef.tydef_id decl; imported)
     | Open (local, dep) ->
        let basename = name_dependency (local, dep) in
-       if ISet.mem basename imported then imp else
+       if ISet.mem basename imported then imported else
 	 let lusic = import_dependency_aux decl.top_decl_loc (local, dep)
 	 in load_header_rec (ISet.add basename imported) lusic.Lusic.contents
 		 ) imported program
