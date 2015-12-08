@@ -32,7 +32,7 @@ dist-clean: clean
 	@echo Compiling $<
 	@$(LOCAL_BINDIR)/lustrec $(OPTION_LUSIC) -verbose 0 -d include $< 
 
-include/mpfr_lustre.lusic: OPTION_LUSIC=-mpfr 1
+include/mpfr_lustre.lusic: OPTION_LUSIC=-mpfr 2 
 
 compile-lusi: lustrec $(LUSI_LIBS:%.lusi=%.lusic)
 

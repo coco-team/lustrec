@@ -43,13 +43,13 @@ let horn_queries = ref false
 
 
 let set_mpfr prec =
-  if prec > 2 then (
+  if prec > 1 then (
     mpfr := true;
     mpfr_prec := prec;
     (* salsa_enabled := false; (* We deactivate salsa *) TODO *)
   )
   else
-    failwith "mpfr requires an integer > 2"
+    failwith "mpfr requires an integer > 1"
 			
 let options =
   [ "-d", Arg.Set_string dest_dir,
