@@ -46,7 +46,7 @@ let pp_conj pp fmt l =
   match l with
     [] -> assert false
   | [x] -> pp fmt x
-  | _ -> fprintf fmt "(and @[<v 0>%a@]@ )" (Utils.fprintf_list ~sep:" " pp) l
+  | _ -> fprintf fmt "(and @[<v 0>%a@]@ )" (Utils.fprintf_list ~sep:"\n\t" pp) l
 
 
 
