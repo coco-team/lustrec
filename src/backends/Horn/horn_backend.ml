@@ -514,8 +514,16 @@ end
 
 
 let translate fmt basename prog machines =
-  List.iter (print_machine machines fmt) (List.rev machines);
-  main_print machines fmt
+  if !Options.mcmt then
+    begin
+      Log.report ~level:1 (fun fmt -> fprintf fmt ".. mcmt generation@,");
+      Mcmt_backend.translate fmt basename prog machines
+    end
+  else
+    begin
+      List.iter (print_machine machines fmt) (List.rev machines);
+      main_print machines fmt
+    end
 
 
 let traces_file fmt basename prog machines =
