@@ -38,6 +38,9 @@ let traces = ref false
 let horntraces = ref false
 let horn_cex = ref false
 let horn_query = ref true
+let mcmt = ref false
+
+
 
 
 let options =
@@ -54,6 +57,7 @@ let options =
     "-c-spec", Arg.Unit (fun () -> spec := "c"), "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
     "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C";
     "-horn", Arg.Unit (fun () -> output := "horn"), "generates Horn clauses encoding output instead of C";
+    "-mcmt", Arg.Unit (fun () -> output := "horn"; mcmt:=true; global_inline:=true), "generates MCMT encoding output";
     "-horn-traces", Arg.Unit (fun () -> output := "horn"; traces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
     "-horn-cex", Arg.Unit (fun () -> output := "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
     "-horn-query", Arg.Unit (fun () -> output := "horn"; horn_query:=true), "generate queries in generated Horn file. Enable the horn backend (work in progress)";

@@ -8,8 +8,7 @@
 (*                                                                  *)
 (********************************************************************)
 
-(* The compilation presented here is defined in Garoche, Gurfinkel, Kahsai,
-   HCSV'14 *)
+(* Compiling Lustre to MCMT *)
 
 open Format
 open LustreSpec
