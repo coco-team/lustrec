@@ -515,7 +515,10 @@ end
 
 
 let translate fmt basename prog machines =
-  List.iter (print_machine machines fmt) (List.rev machines);
+  List.iter(fun m ->
+            if !Options.main_node = m.mname.node_id then
+              print_machine machines fmt m) (List.rev machines);
+  (* List.iter (print_machine machines fmt) (List.rev machines); *)
   main_print machines fmt
 
 
