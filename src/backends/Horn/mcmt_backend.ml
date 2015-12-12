@@ -331,15 +331,17 @@ let print_machine machines fmt m =
        | [] ->
           begin
             (* Rule for init *)
-            Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@."
-	                   (pp_conj (pp_instr true m.mname.node_id)) m.mstep.step_instrs
-	                   pp_machine_init_name m.mname.node_id
-	                   (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m);
+            Format.fprintf fmt "; Initial states @.";
+            Format.fprintf fmt "@[<v 2>(define-states %a@ %a@]@.)@.@."
+                           pp_machine_init_name m.mname.node_id
+	                   (pp_conj (pp_instr true m.mname.node_id)) m.mstep.step_instrs;
+	                   (* (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m); *)
             (* Rule for step*)
-            Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@."
-                           (pp_conj (pp_instr false m.mname.node_id)) m.mstep.step_instrs
+            Format.fprintf fmt "; Transition relation @.";
+            Format.fprintf fmt "@[<v 2>(define-transition %a@ %a@]@.)@.@."
                            pp_machine_step_name m.mname.node_id
-                           (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
+                           (pp_conj (pp_instr false m.mname.node_id)) m.mstep.step_instrs
+                           (* (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m); *)
           end
        | assertsl ->
           begin
@@ -517,9 +519,9 @@ end
 let translate fmt basename prog machines =
   List.iter(fun m ->
             if !Options.main_node = m.mname.node_id then
-              print_machine machines fmt m) (List.rev machines);
+              print_machine machines fmt m) (List.rev machines)
   (* List.iter (print_machine machines fmt) (List.rev machines); *)
-  main_print machines fmt
+  (* main_print machines fmt *)
 
 
 let traces_file fmt basename prog machines =
