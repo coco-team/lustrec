@@ -71,7 +71,7 @@ let print_main_inout_declaration fmt m =
   end
 
 let print_main_memory_allocation mname main_mem fmt m =
-  if m.mmemory <> [] then
+  if not (fst (get_stateless_status m)) then
   begin
     fprintf fmt "@ /* Main memory allocation */@ ";
     if (!Options.static_mem && !Options.main_node <> "")
@@ -82,7 +82,7 @@ let print_main_memory_allocation mname main_mem fmt m =
   end
 
 let print_main_initialize mname main_mem fmt m =
-  if m.mmemory <> []
+  if not (fst (get_stateless_status m)) 
   then
     fprintf fmt "@ /* Initialize inputs, outputs and memories */@ %a%t%a%t%a(%s);@ "
       (Utils.fprintf_list ~sep:"@ " (pp_initialize m main_mem (pp_c_var_read m))) m.mstep.step_inputs
@@ -98,7 +98,7 @@ let print_main_initialize mname main_mem fmt m =
       (Utils.fprintf_list ~sep:"@ " (pp_initialize m main_mem (pp_c_var_read m))) m.mstep.step_outputs
 
 let print_main_clear mname main_mem fmt m =
-  if m.mmemory <> []
+  if not (fst (get_stateless_status m)) 
   then
     fprintf fmt "@ /* Clear inputs, outputs and memories */@ %a%t%a%t%a(%s);@ "
       (Utils.fprintf_list ~sep:"@ " (pp_clear m main_mem (pp_c_var_read m))) m.mstep.step_inputs

@@ -289,7 +289,7 @@ let pp_c_checks self fmt m =
 (********************************************************************************************)
 
 let pp_registers_struct fmt m =
-  if m.mmemory <> []
+  if not (fst (get_stateless_status m))
   then
     fprintf fmt "@[%a {@[<v>%a;@ @]}@] _reg; "
       pp_machine_regtype_name m.mname.node_id
@@ -414,7 +414,7 @@ let pp_c_main_var_output fmt id =
     fprintf fmt "&%s" id.var_id
 
 let pp_main_call mname self fmt m (inputs: value_t list) (outputs: var_decl list) =
-  if m.mmemory = []
+  if fst (get_stateless_status m)
   then
     fprintf fmt "%a (%a%t%a);"
       pp_machine_step_name mname
