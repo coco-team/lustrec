@@ -416,7 +416,7 @@ and type_expr env in_main const expr =
     expr.expr_type <- ty;
     ty
   | Expr_access (e1, d) ->
-    type_subtyping_arg env in_main true (expr_of_dimension d) Type_predef.type_int;
+    type_subtyping_arg env in_main false (* not necessary a constant *) (expr_of_dimension d) Type_predef.type_int;
     let ty_elt = new_var () in
     let d = Dimension.mkdim_var () in
     type_subtyping_arg env in_main const e1 (Type_predef.type_array d ty_elt);
