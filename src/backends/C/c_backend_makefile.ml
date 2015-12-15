@@ -63,7 +63,7 @@ struct
 
 
 let print_makefile basename nodename (dependencies:  dep_t list) fmt =
-  fprintf fmt "GCC=gcc@.";
+  fprintf fmt "GCC=gcc -O0@.";
   fprintf fmt "LUSTREC=%s@." Sys.executable_name;
   fprintf fmt "LUSTREC_BASE=%s@." (Filename.dirname (Filename.dirname Sys.executable_name));
   fprintf fmt "INC=${LUSTREC_BASE}/include/lustrec@.";
