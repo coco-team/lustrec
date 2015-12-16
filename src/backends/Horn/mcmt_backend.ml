@@ -35,7 +35,7 @@ let pp_type fmt t =
     Types.print_ty t; assert false
 
 let pp_decl_var fmt id =
-  Format.fprintf fmt "(declare-var %s %a)"
+  Format.fprintf fmt "  (%s %a)"
     id.var_id
     pp_type id.var_type
 
@@ -284,11 +284,17 @@ let print_machine machines fmt m =
     begin
       Format.fprintf fmt "; %s@." m.mname.node_id;
 
-   (* Printing variables *)
-   Utils.fprintf_list ~sep:"@." pp_decl_var fmt
-     ((step_vars machines m)@
-	 (rename_machine_list m.mname.node_id m.mstep.step_locals));
-   Format.pp_print_newline fmt ();
+      (* Printing variables *)
+        (* Format.fprintf fmt "(%a %a)@." *)
+       (*   pp_machine_init_name m.mname.node_id *)
+       (*   (Utils.fprintf_list ~sep:" " pp_type) *)
+      (*   (List.map (fun v -> v.var_type) (init_vars machines m)); *)
+      Format.fprintf fmt "(define-state-type state_type (\n";
+        (Utils.fprintf_list ~sep:"@." pp_decl_var fmt
+          ((step_vars machines m)@
+	     (rename_machine_list m.mname.node_id m.mstep.step_locals)));
+        Format.fprintf fmt "\n  )\n)";
+      Format.pp_print_newline fmt ();
 
 
 
@@ -301,28 +307,29 @@ let print_machine machines fmt m =
 	 (List.map (fun v -> v.var_type) (stateless_vars machines m));
 
        (* Rule for single predicate *)
-       Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@."
+       Format.fprintf fmt "; Stateless predicate @.";
+       Format.fprintf fmt "@[<v 2>(define-transition %a@ %a@]@.))@.@."
+         pp_machine_stateless_name m.mname.node_id
 	 (pp_conj (pp_instr
 		     true (* In this case, the boolean init can be set to true or false.
 			     The node is stateless. *)
 		     m.mname.node_id)
 	 )
 	 m.mstep.step_instrs
-	 pp_machine_stateless_name m.mname.node_id
-	 (Utils.fprintf_list ~sep:" " pp_var) (stateless_vars machines m);
+	 (* (Utils.fprintf_list ~sep:" " pp_var) (stateless_vars machines m); *)
      end
    else
      begin
        (* Declaring predicate *)
-       Format.fprintf fmt "(declare-rel %a (%a))@."
-	 pp_machine_init_name m.mname.node_id
-	 (Utils.fprintf_list ~sep:" " pp_type)
-	 (List.map (fun v -> v.var_type) (init_vars machines m));
+       (* Format.fprintf fmt "(%a %a)@." *)
+       (*   pp_machine_init_name m.mname.node_id *)
+       (*   (Utils.fprintf_list ~sep:" " pp_type) *)
+       (*   (List.map (fun v -> v.var_type) (init_vars machines m)); *)
 
-       Format.fprintf fmt "(declare-rel %a (%a))@."
-	 pp_machine_step_name m.mname.node_id
-	 (Utils.fprintf_list ~sep:" " pp_type)
-	 (List.map (fun v -> v.var_type) (step_vars machines m));
+       (* Format.fprintf fmt "(%a %a)@." *)
+       (*   pp_machine_step_name m.mname.node_id *)
+       (*   (Utils.fprintf_list ~sep:" " pp_type) *)
+       (*   (List.map (fun v -> v.var_type) (step_vars machines m)); *)
 
        Format.pp_print_newline fmt ();
 
@@ -332,13 +339,13 @@ let print_machine machines fmt m =
           begin
             (* Rule for init *)
             Format.fprintf fmt "; Initial states @.";
-            Format.fprintf fmt "@[<v 2>(define-states %a@ %a@]@.)@.@."
+            Format.fprintf fmt "@[<v 2>(define-states state_type %a@ %a@]@.)@.@."
                            pp_machine_init_name m.mname.node_id
 	                   (pp_conj (pp_instr true m.mname.node_id)) m.mstep.step_instrs;
 	                   (* (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m); *)
             (* Rule for step*)
             Format.fprintf fmt "; Transition relation @.";
-            Format.fprintf fmt "@[<v 2>(define-transition %a@ %a@]@.)@.@."
+            Format.fprintf fmt "@[<v 2>(define-transition state_type %a@ %a@]@.)@.@."
                            pp_machine_step_name m.mname.node_id
                            (pp_conj (pp_instr false m.mname.node_id)) m.mstep.step_instrs
                            (* (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m); *)
@@ -351,14 +358,14 @@ let print_machine machines fmt m =
             Format.fprintf fmt "; with Assertions @.";
             (*Rule for init*)
             Format.fprintf fmt "; Initial states @.";
-            Format.fprintf fmt "@[<v 2>(define-states %a@ (and @ %a@. %a)@]@.)@.@."
+            Format.fprintf fmt "@[<v 2>(define-states state_type %a@ (and @ %a@. %a)@]@.)@.@."
                            pp_machine_init_name m.mname.node_id
                            (pp_conj (pp_instr true m.mname.node_id)) instrs_concat
                            (pp_conj pp_val) assertsl;
                            (* (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m); *)
             (*Rule for step*)
             Format.fprintf fmt "; Transition relation @.";
-            Format.fprintf fmt "@[<v 2>(define-transition %a@ (and @ %a@. %a)@]@.)@.@."
+            Format.fprintf fmt "@[<v 2>(define-transition state_type %a@ (and @ %a@. %a)@]@.)@.@."
                            pp_machine_step_name m.mname.node_id
                            (pp_conj (pp_instr false m.mname.node_id)) instrs_concat
                            (pp_conj pp_val) assertsl;
@@ -396,26 +403,11 @@ let collecting_semantics machines fmt node machine =
 	pp_machine_init_name, pp_machine_step_name
     in
 
-    Format.fprintf fmt "(declare-rel MAIN (%a))@."
-      (Utils.fprintf_list ~sep:" " pp_type)
-      (List.map (fun v -> v.var_type) main_memory_next);
+    Format.fprintf fmt "(define-transition-system T
+                          state_type
+                          initial_state
+                          transition)@."
 
-    Format.fprintf fmt "; Initial set@.";
-    Format.fprintf fmt "(declare-rel INIT_STATE ())@.";
-    Format.fprintf fmt "(rule INIT_STATE)@.";
-    Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>INIT_STATE@ (@[<v 0>%a %a@])@]@ )@ (MAIN %a)@]@.))@.@."
-      init_name node
-      (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines machine)
-      (Utils.fprintf_list ~sep:" " pp_var) main_memory_next ;
-
-    Format.fprintf fmt "; Inductive def@.";
-    (Utils.fprintf_list ~sep:" " (fun fmt v -> Format.fprintf fmt "%a@." pp_decl_var v)) fmt main_output_dummy;
-    Format.fprintf fmt
-      "@[<v 2>(rule (=> @ (and @[<v 0>(MAIN %a)@ (@[<v 0>%a %a@])@]@ )@ (MAIN %a)@]@.))@.@."
-      (Utils.fprintf_list ~sep:" " pp_var) main_memory_current
-      step_name node
-      (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines machine)
-      (Utils.fprintf_list ~sep:" " pp_var) main_memory_next
 
 let check_prop machines fmt node machine =
   let main_output =
@@ -425,82 +417,9 @@ let check_prop machines fmt node machine =
     (rename_next_list (full_memory_vars machines machine)) @ main_output
   in
   Format.fprintf fmt "; Property def@.";
-  Format.fprintf fmt "(declare-rel ERR ())@.";
-  Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>(not %a)@ (MAIN %a)@])@ ERR))@."
+  Format.fprintf fmt "@[<v 2>(query T (not %a))@."
     (pp_conj pp_var) main_output
-    (Utils.fprintf_list ~sep:" " pp_var) main_memory_next
-    ;
-   if !Options.horn_query then Format.fprintf fmt "(query ERR)@."
 
-
-let cex_computation machines fmt node machine =
-    Format.fprintf fmt "; CounterExample computation for node %s@.@." node;
-    (* We print the types of the cex node "memory tree" TODO: add the output *)
-    let cex_input =
-     rename_machine_list machine.mname.node_id machine.mstep.step_inputs
-    in
-    let cex_input_dummy =
-     rename_machine_list ("dummy" ^ machine.mname.node_id) machine.mstep.step_inputs
-    in
-    let cex_output =
-     rename_machine_list machine.mname.node_id machine.mstep.step_outputs
-    in
-    let cex_output_dummy =
-     rename_machine_list ("dummy" ^ machine.mname.node_id) machine.mstep.step_outputs
-    in
-    let cex_memory_next =
-      cex_input @ (rename_next_list (full_memory_vars machines machine)) @ cex_output
-    in
-    let cex_memory_current =
-      cex_input_dummy @ (rename_current_list (full_memory_vars machines machine)) @ cex_output_dummy
-    in
-
-    (* Special case when the cex node is stateless *)
-    let init_name, step_name =
-      if is_stateless machine then
-	pp_machine_stateless_name, pp_machine_stateless_name
-      else
-	pp_machine_init_name, pp_machine_step_name
-    in
-
-    Format.fprintf fmt "(declare-rel CEX (Int %a))@.@."
-      (Utils.fprintf_list ~sep:" " pp_type)
-      (List.map (fun v -> v.var_type) cex_memory_next);
-
-    Format.fprintf fmt "; Initial set@.";
-    Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>INIT_STATE@ (@[<v 0>%a %a@])@]@ )@ (CEX 0 %a)@]@.))@.@."
-      init_name node
-      (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines machine)
-      (Utils.fprintf_list ~sep:" " pp_var) cex_memory_next ;
-
-    Format.fprintf fmt "; Inductive def@.";
-    (* Declare dummy inputs. Outputs should have been declared previously with collecting sem *)
-    (Utils.fprintf_list ~sep:" " (fun fmt v -> Format.fprintf fmt "%a@." pp_decl_var v)) fmt cex_input_dummy;
-    Format.fprintf fmt "(declare-var cexcpt Int)@.";
-    Format.fprintf fmt
-      "@[<v 2>(rule (=> @ (and @[<v 0>(CEX cexcpt %a)@ (@[<v 0>%a %a@])@]@ )@ (CEX (+ 1 cexcpt) %a)@]@.))@.@."
-      (Utils.fprintf_list ~sep:" " pp_var) cex_memory_current
-      step_name node
-      (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines machine)
-      (Utils.fprintf_list ~sep:" " pp_var) cex_memory_next
-
-let get_cex machines fmt node machine =
-    let cex_input =
-     rename_machine_list machine.mname.node_id machine.mstep.step_inputs
-    in
-    let cex_output =
-     rename_machine_list machine.mname.node_id machine.mstep.step_outputs
-    in
-  let cex_memory_next =
-    cex_input @ (rename_next_list (full_memory_vars machines machine)) @ cex_output
-  in
-  Format.fprintf fmt "; Property def@.";
-  Format.fprintf fmt "(declare-rel CEXTRACE ())@.";
-  Format.fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>(not %a)@ (CEX cexcpt %a)@])@ CEXTRACE))@."
-    (pp_conj pp_var) cex_output
-    (Utils.fprintf_list ~sep:" " pp_var) cex_memory_next
-    ;
-  Format.fprintf fmt "(query CEXTRACE)@."
 
 
 let main_print machines fmt =
@@ -508,22 +427,17 @@ if !Options.main_node <> "" then
   begin
     let node = !Options.main_node in
     let machine = get_machine machines node in
-
-
     collecting_semantics machines fmt node machine;
-    check_prop machines fmt node machine;
-    if !Options.horn_cex then(
-      cex_computation machines fmt node machine;
-      get_cex machines fmt node machine)
+    check_prop machines fmt node machine
 end
 
 
 let translate fmt basename prog machines =
   List.iter(fun m ->
             if !Options.main_node = m.mname.node_id then
-              print_machine machines fmt m) (List.rev machines)
+              print_machine machines fmt m) (List.rev machines);
   (* List.iter (print_machine machines fmt) (List.rev machines); *)
-  (* main_print machines fmt *)
+   main_print machines fmt
 
 
 let traces_file fmt basename prog machines =
