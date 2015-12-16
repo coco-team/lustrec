@@ -350,17 +350,19 @@ let print_machine machines fmt m =
             let instrs_concat = m.mstep.step_instrs in
             Format.fprintf fmt "; with Assertions @.";
             (*Rule for init*)
-            Format.fprintf fmt "@[<v 2>(rule (=> @ (and @ %a@. %a)(%a %a)@]@.))@.@."
-                           (pp_conj (pp_instr true m.mname.node_id)) instrs_concat
-                           (pp_conj pp_val) assertsl
+            Format.fprintf fmt "; Initial states @.";
+            Format.fprintf fmt "@[<v 2>(define-states %a@ (and @ %a@. %a)@]@.)@.@."
                            pp_machine_init_name m.mname.node_id
-                           (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m);
+                           (pp_conj (pp_instr true m.mname.node_id)) instrs_concat
+                           (pp_conj pp_val) assertsl;
+                           (* (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m); *)
             (*Rule for step*)
-            Format.fprintf fmt "@[<v 2>(rule (=> @ (and @ %a@. %a)(%a %a)@]@.))@.@."
-                           (pp_conj (pp_instr false m.mname.node_id)) instrs_concat
-                           (pp_conj pp_val) assertsl
+            Format.fprintf fmt "; Transition relation @.";
+            Format.fprintf fmt "@[<v 2>(define-transition %a@ (and @ %a@. %a)@]@.)@.@."
                            pp_machine_step_name m.mname.node_id
-                           (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
+                           (pp_conj (pp_instr false m.mname.node_id)) instrs_concat
+                           (pp_conj pp_val) assertsl;
+                           (* (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m); *)
           end
        );
      end

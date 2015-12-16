@@ -298,7 +298,11 @@ let rec compile_source dirname basename extension =
       end
     | "horn" ->
        begin
-	let source_file = destname ^ ".smt2" in (* Could be changed *)
+	 let source_file =
+           if !Options.mcmt then
+             destname ^ ".mcmt"
+           else
+             destname ^ ".smt2" in (* Could be changed *)
 	let source_out = open_out source_file in
 	let fmt = formatter_of_out_channel source_out in
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. hornification@,");
