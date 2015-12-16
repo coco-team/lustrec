@@ -34,7 +34,6 @@ TODO:
 - traiter les types enum et les branchements sur ces types enum (en particulier les traitements des resets qui ont lieu dans certaines branches et pas dans d'autres )
 *)
 
-
 let main_print machines fmt =
 if !Options.main_node <> "" then
   begin
