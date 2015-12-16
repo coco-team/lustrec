@@ -345,7 +345,7 @@ let print_machine machines fmt m =
 	                   (* (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m); *)
             (* Rule for step*)
             Format.fprintf fmt "; Transition relation @.";
-            Format.fprintf fmt "@[<v 2>(define-transition tranistion state_type @ %a@]@.)@.@."
+            Format.fprintf fmt "@[<v 2>(define-transition transition state_type @ %a@]@.)@.@."
                            (* pp_machine_step_name m.mname.node_id *)
                            (pp_conj (pp_instr false m.mname.node_id)) m.mstep.step_instrs
                            (* (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m); *)
