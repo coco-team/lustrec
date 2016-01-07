@@ -252,7 +252,13 @@ let rec pp_machine_instr machines reset_instances (m: machine_t) fmt instr : ide
        statement. *)
     let self = m.mname.node_id in
     let pp_branch fmt (tag, instrs) =
-      fprintf fmt "@[<v 3>(=> (= %a %s)@ "
+      fprintf fmt 
+	"@[<v 3>(or (not (= %a %s))@ " 
+	(*"@[<v 3>(=> (= %a %s)@ "*)  (* Issues with some versions of Z3. It
+					  seems that => within Horn predicate
+					  may cause trouble. I have hard time
+					  producing a MWE, so I'll just keep the
+					  fix here as (not a) or b *)
 	(pp_horn_val self (pp_horn_var m)) g
 	tag;
       let rs = pp_machine_instrs machines reset_instances m fmt instrs in
@@ -420,5 +426,5 @@ let print_machine machines fmt m =
 
 
 (* Local Variables: *)
-(* compile-command:"make -C ../.." *)
+(* compile-command:"make -C ../../.." *)
 (* End: *)
