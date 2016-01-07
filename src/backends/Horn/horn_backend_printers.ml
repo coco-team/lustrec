@@ -189,28 +189,6 @@ let pp_instance_call machines reset_instances m fmt i inputs outputs =
       (Utils.fprintf_list ~sep:"@ " (pp_horn_val self (pp_horn_var m)))
       (List.map (fun v -> LocalVar v) outputs)
   )
-
-
-(* let rec pp_bool_conditional machines ?(init=false)  (m: machine_t) self fmt c tl el = *)
-(*   fprintf fmt "@[<v 2>if (%a) {%t%a@]@,@[<v 2>} else {%t%a@]@,}" *)
-(*     (pp_horn_val self (pp_horn_var m)) c *)
-(*     (Utils.pp_newline_if_non_empty tl) *)
-(*     (Utils.fprintf_list ~sep:"@," (pp_machine_instr machines ~init:init  m self)) tl *)
-(*     (Utils.pp_newline_if_non_empty el) *)
-(*     (Utils.fprintf_list ~sep:"@," (pp_machine_instr machines ~init:init  m self)) el *)
-
-(* and pp_enum_conditional machines ?(init=false)  (m: machine_t) self fmt g hl = *)
-(* (\* TODO: check that the enum has all its constructor defined: Xavier how have you handled that, could we have partial definition? *\) *)
-(*   match hl with *)
-(*   | [] -> assert false *)
-(*   | [el] -> Utils.fprintf_list ~sep:"@," (pp_machine_instr machines ~init:init  m self) fmt el *)
-(*   | hd::tl -> *)
-(*   fprintf fmt "@[<v 2>if (= %a %a) {%t%a@]@,@[<v 2>} else {@.(%a)xxxx@]@,}" *)
-(*     (pp_horn_val self (pp_horn_var m)) c *)
-(*     TODOg *)
-(*     (Utils.pp_newline_if_non_empty tl) *)
-(*     (Utils.fprintf_list ~sep:"@," (pp_machine_instr machines ~init:init  m self)) hd *)
-(*     pp_print_newline fmt; *)
     
     
 (* Print the instruction and update the set of reset instances *)
@@ -266,19 +244,8 @@ let rec pp_machine_instr machines reset_instances (m: machine_t) fmt instr : ide
       () (* rs *)
     in
     pp_conj pp_branch fmt hl;
-    reset_instances (* TODO: le code est faux en ce qui concerne les resets. Il
-		       faut calculer ce qui se passe sur chaque branche et rajouter les instructions
-		       adequates *)
-	     
-(* if hl <> [] && let t = fst (List.hd hl) in t = tag_true || t = tag_false *)
-(* then (\* boolean case, needs special treatment in C because truth value is not unique *\) *)
-(*   (\* may disappear if we optimize code by replacing last branch test with default *\) *)
-(*   let tl = try List.assoc tag_true  hl with Not_found -> [] in *)
-(*   let el = try List.assoc tag_false hl with Not_found -> [] in *)
-(*   pp_bool_conditional machines ~init:init m self fmt g tl el *)
-(* else (\* enum type case *\) *)
+    reset_instances 
 
-(*   pp_enum_conditional machines ~init:init m self fmt g hl  *)
 and pp_machine_instrs machines reset_instances m fmt instrs = 
   let ppi rs fmt i = pp_machine_instr machines rs m fmt i in
   match instrs with
