@@ -86,6 +86,10 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
   end
 
 
+let functional_backend () = 
+  match !Options.output with
+  | "horn" | "lustre" | "acsl" -> true
+  | _ -> false
 
 (* compile a .lus source file *)
 let rec compile_source dirname basename extension =
@@ -236,9 +240,10 @@ let rec compile_source dirname basename extension =
 
   (* Optimize machine code *)
   let machine_code =
-    if !Options.optimization >= 4 && !Options.output <> "horn" then
+    if !Options.optimization >= 4 (* && !Options.output <> "horn" *) then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 3)@,");
+	Log.report ~level:1 
+	  (fun fmt -> fprintf fmt ".. machines optimization: sub-expression elimination@,");
 	Optimize_machine.machines_cse machine_code
       end
     else
@@ -247,20 +252,24 @@ let rec compile_source dirname basename extension =
 
   (* Optimize machine code *)
   let machine_code =
-    if !Options.optimization >= 2 && !Options.output <> "horn" then
+    if !Options.optimization >= 2 (* && !Options.output <> "horn" *) then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 1)@,");
+	Log.report ~level:1 
+	  (fun fmt -> fprintf fmt 
+	    ".. machines optimization: const. inlining (partial eval. with const)@,");
 	Optimize_machine.machines_unfold (Corelang.get_consts prog) node_schs machine_code
       end
     else
       machine_code
   in
   (* Optimize machine code *)
-  let machine_code =
-    if !Options.optimization >= 3 && !Options.output <> "horn" then
+  let machine_code = (* TODO reactivate. I disabled it because output variables were removed *)
+    if false && !Options.optimization >= 3 && not (functional_backend ()) then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 2)@,");
-	Optimize_machine.machines_fusion (Optimize_machine.machines_reuse_variables machine_code node_schs)
+	Log.report ~level:1 
+	  (fun fmt -> fprintf fmt ".. machines optimization: minimize heap alloc by reusing vars@,");
+	Optimize_machine.machines_fusion 
+	  (Optimize_machine.machines_reuse_variables machine_code node_schs)
       end
     else
       machine_code

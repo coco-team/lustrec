@@ -34,6 +34,7 @@ type instr_t =
   | MLocalAssign of var_decl * value_t
   | MStateAssign of var_decl * value_t
   | MReset of ident
+  | MNoReset of ident (* used to symmetrize the reset function *)
   | MStep of var_decl list * ident * value_t list
   | MBranch of value_t * (label * instr_t list) list
 
@@ -52,6 +53,7 @@ let rec pp_instr fmt i =
     | MLocalAssign (i,v) -> Format.fprintf fmt "%s<-l- %a" i.var_id pp_val v
     | MStateAssign (i,v) -> Format.fprintf fmt "%s<-s- %a" i.var_id pp_val v
     | MReset i           -> Format.fprintf fmt "reset %s" i
+    | MNoReset i         -> ()
     | MStep (il, i, vl)  ->
       Format.fprintf fmt "%a = %s (%a)"
 	(Utils.fprintf_list ~sep:", " (fun fmt v -> Format.pp_print_string fmt v.var_id)) il
@@ -319,11 +321,11 @@ let rec translate_expr ?(ite=false) node ((m, si, j, d, s) as args) expr =
  | Expr_pre _                       -> (Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
  | Expr_when    (e1, _, _)          -> translate_expr node args e1
  | Expr_merge   (g, hl)              -> (
-   (* Special treatment for functional backends. Is transformed into Ite *)
-   match !Options.output with
-   | "horn" -> translate_expr node  args (merge_to_ite g hl)
-   | ("C" | "java")          -> raise NormalizationError (* should have been replaced by MBranch *)
-   | _ ->
+   (* (\* Special treatment for functional backends. Is transformed into Ite *\) *)
+   (* match !Options.output with *)
+   (* | "horn" -> translate_expr node  args (merge_to_ite g hl) *)
+   (* | ("C" | "java")          -> raise NormalizationError (\* should have been replaced by MBranch *\) *)
+   (* | _ -> *)
      (Format.eprintf "option:%s@." !Options.output; Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
 
  )
@@ -363,7 +365,7 @@ let reset_instance node args i r c =
   match r with
   | None        -> []
   | Some r      -> let g = translate_guard node args r in
-                   [control_on_clock node args c (conditional g [MReset i] [])]
+                   [control_on_clock node args c (conditional g [MReset i] [MNoReset i])]
 
 let translate_eq node ((m, si, j, d, s) as args) eq =
   (* Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock; *)
@@ -415,14 +417,14 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       then []
       else reset_instance node args o r call_ck) @
        (control_on_clock node args call_ck (MStep (var_p, o, vl))) :: s)
-
+(*
    (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
       are preserved. While they are replaced as if g then x = t else x = e in  C or Java
       backends. *)
   | [x], Expr_ite   _
   (* similar treatment for merge, avoid generating MBranch instructions when using Horn backend *)
   | [x], Expr_merge _ 
-    when (match !Options.output with | "horn" -> true | "C" | "java" | _ -> false)
+    when (match !Options.output with | "horn" -> false (* TODO 16/12 was true *) | "C" | "java" | _ -> false)
 
       (* Remark for Ocaml: the when is shared among the two patterns *)
       ->
@@ -435,7 +437,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
 	(MLocalAssign (var_x, translate_expr node args eq.eq_rhs))::s)
     )
 
- 
+*)
   | [x], _                                       -> (
     let var_x = get_node_var x node in
     (m, si, j, d,
@@ -543,7 +545,7 @@ let translate_decl nd sch =
 	   common branches are not merged while they are in C or Java
 	   backends. *)
 	match !Options.output with
-	| "horn" -> s
+	(* | "horn" -> s TODO 16/12 *)
 	| "C" | "java" | _ -> join_guards_list s
       );
       step_asserts =

@@ -30,6 +30,7 @@ let rec eliminate elim instr =
   | MLocalAssign (i,v) -> MLocalAssign (i, e_expr v)
   | MStateAssign (i,v) -> MStateAssign (i, e_expr v)
   | MReset i           -> instr
+  | MNoReset i         -> instr
   | MStep (il, i, vl)  -> MStep(il, i, List.map e_expr vl)
   | MBranch (g,hl)     -> 
     MBranch
@@ -51,10 +52,19 @@ and eliminate_expr elim expr =
   | Cst _ -> expr
 
 let eliminate_dim elim dim =
-  Dimension.expr_replace_expr (fun v -> try dimension_of_value (IMap.find v elim) with Not_found -> mkdim_ident dim.dim_loc v) dim
+  Dimension.expr_replace_expr 
+    (fun v -> try
+		dimension_of_value (IMap.find v elim) 
+      with Not_found -> mkdim_ident dim.dim_loc v) 
+    dim
 
 let unfold_expr_offset m offset expr =
-  List.fold_left (fun res -> (function Index i -> Access(res, value_of_dimension m i) | Field f -> failwith "not yet implemented")) expr offset
+  List.fold_left 
+    (fun res -> 
+      (function Index i -> 
+       Access(res, value_of_dimension m i) 
+      | Field f -> failwith "not yet implemented"))
+    expr offset
 
 let rec simplify_cst_expr m offset cst =
     match offset, cst with
@@ -84,22 +94,30 @@ let simplify_expr_offset m expr =
     | Index i :: q, Array vl when Dimension.is_dimension_const i
                                      -> simplify q (List.nth vl (Dimension.size_const_dimension i))
     | Index i :: q, Array vl         -> unfold_expr_offset m [Index i] (Array (List.map (simplify q) vl))
-    | _ -> (Format.eprintf "internal error: Optimize_machine.simplify_expr_offset %a@." pp_val expr; assert false)
+(*    | _ -> (Format.eprintf "internal error: Optimize_machine.simplify_expr_offset %a@." pp_val expr; assert false) *)
     (*Format.eprintf "simplify_expr %a %a = %a@." pp_val expr (Utils.fprintf_list ~sep:"" Printers.pp_offset) offset pp_val res; res)
      with e -> (Format.eprintf "simplify_expr %a %a = <FAIL>@." pp_val expr (Utils.fprintf_list ~sep:"" Printers.pp_offset) offset; raise e*)
   in simplify [] expr
 
-let rec simplify_instr_offset m instr =
+let rec simplify_instr_offset m accu instr =
   match instr with
-  | MLocalAssign (v, expr) -> MLocalAssign (v, simplify_expr_offset m expr)
-  | MStateAssign (v, expr) -> MStateAssign (v, simplify_expr_offset m expr)
-  | MReset id              -> instr
-  | MStep (outputs, id, inputs) -> MStep (outputs, id, List.map (simplify_expr_offset m) inputs)
+  | MLocalAssign (v, expr) -> MLocalAssign (v, simplify_expr_offset m expr) :: accu
+  | MStateAssign (v, expr) -> MStateAssign (v, simplify_expr_offset m expr) :: accu
+  | MReset id              -> instr :: accu
+  | MNoReset id              -> instr :: accu
+  | MStep (outputs, id, inputs) -> MStep (outputs, id, List.map (simplify_expr_offset m) inputs) :: accu
   | MBranch (cond, brl)
-    -> MBranch(simplify_expr_offset m cond, List.map (fun (l, il) -> l, simplify_instrs_offset m il) brl)
-
+    -> (
+    let cond' = simplify_expr_offset m cond in
+    match cond' with
+    | Cst (Const_tag l) -> 
+      let il = List.assoc l brl in
+      List.fold_left (simplify_instr_offset m) accu il
+    |  _ -> MBranch(cond', List.map (fun (l, il) -> l, simplify_instrs_offset m il) brl) :: accu
+    )
 and simplify_instrs_offset m instrs =
-  List.map (simplify_instr_offset m) instrs
+  let rev_l = List.fold_left (simplify_instr_offset m) [] instrs in
+  List.rev rev_l
 
 let is_scalar_const c =
   match c with
@@ -219,7 +237,7 @@ let static_call_unfold elim (inst, (n, args)) =
 
 (** Perform optimization on machine code:
     - iterate through step instructions and remove simple local assigns
-    
+    - constant switch cases are simplified
 *)
 let machine_unfold fanin elim machine =
   (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "machine_unfold %a@." pp_elim elim);*)
@@ -419,6 +437,7 @@ let rec instr_replace_var fvar instr cont =
   | MLocalAssign (i, v) -> instr_cons (MLocalAssign (fvar i, value_replace_var fvar v)) cont
   | MStateAssign (i, v) -> instr_cons (MStateAssign (i, value_replace_var fvar v)) cont
   | MReset i            -> instr_cons instr cont
+  | MNoReset i            -> instr_cons instr cont
   | MStep (il, i, vl)   -> instr_cons (MStep (List.map fvar il, i, List.map (value_replace_var fvar) vl)) cont
   | MBranch (g, hl)     -> instr_cons (MBranch (value_replace_var fvar g, List.map (fun (h, il) -> (h, instrs_replace_var fvar il [])) hl)) cont
 

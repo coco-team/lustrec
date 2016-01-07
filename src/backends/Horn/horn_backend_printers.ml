@@ -78,14 +78,18 @@ let rec pp_value_suffix self pp_value fmt value =
    - [value]: assigned value
    - [pp_var]: printer for variables
 *)
-let pp_assign m self pp_var fmt var_type var_name value =
+let pp_assign m pp_var fmt var_type var_name value =
+  let self = m.mname.node_id in
   fprintf fmt "(= %a %a)" 
     (pp_horn_val ~is_lhs:true self pp_var) var_name
     (pp_value_suffix self pp_var) value
     
 
 (* In case of no reset call, we define mid_mem = current_mem *)
-let pp_no_reset machines m target_machine i fmt =
+let pp_no_reset machines m fmt i =
+  let (n,_) = List.assoc i m.minstances in
+  let target_machine = List.find (fun m  -> m.mname.node_id = (node_name n)) machines in
+
   let m_list = 
     rename_machine_list
       (concat m.mname.node_id i)
@@ -114,7 +118,7 @@ let pp_no_reset machines m target_machine i fmt =
     fprintf fmt ")@]@ @]"
   )
 
-let pp_instance_reset machines m self fmt i =
+let pp_instance_reset machines m fmt i =
   let (n,_) = List.assoc i m.minstances in
   let target_machine = List.find (fun m  -> m.mname.node_id = (node_name n)) machines in
   
@@ -133,7 +137,8 @@ let pp_instance_reset machines m self fmt i =
 	)
     )
 
-let pp_instance_call machines reset_instances m self fmt i inputs outputs =
+let pp_instance_call machines reset_instances m fmt i inputs outputs =
+  let self = m.mname.node_id in
   try (* stateful node instance *)
     begin
       let (n,_) = List.assoc i m.minstances in
@@ -141,7 +146,7 @@ let pp_instance_call machines reset_instances m self fmt i inputs outputs =
       (* Checking whether this specific instances has been reset yet *)
       if not (List.mem i reset_instances) then
 	(* If not, declare mem_m = mem_c *)
-	pp_no_reset machines m target_machine i fmt;
+	pp_no_reset machines m fmt i;
       
       let mems = full_memory_vars machines target_machine in
       let rename_mems f = rename_machine_list (concat m.mname.node_id i) (f mems) in
@@ -208,49 +213,69 @@ let pp_instance_call machines reset_instances m self fmt i inputs outputs =
 (*     pp_print_newline fmt; *)
     
     
-
-let rec pp_machine_instr machines reset_instances (m: machine_t) self fmt instr =
+(* Print the instruction and update the set of reset instances *)
+let rec pp_machine_instr machines reset_instances (m: machine_t) fmt instr : ident list =
   match instr with
+  | MNoReset i -> (* we assign middle_mem with mem_m. And declare i as reset *)
+    pp_no_reset machines m fmt i;
+    i::reset_instances
   | MReset i -> (* we assign middle_mem with reset: reset(mem_m) *)
-    pp_instance_reset machines m self fmt i;
+    pp_instance_reset machines m fmt i;
     i::reset_instances
   | MLocalAssign (i,v) ->
     pp_assign
-      m self (pp_horn_var m) fmt
+      m (pp_horn_var m) fmt
       i.var_type (LocalVar i) v;
     reset_instances
   | MStateAssign (i,v) ->
     pp_assign
-      m self (pp_horn_var m) fmt
+      m (pp_horn_var m) fmt
       i.var_type (StateVar i) v;
     reset_instances
   | MStep ([i0], i, vl) when Basic_library.is_internal_fun i  ->
     assert false (* This should not happen anymore *)
   | MStep (il, i, vl) ->
-      (* if reset instance, just print the call over mem_m , otherwise declare mem_m =
-	 mem_c and print the call to mem_m *)
-    pp_instance_call machines reset_instances m self fmt i vl il;
+    (* if reset instance, just print the call over mem_m , otherwise declare mem_m =
+       mem_c and print the call to mem_m *)
+    pp_instance_call machines reset_instances m fmt i vl il;
     reset_instances (* Since this instance call will only happen once, we
 		       don't have to update reset_instances *)
-  | MBranch (g,hl) -> (* should not be produced yet. Later, we will have to
+
+  | MBranch (g,hl) -> (* (g = tag1 => expr1) and (g = tag2 => expr2) ...
+			 should not be produced yet. Later, we will have to
 			 compare the reset_instances of each branch and
 			 introduced the mem_m = mem_c for branches to do not
 			 address it while other did. Am I clear ? *)
-    assert false
-      
-  (* if hl <> [] && let t = fst (List.hd hl) in t = tag_true || t = tag_false *)
-  (* then (\* boolean case, needs special treatment in C because truth value is not unique *\) *)
-  (*   (\* may disappear if we optimize code by replacing last branch test with default *\) *)
-  (*   let tl = try List.assoc tag_true  hl with Not_found -> [] in *)
-  (*   let el = try List.assoc tag_false hl with Not_found -> [] in *)
-  (*   pp_bool_conditional machines ~init:init m self fmt g tl el *)
-  (* else (\* enum type case *\) *)
+    (* For each branch we obtain the logical encoding, and the information
+       whether a sub node has been reset or not. If a node has been reset in one
+       of the branch, then all others have to have the mem_m = mem_c
+       statement. *)
+    let self = m.mname.node_id in
+    let pp_branch fmt (tag, instrs) =
+      fprintf fmt "@[<v 3>(=> (= %a %s)@ "
+	(pp_horn_val self (pp_horn_var m)) g
+	tag;
+      let rs = pp_machine_instrs machines reset_instances m fmt instrs in
+      fprintf fmt "@])";
+      () (* rs *)
+    in
+    pp_conj pp_branch fmt hl;
+    reset_instances (* TODO: le code est faux en ce qui concerne les resets. Il
+		       faut calculer ce qui se passe sur chaque branche et rajouter les instructions
+		       adequates *)
+	     
+(* if hl <> [] && let t = fst (List.hd hl) in t = tag_true || t = tag_false *)
+(* then (\* boolean case, needs special treatment in C because truth value is not unique *\) *)
+(*   (\* may disappear if we optimize code by replacing last branch test with default *\) *)
+(*   let tl = try List.assoc tag_true  hl with Not_found -> [] in *)
+(*   let el = try List.assoc tag_false hl with Not_found -> [] in *)
+(*   pp_bool_conditional machines ~init:init m self fmt g tl el *)
+(* else (\* enum type case *\) *)
 
-  (*   pp_enum_conditional machines ~init:init m self fmt g hl  *)
+(*   pp_enum_conditional machines ~init:init m self fmt g hl  *)
 and pp_machine_instrs machines reset_instances m fmt instrs = 
-  let ppi rs fmt i = pp_machine_instr machines rs m m.mname.node_id fmt i in
+  let ppi rs fmt i = pp_machine_instr machines rs m fmt i in
   match instrs with
-  | [] -> assert false
   | [x] -> ppi reset_instances fmt x 
   | _::_ ->
     fprintf fmt "(and @[<v 0>";
@@ -261,8 +286,10 @@ and pp_machine_instrs machines reset_instances m fmt instrs =
     )
       reset_instances instrs 
     in
-    fprintf fmt "@]@ )";
+    fprintf fmt "@])";
     rs
+
+  | [] -> fprintf fmt "true"; reset_instances
 
 let pp_machine_reset machines fmt m =
   let locals = local_memory_vars machines m in
