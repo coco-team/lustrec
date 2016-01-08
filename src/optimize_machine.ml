@@ -45,12 +45,11 @@ let rec eliminate elim instr =
 and eliminate_expr elim expr =
   match expr.value_desc with
   | LocalVar v -> (try IMap.find v.var_id elim with Not_found -> expr)
-<<<<<<< HEAD
-  | Fun (id, vl) -> Fun (id, List.map (eliminate_expr elim) vl)
-  | Array(vl) -> Array(List.map (eliminate_expr elim) vl)
-  | Access(v1, v2) -> Access(eliminate_expr elim v1, eliminate_expr elim v2)
-  | Power(v1, v2) -> Power(eliminate_expr elim v1, eliminate_expr elim v2)
-  | Cst _ -> expr
+  | Fun (id, vl) -> {expr with value_desc = Fun (id, List.map (eliminate_expr elim) vl)}
+  | Array(vl) -> {expr with value_desc = Array(List.map (eliminate_expr elim) vl)}
+  | Access(v1, v2) -> { expr with value_desc = Access(eliminate_expr elim v1, eliminate_expr elim v2)}
+  | Power(v1, v2) -> { expr with value_desc = Power(eliminate_expr elim v1, eliminate_expr elim v2)}
+  | Cst _ | StateVar _ -> expr
 
 let eliminate_dim elim dim =
   Dimension.expr_replace_expr 
@@ -59,11 +58,16 @@ let eliminate_dim elim dim =
       with Not_found -> mkdim_ident dim.dim_loc v) 
     dim
 
+
+(* 8th Jan 2016: issues when merging salsa with horn_encoding: The following
+   functions seem unsused. They have to be adapted to the new type for expr
+
+
 let unfold_expr_offset m offset expr =
   List.fold_left 
     (fun res -> 
       (function Index i -> 
-       Access(res, value_of_dimension m i) 
+	Access(res, value_of_dimension m i) 
       | Field f -> failwith "not yet implemented"))
     expr offset
 
@@ -80,7 +84,7 @@ let rec simplify_cst_expr m offset cst =
     | _ -> (Format.eprintf "internal error: Optimize_machine.simplify_cst_expr %a@." Printers.pp_const cst; assert false)
 
 let simplify_expr_offset m expr =
-  let rec simplify offset expr =
+  let rec simplify offset expr_desc =
     match offset, expr with
     | Field f ::q , _                -> failwith "not yet implemented"
     | _           , Fun (id, vl) when Basic_library.is_internal_fun id
@@ -98,7 +102,7 @@ let simplify_expr_offset m expr =
 (*    | _ -> (Format.eprintf "internal error: Optimize_machine.simplify_expr_offset %a@." pp_val expr; assert false) *)
     (*Format.eprintf "simplify_expr %a %a = %a@." pp_val expr (Utils.fprintf_list ~sep:"" Printers.pp_offset) offset pp_val res; res)
      with e -> (Format.eprintf "simplify_expr %a %a = <FAIL>@." pp_val expr (Utils.fprintf_list ~sep:"" Printers.pp_offset) offset; raise e*)
-  in simplify [] expr
+  in { expr with value_desc = simplify [] expr_desc }
 
 let rec simplify_instr_offset m accu instr =
   match instr with
@@ -119,13 +123,7 @@ let rec simplify_instr_offset m accu instr =
 and simplify_instrs_offset m instrs =
   let rev_l = List.fold_left (simplify_instr_offset m) [] instrs in
   List.rev rev_l
-=======
-  | Fun (id, vl) -> {expr with value_desc = Fun (id, List.map (eliminate_expr elim) vl)}
-  | Array(vl) -> {expr with value_desc = Array(List.map (eliminate_expr elim) vl)}
-  | Access(v1, v2) -> { expr with value_desc = Access(eliminate_expr elim v1, eliminate_expr elim v2)}
-  | Power(v1, v2) -> { expr with value_desc = Power(eliminate_expr elim v1, eliminate_expr elim v2)}
-  | Cst _ | StateVar _ -> expr
->>>>>>> salsa
+*)
 
 let is_scalar_const c =
   match c with

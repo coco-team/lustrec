@@ -27,13 +27,13 @@ open Horn_backend_collecting_sem
 (*
 TODO:
 - gerer les traces. Ca merde pour l'instant dans le calcul des memoires sur les arrows
-
-<<<<<<< HEAD
 - gerer le reset --- DONE
 - reconstruire les rechable states DONE
 - reintroduire le cex/traces ... DONE
 - traiter les types enum et les branchements sur ces types enum (en particulier les traitements des resets qui ont lieu dans certaines branches et pas dans d'autres )
 *)
+
+(************************************************
 =======
 (* Used to print boolean constants *)
 let pp_horn_tag fmt t =
@@ -445,8 +445,8 @@ let get_cex machines fmt node machine =
     ;
   Format.fprintf fmt "(query CEXTRACE)@."
 
->>>>>>> salsa
 
+************************************)
 let main_print machines fmt =
 if !Options.main_node <> "" then
   begin

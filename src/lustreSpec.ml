@@ -240,6 +240,7 @@ type instr_t =
   | MLocalAssign of var_decl * value_t
   | MStateAssign of var_decl * value_t
   | MReset of ident
+  | MNoReset of ident (* used to symmetrize the reset function *)
   | MStep of var_decl list * ident * value_t list
   | MBranch of value_t * (label * instr_t list) list
   | MComment of string

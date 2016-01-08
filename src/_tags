@@ -8,15 +8,11 @@
 "main_lustre_compiler.native": package(ocamlgraph)
 "main_lustre_compiler.native": use_str
 "main_lustre_compiler.native": use_unix
-<<<<<<< HEAD
-<*.ml{,i}>: package(ocamlgraph)
-<*.ml{,i}>: use_str
-<*.ml{,i}>: use_unix
-=======
 "main_lustre_compiler.native": use_num, package(salsa)
+
+#<*.ml{,i}>: package(ocamlgraph)
 #<*.ml{,i}>: package(salsa)
 <**/*.cm?>: use_graph
 #<*.ml{,i}>: use_str
 #<*.ml{,i}>: use_unix
 <**/*.cm?>: package(salsa)
->>>>>>> salsa
