@@ -608,7 +608,7 @@ and clock_subtyping_arg env ?(sub=true) real_arg formal_clock =
 (* computes clocks for node application *)
 and clock_appl env f args clock_reset loc =
  let args = expr_list_of_expr args in
-  if Basic_library.is_internal_fun f && List.exists is_tuple_expr args
+  if Basic_library.is_homomorphic_fun f && List.exists is_tuple_expr args
   then
       let args = Utils.transpose_list (List.map expr_list_of_expr args) in
       Clocks.clock_of_clock_list (List.map (fun args -> clock_call env f args clock_reset loc) args)

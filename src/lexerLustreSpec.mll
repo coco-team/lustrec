@@ -44,7 +44,7 @@ let keyword_table =
   "wcet", WCET;
   "int", TINT;
   "bool", TBOOL;
-  "float", TFLOAT;
+  (* "float", TFLOAT; *)
   "real", TREAL;
   "clock", TCLOCK;
   "not", NOT;
@@ -86,11 +86,13 @@ rule token = parse
 	token lexbuf }
   | blank +
       {token lexbuf}
-  | '-'? ['0'-'9'] ['0'-'9']* '.' ['0'-'9']*
-      {FLOAT (float_of_string (Lexing.lexeme lexbuf))}
+  | (('-'? ['0'-'9'] ['0'-'9']* as l) '.' (['0'-'9']* as r)) as s
+      {REAL (Num.num_of_string (l^r), String.length r, s)}
   | '-'? ['0'-'9']+ 
       {INT (int_of_string (Lexing.lexeme lexbuf)) }
-  | '-'? ['0'-'9']+ '.' ['0'-'9']+ ('E'|'e') ('+'|'-') ['0'-'9'] ['0'-'9'] as s {REAL s}
+  | (('-'? ['0'-'9']+ as l)  '.' (['0'-'9']+ as r) ('E'|'e') (('+'|'-') ['0'-'9'] ['0'-'9']* as exp)) as s
+      {REAL (Num.num_of_string (l^r), String.length r + -1 * int_of_string exp, s)}
+
  (* | '/' (['_' 'A'-'Z' 'a'-'z'] ['A'-'Z' 'a'-'z' '_' '0'-'9']* '/')+ as s
       {IDENT s}
  *)

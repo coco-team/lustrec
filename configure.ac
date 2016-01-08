@@ -1,4 +1,4 @@
-define([svnversion], esyscmd([sh -c "svnversion|sed "s/:.*//"|tr -d '\n'"]))dnl
+dnl define([svnversion], esyscmd([sh -c "svnversion|sed "s/:.*//"|tr -d '\n'"]))
 AC_INIT([lustrec], [1.1-svnversion], [ploc@garoche.net])
 
 
@@ -7,8 +7,23 @@ AC_SUBST(SVN_REVISION)
 
 AC_CONFIG_SRCDIR([src/main_lustre_compiler.ml])
 
+AC_PATH_PROG([OCAMLC],[ocamlc],[:])
+AC_MSG_CHECKING(OCaml version)
+ocamlc_version=`$OCAMLC -v | grep version | rev| cut -d \  -f 1 | rev`
+major=`echo $ocamlc_version | cut -d . -f 1`
+minor=`echo $ocamlc_version | cut -d . -f 2`
+if (test "$major" -lt 3 -a "$minor" -lt 12 ); then
+  AC_MSG_ERROR([Ocaml version must be at least 3.12. You have version $ocamlc_version])
+fi
+AC_MSG_RESULT(valid ocaml version detected: $ocamlc_version)
+
+AC_PATH_PROG([OCAMLBUILD],[ocamlbuild],[:])
+
+
 # default prefix is /usr/local
 AC_PREFIX_DEFAULT(/usr/local)
+
+# Checking libs
 
 AC_ARG_WITH([ocamlgraph-path],
         [AS_HELP_STRING([--ocamlgraph-path],
@@ -23,31 +38,24 @@ AC_ARG_WITH([ocamlgraph-path],
 )
 AC_SUBST(OCAMLGRAPH_PATH)
 
-
-AC_PATH_PROG([OCAMLC],[ocamlc],[:])
-AC_MSG_CHECKING(OCaml version)
-ocamlc_version=`$OCAMLC -v | grep version | rev| cut -d \  -f 1 | rev`
-major=`echo $ocamlc_version | cut -d . -f 1`
-minor=`echo $ocamlc_version | cut -d . -f 2`
-if (test "$major" -lt 3 -a "$minor" -lt 11 ); then
-  AC_MSG_ERROR([Ocaml version must be at least 3.11. You have version $ocamlc_version])
-fi
-AC_MSG_RESULT(valid ocaml version detected: $ocamlc_version)
-
-AC_PATH_PROG([OCAMLBUILD],[ocamlbuild],[:])
-
-
-# Checking libs
-
-# Checks for libraries. OCamlgraph
 AC_MSG_CHECKING(ocamlgraph library)
-   ocamlgraph_lib=`find $OCAMLGRAPH_PATH -iname graph.cmxa | grep -m 1 -o "graph.cmxa"`
+   ocamlgraph_lib=`find $OCAMLGRAPH_PATH -iname graph.cmxa -nowarn | grep -m 1 -o "graph.cmxa"`
    if (test "x$ocamlgraph_lib" = xgraph.cmxa ); then
-	ocamlgraph_lib_full=`find $OCAMLGRAPH_PATH -iname graph.cmxa  | grep -m 1 "graph.cmxa"`
-      AC_MSG_RESULT(library detected: $ocamlgraph_lib_full )
-   else
+	ocamlgraph_lib_full=`find $OCAMLGRAPH_PATH -iname graph.cmxa -nowarn | grep -m 1 "graph.cmxa"`
+      AC_MSG_RESULT($ocamlgraph_lib_full )
+   else 
       AC_MSG_ERROR([ocamlgraph library not installed in $OCAMLGRAPH_PATH])
    fi
+
+AC_CHECK_LIB(gmp, __gmpz_init, 
+      [gmp=yes],
+      [AC_MSG_RESULT([GNU MP not found])
+      gmp=no])
+
+AC_CHECK_LIB(mpfr, mpfr_add, [mpfr=yes], 
+		   [AC_MSG_RESULT(
+[MPFR not found])
+mpfr=no])
 
 
 # Workaround to solve an issue with ocamlbuild and C libraries.
@@ -92,4 +100,20 @@ AC_OUTPUT
 
 
 # summary
-dnl AC_MSG_NOTICE(******** Configuration ********)
+AC_MSG_NOTICE(******** Configuration ********)
+AC_MSG_NOTICE(bin path:     $prefix/bin)
+AC_MSG_NOTICE(include path: $prefix/include)
+AC_MSG_NOTICE(********    Plugins    ********)
+
+  if (test "x$gmp" = xyes -a "x$mpfr" = xyes ); then
+       AC_MSG_NOTICE([-mpfr option enable])
+
+   else 
+       AC_MSG_WARN([MPFR option cannot be activated. Requires GMP and MPFR libs])
+      
+   fi
+ 
+AC_MSG_NOTICE
+AC_MSG_NOTICE(******** Configuration ********)
+AC_MSG_NOTICE(******** Configuration ********)
+

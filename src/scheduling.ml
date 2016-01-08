@@ -17,14 +17,18 @@ open Causality
 
 type schedule_report =
 {
+  (* the scheduled node *)
+  node : node_desc;
   (* a schedule computed wrt the dependency graph *)
   schedule : ident list list;
   (* the set of unused variables (no output or mem depends on them) *)
   unused_vars : ISet.t;
   (* the table mapping each local var to its in-degree *)
   fanin_table : (ident, int) Hashtbl.t;
+  (* the dependency graph *)
+  dep_graph   : IdentDepGraph.t;
   (* the table mapping each assignment to a reusable variable *)
-  reuse_table : (ident, var_decl) Hashtbl.t
+  (*reuse_table : (ident, var_decl) Hashtbl.t*)
 }
 
 (* Topological sort with a priority for variables belonging in the same equation lhs.
@@ -125,7 +129,7 @@ let filter_original n vl =
    if vdecl.var_orig then v :: res else res) vl []
 
 let schedule_node n =
-  let node_vars = get_node_vars n in
+  (* let node_vars = get_node_vars n in *)
   try
     let eq_equiv = ExprDep.node_eq_equiv n in
     let eq_equiv v1 v2 =
@@ -134,13 +138,6 @@ let schedule_node n =
       with Not_found -> false in
 
     let n', g = global_dependency n in
-    Log.report ~level:5 
-      (fun fmt -> 
-	Format.fprintf fmt
-	  "dependency graph for node %s: %a" 
-	  n'.node_id
-	  pp_dep_graph g
-      );
     
     (* TODO X: extend the graph with inputs (adapt the causality analysis to deal with inputs
      compute: coi predecessors of outputs
@@ -152,17 +149,17 @@ let schedule_node n =
     let sort = topological_sort eq_equiv g in
     let unused = Liveness.compute_unused_variables n gg in
     let fanin = Liveness.compute_fanin n gg in
+    { node = n'; schedule = sort; unused_vars = unused; fanin_table = fanin; dep_graph = gg; }
 
-    let (disjoint, reuse) =
-      if !Options.optimization >= 3
-      then
-	let disjoint = Disjunction.clock_disjoint_map node_vars in
-	(disjoint,
-	 Liveness.compute_reuse_policy n sort disjoint gg)
-      else
-	(Hashtbl.create 1,
-	 Hashtbl.create 1) in
+  with (Causality.Cycle vl) as exc ->
+    let vl = filter_original n vl in
+    pp_error Format.err_formatter vl;
+    raise exc
 
+let compute_node_reuse_table report =
+  let disjoint = Disjunction.clock_disjoint_map (get_node_vars report.node) in
+  let reuse = Liveness.compute_reuse_policy report.node report.schedule disjoint report.dep_graph in
+(*
     if !Options.print_reuse
     then
       begin
@@ -186,24 +183,44 @@ let schedule_node n =
 	      Liveness.pp_reuse_policy reuse
 	  );
       end;
-    n', { schedule = sort; unused_vars = unused; fanin_table = fanin; reuse_table = reuse }
-  with (Causality.Cycle vl) as exc ->
-    let vl = filter_original n vl in
-    pp_error Format.err_formatter vl;
-    raise exc
+*)
+    reuse
+
 
 let schedule_prog prog =
   List.fold_right (
     fun top_decl (accu_prog, sch_map)  ->
       match top_decl.top_decl_desc with
 	| Node nd -> 
-	  let nd', report = schedule_node nd in
-	  {top_decl with top_decl_desc = Node nd'}::accu_prog, 
+	  let report = schedule_node nd in
+	  {top_decl with top_decl_desc = Node report.node}::accu_prog, 
 	  IMap.add nd.node_id report sch_map
 	| _ -> top_decl::accu_prog, sch_map
     ) 
     prog
     ([],IMap.empty)
+  
+
+let compute_prog_reuse_table report =
+  IMap.map compute_node_reuse_table report
+
+(* removes inlined local variables from schedule report, 
+   which are now useless *)
+let remove_node_inlined_locals locals report =
+  let is_inlined v = IMap.exists (fun l _ -> v = l) locals in
+  let schedule' =
+    List.fold_right (fun heads q -> let heads' = List.filter (fun v -> not (is_inlined v)) heads
+				    in if heads' = [] then q else heads'::q)
+      report.schedule [] in
+  begin
+    IMap.iter (fun v _ -> Hashtbl.remove report.fanin_table v) locals;
+    IMap.iter (fun v _ -> let iv = ExprDep.mk_instance_var v
+			  in Liveness.replace_in_dep_graph v iv report.dep_graph) locals;
+    { report with schedule = schedule' }
+  end
+
+let remove_prog_inlined_locals removed reuse =
+  IMap.mapi (fun id -> remove_node_inlined_locals (IMap.find id removed)) reuse
 
 let pp_eq_schedule fmt vl =
   match vl with
@@ -222,7 +239,13 @@ let pp_schedule fmt node_schs =
 let pp_fanin_table fmt node_schs =
   IMap.iter
     (fun nd report ->
-      Format.fprintf fmt "%s : %a" nd Liveness.pp_fanin report.fanin_table)
+      Format.fprintf fmt "%s: %a" nd Liveness.pp_fanin report.fanin_table)
+    node_schs
+
+let pp_dep_graph fmt node_schs =
+  IMap.iter
+    (fun nd report ->
+      Format.fprintf fmt "%s dependency graph: %a" nd pp_dep_graph report.dep_graph)
     node_schs
 
 let pp_warning_unused fmt node_schs =
@@ -240,6 +263,7 @@ let pp_warning_unused fmt node_schs =
 	 unused
    )
    node_schs
+
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

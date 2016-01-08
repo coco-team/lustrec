@@ -24,7 +24,7 @@ and type_dec_desc =
   | Tydec_any
   | Tydec_int
   | Tydec_real
-  | Tydec_float
+  (* | Tydec_float *)
   | Tydec_bool
   | Tydec_clock of type_dec_desc
   | Tydec_const of ident
@@ -50,8 +50,8 @@ and clock_dec_desc =
 
 type constant =
   | Const_int of int
-  | Const_real of string
-  | Const_float of float
+  | Const_real of Num.num * int * string (* (a,b, c) means a * 10^-b. c is the original string *)
+  (* | Const_float of float *)
   | Const_array of constant list
   | Const_tag of label
   | Const_string of string (* used only for annotations *)
@@ -74,8 +74,6 @@ type var_decl =
     location in the program text. The type and clock of an ast element
     is mutable (and initialized to dummy values). This avoids to have to
     duplicate ast structures (e.g. ast, typed_ast, clocked_ast). *)
-
-
 
 (* The tag of an expression is a unique identifier used to distinguish
    different instances of the same node *)
@@ -188,7 +186,7 @@ type imported_node_desc =
      nodei_stateless: bool;
      nodei_spec: node_annot option;
      nodei_prototype: string option;
-     nodei_in_lib: string option;
+     nodei_in_lib: string list;
     }
 
 type const_desc = 
@@ -219,6 +217,33 @@ type dep_t = Dep of
   * ident
   * (top_decl list) 
   * bool (* is stateful *)
+
+
+(************ Machine code types *************)
+
+type value_t = 
+  {
+    value_desc: value_t_desc;
+    value_type: Types.type_expr;
+    value_annot: expr_annot option
+  }
+and value_t_desc =
+  | Cst of constant
+  | LocalVar of var_decl
+  | StateVar of var_decl
+  | Fun of ident * value_t list 
+  | Array of value_t list
+  | Access of value_t * value_t
+  | Power of value_t * value_t
+
+type instr_t =
+  | MLocalAssign of var_decl * value_t
+  | MStateAssign of var_decl * value_t
+  | MReset of ident
+  | MStep of var_decl list * ident * value_t list
+  | MBranch of value_t * (label * instr_t list) list
+  | MComment of string
+
 
 type error =
     Main_not_found

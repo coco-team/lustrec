@@ -14,6 +14,13 @@ open Format
 open LustreSpec
 open Corelang
 
+let check_main () =
+  if !Options.main_node = "" then
+    begin
+      eprintf "Code generation error: %a@." pp_error No_main_specified;
+      raise (Error (Location.dummy_loc, No_main_specified))
+    end
+
 let create_dest_dir () =
   begin
     if not (Sys.file_exists !Options.dest_dir) then
@@ -82,6 +89,16 @@ let check_stateless_decls decls =
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. checking stateless/stateful status@ ");
   try
     Stateless.check_prog decls
+  with (Stateless.Error (loc, err)) as exc ->
+    eprintf "Stateless status error: %a%a@."
+      Stateless.pp_error err
+      Location.pp_loc loc;
+    raise exc
+
+let force_stateful_decls decls =
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. forcing stateful status@ ");
+  try
+    Stateless.force_prog decls
   with (Stateless.Error (loc, err)) as exc ->
     eprintf "Stateless status error: %a%a@."
       Stateless.pp_error err
@@ -199,16 +216,16 @@ let is_stateful topdecl =
 
 
 let import_dependencies prog =
-  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>.. extracting dependencies@,");
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 0>.. extracting dependencies@ ");
   let dependencies = Corelang.get_dependencies prog in
   let deps =
   List.fold_left
     (fun (compilation_dep, type_env, clock_env) dep ->
       let (local, s) = Corelang.dependency_of_top dep in
       let basename = Modules.name_dependency (local, s) in
-      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@[<v 0>Library %s@," basename);
+      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "  Library %s@ " basename);
       let lusic = Modules.import_dependency dep.top_decl_loc (local, s) in
-      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@]@ ");
+      (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "");*)
       let (lusi_type_env, lusi_clock_env) = get_envs_from_top_decls lusic.Lusic.contents in
       let is_stateful = List.exists is_stateful lusic.Lusic.contents in
       let new_dep = Dep (local, s, lusic.Lusic.contents, is_stateful ) in

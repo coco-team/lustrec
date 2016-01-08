@@ -103,7 +103,7 @@ let rec type_coretype type_dim cty =
   | Tydec_any -> new_var ()
   | Tydec_int -> Type_predef.type_int
   | Tydec_real -> Type_predef.type_real
-  | Tydec_float -> Type_predef.type_real
+  (* | Tydec_float -> Type_predef.type_real *)
   | Tydec_bool -> Type_predef.type_bool
   | Tydec_clock ty -> Type_predef.type_clock (type_coretype type_dim ty)
   | Tydec_const c -> Type_predef.type_const c
@@ -261,7 +261,7 @@ and type_const loc c =
   match c with
   | Const_int _     -> Type_predef.type_int
   | Const_real _    -> Type_predef.type_real
-  | Const_float _   -> Type_predef.type_real
+  (* | Const_float _   -> Type_predef.type_real *)
   | Const_array ca  -> let d = Dimension.mkdim_int loc (List.length ca) in
 		      let ty = new_var () in
 		      List.iter (fun e -> try_unify ty (type_const loc e) loc) ca;
@@ -344,7 +344,7 @@ and type_subtyping_arg env in_main ?(sub=true) const real_arg formal_type =
 *)
 and type_appl env in_main loc const f args =
   let targs = List.map (type_expr env in_main const) args in
-  if Basic_library.is_internal_fun f && List.exists is_tuple_type targs
+  if Basic_library.is_homomorphic_fun f && List.exists is_tuple_type targs
   then
     try
       let targs = Utils.transpose_list (List.map type_list_of_type targs) in
@@ -367,10 +367,8 @@ and type_dependent_call env in_main loc const f targs =
     begin
       List.iter2 (fun (a,t) ti ->
 	let t' = type_add_const env (const || Types.get_static_value ti <> None) a t
-	in try_unify ~sub:true ti t' a.expr_loc;
-      ) targs tins;
-(*Format.eprintf "Typing.type_dependent_call END@.";*)
-      touts;
+	in try_unify ~sub:true ti t' a.expr_loc) targs tins;
+      touts
     end
 
 (* type a simple call without dependent types 
@@ -418,7 +416,7 @@ and type_expr env in_main const expr =
     expr.expr_type <- ty;
     ty
   | Expr_access (e1, d) ->
-    type_subtyping_arg env in_main true (expr_of_dimension d) Type_predef.type_int;
+    type_subtyping_arg env in_main false (* not necessary a constant *) (expr_of_dimension d) Type_predef.type_int;
     let ty_elt = new_var () in
     let d = Dimension.mkdim_var () in
     type_subtyping_arg env in_main const e1 (Type_predef.type_array d ty_elt);
@@ -575,14 +573,13 @@ let type_var_decl vd_env env vdecl =
   let type_dim d =
     begin
       type_subtyping_arg (env, vd_env) false true (expr_of_dimension d) Type_predef.type_int;
-
       Dimension.eval Basic_library.eval_env eval_const d;
     end in
   let ty = type_coretype type_dim vdecl.var_dec_type.ty_dec_desc in
 
   let ty_static =
     if vdecl.var_dec_const
-    then  Type_predef.type_static (Dimension.mkdim_var ()) ty
+    then Type_predef.type_static (Dimension.mkdim_var ()) ty
     else ty in
   (match vdecl.var_dec_value with
   | None   -> ()
@@ -680,19 +677,19 @@ let type_top_consts env clist =
 let rec type_top_decl env decl =
   match decl.top_decl_desc with
   | Node nd -> (
-      try
-	type_node env nd decl.top_decl_loc
-      with Error (loc, err) as exc -> (
-	(*if !Options.global_inline then
-	  Format.eprintf "Type error: failing node@.%a@.@?"
-	    Printers.pp_node nd
-	;*)
-	raise exc)
+    try
+      type_node env nd decl.top_decl_loc
+    with Error (loc, err) as exc -> (
+      if !Options.global_inline then
+	Format.eprintf "Type error: failing node@.%a@.@?"
+	  Printers.pp_node nd
+      ;
+      raise exc)
   )
   | ImportedNode nd ->
-      type_imported_node env nd decl.top_decl_loc
+    type_imported_node env nd decl.top_decl_loc
   | Const c ->
-      type_top_const env c
+    type_top_const env c
   | TypeDef _ -> List.fold_left type_top_decl env (consts_of_enum_type decl)
   | Open _  -> env
 

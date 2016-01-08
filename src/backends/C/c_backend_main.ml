@@ -30,80 +30,120 @@ struct
 (*                         Main related functions                                           *)
 (********************************************************************************************)
 
-let print_get_input fmt v =
+let print_get_inputs fmt m =
+  let pi fmt (v', v) =
   match (Types.repr v.var_type).Types.tdesc with
-    | Types.Tint -> fprintf fmt "_get_int(\"%s\")" v.var_id
-    | Types.Tbool -> fprintf fmt "_get_bool(\"%s\")" v.var_id
-    | Types.Treal -> fprintf fmt "_get_double(\"%s\")" v.var_id
-    | _ -> assert false
+    | Types.Tint -> fprintf fmt "%s = _get_int(\"%s\")" v.var_id v'.var_id
+    | Types.Tbool -> fprintf fmt "%s = _get_bool(\"%s\")" v.var_id v'.var_id
+    | Types.Treal when !Options.mpfr -> fprintf fmt "mpfr_set_d(%s, _get_double(\"%s\"), %i)" v.var_id v'.var_id (Mpfr.mpfr_prec ())
+    | Types.Treal -> fprintf fmt "%s = _get_double(\"%s\")" v.var_id v'.var_id
+    | _ ->
+      begin
+	Global.main_node := !Options.main_node;
+	Format.eprintf "Code generation error: %a%a@."
+	  pp_error Main_wrong_kind
+	  Location.pp_loc v'.var_loc;
+	raise (Error (v'.var_loc, Main_wrong_kind))
+      end
+  in
+  List.iter2 (fun v' v -> fprintf fmt "@ %a;" pi (v', v)) m.mname.node_inputs m.mstep.step_inputs
 
-let print_put_outputs fmt ol = 
-  let po fmt o =
+let print_put_outputs fmt m = 
+  let po fmt (o', o) =
     match (Types.repr o.var_type).Types.tdesc with
-    | Types.Tint -> fprintf fmt "_put_int(\"%s\", %s)" o.var_id o.var_id
-    | Types.Tbool -> fprintf fmt "_put_bool(\"%s\", %s)" o.var_id o.var_id
-    | Types.Treal -> fprintf fmt "_put_double(\"%s\", %s)" o.var_id o.var_id
+    | Types.Tint -> fprintf fmt "_put_int(\"%s\", %s)" o'.var_id o.var_id
+    | Types.Tbool -> fprintf fmt "_put_bool(\"%s\", %s)" o'.var_id o.var_id
+    | Types.Treal when !Options.mpfr -> fprintf fmt "_put_double(\"%s\", mpfr_get_d(%s, %s))" o'.var_id o.var_id (Mpfr.mpfr_rnd ())
+    | Types.Treal -> fprintf fmt "_put_double(\"%s\", %s)" o'.var_id o.var_id
     | _ -> assert false
   in
-  List.iter (fprintf fmt "@ %a;" po) ol
+  List.iter2 (fun v' v -> fprintf fmt "@ %a;" po (v', v)) m.mname.node_outputs m.mstep.step_outputs
 
-let print_main_fun machines m fmt =
+let print_main_inout_declaration fmt m =
+  begin
+    fprintf fmt "/* Declaration of inputs/outputs variables */@ ";
+    List.iter 
+      (fun v -> fprintf fmt "%a;@ " (pp_c_type v.var_id) v.var_type
+      ) m.mstep.step_inputs;
+    List.iter 
+      (fun v -> fprintf fmt "%a;@ " (pp_c_type v.var_id) v.var_type
+      ) m.mstep.step_outputs
+  end
+
+let print_main_memory_allocation mname main_mem fmt m =
+  if not (fst (get_stateless_status m)) then
+  begin
+    fprintf fmt "@ /* Main memory allocation */@ ";
+    if (!Options.static_mem && !Options.main_node <> "")
+    then (fprintf fmt "%a(static,main_mem);@ " pp_machine_static_alloc_name mname)
+    else (fprintf fmt "%a *main_mem = %a();@ " pp_machine_memtype_name mname pp_machine_alloc_name mname);
+    fprintf fmt "@ /* Initialize the main memory */@ ";
+    fprintf fmt "%a(%s);@ " pp_machine_reset_name mname main_mem;
+  end
+
+let print_main_initialize mname main_mem fmt m =
+  if not (fst (get_stateless_status m)) 
+  then
+    fprintf fmt "@ /* Initialize inputs, outputs and memories */@ %a%t%a%t%a(%s);@ "
+      (Utils.fprintf_list ~sep:"@ " (pp_initialize m main_mem (pp_c_var_read m))) m.mstep.step_inputs
+      (Utils.pp_newline_if_non_empty m.mstep.step_inputs)
+      (Utils.fprintf_list ~sep:"@ " (pp_initialize m main_mem (pp_c_var_read m))) m.mstep.step_outputs
+      (Utils.pp_newline_if_non_empty m.mstep.step_inputs)
+      pp_machine_init_name mname
+      main_mem
+  else
+    fprintf fmt "@ /* Initialize inputs and outputs */@ %a%t%a@ "
+      (Utils.fprintf_list ~sep:"@ " (pp_initialize m main_mem (pp_c_var_read m))) m.mstep.step_inputs
+      (Utils.pp_newline_if_non_empty m.mstep.step_inputs)
+      (Utils.fprintf_list ~sep:"@ " (pp_initialize m main_mem (pp_c_var_read m))) m.mstep.step_outputs
+
+let print_main_clear mname main_mem fmt m =
+  if not (fst (get_stateless_status m)) 
+  then
+    fprintf fmt "@ /* Clear inputs, outputs and memories */@ %a%t%a%t%a(%s);@ "
+      (Utils.fprintf_list ~sep:"@ " (pp_clear m main_mem (pp_c_var_read m))) m.mstep.step_inputs
+      (Utils.pp_newline_if_non_empty m.mstep.step_inputs)
+      (Utils.fprintf_list ~sep:"@ " (pp_clear m main_mem (pp_c_var_read m))) m.mstep.step_outputs
+      (Utils.pp_newline_if_non_empty m.mstep.step_inputs)
+      pp_machine_clear_name mname
+      main_mem
+  else
+    fprintf fmt "@ /* Clear inputs and outputs */@ %a%t%a@ "
+      (Utils.fprintf_list ~sep:"@ " (pp_clear m main_mem (pp_c_var_read m))) m.mstep.step_inputs
+      (Utils.pp_newline_if_non_empty m.mstep.step_inputs)
+      (Utils.fprintf_list ~sep:"@ " (pp_clear m main_mem (pp_c_var_read m))) m.mstep.step_outputs
+
+let print_main_loop mname main_mem fmt m =
+  let input_values =
+    List.map (fun v -> mk_val (LocalVar v) v.var_type)
+      m.mstep.step_inputs in
+  begin
+    fprintf fmt "@ ISATTY = isatty(0);@ ";
+    fprintf fmt "@ /* Infinite loop */@ ";
+    fprintf fmt "@[<v 2>while(1){@ ";
+    fprintf fmt  "fflush(stdout);@ ";
+    fprintf fmt "%a@ %t%a"
+      print_get_inputs m
+      (fun fmt -> pp_main_call mname main_mem fmt m input_values m.mstep.step_outputs)
+      print_put_outputs m
+  end
+
+let print_main_code fmt m =
   let mname = m.mname.node_id in
   let main_mem =
     if (!Options.static_mem && !Options.main_node <> "")
     then "&main_mem"
     else "main_mem" in
   fprintf fmt "@[<v 2>int main (int argc, char *argv[]) {@ ";
-  fprintf fmt "/* Declaration of inputs/outputs variables */@ ";
-  List.iter 
-    (fun v -> fprintf fmt "%a = %a;@ " (pp_c_type v.var_id) v.var_type pp_c_initialize v.var_type
-    ) m.mstep.step_inputs;
-  List.iter 
-    (fun v -> fprintf fmt "%a = %a;@ " (pp_c_type v.var_id) v.var_type pp_c_initialize v.var_type
-    ) m.mstep.step_outputs;
-  fprintf fmt "@ /* Main memory allocation */@ ";
-  if (!Options.static_mem && !Options.main_node <> "")
-  then (fprintf fmt "%a(static,main_mem);@ " pp_machine_static_alloc_name mname)
-  else (fprintf fmt "%a *main_mem = %a();@ " pp_machine_memtype_name mname pp_machine_alloc_name mname);
-  fprintf fmt "@ /* Initialize the main memory */@ ";
-  fprintf fmt "%a(%s);@ " pp_machine_reset_name mname main_mem;
-  fprintf fmt "@ ISATTY = isatty(0);@ ";
-  fprintf fmt "@ /* Infinite loop */@ ";
-  fprintf fmt "@[<v 2>while(1){@ ";
-  fprintf fmt  "fflush(stdout);@ ";
-  List.iter 
-    (fun v -> fprintf fmt "%s = %a;@ "
-      v.var_id
-      print_get_input v
-    ) m.mstep.step_inputs;
-  (match m.mstep.step_outputs with
-    (* | [] -> ( *)
-    (*   fprintf fmt "%a(%a%t%s);@ "  *)
-    (* 	pp_machine_step_name mname *)
-    (* 	(Utils.fprintf_list ~sep:", " (fun fmt v -> pp_print_string fmt v.var_id)) m.mstep.step_inputs *)
-    (* 	(pp_final_char_if_non_empty ", " m.mstep.step_inputs) *)
-    (* 	main_mem *)
-    (* ) *)
-    (* | [o] -> ( *)
-    (*   fprintf fmt "%s = %a(%a%t%a, %s);%a" *)
-    (* 	o.var_id *)
-    (* 	pp_machine_step_name mname *)
-    (* 	(Utils.fprintf_list ~sep:", " (fun fmt v -> pp_print_string fmt v.var_id)) m.mstep.step_inputs *)
-    (* 	(pp_final_char_if_non_empty ", " m.mstep.step_inputs) *)
-    (* 	(Utils.fprintf_list ~sep:", " (fun fmt v -> fprintf fmt "&%s" v.var_id)) m.mstep.step_outputs *)
-    (* 	main_mem *)
-    (* 	print_put_outputs [o]) *)
-    | _ -> (
-      fprintf fmt "%a(%a%t%a, %s);%a"
-	pp_machine_step_name mname
-	(Utils.fprintf_list ~sep:", " (fun fmt v -> pp_print_string fmt v.var_id)) m.mstep.step_inputs
-	(Utils.pp_final_char_if_non_empty ", " m.mstep.step_inputs)
-	(Utils.fprintf_list ~sep:", " (fun fmt v -> fprintf fmt "&%s" v.var_id)) m.mstep.step_outputs
-	main_mem
-	print_put_outputs m.mstep.step_outputs)
-  );
-  fprintf fmt "@]@ }@ ";
-  fprintf fmt "return 1;";
+  print_main_inout_declaration fmt m;
+  print_main_memory_allocation mname main_mem fmt m;
+  print_main_initialize mname main_mem fmt m;
+  print_main_loop mname main_mem fmt m;
+
+  Plugins.c_backend_main_loop_body_suffix fmt ();
+  fprintf fmt "@]@ }@ @ ";
+  print_main_clear mname main_mem fmt m;
+  fprintf fmt "@ return 1;";
   fprintf fmt "@]@ }@."       
 
 let print_main_header fmt =
@@ -118,7 +158,7 @@ let print_main_c main_fmt main_machine basename prog machines _ (*dependencies*)
 
   (* Print the svn version number and the supported C standard (C90 or C99) *)
   print_version main_fmt;
-  print_main_fun machines main_machine main_fmt
+  print_main_code main_fmt main_machine
 end  
 
 (* Local Variables: *)

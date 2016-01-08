@@ -225,7 +225,7 @@ let add_eq_dependencies mems inputs node_vars eq (g, g') =
     | Expr_arrow (e1, e2)  -> add_dep lhs_is_mem lhs e2 (add_dep lhs_is_mem lhs e1 g)
     | Expr_when  (e, c, _)  -> add_dep lhs_is_mem lhs e (add_var lhs_is_mem lhs c g)
     | Expr_appl (f, e, None) ->
-      if Basic_library.is_internal_fun f
+      if Basic_library.is_expr_internal_fun rhs
       (* tuple component-wise dependency for internal operators *)
       then
 	List.fold_right (add_dep lhs_is_mem lhs) (expr_list_of_expr e) g
@@ -278,7 +278,7 @@ module NodeDep = struct
       | Expr_pre e 
       | Expr_when (e,_,_) -> get_expr_calls prednode e
       | Expr_appl (id,e, _) ->
-	if not (Basic_library.is_internal_fun id) && prednode id
+	if not (Basic_library.is_expr_internal_fun expr) && prednode id
 	then ESet.add expr (get_expr_calls prednode e)
 	else (get_expr_calls prednode e)
 

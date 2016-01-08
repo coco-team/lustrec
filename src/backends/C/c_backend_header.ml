@@ -34,10 +34,16 @@ module Main = functor (Mod: MODIFIERS_HDR) ->
 struct
 
 let print_import_standard fmt =
-  fprintf fmt "#include \"%s/arrow.h\"@.@." Version.include_path
+  begin
+    if !Options.mpfr then
+      begin
+	fprintf fmt "#include <mpfr.h>@."
+      end;
+    fprintf fmt "#include \"%s/arrow.h\"@.@." Version.include_path
+  end
 
 let rec print_static_val pp_var fmt v =
-  match v with
+  match v.value_desc with
   | Cst c         -> pp_c_const fmt c
   | LocalVar v    -> pp_var fmt v
   | Fun (n, vl)   -> Basic_library.pp_c n (print_static_val pp_var) fmt vl
@@ -144,6 +150,7 @@ let print_static_alloc_macro fmt (m, attr, inst) =
     pp_machine_static_link_name m.mname.node_id
     inst
 
+ 
 let print_machine_decl fmt m =
   Mod.print_machine_decl_prefix fmt m;
   if fst (get_stateless_status m) then
@@ -174,6 +181,12 @@ let print_machine_decl fmt m =
       let self = mk_self m in
       fprintf fmt "extern %a;@.@."
 	(print_reset_prototype self) (m.mname.node_id, m.mstatic);
+
+     fprintf fmt "extern %a;@.@."
+	(print_init_prototype self) (m.mname.node_id, m.mstatic);
+
+     fprintf fmt "extern %a;@.@."
+	(print_clear_prototype self) (m.mname.node_id, m.mstatic);
 
       fprintf fmt "extern %a;@.@."
 	(print_step_prototype self)
@@ -233,7 +246,13 @@ let print_machine_decl_from_header fmt inode =
 	let self = mk_new_name used "self" in
 	fprintf fmt "extern %a;@.@."
 	  (print_reset_prototype self) (inode.nodei_id, static_inputs);
-	
+
+	fprintf fmt "extern %a;@.@."
+	  (print_init_prototype self) (inode.nodei_id, static_inputs);
+
+	fprintf fmt "extern %a;@.@."
+	  (print_clear_prototype self) (inode.nodei_id, static_inputs);
+
 	fprintf fmt "extern %a;@.@."
 	  (print_step_prototype self)
 	  (inode.nodei_id, inode.nodei_inputs, inode.nodei_outputs)
@@ -249,8 +268,10 @@ and pp_c_type_decl filename cpt var fmt tdecl =
   match tdecl with
   | Tydec_any           -> assert false
   | Tydec_int           -> fprintf fmt "int %s" var
+  | Tydec_real when !Options.mpfr
+                        -> fprintf fmt "%s %s" Mpfr.mpfr_t var
   | Tydec_real          -> fprintf fmt "double %s" var
-  | Tydec_float         -> fprintf fmt "float %s" var
+  (* | Tydec_float         -> fprintf fmt "float %s" var *)
   | Tydec_bool          -> fprintf fmt "_Bool %s" var
   | Tydec_clock ty      -> pp_c_type_decl filename cpt var fmt ty
   | Tydec_const c       -> fprintf fmt "%s %s" c var
