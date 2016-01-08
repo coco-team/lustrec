@@ -165,7 +165,7 @@ let node_of_assign_until nused used node aut_id aut_state handler =
   let frename = mk_frename used writes in
   let var_inputs = node_vars_of_idents node inputs in
   let new_var_locals = node_vars_of_idents node writes in
-  let var_outputs = node_vars_of_idents node writes in
+  let var_outputs = List.sort IdentModule.compare (node_vars_of_idents node writes) in
   let new_var_outputs = List.map (fun vdecl -> { vdecl with var_id = frename vdecl.var_id }) var_outputs in
   let new_output_eqs = List.map2 (fun o o' -> Eq (mkeq handler.hand_loc ([o'.var_id], mkident handler.hand_loc o.var_id))) var_outputs new_var_outputs in
   let until_expr = List.fold_right add_branch handler.hand_until (mkidentpair handler.hand_loc aut_state.actual_r.var_id aut_state.actual_s.var_id) in
