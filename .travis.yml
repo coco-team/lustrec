@@ -1,5 +1,4 @@
 language: c
-
 env:
   - OCAML_VERSION=4.02.1 OPAM_VERSION=1.2.0
   - OCAML_VERSION=4.02.1 OPAM_VERSION=1.1.0
@@ -7,7 +6,7 @@ env:
   - OCAML_VERSION=4.01.0 OPAM_VERSION=1.1.0
 
 before_install:
-   - until sudo add-apt-repository -y ppa:saiarcot895/chromium-beta; do echo retry; done
+  - until sudo add-apt-repository -y ppa:saiarcot895/chromium-beta; do echo retry; done
   - until sudo add-apt-repository --yes ppa:kalakris/cmake; do echo retry; done
   - until sudo apt-get -qq update; do echo retry; done 
   - until sudo apt-get install cmake; do echo retry; done
