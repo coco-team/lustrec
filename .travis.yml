@@ -33,8 +33,16 @@ script:
   - autoconf
   - ./configure
   - make
-  - ./bin/lustrec -h
-  - pwd
+  - ./bin/lustrec
+  - cd $LZ
+  - mkdir -p build
+  - cd build
+  - /usr/bin/cmake -DLUSTREC_EXECUTABLE=/home/travis/build/coco-team/lustrec/bin/lustrec -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=run -DCMAKE_PROGRAM_PATH=/usr/bin  ../;
+  - /usr/bin/cmake --build .
+  - /usr/bin/cmake --build . --target install 
+  - cd ..
+  - ls build/run/bin
+  - ./build/run/bin/zustre -h 
   
 
 
