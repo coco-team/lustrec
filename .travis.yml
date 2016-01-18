@@ -24,7 +24,7 @@ install:
   - eval `opam config env`
   - export LZ="$TRAVIS_BUILD_DIR/../zustre"
   - git clone https://github.com/coco-team/zustre $LZ
-  -ls $LZ
+  - ls $LZ
 
 before_script:
   - ocaml -version

@@ -167,7 +167,7 @@ m4trace:configure.ac:84: -1- AC_SUBST_TRACE([abs_datadir])
 m4trace:configure.ac:84: -1- m4_pattern_allow([^abs_datadir$])
 m4trace:configure.ac:84: -1- AC_DEFINE_TRACE_LITERAL([abs_datadir])
 m4trace:configure.ac:84: -1- m4_pattern_allow([^abs_datadir$])
-m4trace:configure.ac:87: -1- AC_CONFIG_FILES([Makefile
+m4trace:configure.ac:90: -1- AC_CONFIG_FILES([Makefile
 		 src/Makefile
                  src/myocamlbuild.ml
 		 src/version.ml])
