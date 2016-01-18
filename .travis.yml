@@ -33,8 +33,9 @@ script:
   - autoconf
   - ./configure
   - make
-  - cd test
-  - ./regression.sh -r -v 2 horn_regression.list
+  - ./bin/lustrec -h
+  - pwd
+  
 
 
 
