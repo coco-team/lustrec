@@ -1,4 +1,4 @@
-Current Status:    [![Build Status](https://travis-ci.org/lememta/lustrec.svg?branch=master)](https://travis-ci.org/lememta/lustrec)
+Current Status:    [![Build Status](https://travis-ci.org/coco-team/lustrec.svg?branch=master)](https://travis-ci.org/coco-team/lustrec)
 # LustreC
 
 LustreC is a modular compiler of Lustre code into C and Horn Clauses.
