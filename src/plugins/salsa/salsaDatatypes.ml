@@ -111,7 +111,7 @@ struct
   let pp fmt (f,r) = 
     match f, r with
     | ST.I(a,b), ST.J(c,d) ->
-      Format.fprintf fmt "[%f, %f] + [%f, %f]" a b c d
+      Format.fprintf fmt "[%f, %f] + [%e, %e]" a b c d
     | ST.I(a,b), ST.JInfty ->  Format.fprintf fmt "[%f, %f] + oo" a b 
     | ST.Empty, _ -> Format.fprintf fmt "???"
 
