@@ -42,7 +42,8 @@ script:
   - /usr/bin/cmake --build . --target install 
   - cd ..
   - ls build/run/bin
-  - ./build/run/bin/zustre -h 
+  - ./build/run/bin/zustre -h
+  -  python src/reg_test.py ./build/run/bin/zustre
   
 
 
