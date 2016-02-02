@@ -1,4 +1,3 @@
-
 (* We try to avoid opening modules here *)
 module ST = Salsa.SalsaTypes
 module SDT = SalsaDatatypes
@@ -92,7 +91,6 @@ let optimize_expr nodename constEnv printed_vars vars_env ranges formalEnv e : L
     | LT.LocalVar v
     | LT.StateVar v -> 
       if not (Vars.mem v printed_vars) && 
-	(* TODO xAvier: comment recuperer le type de l'expression? Parfois e.value_type vaut 'd *)
 	(Types.is_real_type e.LT.value_type ||  Types.is_real_type v.LT.var_type) 
       then
 	opt_num_expr ranges formalEnv e 

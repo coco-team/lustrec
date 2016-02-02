@@ -111,7 +111,7 @@ struct
   let pp fmt (f,r) = 
     match f, r with
     | ST.I(a,b), ST.J(c,d) ->
-      Format.fprintf fmt "[%f, %f] + [%e, %e]" a b c d
+      Format.fprintf fmt "[%.50f, %.50f] + [%.50e, %.50e]" a b c d
     | ST.I(a,b), ST.JInfty ->  Format.fprintf fmt "[%f, %f] + oo" a b 
     | ST.Empty, _ -> Format.fprintf fmt "???"
 
@@ -251,6 +251,7 @@ let compute_vars_env m =
 env
 
 let rec salsa_expr2value_t vars_env cst_env e  = 
+  let e =   Float.evalPartExpr e [] [] in
   let salsa_expr2value_t = salsa_expr2value_t vars_env cst_env in
   let binop op e1 e2 t = 
     let x = salsa_expr2value_t e1 in
@@ -273,9 +274,10 @@ let rec salsa_expr2value_t vars_env cst_env e  =
 	let s = 
 	  if new_float = 0. then "0." else
 	    (* We have to convert it into our format: int * int * real *)
+	    (* string_of_float new_float *) 
 	    let _ = Format.flush_str_formatter () in
-	    Format.fprintf Format.str_formatter "%.50f" new_float;
-	    Format.flush_str_formatter () 
+	    Format.fprintf Format.str_formatter "%.11f" new_float;
+	    Format.flush_str_formatter ()  
 	in
 	Parser_lustre.signed_const Lexer_lustre.token (Lexing.from_string s) 
       in
@@ -308,6 +310,7 @@ let rec salsa_expr2value_t vars_env cst_env e  =
   | ST.IntOfBool(ST.Lte(x,y,_),_)  -> binop "<=" x y Type_predef.type_bool
   | ST.IntOfBool(ST.Gte(x,y,_),_)  -> binop ">=" x y Type_predef.type_bool
   | _      -> raise (Salsa.Prelude.Error "Entschuldigung, salsaExpr2value_t case not yet implemented")
+
 
 
 let rec get_salsa_free_vars vars_env constEnv absenv e =
