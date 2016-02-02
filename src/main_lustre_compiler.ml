@@ -98,6 +98,8 @@ let rec compile_source dirname basename extension =
   (* Removing automata *)
   let prog = Automata.expand_decls prog in
 
+  Log.report ~level:4 (fun fmt -> fprintf fmt "After automata expansion:@.@[<v 2>@ %a@]@," Printers.pp_prog prog);
+
   (* Importing source *)
   let _ = Modules.load_program ISet.empty prog in
 
