@@ -127,7 +127,7 @@ let pp_c i pp_val fmt vl =
     | "equi", [v1; v2] -> Format.fprintf fmt "(!%a == !%a)" pp_val v1 pp_val v2
     | "xor", [v1; v2] -> Format.fprintf fmt "(!%a != !%a)" pp_val v1 pp_val v2
     | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2
-    | _ -> failwith i
+    | _ -> (Format.eprintf "internal error: Basic_library.pp_c %s@." i; assert false)
 
 let pp_java i pp_val fmt vl =
   match i, vl with
@@ -140,7 +140,7 @@ let pp_java i pp_val fmt vl =
     | "equi", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2
     | "xor", [v1; v2] -> Format.fprintf fmt "(%a != %a)" pp_val v1 pp_val v2
     | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2
-    | _ -> assert false
+    | _ -> (Format.eprintf "internal error: Basic_library.pp_java %s@." i; assert false)
 
 let pp_horn i pp_val fmt vl =
   match i, vl with
@@ -158,7 +158,7 @@ let pp_horn i pp_val fmt vl =
   | "!=", [v1; v2] -> Format.fprintf fmt "(not (= %a %a))" pp_val v1 pp_val v2
   | "/", [v1; v2] -> Format.fprintf fmt "(div %a %a)" pp_val v1 pp_val v2
   | _, [v1; v2] -> Format.fprintf fmt "(%s %a %a)" i pp_val v1 pp_val v2
-  | _ -> assert false
+  | _ -> (Format.eprintf "internal error: Basic_library.pp_horn %s@." i; assert false)
 (*  | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
 
 *)

@@ -98,6 +98,8 @@ let rec compile_source dirname basename extension =
   (* Removing automata *)
   let prog = Automata.expand_decls prog in
 
+  Log.report ~level:4 (fun fmt -> fprintf fmt "After automata expansion:@.@[<v 2>@ %a@]@," Printers.pp_prog prog);
+
   (* Importing source *)
   let _ = Modules.load_program ISet.empty prog in
 
@@ -230,6 +232,10 @@ let rec compile_source dirname basename extension =
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,");
   let machine_code = Machine_code.translate_prog prog node_schs in
 
+  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
+  (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
+  machine_code);
+
   (* Optimize machine code *)
   let machine_code =
     if !Options.optimization >= 4 && !Options.output <> "horn" then
@@ -240,10 +246,6 @@ let rec compile_source dirname basename extension =
     else
       machine_code
   in
-
-  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
-  (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
-  machine_code);
 
   (* Optimize machine code *)
   let machine_code =
@@ -266,10 +268,12 @@ let rec compile_source dirname basename extension =
       machine_code
   in
 
-
-  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
-  (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
-  machine_code);
+  if !Options.optimization >= 2 then
+    begin
+      Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
+	(Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
+	machine_code);
+    end;
 
   (* Printing code *)
   let basename    =  Filename.basename basename in

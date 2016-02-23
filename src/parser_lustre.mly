@@ -257,7 +257,7 @@ typ_def_rhs:
 | STRUCT LCUR field_list RCUR { Tydec_struct (List.rev $3) }
 
 array_typ_decl:
-                            { fun typ -> typ }
+ %prec POWER                { fun typ -> typ }
  | POWER dim array_typ_decl { fun typ -> $3 (Tydec_array ($2, typ)) }
 
 typeconst:

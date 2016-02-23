@@ -1,3 +1,4 @@
+(********************************************************************)
 (*                                                                  *)
 (*  The LustreC compiler toolset   /  The LustreC Development Team  *)
 (*  Copyright 2012 -    --   ONERA - CNRS - INPT                    *)
@@ -46,7 +47,7 @@ let pp_conj pp fmt l =
   match l with
     [] -> assert false
   | [x] -> pp fmt x
-  | _ -> fprintf fmt "(and @[<v 0>%a@]@ )" (Utils.fprintf_list ~sep:"\n\t" pp) l
+  | _ -> fprintf fmt "(and @[<v 0>%a@]@ )" (Utils.fprintf_list ~sep:" " pp) l
 
 
 

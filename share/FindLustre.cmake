@@ -15,7 +15,15 @@
 # The module defines some functions:
 #   Lustre_Compile([NODE <Lustre Main Node>]
 #                  LUS_FILES <Lustre files>
-#                  [USER_C_FILES <C files>])
+#                  [USER_C_FILES <C files>]
+#                  [VERBOSE <level>]
+#                  LIBNAME <libraryName>)
+#
+# When used the Lustre_Compile macro define the variable
+# LUSTRE_GENERATED_C_FILES_<libraryName> in the parent scope
+# so that the caller can get (if needed) the list of Lustre generated files.
+# The VERBOSE level is a numeric value passed directly to the -verbose
+# command line option of the lustre compiler
 #
 
 if(LUSTRE_PATH_HINT)
@@ -65,7 +73,7 @@ find_path(LUSTRE_INCLUDE_DIR
 include(CMakeParseArguments)
 function(Lustre_Compile)
   set(options "")
-  set(oneValueArgs NODE LIBNAME)
+  set(oneValueArgs NODE LIBNAME VERBOSE)
   set(multiValueArgs LUS_FILES USER_C_FILES)
   cmake_parse_arguments(LUS "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
@@ -79,6 +87,13 @@ function(Lustre_Compile)
   else()
     set(LUSTRE_NODE_OPT "")
     set(LUSTRE_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/lus_${LUS_LIBNAME}")
+  endif()
+
+  if (LUS_VERBOSE)
+    set(LUSTRE_VERBOSE_OPT "-verbose ${LUS_VERBOSE}")
+  else()
+    # the default is to be quiet.
+    set(LUSTRE_VERBOSE_OPT "-verbose;0")
   endif()
 
   file(MAKE_DIRECTORY ${LUSTRE_OUTPUT_DIR})
@@ -97,7 +112,7 @@ function(Lustre_Compile)
     set(LUSTRE_GENERATED_FILES ${LUSTRE_GENERATED_FILES} ${LUSTRE_OUTPUT_DIR}/${L}.lusic)
     add_custom_command(
       OUTPUT ${LUSTRE_GENERATED_FILES}
-      COMMAND ${LUSTRE_COMPILER} ${LUSTRE_NODE_OPT} -d ${LUSTRE_OUTPUT_DIR} ${LFILE}
+      COMMAND ${LUSTRE_COMPILER} ${LUSTRE_VERBOSE_OPT} ${LUSTRE_NODE_OPT} -d ${LUSTRE_OUTPUT_DIR} ${LFILE}
       DEPENDS ${LFILE}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       COMMENT "Compile Lustre source(s): ${LFILE} (generates: ${LUSTRE_GENERATED_FILES})."
@@ -109,6 +124,7 @@ function(Lustre_Compile)
   add_library(${LUS_LIBNAME} SHARED
               ${GLOBAL_LUSTRE_GENERATED_C_FILES} ${LUS_USER_C_FILES}
               )
+  set_target_properties(${LUS_LIBNAME} PROPERTIES COMPILE_FLAGS "-std=c99")
   set(LUSTRE_GENERATED_C_FILES_${LUS_LIBNAME} "${GLOBAL_LUSTRE_GENERATED_C_FILES}" PARENT_SCOPE)
   message(STATUS "Lustre: Added rule for building lustre library: ${LUS_LIBNAME}")
 endfunction(Lustre_Compile)
