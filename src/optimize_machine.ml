@@ -16,6 +16,7 @@ open Causality
 open Machine_code 
 open Dimension
 
+
 let pp_elim fmt elim =
   begin
     Format.fprintf fmt "{ /* elim table: */@.";
@@ -52,6 +53,54 @@ and eliminate_expr elim expr =
 let eliminate_dim elim dim =
   Dimension.expr_replace_expr (fun v -> try dimension_of_value (IMap.find v elim) with Not_found -> mkdim_ident dim.dim_loc v) dim
 
+let unfold_expr_offset m offset expr =
+  List.fold_left (fun res -> (function Index i -> Access(res, value_of_dimension m i) | Field f -> failwith "not yet implemented")) expr offset
+
+let rec simplify_cst_expr m offset cst =
+    match offset, cst with
+    | []          , _
+        -> Cst cst
+    | Index i :: q, Const_array cl when Dimension.is_dimension_const i
+	-> simplify_cst_expr m q (List.nth cl (Dimension.size_const_dimension i))
+    | Index i :: q, Const_array cl
+        -> unfold_expr_offset m [Index i] (Array (List.map (simplify_cst_expr m q) cl))
+    | Field f :: q, Const_struct fl
+        -> simplify_cst_expr m q (List.assoc f fl)
+    | _ -> (Format.eprintf "internal error: Optimize_machine.simplify_cst_expr %a@." Printers.pp_const cst; assert false)
+
+let simplify_expr_offset m expr =
+  let rec simplify offset expr =
+    match offset, expr with
+    | Field f ::q , _                -> failwith "not yet implemented"
+    | _           , Fun (id, vl) when Basic_library.is_internal_fun id
+                                     -> Fun (id, List.map (simplify offset) vl)
+    | _           , Fun _
+    | _           , StateVar _
+    | _           , LocalVar _       -> unfold_expr_offset m offset expr
+    | _           , Cst cst          -> simplify_cst_expr m offset cst
+    | _           , Access (expr, i) -> simplify (Index (dimension_of_value i) :: offset) expr
+    | []          , _                -> expr
+    | Index _ :: q, Power (expr, _)  -> simplify q expr
+    | Index i :: q, Array vl when Dimension.is_dimension_const i
+                                     -> simplify q (List.nth vl (Dimension.size_const_dimension i))
+    | Index i :: q, Array vl         -> unfold_expr_offset m [Index i] (Array (List.map (simplify q) vl))
+    | _ -> (Format.eprintf "internal error: Optimize_machine.simplify_expr_offset %a@." pp_val expr; assert false)
+    (*Format.eprintf "simplify_expr %a %a = %a@." pp_val expr (Utils.fprintf_list ~sep:"" Printers.pp_offset) offset pp_val res; res)
+     with e -> (Format.eprintf "simplify_expr %a %a = <FAIL>@." pp_val expr (Utils.fprintf_list ~sep:"" Printers.pp_offset) offset; raise e*)
+  in simplify [] expr
+
+let rec simplify_instr_offset m instr =
+  match instr with
+  | MLocalAssign (v, expr) -> MLocalAssign (v, simplify_expr_offset m expr)
+  | MStateAssign (v, expr) -> MStateAssign (v, simplify_expr_offset m expr)
+  | MReset id              -> instr
+  | MStep (outputs, id, inputs) -> MStep (outputs, id, List.map (simplify_expr_offset m) inputs)
+  | MBranch (cond, brl)
+    -> MBranch(simplify_expr_offset m cond, List.map (fun (l, il) -> l, simplify_instrs_offset m il) brl)
+
+and simplify_instrs_offset m instrs =
+  List.map (simplify_instr_offset m) instrs
+
 let is_scalar_const c =
   match c with
   | Const_int _
@@ -60,23 +109,58 @@ let is_scalar_const c =
   | Const_tag _   -> true
   | _             -> false
 
-let basic_unfoldable_expr expr =
-  match expr with
-  | Cst c when is_scalar_const c -> true
-  | LocalVar _
-  | StateVar _                   -> true
-  | _                            -> false
+(* An instruction v = expr may (and will) be unfolded iff:
+   - either expr is atomic
+     (no complex expressions, only const, vars and array/struct accesses)
+   - or v has a fanin <= 1 (used at most once)
+*)
+let is_unfoldable_expr fanin expr =
+  let rec unfold_const offset cst =
+    match offset, cst with
+    | _           , Const_int _
+    | _           , Const_real _
+    | _           , Const_float _
+    | _           , Const_tag _     -> true
+    | Field f :: q, Const_struct fl -> unfold_const q (List.assoc f fl)
+    | []          , Const_struct _  -> false
+    | Index i :: q, Const_array cl when Dimension.is_dimension_const i
+                                    -> unfold_const q (List.nth cl (Dimension.size_const_dimension i))
+    | _           , Const_array _   -> false
+    | _                             -> assert false in
+  let rec unfold offset expr =
+    match offset, expr with
+    | _           , Cst cst                      -> unfold_const offset cst
+    | _           , LocalVar _
+    | _           , StateVar _                   -> true
+    | []          , Power _
+    | []          , Array _                      -> false
+    | Index i :: q, Power (v, _)                 -> unfold q v
+    | Index i :: q, Array vl when Dimension.is_dimension_const i
+                                                 -> unfold q (List.nth vl (Dimension.size_const_dimension i))
+    | _           , Array _                      -> false
+    | _           , Access (v, i)                -> unfold (Index (dimension_of_value i) :: offset) v
+    | _           , Fun (id, vl) when fanin < 2 && Basic_library.is_internal_fun id
+                                                 -> List.for_all (unfold offset) vl
+    | _           , Fun _                        -> false
+    | _                                          -> assert false
+  in unfold [] expr
 
 let unfoldable_assign fanin v expr =
   try
     let d = Hashtbl.find fanin v.var_id
-    in basic_unfoldable_expr expr ||
+    in is_unfoldable_expr d expr
+  with Not_found -> false
+(*
+let unfoldable_assign fanin v expr =
+  try
+    let d = Hashtbl.find fanin v.var_id
+    in is_basic_expr expr ||
     match expr with
     | Cst c when d < 2                                           -> true
     | Fun (id, _) when d < 2 && Basic_library.is_internal_fun id -> true
     | _                                                          -> false
   with Not_found -> false
-
+*)
 let merge_elim elim1 elim2 =
   let merge k e1 e2 =
     match e1, e2 with
@@ -141,6 +225,8 @@ let machine_unfold fanin elim machine =
   (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "machine_unfold %a@." pp_elim elim);*)
   let elim_consts, mconst = instrs_unfold fanin elim machine.mconst in
   let elim_vars, instrs = instrs_unfold fanin elim_consts machine.mstep.step_instrs in
+  let instrs = simplify_instrs_offset machine instrs in
+  let checks = List.map (fun (loc, check) -> loc, eliminate_expr elim_vars check) machine.mstep.step_checks in
   let locals = List.filter (fun v -> not (IMap.mem v.var_id elim_vars)) machine.mstep.step_locals in
   let minstances = List.map (static_call_unfold elim_consts) machine.minstances in
   let mcalls = List.map (static_call_unfold elim_consts) machine.mcalls
@@ -150,7 +236,8 @@ let machine_unfold fanin elim machine =
       mstep = { 
 	machine.mstep with 
 	  step_locals = locals;
-	  step_instrs = instrs
+	  step_instrs = instrs;
+	  step_checks = checks
       };
       mconst = mconst;
       minstances = minstances;
@@ -256,7 +343,7 @@ let rec instr_cse (subst, instrs) instr =
   (* Simple cases*)
   | MStep([v], id, vl) when Basic_library.is_internal_fun id
       -> instr_cse (subst, instrs) (MLocalAssign (v, Fun (id, vl)))
-  | MLocalAssign(v, expr) when basic_unfoldable_expr expr
+  | MLocalAssign(v, expr) when is_unfoldable_expr 2 expr
       -> (IMap.add v.var_id expr subst, instr :: instrs)
   | _ when is_assign instr
       -> subst_instr subst instrs instr

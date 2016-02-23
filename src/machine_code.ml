@@ -496,7 +496,7 @@ let translate_decl nd sch =
   assert (ISet.is_empty m0);
   assert (init0 = []);
   assert (Utils.IMap.is_empty j0);
-  let m, init, j, locals, s = translate_eqs nd (m0, init0, j0, locals0, s0) sorted_eqs in
+  let m, init, j, locals, s = translate_eqs nd (m0, init0, j0, locals0, []) sorted_eqs in
   let mmap = Utils.IMap.fold (fun i n res -> (i, n)::res) j [] in
   {
     mname = nd;

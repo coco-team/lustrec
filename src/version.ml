@@ -1,5 +1,5 @@
 
-let number = "1.0-Unversioned directory"
+let number = "1.1-Unversioned directory"
 
 let prefix = "/usr/local"
 
