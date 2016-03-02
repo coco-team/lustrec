@@ -13,7 +13,7 @@
   open Utils
   open Corelang
   open LustreSpec
-  
+
   let mkexpr x = mkexpr (Location.symbol_rloc ()) x
   let mkpredef_call x = mkpredef_call (Location.symbol_rloc ()) x
   let mkpredef_unary_call x = mkpredef_unary_call (Location.symbol_rloc ()) x
@@ -52,7 +52,7 @@
 %token PRE ARROW
 %token EOF
 %token REQUIRES ENSURES OBSERVER
-%token INVARIANT BEHAVIOR ASSUMES
+%token INVARIANT BEHAVIOR ASSUMES CCODE
 %token EXISTS FORALL
 
 %nonassoc prec_exists prec_forall
@@ -69,7 +69,7 @@
 %nonassoc EQ LT GT LTE GTE NEQ
 %left MINUS PLUS
 %left MULT DIV MOD
-%left PRE 
+%left PRE
 %nonassoc UMINUS
 
 %start lustre_annot
@@ -85,7 +85,7 @@ lustre_spec:
 
 contract:
 requires ensures behaviors { { requires = $1; ensures = $2; behaviors = $3; } }
- 
+
 requires:
 { [] }
 | REQUIRES qexpr SCOL requires { $2::$4 }
@@ -101,7 +101,7 @@ behaviors:
 
 assumes:
 { [] }
-| ASSUMES qexpr SCOL assumes { $2::$4 } 
+| ASSUMES qexpr SCOL assumes { $2::$4 }
 
 tuple_qexpr:
 | qexpr COMMA qexpr {[$3;$1]}
@@ -144,14 +144,14 @@ expr:
 | expr LBRACKET dim_list { $3 $1 }
 
 /* Temporal operators */
-| PRE expr 
+| PRE expr
     {mkexpr (Expr_pre $2)}
-| expr ARROW expr 
+| expr ARROW expr
     {mkexpr (Expr_arrow ($1,$3))}
-| expr FBY expr 
+| expr FBY expr
     {(*mkexpr (Expr_fby ($1,$3))*)
       mkexpr (Expr_arrow ($1, mkexpr (Expr_pre $3)))}
-| expr WHEN IDENT 
+| expr WHEN IDENT
     {mkexpr (Expr_when ($1,$3,tag_true))}
 | expr WHENNOT IDENT
     {mkexpr (Expr_when ($1,$3,tag_false))}
@@ -175,47 +175,47 @@ expr:
     {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), Some ($8, $6))) }
 
 /* Boolean expr */
-| expr AND expr 
+| expr AND expr
     {mkpredef_call "&&" [$1;$3]}
-| expr AMPERAMPER expr 
+| expr AMPERAMPER expr
     {mkpredef_call "&&" [$1;$3]}
-| expr OR expr 
+| expr OR expr
     {mkpredef_call "||" [$1;$3]}
-| expr BARBAR expr 
+| expr BARBAR expr
     {mkpredef_call "||" [$1;$3]}
-| expr XOR expr 
+| expr XOR expr
     {mkpredef_call "xor" [$1;$3]}
-| NOT expr 
+| NOT expr
     {mkpredef_unary_call "not" $2}
-| expr IMPL expr 
+| expr IMPL expr
     {mkpredef_call "impl" [$1;$3]}
 
 /* Comparison expr */
-| expr EQ expr 
+| expr EQ expr
     {mkpredef_call "=" [$1;$3]}
-| expr LT expr 
+| expr LT expr
     {mkpredef_call "<" [$1;$3]}
-| expr LTE expr 
+| expr LTE expr
     {mkpredef_call "<=" [$1;$3]}
-| expr GT expr 
+| expr GT expr
     {mkpredef_call ">" [$1;$3]}
-| expr GTE  expr 
+| expr GTE  expr
     {mkpredef_call ">=" [$1;$3]}
-| expr NEQ expr 
+| expr NEQ expr
     {mkpredef_call "!=" [$1;$3]}
 
 /* Arithmetic expr */
-| expr PLUS expr 
+| expr PLUS expr
     {mkpredef_call "+" [$1;$3]}
-| expr MINUS expr 
+| expr MINUS expr
     {mkpredef_call "-" [$1;$3]}
-| expr MULT expr 
+| expr MULT expr
     {mkpredef_call "*" [$1;$3]}
-| expr DIV expr 
+| expr DIV expr
     {mkpredef_call "/" [$1;$3]}
 | MINUS expr %prec UMINUS
   {mkpredef_unary_call "uminus" $2}
-| expr MOD expr 
+| expr MOD expr
     {mkpredef_call "mod" [$1;$3]}
 
 /* If */
@@ -233,13 +233,13 @@ handler_expr:
 qexpr:
 | expr { mkeexpr [] $1 }
   /* Quantifiers */
-| EXISTS vdecl SCOL qexpr %prec prec_exists { extend_eepxr (Exists, $2) $4 } 
+| EXISTS vdecl SCOL qexpr %prec prec_exists { extend_eepxr (Exists, $2) $4 }
 | FORALL vdecl SCOL qexpr %prec prec_forall { extend_eepxr (Forall, $2) $4 }
 
 vdecl:
-| ident_list COL typ clock 
+| ident_list COL typ clock
     {List.map mkvar_decl (List.map (fun id -> (id, $3, $4, false)) $1)}
-| CONST ident_list COL typ clock 
+| CONST ident_list COL typ clock
     {List.map mkvar_decl (List.map (fun id -> (id, $4, $5, true)) $2)}
 
 
@@ -252,7 +252,7 @@ typ:
     {mktyp Tydec_any}
 | TINT {mktyp Tydec_int}
 | IDENT {
-  try 
+  try
     mktyp (Hashtbl.find Corelang.type_table (Tydec_const $1))
   with Not_found -> raise (Corelang.Error (Location.symbol_rloc(), Corelang.Unbound_symbol ("type " ^ $1)))
 }
@@ -261,7 +261,7 @@ typ:
 | TBOOL {mktyp Tydec_bool}
 | TCLOCK {mktyp (Tydec_clock Tydec_bool) }
 | typ POWER INT {mktyp Tydec_any (*(mktyptuple $3 $1)*)}
-| typ POWER IDENT {mktyp Tydec_any (*(mktyptuple (try 
+| typ POWER IDENT {mktyp Tydec_any (*(mktyptuple (try
 					match get_const $3 with Const_int i -> i with _ -> failwith "Const power error") $1)*)}
 
 clock:
@@ -290,9 +290,10 @@ lustre_annot:
 lustre_annot_list EOF { fun node_id -> $1 }
 
 lustre_annot_list:
-  { [] } 
+  { [] }
 | kwd COL expr SCOL lustre_annot_list { ($1,$3)::$5 }
 | IDENT COL expr SCOL lustre_annot_list { ([$1],$3)::$5 }
+| CCODE COL qexpr SCOL lustre_annot_list{ (["c_code"],$3)::$5 }
 | INVARIANT COL expr SCOL lustre_annot_list{ (["invariant"],$3)::$5 }
 | OBSERVER COL expr SCOL lustre_annot_list { (["observer"],$3)::$5 }
 

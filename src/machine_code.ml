@@ -489,7 +489,7 @@ let translate_decl nd sch =
 
   let sorted_eqs = sort_equations_from_schedule nd sch in
   let constant_eqs = constant_equations nd in
-  
+
   let init_args = ISet.empty, [], Utils.IMap.empty, List.fold_right (fun l -> ISet.add l) nd.node_locals ISet.empty, [] in
   (* memories, init instructions, node calls, local variables (including memories), step instrs *)
   let m0, init0, j0, locals0, s0 = translate_eqs nd init_args constant_eqs in

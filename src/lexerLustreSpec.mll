@@ -66,6 +66,8 @@ let keyword_table =
   "assumes", ASSUMES;
   "exists", EXISTS;
   "forall", FORALL;
+  "c_code", CCODE;
+
   ]
 
 }
@@ -88,7 +90,7 @@ rule token = parse
       {token lexbuf}
   | '-'? ['0'-'9'] ['0'-'9']* '.' ['0'-'9']*
       {FLOAT (float_of_string (Lexing.lexeme lexbuf))}
-  | '-'? ['0'-'9']+ 
+  | '-'? ['0'-'9']+
       {INT (int_of_string (Lexing.lexeme lexbuf)) }
   | '-'? ['0'-'9']+ '.' ['0'-'9']+ ('E'|'e') ('+'|'-') ['0'-'9'] ['0'-'9'] as s {REAL s}
  (* | '/' (['_' 'A'-'Z' 'a'-'z'] ['A'-'Z' 'a'-'z' '_' '0'-'9']* '/')+ as s
@@ -154,7 +156,7 @@ and string_parse = parse
        (fun fmt p -> Format.fprintf fmt "%s l%i c%i" p.Lexing.pos_fname p.Lexing.pos_lnum p.Lexing.pos_cnum) lb.Lexing.lex_curr_p
        (Lexing.lexeme lb);
      raise Parsing.Parse_error)
-     
+
 
   let spec s =
     let lb = Lexing.from_string s in

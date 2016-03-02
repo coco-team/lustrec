@@ -285,6 +285,19 @@ let print_machine machines fmt m =
     begin
       Format.fprintf fmt "; %s@." m.mname.node_id;
 
+      (* Check if there is annotation *)
+      if m.mannot != [] then
+        begin
+          Format.fprintf fmt "; @[%a@]@]@\n" (Utils.fprintf_list ~sep:"@ " Printers.pp_s_function) m.mannot;
+          (* List.iter ( fun kwd -> *)
+
+          (*             match kwd with *)
+          (*               [] -> Format.fprintf fmt "; no;" *)
+          (*              |[k] -> Format.fprintf fmt "; yes;" *)
+          (*              |_ -> assert false)  m.mannot; *)
+
+        end
+
    (* Printing variables *)
    Utils.fprintf_list ~sep:"@." pp_decl_var fmt
      ((step_vars machines m)@

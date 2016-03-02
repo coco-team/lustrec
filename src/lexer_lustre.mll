@@ -65,24 +65,25 @@ let keyword_table =
   "assert", ASSERT;
   "lib", LIB;
   "prototype", PROTOTYPE;
+  "c_code", CCODE;
 ]
 
 
 (* Buffer for parsing specification/annotation *)
 let buf = Buffer.create 1024
 
-let make_annot lexbuf s = 
+let make_annot lexbuf s =
   try
     let ann = LexerLustreSpec.annot s in
     ANNOT ann
   with _ -> (Format.eprintf "Impossible to parse the following annotation:@.%s@.@?" s; exit 1)
 
-let make_spec lexbuf s = 
+let make_spec lexbuf s =
   try
     let ns = LexerLustreSpec.spec s in
     NODESPEC ns
   with _ -> (Format.eprintf "Impossible to parse the following node specification:@.%s@.@?" s; exit 1)
-   
+
 }
 
 let newline = ('\010' | '\013' | "\013\010")
@@ -92,11 +93,11 @@ let blank = [' ' '\009' '\012']
 rule token = parse
 | "--@" { Buffer.clear buf;
 	  spec_singleline lexbuf }
-| "(*@" { Buffer.clear buf; 
+| "(*@" { Buffer.clear buf;
 	  spec_multiline 0 lexbuf }
-| "--!" { Buffer.clear buf; 
+| "--!" { Buffer.clear buf;
 	  annot_singleline lexbuf }
-| "(*!" { Buffer.clear buf; 
+| "(*!" { Buffer.clear buf;
 	  annot_multiline 0 lexbuf }
 | "(*"
     { comment 0 lexbuf }
@@ -110,7 +111,7 @@ rule token = parse
     {token lexbuf}
 | ['0'-'9'] ['0'-'9']* '.' ['0'-'9']*
     {FLOAT (float_of_string (Lexing.lexeme lexbuf))}
-| ['0'-'9']+ 
+| ['0'-'9']+
     {INT (int_of_string (Lexing.lexeme lexbuf)) }
 | ['0'-'9']+ '.' ['0'-'9']+ ('E'|'e') ('+'|'-') ['0'-'9'] ['0'-'9']* as s {REAL s}
 | "tel." {TEL}
@@ -177,10 +178,10 @@ and annot_singleline = parse
   | _ as c { Buffer.add_char buf c; annot_singleline lexbuf }
 
 and annot_multiline n = parse
-  | "*)" as s { 
-    if n > 0 then 
-      (Buffer.add_string buf s; annot_multiline (n-1) lexbuf) 
-    else 
+  | "*)" as s {
+    if n > 0 then
+      (Buffer.add_string buf s; annot_multiline (n-1) lexbuf)
+    else
       make_annot lexbuf (Buffer.contents buf) }
   | "(*" as s { Buffer.add_string buf s; annot_multiline (n+1) lexbuf }
   | newline as s { incr_line lexbuf; Buffer.add_string buf s; annot_multiline n lexbuf }
@@ -191,11 +192,10 @@ and spec_singleline = parse
   | _ as c { Buffer.add_char buf c; spec_singleline lexbuf }
 
 and spec_multiline n = parse
-  | "*)" as s { if n > 0 then 
-      (Buffer.add_string buf s; spec_multiline (n-1) lexbuf) 
-    else 
+  | "*)" as s { if n > 0 then
+      (Buffer.add_string buf s; spec_multiline (n-1) lexbuf)
+    else
       make_spec lexbuf (Buffer.contents buf) }
   | "(*" as s { Buffer.add_string buf s; spec_multiline (n+1) lexbuf }
   | newline as s { incr_line lexbuf; Buffer.add_string buf s; spec_multiline n lexbuf }
   | _ as c { Buffer.add_char buf c; spec_multiline n lexbuf }
-

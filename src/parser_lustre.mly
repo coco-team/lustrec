@@ -22,7 +22,7 @@ let mktyp x = mktyp (get_loc ()) x
 let mkclock x = mkclock (get_loc ()) x
 let mkvar_decl x = mkvar_decl (get_loc ()) ~orig:true x
 let mkexpr x = mkexpr (get_loc ()) x
-let mkeexpr x = mkeexpr (get_loc ()) x 
+let mkeexpr x = mkeexpr (get_loc ()) x
 let mkeq x = mkeq (get_loc ()) x
 let mkassert x = mkassert (get_loc ()) x
 let mktop_decl itf x = mktop_decl (get_loc ()) (Location.get_module ()) itf x
@@ -48,7 +48,7 @@ let rec fby expr n init =
     mkexpr (Expr_arrow (init, mkexpr (Expr_pre expr)))
   else
     mkexpr (Expr_arrow (init, mkexpr (Expr_pre (fby expr (n-1) init))))
-  
+
 %}
 
 %token <int> INT
@@ -62,7 +62,7 @@ let rec fby expr n init =
 %token TRUE FALSE
 %token <LustreSpec.expr_annot> ANNOT
 %token <LustreSpec.node_annot> NODESPEC
-%token LBRACKET RBRACKET LCUR RCUR LPAR RPAR SCOL COL COMMA COLCOL 
+%token LBRACKET RBRACKET LCUR RCUR LPAR RPAR SCOL COL COMMA COLCOL
 %token AMPERAMPER BARBAR NOT POWER
 %token IF THEN ELSE
 %token UCLOCK DCLOCK PHCLOCK TAIL
@@ -77,7 +77,7 @@ let rec fby expr n init =
 %token MINUS PLUS UMINUS
 %token PRE ARROW
 %token REQUIRES ENSURES OBSERVER
-%token INVARIANT BEHAVIOR ASSUMES
+%token INVARIANT BEHAVIOR ASSUMES CCODE
 %token EXISTS FORALL
 %token PROTOTYPE LIB
 %token EOF
@@ -200,16 +200,16 @@ prototype_opt:
 
 in_lib_opt:
 { None }
-| LIB module_ident {Some $2} 
+| LIB module_ident {Some $2}
 
 top_decl:
 | CONST cdecl_list { List.rev ($2 false) }
-| nodespec_list state_annot node_ident_decl LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET stmt_list TEL 
+| nodespec_list state_annot node_ident_decl LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET stmt_list TEL
     {
       let stmts, asserts, annots = $16 in
       (* Declaring eqs annots *)
-      List.iter (fun ann -> 
-	List.iter (fun (key, _) -> 
+      List.iter (fun ann ->
+	List.iter (fun (key, _) ->
 	  Annotations.add_node_ann $3 key
 	) ann.annots
       ) annots;
@@ -223,7 +223,7 @@ top_decl:
 				    node_locals = List.rev $14;
 				    node_gencalls = [];
 				    node_checks = [];
-				    node_asserts = asserts; 
+				    node_asserts = asserts;
 				    node_stmts = stmts;
 				    node_dec_stateless = $2;
 				    node_stateless = None;
@@ -232,12 +232,12 @@ top_decl:
       in
       pop_node ();
      (*add_node $3 nd;*) [nd] }
-    
+
  nodespec_list:
  { None }
-| NODESPEC nodespec_list { 
-  (function 
-  | None    -> (fun s1 -> Some s1) 
+| NODESPEC nodespec_list {
+  (function
+  | None    -> (fun s1 -> Some s1)
   | Some s2 -> (fun s1 -> Some (merge_node_annot s1 s2))) $2 $1 }
 
 typ_def_list:
@@ -272,10 +272,10 @@ typeconst:
 tag_list:
   UIDENT                { $1 :: [] }
 | tag_list COMMA UIDENT { $3 :: $1 }
-      
+
 field_list:                           { [] }
 | field_list IDENT COL typeconst SCOL { ($2, $4) :: $1 }
-      
+
 stmt_list:
   { [], [], [] }
 | eq stmt_list {let eql, assertl, annotl = $2 in ((Eq $1)::eql), assertl, annotl}
@@ -321,7 +321,7 @@ lustre_spec:
 
 contract:
 requires ensures behaviors { { requires = $1; ensures = $2; behaviors = $3; spec_loc = get_loc () } }
- 
+
 requires:
 { [] }
 | REQUIRES qexpr SCOL requires { $2::$4 }
@@ -329,7 +329,7 @@ requires:
 ensures:
 { [] }
 | ENSURES qexpr SCOL ensures { $2 :: $4 }
-| OBSERVER node_ident LPAR tuple_expr RPAR SCOL ensures { 
+| OBSERVER node_ident LPAR tuple_expr RPAR SCOL ensures {
   mkeexpr (mkexpr ((Expr_appl ($2, mkexpr (Expr_tuple $4), None)))) :: $7
 }
 
@@ -339,7 +339,7 @@ behaviors:
 
 assumes:
 { [] }
-| ASSUMES qexpr SCOL assumes { $2::$4 } 
+| ASSUMES qexpr SCOL assumes { $2::$4 }
 
 /* WARNING: UNUSED RULES */
 tuple_qexpr:
@@ -349,7 +349,7 @@ tuple_qexpr:
 qexpr:
 | expr { mkeexpr $1 }
   /* Quantifiers */
-| EXISTS vdecl SCOL qexpr %prec prec_exists { extend_eexpr [Exists, $2] $4 } 
+| EXISTS vdecl SCOL qexpr %prec prec_exists { extend_eexpr [Exists, $2] $4 }
 | FORALL vdecl SCOL qexpr %prec prec_forall { extend_eexpr [Forall, $2] $4 }
 
 
@@ -387,11 +387,11 @@ expr:
 | expr LBRACKET dim_list { $3 $1 }
 
 /* Temporal operators */
-| PRE expr 
+| PRE expr
     {mkexpr (Expr_pre $2)}
-| expr ARROW expr 
+| expr ARROW expr
     {mkexpr (Expr_arrow ($1,$3))}
-| expr FBY expr 
+| expr FBY expr
     {(*mkexpr (Expr_fby ($1,$3))*)
       mkexpr (Expr_arrow ($1, mkexpr (Expr_pre $3)))}
 | expr WHEN vdecl_ident
@@ -429,51 +429,51 @@ expr:
       if id="fby" then
 	assert false (* TODO Ca veut dire quoi fby (e,n,init) every c *)
       else
-	mkexpr (Expr_appl (id, mkexpr (Expr_tuple args), Some clock)) 
+	mkexpr (Expr_appl (id, mkexpr (Expr_tuple args), Some clock))
     }
 
 /* Boolean expr */
-| expr AND expr 
+| expr AND expr
     {mkpredef_call "&&" [$1;$3]}
-| expr AMPERAMPER expr 
+| expr AMPERAMPER expr
     {mkpredef_call "&&" [$1;$3]}
-| expr OR expr 
+| expr OR expr
     {mkpredef_call "||" [$1;$3]}
-| expr BARBAR expr 
+| expr BARBAR expr
     {mkpredef_call "||" [$1;$3]}
-| expr XOR expr 
+| expr XOR expr
     {mkpredef_call "xor" [$1;$3]}
-| NOT expr 
+| NOT expr
     {mkpredef_call "not" [$2]}
-| expr IMPL expr 
+| expr IMPL expr
     {mkpredef_call "impl" [$1;$3]}
 
 /* Comparison expr */
-| expr EQ expr 
+| expr EQ expr
     {mkpredef_call "=" [$1;$3]}
-| expr LT expr 
+| expr LT expr
     {mkpredef_call "<" [$1;$3]}
-| expr LTE expr 
+| expr LTE expr
     {mkpredef_call "<=" [$1;$3]}
-| expr GT expr 
+| expr GT expr
     {mkpredef_call ">" [$1;$3]}
-| expr GTE  expr 
+| expr GTE  expr
     {mkpredef_call ">=" [$1;$3]}
-| expr NEQ expr 
+| expr NEQ expr
     {mkpredef_call "!=" [$1;$3]}
 
 /* Arithmetic expr */
-| expr PLUS expr 
+| expr PLUS expr
     {mkpredef_call "+" [$1;$3]}
-| expr MINUS expr 
+| expr MINUS expr
     {mkpredef_call "-" [$1;$3]}
-| expr MULT expr 
+| expr MULT expr
     {mkpredef_call "*" [$1;$3]}
-| expr DIV expr 
+| expr DIV expr
     {mkpredef_call "/" [$1;$3]}
 | MINUS expr %prec UMINUS
   {mkpredef_call "uminus" [$2]}
-| expr MOD expr 
+| expr MOD expr
     {mkpredef_call "mod" [$1;$3]}
 
 /* If */
@@ -511,47 +511,47 @@ dim:
 | LPAR dim RPAR { $2 }
 | UIDENT { mkdim_ident $1 }
 | IDENT { mkdim_ident $1 }
-| dim AND dim 
+| dim AND dim
     {mkdim_appl "&&" [$1;$3]}
-| dim AMPERAMPER dim 
+| dim AMPERAMPER dim
     {mkdim_appl "&&" [$1;$3]}
-| dim OR dim 
+| dim OR dim
     {mkdim_appl "||" [$1;$3]}
-| dim BARBAR dim 
+| dim BARBAR dim
     {mkdim_appl "||" [$1;$3]}
-| dim XOR dim 
+| dim XOR dim
     {mkdim_appl "xor" [$1;$3]}
-| NOT dim 
+| NOT dim
     {mkdim_appl "not" [$2]}
-| dim IMPL dim 
+| dim IMPL dim
     {mkdim_appl "impl" [$1;$3]}
 
 /* Comparison dim */
-| dim EQ dim 
+| dim EQ dim
     {mkdim_appl "=" [$1;$3]}
-| dim LT dim 
+| dim LT dim
     {mkdim_appl "<" [$1;$3]}
-| dim LTE dim 
+| dim LTE dim
     {mkdim_appl "<=" [$1;$3]}
-| dim GT dim 
+| dim GT dim
     {mkdim_appl ">" [$1;$3]}
-| dim GTE  dim 
+| dim GTE  dim
     {mkdim_appl ">=" [$1;$3]}
-| dim NEQ dim 
+| dim NEQ dim
     {mkdim_appl "!=" [$1;$3]}
 
 /* Arithmetic dim */
-| dim PLUS dim 
+| dim PLUS dim
     {mkdim_appl "+" [$1;$3]}
-| dim MINUS dim 
+| dim MINUS dim
     {mkdim_appl "-" [$1;$3]}
-| dim MULT dim 
+| dim MULT dim
     {mkdim_appl "*" [$1;$3]}
-| dim DIV dim 
+| dim DIV dim
     {mkdim_appl "/" [$1;$3]}
 | MINUS dim %prec UMINUS
   {mkdim_appl "uminus" [$2]}
-| dim MOD dim 
+| dim MOD dim
     {mkdim_appl "mod" [$1;$3]}
 /* If */
 | IF dim THEN dim ELSE dim
@@ -566,7 +566,7 @@ vdecl_list:
 | vdecl_list SCOL vdecl {$3 @ $1}
 
 vdecl:
-  ident_list COL typeconst clock 
+  ident_list COL typeconst clock
     { List.map (fun id -> mkvar_decl (id, mktyp $3, $4, false, None)) $1 }
 | CONST ident_list /* static parameters don't have clocks */
     { List.map (fun id -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, true, None)) $2 }
@@ -580,7 +580,7 @@ local_vdecl_list:
 local_vdecl:
 /* Useless no ?*/    ident_list
     { List.map (fun id -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, false, None)) $1 }
-| ident_list COL typeconst clock 
+| ident_list COL typeconst clock
     { List.map (fun id -> mkvar_decl (id, mktyp $3, $4, false, None)) $1 }
 | CONST vdecl_ident EQ expr /* static parameters don't have clocks */
     { [ mkvar_decl ($2, mktyp Tydec_any, mkclock Ckdec_any, true, Some $4) ] }
@@ -593,7 +593,7 @@ cdecl_list:
 
 cdecl:
     const_ident EQ signed_const {
-      (fun itf -> 
+      (fun itf ->
        let c = mktop_decl itf (Const {
 				   const_id = $1;
 				   const_loc = Location.symbol_rloc ();
@@ -629,10 +629,11 @@ lustre_annot:
 lustre_annot_list EOF { { annots = $1; annot_loc = get_loc () } }
 
 lustre_annot_list:
-  { [] } 
+  { [] }
 | kwd COL qexpr SCOL lustre_annot_list { ($1,$3)::$5 }
 | IDENT COL qexpr SCOL lustre_annot_list { ([$1],$3)::$5 }
 | INVARIANT COL qexpr SCOL lustre_annot_list{ (["invariant"],$3)::$5 }
+| CCODE COL qexpr SCOL lustre_annot_list{ (["c_code"],$3)::$5 }
 | OBSERVER COL qexpr SCOL lustre_annot_list { (["observer"],$3)::$5 }
 
 kwd:
@@ -643,5 +644,3 @@ DIV { [] }
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)
-
-
