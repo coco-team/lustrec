@@ -45,7 +45,7 @@ type clock_dec =
 
 and clock_dec_desc =
   | Ckdec_any
-  | Ckdec_bool of (ident * ident) list 
+  | Ckdec_bool of (ident * ident) list
   | Ckdec_pclock of int * rat
 
 type constant =
@@ -59,7 +59,7 @@ type constant =
 
 type quantifier_type = Exists | Forall
 
-type var_decl = 
+type var_decl =
     {var_id: ident;
      var_orig:bool;
      var_dec_type: type_dec;
@@ -103,7 +103,7 @@ and expr_desc =
   | Expr_merge of ident * (label * expr) list
   | Expr_appl of call_t
 
-and call_t = ident * expr * expr option 
+and call_t = ident * expr * expr option
      (* The third part denotes the boolean condition for resetting *)
 
 and eq =
@@ -126,6 +126,7 @@ and expr_annot =
  {annots: (string list * eexpr) list;
   annot_loc: Location.t}
 
+
 type node_annot = {
   requires: eexpr list;
   ensures: eexpr list;
@@ -137,7 +138,7 @@ type offset =
 | Index of Dimension.dim_expr
 | Field of label
 
-type assert_t = 
+type assert_t =
     {
       assert_expr: expr;
       assert_loc: Location.t;
@@ -171,7 +172,7 @@ type node_desc =
      node_locals: var_decl list;
      mutable node_gencalls: expr list;
      mutable node_checks: Dimension.dim_expr list;
-     node_asserts: assert_t list; 
+     node_asserts: assert_t list;
      node_stmts: statement list;
      mutable node_dec_stateless: bool;
      mutable node_stateless: bool option;
@@ -191,10 +192,10 @@ type imported_node_desc =
      nodei_in_lib: string option;
     }
 
-type const_desc = 
-    {const_id: ident; 
-     const_loc: Location.t; 
-     const_value: constant;      
+type const_desc =
+    {const_id: ident;
+     const_loc: Location.t;
+     const_value: constant;
      mutable const_type: Types.type_expr;
     }
 
@@ -202,7 +203,7 @@ type top_decl_desc =
 | Node of node_desc
 | Const of const_desc
 | ImportedNode of imported_node_desc
-| Open of bool * string (* the boolean set to true denotes a local 
+| Open of bool * string (* the boolean set to true denotes a local
 			   lusi vs a lusi installed at system level *)
 | TypeDef of typedef_desc
 
@@ -214,10 +215,10 @@ type top_decl =
 
 type program = top_decl list
 
-type dep_t = Dep of 
-    bool 
+type dep_t = Dep of
+    bool
   * ident
-  * (top_decl list) 
+  * (top_decl list)
   * bool (* is stateful *)
 
 type error =

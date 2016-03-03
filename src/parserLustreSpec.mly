@@ -293,7 +293,7 @@ lustre_annot_list:
   { [] }
 | kwd COL expr SCOL lustre_annot_list { ($1,$3)::$5 }
 | IDENT COL expr SCOL lustre_annot_list { ([$1],$3)::$5 }
-| CCODE COL qexpr SCOL lustre_annot_list{ (["c_code"],$3)::$5 }
+| CCODE COL const lustre_annot_list{ (["c_code"],$3)::$5 }
 | INVARIANT COL expr SCOL lustre_annot_list{ (["invariant"],$3)::$5 }
 | OBSERVER COL expr SCOL lustre_annot_list { (["observer"],$3)::$5 }
 

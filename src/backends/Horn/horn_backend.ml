@@ -285,18 +285,16 @@ let print_machine machines fmt m =
     begin
       Format.fprintf fmt "; %s@." m.mname.node_id;
 
-      (* Check if there is annotation *)
-      if m.mannot != [] then
-        begin
+      (* Check if there is annotation for s-function *)
+      if m.mannot != [] then(
           Format.fprintf fmt "; @[%a@]@]@\n" (Utils.fprintf_list ~sep:"@ " Printers.pp_s_function) m.mannot;
-          (* List.iter ( fun kwd -> *)
 
-          (*             match kwd with *)
-          (*               [] -> Format.fprintf fmt "; no;" *)
-          (*              |[k] -> Format.fprintf fmt "; yes;" *)
-          (*              |_ -> assert false)  m.mannot; *)
-
-        end
+          (* List.iter( fun x -> match x with
+              [] -> Format.fprintf fmt "; empty"
+              | [x] -> Format.fprintf fmt "; one"
+              | k::l -> Format.fprintf fmt "; lots"
+            ) m.mannot; *)
+        );
 
    (* Printing variables *)
    Utils.fprintf_list ~sep:"@." pp_decl_var fmt
@@ -377,6 +375,80 @@ let print_machine machines fmt m =
        );
      end
     end
+
+  let print_sfunction machines fmt m =
+      let pp_instr init = pp_machine_instr machines ~init:init m in
+      if m.mname.node_id = arrow_id then
+        (* We don't print arrow function *)
+        ()
+      else
+        begin
+          Format.fprintf fmt "; SFUNCTION@.";
+          Format.fprintf fmt "; %s@." m.mname.node_id;
+
+          (* Check if there is annotation for s-function *)
+          if m.mannot != [] then(
+              Format.fprintf fmt "; @[%a@]@]@\n" (Utils.fprintf_list ~sep:"@ " Printers.pp_s_function) m.mannot;
+            );
+
+       (* Printing variables *)
+       Utils.fprintf_list ~sep:"@." pp_decl_var fmt
+         ((step_vars machines m)@
+    	 (rename_machine_list m.mname.node_id m.mstep.step_locals));
+       Format.pp_print_newline fmt ();
+
+
+
+       if is_stateless m then
+         begin
+           (* Declaring single predicate *)
+           Format.fprintf fmt "(declare-rel %a (%a))@."
+    	 pp_machine_stateless_name m.mname.node_id
+    	 (Utils.fprintf_list ~sep:" " pp_type)
+    	 (List.map (fun v -> v.var_type) (stateless_vars machines m));
+        Format.pp_print_newline fmt ();
+         end
+       else
+         begin
+           (* Declaring predicate *)
+           Format.fprintf fmt "(declare-rel %a (%a))@."
+    	 pp_machine_init_name m.mname.node_id
+    	 (Utils.fprintf_list ~sep:" " pp_type)
+    	 (List.map (fun v -> v.var_type) (init_vars machines m));
+
+           Format.fprintf fmt "(declare-rel %a (%a))@."
+    	 pp_machine_step_name m.mname.node_id
+    	 (Utils.fprintf_list ~sep:" " pp_type)
+    	 (List.map (fun v -> v.var_type) (step_vars machines m));
+
+           Format.pp_print_newline fmt ();
+
+          (* Adding assertions *)
+           (match m.mstep.step_asserts with
+           | [] -> ()
+
+           | assertsl ->
+              begin
+    	    let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id pp_var in
+                (* print_string pp_val; *)
+                let instrs_concat = m.mstep.step_instrs in
+                Format.fprintf fmt "; with Assertions @.";
+                (*Rule for init*)
+                Format.fprintf fmt "@[<v 2>(rule (=> @ (and @ %a@. %a)(%a %a)@]@.))@.@."
+                               (pp_conj (pp_instr true m.mname.node_id)) instrs_concat
+                               (pp_conj pp_val) assertsl
+                               pp_machine_init_name m.mname.node_id
+                               (Utils.fprintf_list ~sep:" " pp_var) (init_vars machines m);
+                (*Rule for step*)
+                Format.fprintf fmt "@[<v 2>(rule (=> @ (and @ %a@. %a)(%a %a)@]@.))@.@."
+                               (pp_conj (pp_instr false m.mname.node_id)) instrs_concat
+                               (pp_conj pp_val) assertsl
+                               pp_machine_step_name m.mname.node_id
+                               (Utils.fprintf_list ~sep:" " pp_var) (step_vars machines m);
+              end
+           );
+         end
+        end
 
 
 
@@ -527,9 +599,30 @@ if !Options.main_node <> "" then
       get_cex machines fmt node machine)
 end
 
+let check_sfunction mannot =
+ (*Check if its an sfunction*)
+ match mannot with
+   [] -> false
+  | [x] -> match x.annots with
+          [] -> false
+          |[(key,va)] -> match key with
+                        [] -> false
+                        | ["c_code"] -> true
+                        | _ -> false
+          | _ -> false
+  | _  -> false
 
 let translate fmt basename prog machines =
-  List.iter (print_machine machines fmt) (List.rev machines);
+  (*Check if there is a C_node annotation and do not print*)
+  List.iter(fun m ->
+    let is_sfunction = check_sfunction m.mannot in
+    if is_sfunction then(
+        Log.report ~level:1 (fun fmt -> fprintf fmt ".. detected sfunction: %s@," m.mname.node_id);
+        print_sfunction machines fmt m
+    ) else (
+        print_machine machines fmt m)
+        )
+         (List.rev machines);
   main_print machines fmt
 
 
