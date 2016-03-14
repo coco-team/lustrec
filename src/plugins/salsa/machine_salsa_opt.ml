@@ -183,11 +183,12 @@ let optimize_expr nodename constEnv printed_vars vars_env ranges formalEnv e : L
 	  let range_after = Float.evalExpr new_e_salsa abstractEnv in
 
     	let new_e = try salsa_expr2value_t vars_env constEnv new_e_salsa   with Not_found -> assert false in
-	if debug then Format.eprintf "@  @[<v>old: %a@ new: %a@ old range: %a@ new range: %a@]" 
+	if debug then Format.eprintf "@  @[<v>old: %a@ new: %a@ old range: %a@ new range: %a@ computed range: %a@]" 
 	  MC.pp_val e 
 	  MC.pp_val new_e 
 	  RangesInt.pp_val range_before
-	  RangesInt.pp_val range_after (* was e_val *);
+	  RangesInt.pp_val range_after
+	  RangesInt.pp_val e_val;
 	new_e, Some e_val
       with Not_found -> assert false
       | Salsa.Epeg_types.EPEGError _ -> (
