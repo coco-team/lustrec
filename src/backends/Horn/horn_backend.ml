@@ -288,12 +288,6 @@ let print_machine machines fmt m =
       (* Check if there is annotation for s-function *)
       if m.mannot != [] then(
           Format.fprintf fmt "; @[%a@]@]@\n" (Utils.fprintf_list ~sep:"@ " Printers.pp_s_function) m.mannot;
-
-          (* List.iter( fun x -> match x with
-              [] -> Format.fprintf fmt "; empty"
-              | [x] -> Format.fprintf fmt "; one"
-              | k::l -> Format.fprintf fmt "; lots"
-            ) m.mannot; *)
         );
 
    (* Printing variables *)
@@ -376,6 +370,19 @@ let print_machine machines fmt m =
      end
     end
 
+
+(* a function to create the padding of flags in case of an s-function*)
+(*TODO fixme*)
+let mk_flags arity =
+ let b_range =
+   let rec range i j =
+     if i > arity then [] else i :: (range (i+1) j) in
+   range 2 arity;
+ in
+ List.fold_left (fun acc x -> acc ^ " false") "true" b_range
+
+
+(*a function to print the rules in case we have an s-function*)
   let print_sfunction machines fmt m =
       let pp_instr init = pp_machine_instr machines ~init:init m in
       if m.mname.node_id = arrow_id then
@@ -385,6 +392,7 @@ let print_machine machines fmt m =
         begin
           Format.fprintf fmt "; SFUNCTION@.";
           Format.fprintf fmt "; %s@." m.mname.node_id;
+          Format.fprintf fmt "; EndPoint Predicate %s." !Options.sfunction;
 
           (* Check if there is annotation for s-function *)
           if m.mannot != [] then(
@@ -397,36 +405,48 @@ let print_machine machines fmt m =
     	 (rename_machine_list m.mname.node_id m.mstep.step_locals));
        Format.pp_print_newline fmt ();
 
+       let splitted = Str.split (Str.regexp "@") !Options.sfunction in
+       Log.report ~level:1 (fun fmt -> fprintf fmt ".. sfunction name: %s@," !Options.sfunction);
+       let sf_name, flags, arity = match splitted with
+           [h;flg;par] -> h, flg, par
+         | _ -> failwith "Wrong Sfunction info"
 
+        in
+        Log.report ~level:1 (fun fmt -> fprintf fmt "... sf_name: %s@, .. flags: %s@ .. arity: %s@," sf_name flags arity);
 
        if is_stateless m then
          begin
            (* Declaring single predicate *)
-           Format.fprintf fmt "(declare-rel %a (%a))@."
-    	 pp_machine_stateless_name m.mname.node_id
-    	 (Utils.fprintf_list ~sep:" " pp_type)
-    	 (List.map (fun v -> v.var_type) (stateless_vars machines m));
-        Format.pp_print_newline fmt ();
+           Format.fprintf fmt "(declare-real %a (%a))@."
+    	                  pp_machine_stateless_name m.mname.node_id
+    	                  (Utils.fprintf_list ~sep:" " pp_type)
+    	                  (List.map (fun v -> v.var_type) (stateless_vars machines m));
+           Format.pp_print_newline fmt ();
+           (* Rule for single predicate *)
+           let str_flags = sf_name ^ " " ^ mk_flags (int_of_string flags) in
+           Format.fprintf fmt "@[<v 2>(rule (=> @ (%s %a) (%a %a)@]@.))@.@."
+                          str_flags
+                          (Utils.fprintf_list ~sep:" " pp_var) (stateless_vars machines m)
+	                  pp_machine_stateless_name m.mname.node_id
+	                  (Utils.fprintf_list ~sep:" " pp_var) (stateless_vars machines m);
          end
-       else
+      else
          begin
            (* Declaring predicate *)
            Format.fprintf fmt "(declare-rel %a (%a))@."
-    	 pp_machine_init_name m.mname.node_id
-    	 (Utils.fprintf_list ~sep:" " pp_type)
-    	 (List.map (fun v -> v.var_type) (init_vars machines m));
+    	                  pp_machine_init_name m.mname.node_id
+    	                  (Utils.fprintf_list ~sep:" " pp_type)
+    	                  (List.map (fun v -> v.var_type) (init_vars machines m));
 
            Format.fprintf fmt "(declare-rel %a (%a))@."
-    	 pp_machine_step_name m.mname.node_id
-    	 (Utils.fprintf_list ~sep:" " pp_type)
-    	 (List.map (fun v -> v.var_type) (step_vars machines m));
+    	                  pp_machine_step_name m.mname.node_id
+    	                  (Utils.fprintf_list ~sep:" " pp_type)
+    	                  (List.map (fun v -> v.var_type) (step_vars machines m));
 
            Format.pp_print_newline fmt ();
-
           (* Adding assertions *)
            (match m.mstep.step_asserts with
            | [] -> ()
-
            | assertsl ->
               begin
     	    let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id pp_var in
@@ -448,7 +468,9 @@ let print_machine machines fmt m =
               end
            );
          end
+
         end
+
 
 
 

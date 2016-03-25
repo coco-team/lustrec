@@ -39,6 +39,8 @@ let horntraces = ref false
 let horn_cex = ref false
 let horn_query = ref true
 
+let sfunction = ref ""
+
 
 let options =
   [ "-d", Arg.Set_string dest_dir,
@@ -57,6 +59,7 @@ let options =
     "-horn-traces", Arg.Unit (fun () -> output := "horn"; traces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
     "-horn-cex", Arg.Unit (fun () -> output := "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
     "-horn-query", Arg.Unit (fun () -> output := "horn"; horn_query:=true), "generate queries in generated Horn file. Enable the horn backend (work in progress)";
+    "-horn-sfunction", Arg.Set_string sfunction, "Get the endpoint predicate of the sfunction";
     "-print_reuse", Arg.Set print_reuse, "prints variable reuse policy";
     "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";
     "-inline", Arg.Set global_inline, "inline all node calls (require a main node)";
