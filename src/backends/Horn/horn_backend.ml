@@ -285,18 +285,11 @@ let print_machine machines fmt m =
     begin
       Format.fprintf fmt "; %s@." m.mname.node_id;
 
-      (* Check if there is annotation for s-function *)
-      if m.mannot != [] then(
-          Format.fprintf fmt "; @[%a@]@]@\n" (Utils.fprintf_list ~sep:"@ " Printers.pp_s_function) m.mannot;
-        );
-
-   (* Printing variables *)
-   Utils.fprintf_list ~sep:"@." pp_decl_var fmt
-     ((step_vars machines m)@
-	 (rename_machine_list m.mname.node_id m.mstep.step_locals));
-   Format.pp_print_newline fmt ();
-
-
+      (* Printing variables *)
+      Utils.fprintf_list ~sep:"@." pp_decl_var fmt
+                         ((step_vars machines m)@
+	                    (rename_machine_list m.mname.node_id m.mstep.step_locals));
+      Format.pp_print_newline fmt ();
 
    if is_stateless m then
      begin
@@ -382,7 +375,20 @@ let mk_flags arity =
  List.fold_left (fun acc x -> acc ^ " false") "true" b_range
 
 
-(*a function to print the rules in case we have an s-function*)
+(*Get sfunction infos from command line*)
+let get_sf_info() =
+  let splitted = Str.split (Str.regexp "@") !Options.sfunction in
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. sfunction name: %s@," !Options.sfunction);
+  let sf_name, flags, arity = match splitted with
+      [h;flg;par] -> h, flg, par
+    | _ -> failwith "Wrong Sfunction info"
+
+  in
+  Log.report ~level:1 (fun fmt -> fprintf fmt "... sf_name: %s@, .. flags: %s@ .. arity: %s@," sf_name flags arity);
+  sf_name, flags, arity
+
+
+    (*a function to print the rules in case we have an s-function*)
   let print_sfunction machines fmt m =
       let pp_instr init = pp_machine_instr machines ~init:init m in
       if m.mname.node_id = arrow_id then
@@ -400,19 +406,11 @@ let mk_flags arity =
             );
 
        (* Printing variables *)
-       Utils.fprintf_list ~sep:"@." pp_decl_var fmt
-         ((step_vars machines m)@
-    	 (rename_machine_list m.mname.node_id m.mstep.step_locals));
-       Format.pp_print_newline fmt ();
-
-       let splitted = Str.split (Str.regexp "@") !Options.sfunction in
-       Log.report ~level:1 (fun fmt -> fprintf fmt ".. sfunction name: %s@," !Options.sfunction);
-       let sf_name, flags, arity = match splitted with
-           [h;flg;par] -> h, flg, par
-         | _ -> failwith "Wrong Sfunction info"
-
-        in
-        Log.report ~level:1 (fun fmt -> fprintf fmt "... sf_name: %s@, .. flags: %s@ .. arity: %s@," sf_name flags arity);
+          Utils.fprintf_list ~sep:"@." pp_decl_var fmt
+                             ((step_vars machines m)@
+    	                        (rename_machine_list m.mname.node_id m.mstep.step_locals));
+          Format.pp_print_newline fmt ();
+          let sf_name, flags, arity = get_sf_info() in
 
        if is_stateless m then
          begin
@@ -622,29 +620,37 @@ if !Options.main_node <> "" then
 end
 
 let check_sfunction mannot =
- (*Check if its an sfunction*)
+  (*Check if its an sfunction*)
  match mannot with
    [] -> false
-  | [x] -> match x.annots with
-          [] -> false
-          |[(key,va)] -> match key with
+ | [x] ->
+    (match x.annots with
+       [(key,va)] -> (match key with
                         [] -> false
-                        | ["c_code"] -> true
-                        | _ -> false
-          | _ -> false
-  | _  -> false
+                      | ["c_code"] -> true
+                      | _ -> false)
+      | _ -> false
+    )
+ |_ -> false
+
+
 
 let translate fmt basename prog machines =
   (*Check if there is a C_node annotation and do not print*)
   List.iter(fun m ->
-    let is_sfunction = check_sfunction m.mannot in
-    if is_sfunction then(
-        Log.report ~level:1 (fun fmt -> fprintf fmt ".. detected sfunction: %s@," m.mname.node_id);
-        print_sfunction machines fmt m
-    ) else (
-        print_machine machines fmt m)
+      if (!Options.sfunction <> "") then(
+        let is_sfunction = check_sfunction m.mannot in
+        if is_sfunction then (
+          Log.report ~level:1 (fun fmt -> fprintf fmt ".. detected sfunction: %s@," m.mname.node_id);
+          print_sfunction machines fmt m
+        ) else (
+          print_machine machines fmt m
         )
-         (List.rev machines);
+      ) else (
+        print_machine machines fmt m
+      )
+    )
+           (List.rev machines);
   main_print machines fmt
 
 
