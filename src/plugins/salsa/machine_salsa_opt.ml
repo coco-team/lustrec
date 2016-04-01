@@ -75,6 +75,17 @@ let rec get_written_vars instrs =
     | LT.MComment _ -> Vars.empty    
   )
 
+let rec iterTransformExpr fresh_id e_salsa abstractEnv old_range =
+  let new_expr, new_range = 
+    Salsa.MainEPEG.transformExpression fresh_id e_salsa abstractEnv 
+  in
+  Format.eprintf "New range: %a@." 	  RangesInt.pp_val new_range;
+  if Salsa.Float.errLt new_range old_range < 0 then 
+    
+    iterTransformExpr fresh_id new_expr abstractEnv new_range
+  else
+    new_expr, new_range
+
 
 (* Optimize a given expression. It returns another expression and a computed range. *)
 let optimize_expr nodename constEnv printed_vars vars_env ranges formalEnv e : LT.value_t * RangesInt.t option = 
@@ -174,12 +185,12 @@ let optimize_expr nodename constEnv printed_vars vars_env ranges formalEnv e : L
 	    MC.pp_val (salsa_expr2value_t vars_env constEnv e_salsa)
 	    (Utils.fprintf_list ~sep:",@ "(fun fmt (l,r) -> Format.fprintf fmt "%s -> %a" l FloatIntSalsa.pp r)) abstractEnv
 	;
+	let range_before = Float.evalExpr e_salsa abstractEnv in
 	  
 	let new_e_salsa, e_val = 
-	  Salsa.MainEPEG.transformExpression fresh_id e_salsa abstractEnv 
+	  iterTransformExpr fresh_id e_salsa abstractEnv range_before
 	in
 
-	  let range_before = Float.evalExpr e_salsa abstractEnv in
 	  let range_after = Float.evalExpr new_e_salsa abstractEnv in
 
     	let new_e = try salsa_expr2value_t vars_env constEnv new_e_salsa   with Not_found -> assert false in
@@ -512,7 +523,8 @@ let salsaStep constEnv  m s =
 	in
 	let minv, maxv = get_cst minv, get_cst maxv in
 	if debug then Format.eprintf "%s in [%f, %f]@ " v minv maxv;
-	RangesInt.enlarge ranges v (Salsa.SalsaTypes.I(minv, maxv),Salsa.SalsaTypes.J(0.,0.))
+	let irange = Salsa.SalsaTypes.I(minv, maxv) in
+	RangesInt.enlarge ranges v (irange, Salsa.Float.ulp irange)
       )
       | _ -> 
 	Format.eprintf 

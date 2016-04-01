@@ -131,7 +131,7 @@ struct
       if r = 0. then
 	Salsa.Builder.mk_cst (ST.I(-. min_float, min_float),Float.ulp (ST.I(-. min_float, min_float)))
       else
-	Salsa.Builder.mk_cst (ST.I(r*.(1.-.epsilon_float),r*.(1.+.epsilon_float)),Float.ulp (ST.I(r,r)))
+	Salsa.Builder.mk_cst (ST.I(r*.(1.-.epsilon_float),r*.(1.+.epsilon_float)), Float.ulp (ST.I(r,r)))
     | _ -> assert false
 end
 
