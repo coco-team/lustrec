@@ -52,8 +52,9 @@ let options =
     "-no-spec", Arg.Unit (fun () -> spec := "no"), "do not generate any specification";
     "-acsl-spec", Arg.Unit (fun () -> spec := "acsl"), "generates an ACSL encoding of the specification. Only meaningful for the C backend (default)";
     "-c-spec", Arg.Unit (fun () -> spec := "c"), "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
-    "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C";
-    "-horn", Arg.Unit (fun () -> output := "horn"), "generates Horn clauses encoding output instead of C";
+    "-java", Arg.Unit (fun () -> output := "java"), "generates Java program";
+    "-rust", Arg.Unit (fun () -> output := "rust"), "generates Rust program";
+    "-horn", Arg.Unit (fun () -> output := "horn"), "generates Horn clauses";
     "-horn-traces", Arg.Unit (fun () -> output := "horn"; traces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
     "-horn-cex", Arg.Unit (fun () -> output := "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
     "-horn-query", Arg.Unit (fun () -> output := "horn"; horn_query:=true), "generate queries in generated Horn file. Enable the horn backend (work in progress)";

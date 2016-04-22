@@ -1,5 +1,6 @@
 "backends/C": include
 "backends/Horn": include
+"backends/Rust": include
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic
 "main_lustre_compiler.native": use_graph

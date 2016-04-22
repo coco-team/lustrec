@@ -35,10 +35,10 @@ let gen_files funs basename prog machines dependencies header_file source_lib_fi
   let print_header, print_lib_c, print_main_c, print_makefile = funs in
   (* Generating H file *)
   print_header header_fmt basename prog machines dependencies;
- 
+
   (* Generating Lib C file *)
   print_lib_c source_lib_fmt basename prog machines dependencies;
- 
+
   close_out header_out;
   close_out source_lib_out;
 
@@ -55,7 +55,7 @@ let gen_files funs basename prog machines dependencies header_file source_lib_fi
 
       (* Generating Main C file *)
       print_main_c source_main_fmt m basename prog machines dependencies;
-      
+
       (* Generating Makefile *)
      print_makefile basename main_node dependencies makefile_fmt;
 
@@ -78,14 +78,14 @@ let translate_to_c header source_lib source_main makefile basename prog machines
     let module SourceMain = C_backend_main.Main (SourceMainMod) in
     let module Makefile = C_backend_makefile.Main (MakefileMod) in
 
-    let funs = 
-      Header.print_alloc_header, 
-      Source.print_lib_c, 
-      SourceMain.print_main_c, 
-      Makefile.print_makefile 
+    let funs =
+      Header.print_alloc_header,
+      Source.print_lib_c,
+      SourceMain.print_main_c,
+      Makefile.print_makefile
     in
-    gen_files 
-      funs basename prog machines dependencies 
+    gen_files
+      funs basename prog machines dependencies
       header source_lib source_main makefile machines
 
   end
@@ -101,11 +101,11 @@ let translate_to_c header source_lib source_main makefile basename prog machines
     let module SourceMain = C_backend_main.Main (SourceMainMod) in
     let module Makefile = C_backend_makefile.Main (MakefileMod) in
 
-    let funs = 
-      Header.print_alloc_header, 
+    let funs =
+      Header.print_alloc_header,
       Source.print_lib_c,
       SourceMain.print_main_c,
-      Makefile.print_makefile 
+      Makefile.print_makefile
     in
     gen_files
       funs basename prog machines dependencies

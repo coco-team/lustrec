@@ -235,7 +235,7 @@ let print_rat fmt (a,b) =
       Format.fprintf fmt "%i/%i" (-a) (-b)
     else
       Format.fprintf fmt "%i/%i" a b
-	
+
 
 (* Generic pretty printing *)
 
@@ -258,7 +258,7 @@ let pp_list l pp_fun beg_str end_str sep_str =
   let rec pp_l l =
     match l with
     | [] -> ()
-    | [hd] -> 
+    | [hd] ->
         pp_fun hd
     | hd::tl ->
         pp_fun hd;
@@ -322,7 +322,7 @@ let pp_longident lid =
     print_int tag;
     print_string ")"
   in
-  pp_list lid pp_fun "" "." "."  
+  pp_list lid pp_fun "" "." "."
 
 let pp_date fmt tm =
   Format.fprintf fmt "%i/%i/%i, %i:%i:%i"
@@ -359,6 +359,12 @@ let incr_line lexbuf =
 let last_tag = ref (-1)
 let new_tag () =
   incr last_tag; !last_tag
+
+
+(* Creates a directory if it does not already exist. *)
+let mk_dir dir =
+  try Unix.mkdir dir 0o740 with Unix.Unix_error(Unix.EEXIST, _, _) -> ()
+
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

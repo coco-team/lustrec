@@ -325,6 +325,12 @@ let rec compile_source dirname basename extension =
 (*	Lustre_backend.translate fmt basename normalized_prog machine_code *)
 	()
       end
+    | "rust" ->
+      begin
+	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. Rust code generation@,");
+	  Rust_backend.translate_to_rust
+	     destname basename prog machine_code dependencies
+	end
 
     | _ -> assert false
   in
