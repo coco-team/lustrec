@@ -302,15 +302,33 @@ let print_machine machines fmt m =
 	 (List.map (fun v -> v.var_type) (stateless_vars machines m));
 
        (* Rule for single predicate *)
-       Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@."
-	 (pp_conj (pp_instr
-		     true (* In this case, the boolean init can be set to true or false.
+
+       (match m.mstep.step_asserts with
+        | [] ->
+           begin
+             (*No assertions *)
+             Format.fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a %a)@]@.))@.@."
+	                    (pp_conj (pp_instr
+		                        true (* In this case, the boolean init can be set to true or false.
 			     The node is stateless. *)
-		     m.mname.node_id)
-	 )
-	 m.mstep.step_instrs
-	 pp_machine_stateless_name m.mname.node_id
-	 (Utils.fprintf_list ~sep:" " pp_var) (stateless_vars machines m);
+		                        m.mname.node_id)
+	                    )
+	                    m.mstep.step_instrs
+	                  pp_machine_stateless_name m.mname.node_id
+	                  (Utils.fprintf_list ~sep:" " pp_var) (stateless_vars machines m);
+           end
+       | assertsl ->
+          begin
+	    let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id pp_var in
+            let instrs_concat = m.mstep.step_instrs in
+            Format.fprintf fmt "; with Assertions @.";
+            Format.fprintf fmt "@[<v 2>(rule (=> @ (and @ %a@. %a)(%a %a)@]@.))@.@."
+                           (pp_conj (pp_instr true m.mname.node_id)) instrs_concat
+                           (pp_conj pp_val) assertsl
+	                   pp_machine_stateless_name m.mname.node_id
+	                   (Utils.fprintf_list ~sep:" " pp_var) (stateless_vars machines m);
+          end
+       )
      end
    else
      begin
