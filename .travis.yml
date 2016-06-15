@@ -24,6 +24,12 @@ install:
   - export LZ="$TRAVIS_BUILD_DIR/../zustre"
   - git clone https://github.com/coco-team/zustre $LZ
   - ls $LZ
+  - export Z3="$TRAVIS_BUILD_DIR/../z3"
+  - mkdir -p $Z3
+  - wget --output-document=zustre.tar.gz  https://www.dropbox.com/s/wqvh31085s49ia4/zustre.tar.gz?dl=1;
+  - tar xvf zustre.tar.gz --strip-components=1 -C $Z3;
+  - ls $LZ
+  - ls $Z3
 
 before_script:
   - ocaml -version
@@ -37,7 +43,7 @@ script:
   - cd $LZ
   - mkdir -p build
   - cd build
-  - /usr/bin/cmake -DLUSTREC_EXECUTABLE=/home/travis/build/coco-team/lustrec/bin/lustrec -DZ3_ROOT=$LZ -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=run -DCMAKE_PROGRAM_PATH=/usr/bin  ../;
+  - /usr/bin/cmake -DLUSTREC_EXECUTABLE=/home/travis/build/coco-team/lustrec/bin/lustrec -DZ3_ROOT=$Z3 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=run -DCMAKE_PROGRAM_PATH=/usr/bin  ../;
   - /usr/bin/cmake --build .
   - /usr/bin/cmake --build . --target install 
   - cd ..
