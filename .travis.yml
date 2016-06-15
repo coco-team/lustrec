@@ -1,9 +1,7 @@
 language: c
 env:
   - OCAML_VERSION=4.02.1 OPAM_VERSION=1.2.0
-  - OCAML_VERSION=4.02.1 OPAM_VERSION=1.1.0
   - OCAML_VERSION=4.01.0 OPAM_VERSION=1.2.0
-  - OCAML_VERSION=4.01.0 OPAM_VERSION=1.1.0
 
 before_install:
   - until sudo add-apt-repository -y ppa:saiarcot895/chromium-beta; do echo retry; done
