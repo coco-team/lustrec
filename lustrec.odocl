@@ -20,6 +20,7 @@ Delay
 Delay_predef
 Dimension
 Env
+Global
 Inliner
 Lexer_lustre
 LexerLustreSpec
@@ -31,12 +32,14 @@ LustreSpec
 Machine_code
 Main_lustre_compiler
 Modules
+Mpfr
 Normalization
 Optimize_machine
 Optimize_prog
 Options
 Parse
 Parser_lustre
+Plugins
 Printers
 Scheduling
 SortProg
