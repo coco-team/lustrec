@@ -1,0 +1,23 @@
+
+
+function MPFRUminus(i: real) returns (out: real) lib gmp lib mpfr;
+
+function MPFRPlus(i1, i2: real) returns (out: real);
+
+function MPFRMinus(i1, i2: real) returns (out: real);
+
+function MPFRTimes(i1, i2: real) returns (out: real);
+
+function MPFRDiv(i1, i2: real) returns (out: real);
+
+function MPFRLe(i1, i2: real) returns (out: bool);
+
+function MPFRLt(i1, i2: real) returns (out: bool);
+
+function MPFRGe(i1, i2: real) returns (out: bool);
+
+function MPFRGt(i1, i2: real) returns (out: bool);
+
+function MPFREq(i1, i2: real) returns (out: bool);
+
+function MPFRNeq(i1, i2: real) returns (out: bool);
