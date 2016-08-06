@@ -13,8 +13,6 @@
 open Parser_lustre
 open Utils
 
-exception Error of Location.t
-
 (* As advised by Caml documentation. This way a single lexer rule is
    used to handle all the possible keywords. *)
 let keyword_table =
@@ -48,7 +46,7 @@ let keyword_table =
   "type", TYPE;
   "int", TINT;
   "bool", TBOOL;
-  "float", TFLOAT;
+  (* "float", TFLOAT; *)
   "real", TREAL;
   "clock", TCLOCK;
   "not", NOT;
@@ -75,13 +73,13 @@ let make_annot lexbuf s =
   try
     let ann = LexerLustreSpec.annot s in
     ANNOT ann
-  with _ -> (Format.eprintf "Impossible to parse the following annotation:@.%s@.@?" s; exit 1)
+  with LexerLustreSpec.Error loc -> raise (Parse.Error (Location.shift (Location.curr lexbuf) loc, Annot_error s))
 
 let make_spec lexbuf s = 
   try
     let ns = LexerLustreSpec.spec s in
     NODESPEC ns
-  with _ -> (Format.eprintf "Impossible to parse the following node specification:@.%s@.@?" s; exit 1)
+  with LexerLustreSpec.Error loc -> raise (Parse.Error (Location.shift (Location.curr lexbuf) loc, Node_spec_error s))
    
 }
 
@@ -108,11 +106,12 @@ rule token = parse
       token lexbuf }
 | blank +
     {token lexbuf}
-| ['0'-'9'] ['0'-'9']* '.' ['0'-'9']*
-    {FLOAT (float_of_string (Lexing.lexeme lexbuf))}
+| ((['0'-'9']+ as l)  '.' (['0'-'9']* as r) ('E'|'e') (('+'|'-')? ['0'-'9']+ as exp)) as s
+    {REAL (Num.num_of_string (l^r), String.length r + -1 * int_of_string exp , s)}
+| ((['0'-'9']+ as l) '.' (['0'-'9']* as r)) as s
+    {REAL (Num.num_of_string (l^r), String.length r, s)}
 | ['0'-'9']+ 
     {INT (int_of_string (Lexing.lexeme lexbuf)) }
-| ['0'-'9']+ '.' ['0'-'9']+ ('E'|'e') ('+'|'-') ['0'-'9'] ['0'-'9']* as s {REAL s}
 | "tel." {TEL}
 | "tel;" {TEL}
 | "#open" { OPEN }
@@ -158,11 +157,11 @@ rule token = parse
 | "^" {POWER}
 | '"' {QUOTE}
 | eof { EOF }
-| _ { raise (Error (Location.curr lexbuf)) }
+| _ { raise (Parse.Error (Location.curr lexbuf, Undefined_token (Lexing.lexeme lexbuf))) }
 
 and comment n = parse
 | eof
-    { raise (Error (Location.curr lexbuf)) }
+    { raise (Parse.Error (Location.curr lexbuf, Unfinished_comment)) }
 | "(*"
     { comment (n+1) lexbuf }
 | "*)"
@@ -173,10 +172,12 @@ and comment n = parse
 | _ { comment n lexbuf }
 
 and annot_singleline = parse
+  | eof { make_annot lexbuf (Buffer.contents buf) }
   | newline { incr_line lexbuf; make_annot lexbuf (Buffer.contents buf) }
   | _ as c { Buffer.add_char buf c; annot_singleline lexbuf }
 
 and annot_multiline n = parse
+  | eof { raise (Parse.Error (Location.curr lexbuf, Unfinished_annot)) }
   | "*)" as s { 
     if n > 0 then 
       (Buffer.add_string buf s; annot_multiline (n-1) lexbuf) 
@@ -187,10 +188,12 @@ and annot_multiline n = parse
   | _ as c { Buffer.add_char buf c; annot_multiline n lexbuf }
 
 and spec_singleline = parse
+  | eof { make_spec lexbuf (Buffer.contents buf) }
   | newline { incr_line lexbuf; make_spec lexbuf (Buffer.contents buf) }
   | _ as c { Buffer.add_char buf c; spec_singleline lexbuf }
 
 and spec_multiline n = parse
+  | eof { raise (Parse.Error (Location.curr lexbuf, Unfinished_node_spec)) }
   | "*)" as s { if n > 0 then 
       (Buffer.add_string buf s; spec_multiline (n-1) lexbuf) 
     else 

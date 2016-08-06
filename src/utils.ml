@@ -36,7 +36,8 @@ module IMap = Map.Make(IdentModule)
 
 module ISet = Set.Make(IdentModule)
 
-let desome x = match x with Some x -> x | None -> failwith "desome"
+exception DeSome
+let desome x = match x with Some x -> x | None -> raise DeSome
 
 let option_map f o =
   match o with

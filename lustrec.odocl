@@ -8,6 +8,7 @@ backends/C/C_backend_makefile
 backends/C/C_backend_spec
 backends/C/C_backend_src
 backends/Horn/Horn_backend
+plugins/scopes/Scopes
 Basic_library
 Causality
 Clock_calculus

@@ -38,15 +38,19 @@ let gen_files funs basename prog machines dependencies header_file source_lib_fi
  
   (* Generating Lib C file *)
   print_lib_c source_lib_fmt basename prog machines dependencies;
- 
+
   close_out header_out;
   close_out source_lib_out;
 
   match !Options.main_node with
-  | "" ->  () (* No main node: we do not genenrate main nor makefile *)
+  | "" ->  () (* No main node: we do not generate main nor makefile *)
   | main_node -> (
     match Machine_code.get_machine_opt main_node machines with
-    | None -> Format.eprintf "Unable to find a main node named %s@.@?" main_node; assert false
+    | None -> begin
+      Global.main_node := main_node;
+      Format.eprintf "Code generation error: %a@." Corelang.pp_error LustreSpec.Main_not_found;
+      raise (Corelang.Error (Location.dummy_loc, LustreSpec.Main_not_found))
+    end
     | Some m -> begin
       let source_main_out = open_out source_main_file in
       let source_main_fmt = formatter_of_out_channel source_main_out in
@@ -57,7 +61,7 @@ let gen_files funs basename prog machines dependencies header_file source_lib_fi
       print_main_c source_main_fmt m basename prog machines dependencies;
       
       (* Generating Makefile *)
-     print_makefile basename main_node dependencies makefile_fmt;
+      print_makefile basename main_node dependencies makefile_fmt;
 
      close_out source_main_out;
      close_out makefile_out

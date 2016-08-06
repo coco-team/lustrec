@@ -15,8 +15,10 @@ open Log
 open Utils
 open LustreSpec
 open Compiler_common
+ 
+exception StopPhase1 of program
 
-let usage = "Usage: lustrec [options] <source-file>"
+let usage = "Usage: lustrec [options] \x1b[4msource file\x1b[0m"
 
 let extensions = [".ec"; ".lus"; ".lusi"]
 
@@ -86,19 +88,12 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
   end
 
 
+(* From prog to prog *)
+let stage1 prog dirname basename =
+  (* Removing automata *) 
+  let prog = expand_automata prog in
 
-(* compile a .lus source file *)
-let rec compile_source dirname basename extension =
-
-  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v>");
-
-  (* Parsing source *)
-  let prog = parse_source (dirname ^ "/" ^ basename ^ extension) in
-
-  (* Removing automata *)
-  let prog = Automata.expand_decls prog in
-
-  Log.report ~level:4 (fun fmt -> fprintf fmt "After automata expansion:@.@[<v 2>@ %a@]@," Printers.pp_prog prog);
+  Log.report ~level:4 (fun fmt -> fprintf fmt ".. after automata expansion:@.@[<v 2>@ %a@]@," Printers.pp_prog prog);
 
   (* Importing source *)
   let _ = Modules.load_program ISet.empty prog in
@@ -120,26 +115,40 @@ let rec compile_source dirname basename extension =
   in
 
   (* Checking stateless/stateful status *)
-  check_stateless_decls prog;
+  if Scopes.Plugin.is_active () then
+    force_stateful_decls prog
+  else
+    check_stateless_decls prog;
 
   (* Typing *)
   let computed_types_env = type_decls type_env prog in
-
+  
   (* Clock calculus *)
   let computed_clocks_env = clock_decls clock_env prog in
 
   (* Generating a .lusi header file only *)
   if !Options.lusi then
-    begin
-      let lusi_ext = extension ^ "i" in
-      Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating interface file %s@," (dirname ^ "/" ^ basename ^ lusi_ext));
-      print_lusi prog dirname basename lusi_ext;
-      Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
-      exit 0
-    end;
+    (* We stop here the processing and produce the current prog. It will be
+       exported as a lusi *)
+    raise (StopPhase1 prog);
 
+ (* Optimization of prog: 
+     - Unfold consts 
+     - eliminate trivial expressions
+ *)
+  (*
+  let prog = 
+    if !Options.const_unfold || !Options.optimization >= 5 then
+      begin
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. eliminating constants and aliases@,");
+	Optimize_prog.prog_unfold_consts prog
+      end
+    else
+      prog
+  in
+  *)
   (* Delay calculus *)
-  (* TO BE DONE LATER (Xavier)
+  (*
     if(!Options.delay_calculus)
     then
     begin
@@ -159,13 +168,8 @@ let rec compile_source dirname basename extension =
 
   (* Compatibility with Lusi *)
   (* Checking the existence of a lusi (Lustre Interface file) *)
-  (match !Options.output with
-    "C" ->
-      begin
-        let extension = ".lusi" in
-        compile_source_to_header prog computed_types_env computed_clocks_env dirname basename extension;
-      end
-   |_ -> ());
+  let extension = ".lusi" in
+  compile_source_to_header prog computed_types_env computed_clocks_env dirname basename extension;
 
   Typing.uneval_prog_generics prog;
   Clock_calculus.uneval_prog_generics prog;
@@ -184,12 +188,13 @@ let rec compile_source dirname basename extension =
 	!Options.main_node
 	orig prog type_env clock_env
     end;
-
-(*Format.eprintf "Inliner.global_inline<<@.%a@.>>@." Printers.pp_prog prog;*)
+  
   (* Computes and stores generic calls for each node,
      only useful for ANSI C90 compliant generic node compilation *)
   if !Options.ansi then Causality.NodeDep.compute_generic_calls prog;
-  (*Hashtbl.iter (fun id td -> match td.Corelang.top_decl_desc with Corelang.Node nd -> Format.eprintf "%s calls %a" id Causality.NodeDep.pp_generic_calls nd | _ -> ()) Corelang.node_table;*)
+  (*Hashtbl.iter (fun id td -> match td.Corelang.top_decl_desc with
+    Corelang.Node nd -> Format.eprintf "%s calls %a" id
+    Causality.NodeDep.pp_generic_calls nd | _ -> ()) Corelang.node_table;*)
 
   (* Normalization phase *)
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. normalization@,");
@@ -197,8 +202,22 @@ let rec compile_source dirname basename extension =
   if !Options.output = "lustre" then
     Normalization.unfold_arrow_active := false;
   let prog = Normalization.normalize_prog prog in
-
   Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
+
+  let prog =
+    if !Options.mpfr
+    then
+      begin
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. targetting MPFR library@,");
+	Mpfr.inject_prog prog
+      end
+    else
+      begin
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. keeping FP numbers@,");
+	prog
+      end in
+  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
+
   (* Checking array accesses *)
   if !Options.check then
     begin
@@ -206,35 +225,33 @@ let rec compile_source dirname basename extension =
       Access.check_prog prog;
     end;
 
+  prog, dependencies
+
+(* from source to machine code, with optimization *)
+let stage2 prog =    
   (* Computation of node equation scheduling. It also breaks dependency cycles
      and warns about unused input or memory variables *)
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. scheduling@,");
   let prog, node_schs = Scheduling.schedule_prog prog in
-  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_warning_unused node_schs);
+  Log.report ~level:1 (fun fmt -> fprintf fmt "%a"              Scheduling.pp_warning_unused node_schs);
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_schedule node_schs);
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_fanin_table node_schs);
+  Log.report ~level:5 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_dep_graph node_schs);
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
 
- (* Optimization of prog:
-    - Unfold consts
-    - eliminate trivial expressions
- *)
-  let prog =
-    if !Options.optimization >= 5 then
-      begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. constants elimination@,");
-	Optimize_prog.prog_unfold_consts prog
-      end
-    else
-      prog
-  in
+
+  (* TODO Salsa optimize prog: 
+     - emits warning for programs with pre inside expressions
+     - make sure each node arguments and memory is bounded by a local annotation
+     - introduce fresh local variables for each real pure subexpression
+  *)
   (* DFS with modular code generation *)
-  Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,");
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@ ");
   let machine_code = Machine_code.translate_prog prog node_schs in
 
-  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
+  Log.report ~level:4 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
   (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
-  machine_code);
+    machine_code);
 
   (* Optimize machine code *)
   let machine_code =
@@ -246,41 +263,66 @@ let rec compile_source dirname basename extension =
     else
       machine_code
   in
-
   (* Optimize machine code *)
-  let machine_code =
+  let machine_code, removed_table = 
     if !Options.optimization >= 2 && !Options.output <> "horn" then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 1)@,");
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 1)@ ");
 	Optimize_machine.machines_unfold (Corelang.get_consts prog) node_schs machine_code
       end
     else
-      machine_code
-  in
+      machine_code, IMap.empty
+  in  
   (* Optimize machine code *)
-  let machine_code =
+  let machine_code = 
     if !Options.optimization >= 3 && !Options.output <> "horn" then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 2)@,");
-	Optimize_machine.machines_fusion (Optimize_machine.machines_reuse_variables machine_code node_schs)
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 2)@ ");
+	let node_schs    = Scheduling.remove_prog_inlined_locals removed_table node_schs in
+	let reuse_tables = Scheduling.compute_prog_reuse_table node_schs in
+	Optimize_machine.machines_fusion (Optimize_machine.machines_reuse_variables machine_code reuse_tables)
       end
     else
       machine_code
   in
+  
+  (* Salsa optimize machine code *)
+  (*
+  let machine_code = 
+    if !Options.salsa_enabled then
+      begin
+	check_main ();
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. salsa machines optimization (phase 3)@ ");
+	(* Selecting float constants for Salsa *)
+	let constEnv = List.fold_left (
+	  fun accu c_topdecl ->
+	    match c_topdecl.top_decl_desc with
+	    | Const c when Types.is_real_type c.const_type  ->
+	      (c.const_id, c.const_value) :: accu
+	    | _ -> accu
+	) [] (Corelang.get_consts prog) 
+	in
+	List.map 
+	  (Machine_salsa_opt.machine_t2machine_t_optimized_by_salsa constEnv) 
+	  machine_code 
+      end
+    else
+      machine_code
+  in
+  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@ "
+    (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
+    machine_code);
+  *)
+  machine_code
 
-  if !Options.optimization >= 2 then
-    begin
-      Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
-	(Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
-	machine_code);
-    end;
 
-  (* Printing code *)
+(* printing code *)
+let stage3 prog machine_code dependencies basename =
   let basename    =  Filename.basename basename in
   let destname = !Options.dest_dir ^ "/" ^ basename in
-  let _ = match !Options.output with
-    | "C" ->
-      begin
+  match !Options.output with
+      "C" -> 
+	begin
 	  let alloc_header_file = destname ^ "_alloc.h" in (* Could be changed *)
 	  let source_lib_file = destname ^ ".c" in (* Could be changed *)
 	  let source_main_file = destname ^ "_main.c" in (* Could be changed *)
@@ -292,7 +334,7 @@ let rec compile_source dirname basename extension =
 	end
     | "java" ->
       begin
-	failwith "Sorry, but not yet supported !"
+	(Format.eprintf "internal error: sorry, but not yet supported !"; assert false)
     (*let source_file = basename ^ ".java" in
       Log.report ~level:1 (fun fmt -> fprintf fmt ".. opening file %s@,@?" source_file);
       let source_out = open_out source_file in
@@ -301,7 +343,7 @@ let rec compile_source dirname basename extension =
       Java_backend.translate_to_java source_fmt basename normalized_prog machine_code;*)
       end
     | "horn" ->
-       begin
+      begin
 	let source_file = destname ^ ".smt2" in (* Could be changed *)
 	let source_out = open_out source_file in
 	let fmt = formatter_of_out_channel source_out in
@@ -309,7 +351,7 @@ let rec compile_source dirname basename extension =
         Horn_backend.translate fmt basename prog machine_code;
 	(* Tracability file if option is activated *)
 	if !Options.traces then (
-	let traces_file = destname ^ ".traces.xml" in (* Could be changed *)
+	let traces_file = destname ^ ".traces" in (* Could be changed *)
 	let traces_out = open_out traces_file in
 	let fmt = formatter_of_out_channel traces_out in
         Log.report ~level:1 (fun fmt -> fprintf fmt ".. tracing info@,");
@@ -327,12 +369,64 @@ let rec compile_source dirname basename extension =
       end
 
     | _ -> assert false
+
+(* compile a .lus source file *)
+let rec compile_source dirname basename extension =
+  let source_name = dirname ^ "/" ^ basename ^ extension in
+
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v>");
+
+  (* Parsing source *)
+  let prog = parse_source source_name in
+
+  let prog =
+    if !Options.mpfr then
+      Mpfr.mpfr_module::prog
+    else
+      prog
   in
-  begin
-    Log.report ~level:1 (fun fmt -> fprintf fmt ".. done @ @]@.");
-  (* We stop the process here *)
-    exit 0
-  end
+  let prog, dependencies = 
+    try 
+      stage1 prog dirname basename
+    with StopPhase1 prog -> (
+      if !Options.lusi then
+	begin
+	  let lusi_ext = extension ^ "i" in
+	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating interface file %s@," (basename ^ lusi_ext));
+	  print_lusi prog dirname basename lusi_ext;
+	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
+	  exit 0
+	end
+      else
+        assert false
+    )
+  in
+
+  let machine_code = 
+    stage2 prog 
+  in
+  if Scopes.Plugin.show_scopes () then
+    begin
+      let all_scopes = Scopes.compute_scopes prog !Options.main_node in
+      (* Printing scopes *)
+      if !Options.verbose_level >= 1 then
+	Format.printf "Possible scopes are:@   ";
+      Format.printf "@[<v>%a@ @]@.@?" Scopes.print_scopes all_scopes;
+      exit 0
+	
+    end;
+
+  let machine_code = 
+    if Scopes.Plugin.is_active () then
+      Scopes.Plugin.process_scopes !Options.main_node prog machine_code
+    else
+      machine_code
+  in
+  
+  stage3 prog machine_code dependencies basename;
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. done @ @]@.");
+    (* We stop the process here *)
+  exit 0
 
 let compile dirname basename extension =
   match extension with
@@ -356,12 +450,22 @@ let anonymous filename =
     raise (Arg.Bad ("Can only compile *.lusi, *.lus or *.ec files"))
 
 let _ =
+  Global.initialize ();
   Corelang.add_internal_funs ();
   try
     Printexc.record_backtrace true;
-    Arg.parse Options.options anonymous usage
+
+    let options = Options.options @ 
+      List.flatten (
+	List.map Options.plugin_opt [
+	  Scopes.Plugin.name, Scopes.Plugin.activate, Scopes.Plugin.options
+	]
+      )
+    in
+    
+    Arg.parse options anonymous usage
   with
-  | Parse.Syntax_err _ | Lexer_lustre.Error _
+  | Parse.Error _
   | Types.Error (_,_) | Clocks.Error (_,_)
   | Corelang.Error _ (*| Task_set.Error _*)
   | Causality.Cycle _ -> exit 1

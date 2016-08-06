@@ -17,6 +17,10 @@ extern struct _arrow_mem *_arrow_alloc ();
   _arrow_DECLARE(attr, inst);\
   _arrow_LINK(inst)
 
+#define _arrow_init(self) {}
+
+#define _arrow_clear(self) {}
+
 #define _arrow_step(x,y,output,self) ((self)->_reg._first?((self)->_reg._first=0,(*output = x)):(*output = y))
 
 #define _arrow_reset(self) {(self)->_reg._first = 1;}

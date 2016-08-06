@@ -50,7 +50,6 @@ let pp_conj pp fmt l =
   | _ -> fprintf fmt "(and @[<v 0>%a@]@ )" (Utils.fprintf_list ~sep:" " pp) l
 
 
-
 let concat prefix x = if prefix = "" then x else prefix ^ "." ^ x
 let rename f = (fun v -> {v with var_id = f v.var_id } )
 let rename_machine p = rename (fun n -> concat p n)
@@ -63,8 +62,13 @@ let rename_next_list = List.map rename_next
 
 
 let get_machine machines node_name =
-  List.find (fun m  -> m.mname.node_id = node_name) machines
-
+  try
+    List.find (fun m  -> m.mname.node_id = node_name) machines
+  with Not_found ->
+    begin
+      Format.eprintf "internal error: get_machine %s@." node_name;
+      assert false
+    end
 
 let full_memory_vars machines machine =
   let rec aux fst prefix m =
@@ -77,7 +81,6 @@ let full_memory_vars machines machine =
       ) [] (m.minstances)
   in
   aux true machine.mname.node_id machine
-
 
 let stateless_vars machines m =
   (rename_machine_list m.mname.node_id m.mstep.step_inputs)@
@@ -111,8 +114,8 @@ let pp_horn_tag fmt t =
 let rec pp_horn_const fmt c =
   match c with
     | Const_int i    -> pp_print_int fmt i
-    | Const_real r   -> pp_print_string fmt r
-    | Const_float r  -> pp_print_float fmt r
+    | Const_real (c,e,s)   -> assert false (* TODO rational pp_print_string fmt r *)
+    (* | Const_float r  -> pp_print_float fmt r *)
     | Const_tag t    -> pp_horn_tag fmt t
     | _              -> assert false
 
@@ -121,7 +124,7 @@ let rec pp_horn_const fmt c =
    but an offset suffix may be added for array variables
 *)
 let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
-  match v with
+  match v.value_desc with
     | Cst c         -> pp_horn_const fmt c
     | Array _
     | Access _ -> assert false (* no arrays *)
@@ -135,7 +138,7 @@ let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
 
 (* Prints a [value] indexed by the suffix list [loop_vars] *)
 let rec pp_value_suffix self pp_value fmt value =
- match value with
+ match value.value_desc with
  | Fun (n, vl)  ->
    Basic_library.pp_horn n (pp_value_suffix self pp_value) fmt vl
  |  _            ->
@@ -163,16 +166,16 @@ let pp_instance_call
    	    self
    	    (pp_horn_var m)
 	    fmt
-   	    o.var_type (LocalVar o) i1
+   	    o.var_type (mk_val (LocalVar o) o.var_type) i1
         else
           pp_assign
    	    m self (pp_horn_var m) fmt
-   	    o.var_type (LocalVar o) i2
-
+   	    o.var_type (mk_val (LocalVar o) o.var_type) i2
+	    
       end
       | name, _, _ ->
 	begin
-	  let target_machine = List.find (fun m  -> m.mname.node_id = name) machines in
+	  let target_machine = get_machine machines name in
 	  if init then
 	    Format.fprintf fmt "(%a %a%t%a%t%a)"
 	      pp_machine_init_name (node_name n)
@@ -182,7 +185,7 @@ let pp_instance_call
 	      (Utils.pp_final_char_if_non_empty " " inputs)
 	      (* outputs *)
 	      (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m)))
-	      (List.map (fun v -> LocalVar v) outputs)
+	      (List.map (fun v -> mk_val (LocalVar v) v.var_type) outputs)
 	      (Utils.pp_final_char_if_non_empty " " outputs)
 	      (* memories (next) *)
 	      (Utils.fprintf_list ~sep:" " pp_var) (
@@ -197,7 +200,7 @@ let pp_instance_call
 	      (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m))) inputs
 	      (Utils.pp_final_char_if_non_empty " " inputs)
 	      (Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m)))
-	      (List.map (fun v -> LocalVar v) outputs)
+	      (List.map (fun v -> mk_val (LocalVar v) v.var_type) outputs)
 	      (Utils.pp_final_char_if_non_empty " " outputs)
 	      (Utils.fprintf_list ~sep:" " pp_var) (
 		(rename_machine_list
@@ -220,7 +223,7 @@ let pp_instance_call
 	inputs
 	(Utils.pp_final_char_if_non_empty " " inputs)
 	(Utils.fprintf_list ~sep:" " (pp_horn_val self (pp_horn_var m)))
-	(List.map (fun v -> LocalVar v) outputs)
+	(List.map (fun v -> mk_val (LocalVar v) v.var_type) outputs)
     )
 
 let pp_machine_init (m: machine_t) self fmt inst =
@@ -247,12 +250,12 @@ and pp_machine_instr machines ?(init=false) (m: machine_t) self fmt instr =
   | MLocalAssign (i,v) ->
     pp_assign
       m self (pp_horn_var m) fmt
-      i.var_type (LocalVar i) v
+      i.var_type (mk_val (LocalVar i) i.var_type) v
   | MStateAssign (i,v) ->
     pp_assign
       m self (pp_horn_var m) fmt
-      i.var_type (StateVar i) v
-  | MStep ([i0], i, vl) when Basic_library.is_internal_fun i  ->
+      i.var_type (mk_val (StateVar i) i.var_type) v
+  | MStep ([i0], i, vl) when Basic_library.is_value_internal_fun (mk_val (Fun (i, vl)) i0.var_type)  -> 
     assert false (* This should not happen anymore *)
   | MStep (il, i, vl) ->
     pp_instance_call machines ~init:init m self fmt i vl il
@@ -264,6 +267,7 @@ and pp_machine_instr machines ?(init=false) (m: machine_t) self fmt instr =
       let el = try List.assoc tag_false hl with Not_found -> [] in
       pp_conditional machines ~init:init m self fmt g tl el
     else assert false (* enum type case *)
+  | MComment _ -> ()
 
 
 (**************************************************************)
@@ -599,10 +603,6 @@ let traces_file fmt basename prog machines =
       	    assert false)
 	memories_old
     in
-
-    (* let pp_prefix_rev fmt prefix = *)
-    (*   Utils.fprintf_list ~sep:"." (fun fmt (id,n) -> fprintf fmt "(%s,%s)" id n.mname.node_id) fmt (List.rev prefix) *)
-    (* in *)
 
     let pp_prefix_rev fmt prefix =
       Utils.fprintf_list ~sep:"." (fun fmt (id,n) -> fprintf fmt "(%s,%s)" id n.mname.node_id) fmt (List.rev prefix)

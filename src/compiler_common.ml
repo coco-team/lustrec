@@ -14,6 +14,13 @@ open Format
 open LustreSpec
 open Corelang
 
+let check_main () =
+  if !Options.main_node = "" then
+    begin
+      eprintf "Code generation error: %a@." pp_error No_main_specified;
+      raise (Error (Location.dummy_loc, No_main_specified))
+    end
+
 let create_dest_dir () =
   begin
     if not (Sys.file_exists !Options.dest_dir) then
@@ -43,7 +50,7 @@ let parse_header own filename =
       close_in h_in;
       header
     with
-    | (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
+    | (Parse.Error err) as exc -> 
       Parse.report_error err;
       raise exc
     | Corelang.Error (loc, err) as exc -> (
@@ -69,7 +76,7 @@ let parse_source source_name =
     close_in s_in;
     prog
   with
-  | (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
+  | (Parse.Error err) as exc -> 
     Parse.report_error err;
     raise exc
   | Corelang.Error (loc, err) as exc ->
@@ -78,10 +85,30 @@ let parse_source source_name =
       Location.pp_loc loc;
     raise exc
 
+let expand_automata decls =
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. expanding automata@ ");
+  try
+    Automata.expand_decls decls
+  with (Corelang.Error (loc, err)) as exc ->
+    eprintf "Automata error: %a%a@."
+      Corelang.pp_error err
+      Location.pp_loc loc;
+    raise exc
+
 let check_stateless_decls decls =
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. checking stateless/stateful status@ ");
   try
     Stateless.check_prog decls
+  with (Stateless.Error (loc, err)) as exc ->
+    eprintf "Stateless status error: %a%a@."
+      Stateless.pp_error err
+      Location.pp_loc loc;
+    raise exc
+
+let force_stateful_decls decls =
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. forcing stateful status@ ");
+  try
+    Stateless.force_prog decls
   with (Stateless.Error (loc, err)) as exc ->
     eprintf "Stateless status error: %a%a@."
       Stateless.pp_error err

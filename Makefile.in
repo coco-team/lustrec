@@ -7,12 +7,13 @@ datadir = ${prefix}/share
 includedir = ${prefix}/include
 
 LUSI_LIBS=include/math.lusi include/conv.lusi
+LUSI_MPFR_LIB=include/mpfr_lustre.lusi
 LOCAL_BINDIR=bin
 LOCAL_DOCDIR=doc/manual
 
 lustrec:
 	@echo Compiling binary lustrec
-	@$(OCAMLBUILD) -cflags -I,@OCAMLGRAPH_PATH@ -lflag @OCAMLGRAPH_PATH@/graph.cmxa -I src -I src/backends/C src/main_lustre_compiler.native
+	@$(OCAMLBUILD) -cflags -I,@OCAMLGRAPH_PATH@ -lflag @OCAMLGRAPH_PATH@/graph.cmxa -lflag nums.cmxa -I src -I src/backends/C -I src/plugins/scopes src/main_lustre_compiler.native
 	@mkdir -p $(LOCAL_BINDIR)
 	@mv _build/src/main_lustre_compiler.native $(LOCAL_BINDIR)/lustrec
 
@@ -31,7 +32,7 @@ clean:
 	$(OCAMLBUILD) -clean
 
 dist-clean: clean
-	@rm -f Makefile myocamlbuild.ml config.log config.status configure include/*.lusic include/math.h include/conv.h
+	@rm -f Makefile myocamlbuild.ml config.log config.status configure include/*.lusic include/math.h include/conv.h include/mpfr_lustre.h
 
 %.lusic: %.lusi
 	@echo Compiling $<
@@ -39,10 +40,15 @@ dist-clean: clean
 
 clean-lusic:
 	@rm -f $(LUSI_LIBS:%.lusi=%.lusic)
+	@rm -f $(LUSI_MPFR_LIB:%.lusi=%.lusic)
 
 compile-lusi: $(LUSI_LIBS:%.lusi=%.lusic)
 
-install: clean-lusic compile-lusi
+compile-mpfr-lusi: $(LUSI_MPFR_LIB)
+	@echo Compiling $<
+	@$(LOCAL_BINDIR)/lustrec -verbose 0 -mpfr 1 -d include $<
+
+install: clean-lusic compile-lusi compile-mpfr-lusi
 	mkdir -p ${bindir}
 	install -m 0755 $(LOCAL_BINDIR)/* ${bindir}
 	mkdir -p ${includedir}/lustrec

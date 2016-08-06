@@ -5,16 +5,18 @@ eval set -- $(getopt -n $0 -o "-aciwvh:" -- "$@")
 declare c i w h a v
 declare -a files
 
-#SRC_PREFIX="../.."
-SRC_PREFIX=`svn info --xml | grep wcroot | sed "s/<[^>]*>//g"`/lustre_compiler
+SRC_PREFIX=/home/thirioux/RECHERCHE/lustrec-tests/
+#SRC_PREFIX=`svn info --xml | grep wcroot | sed "s/<[^>]*>//g"`/lustre_compiler
 NOW=`date "+%y%m%d%H%M"`
-report=`pwd`/report-$NOW
-#LUSTREC="../../_build/src/lustrec"
+report=`pwd`/report-1.1-440-$NOW
 LUSTREC=lustrec
 mkdir -p build
 build=`pwd`"/build"
 
 gcc_compile() {
+    if [ $verbose -gt 1 ]; then
+	echo "gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ $1.c > /dev/null"
+    fi
     gcc -c -Wall -Wno-unused-but-set-variable -I ../../include/ "$1".c > /dev/null;
     if [ $? -ne 0 ]; then
 	rgcc="INVALID";
@@ -24,6 +26,9 @@ gcc_compile() {
 }
 
 lustrec_compile() {
+    if [ $verbose -gt 1 ]; then
+       echo "$LUSTREC $@"
+    fi
     $LUSTREC "$@";
     if [ $? -ne 0 ]; then
         rlustrec="INVALID";
@@ -112,37 +117,59 @@ inline_compile_with_check () {
     while IFS=, read -r file main opts
     do
 	name=`basename "$file" .lus`
-	if [ "$name" = "$file" ]; then
-	    return 0
+	ext=".lus"
+	if [ `dirname "$file"`/"$name" = "$file" ]; then
+	    name=`basename "$file" .lusi`
+	    ext=".lusi"
 	fi
 	dir=${SRC_PREFIX}/`dirname "$file"`
 	pushd $dir > /dev/null
-    lustrec_compile -d $build -verbose 0 $opts -inline -witnesses -node $main $name".lus"
 
-    pushd $build > /dev/null
-    gcc_compile "$name"
+	if [ "$main" != "" ]; then
+	    lustrec_compile -d $build -verbose 0 $opts -inline -witnesses -node $main $name$ext;
+	else
+	    if [ "$ext" = ".lusi" ]; then
+		lustrec_compile -d $build -verbose 0 $opts $name$ext;
+	    else
+		rlustrec="NONE"
+		rgcc="NONE"
+	    fi
+	fi
+	popd > /dev/null
+	pushd $build > /dev/null
 	
-    popd > /dev/null
+	if [ "$main" != "" ] && [ $ext = ".lus" ] && [ "$opts" != "-lusi" ]; then
+	    gcc_compile "$name";
+	else
+	    rgcc="NONE"
+	fi
 	# Cheching witness
-    pushd $build > /dev/null
-    lustrec_compile -verbose 0 -horn-traces -d $build/${name}_witnesses -node check $build/${name}_witnesses/inliner_witness.lus 
-    popd > /dev/null
-    z3="`z3 -T:10 $build/${name}_witnesses/inliner_witness.smt2 | xargs`"
-    if [ "x`echo $z3 | grep unsat`" == "xunsat" ]; then
-	rinlining="VALID";
-    elif [ "x`echo $z3 | xargs | grep -o error`" == "xerror" ]; then
-	rinlining="ERROR";
-    elif [ "x`echo $z3 | xargs | grep -o unknown`" == "xunknown" ]; then
-	rinlining="UNKNOWN";
-    else
-	rinlining="INVALID/TIMEOUT"
-    fi  
-    if [ $verbose -gt 0 ]; then
-	echo "lustrec inlined ($rlustrec), gcc ($rgcc), inlining valid ($rinlining), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;
-    else
-	echo "lustrec inlined ($rlustrec), gcc ($rgcc), inlining valid ($rinlining), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report | grep "INVALID\|ERROR\|UNKNOWN"
-    fi
-    popd > /dev/null
+       
+	if [ "$main" != "" ] && [ $ext = ".lus" ] && [ "$opts" != "-lusi" ]; then
+	    mv ${name}_witnesses/inliner_witness.lus ${name}_inliner_witness.lus
+	    lustrec_compile -verbose 0 -horn-traces -node check ${name}_inliner_witness.lus
+	    z3="`z3 -T:10 ${name}_inliner_witness.smt2 | xargs`"
+	    if [ "x`echo $z3 | grep -o unsat`" == "xunsat" ]; then
+		rinlining="VALID";
+	    elif [ "x`echo $z3 | xargs | grep -o error`" == "xerror" ]; then
+		rinlining="ERROR";
+	    elif [ "x`echo $z3 | xargs | grep -o unknown`" == "xunknown" ]; then
+		rinlining="UNKNOWN";
+	    elif [ "x`echo $z3 | xargs | grep -o timeout`" == "xtimeout" ]; then
+		rinlining="TIMEOUT"
+	    else
+		rinlining="INVALID"
+	    fi
+	else
+	    rinlining="NONE"
+	fi
+	popd > /dev/null
+
+	if [ $verbose -gt 0 ]; then
+	    echo "lustrec inlined ($rlustrec), gcc ($rgcc), inlining check ($rinlining), $dir, ${name}${ext}, node $main" | column -t -s',' | tee -a $report;
+	else
+	    echo "lustrec inlined ($rlustrec), gcc ($rgcc), inlining check ($rinlining), $dir, ${name}${ext}, node $main" | column -t -s',' | tee -a $report | grep "TIMEOUT\|INVALID\|ERROR\|UNKNOWN"
+	fi
 done < $file_list
 
 }
@@ -159,18 +186,24 @@ check_prop () {
 	
     # Checking horn backend
     if [ "$main" != "" ]; then
-	lustrec_compile -horn-traces -horn-queries -d $build -verbose 0 $opts -node $main $name".lus";
+	lustrec_compile -horn-traces -horn-query -d $build -verbose 0 $opts -node $main $name".lus";
     else
-	lustrec_compile -horn-traces -horn-queries -d $build -verbose 0 $opts $name".lus"
+	lustrec_compile -horn-traces -horn-query -d $build -verbose 0 $opts $name".lus"
     fi
 
     # echo "z3 $build/$name".smt2 
     # TODO: This part of the script has to be optimized
-    z3 -T:10 "$build/$name".smt2 | grep unsat > /dev/null
-    if [ $? -ne 0 ]; then
-        rhorn="INVALID";
+    z3="`z3 -T:10 ${build}/${name}.smt2 | xargs`"
+    if [ "x`echo $z3 | grep -o unsat`" == "xunsat" ]; then
+	rhorn="VALID";
+    elif [ "x`echo $z3 | xargs | grep -o error`" == "xerror" ]; then
+	rhorn="ERROR";
+    elif [ "x`echo $z3 | xargs | grep -o unknown`" == "xunknown" ]; then
+	rhorn="UNKNOWN";
+    elif [ "x`echo $z3 | xargs | grep -o timeout`" == "xtimeout" ]; then
+	rhorn="TIMEOUT"
     else
-        rhorn="VALID"
+	rhorn="INVALID"
     fi
     if [ $verbose -gt 0 ]; then
 	echo "lustrec ($rlustrec), horn-pdr ($rhorn), $dir, ${name}.lus, node $main" | column -t -s',' | tee -a $report;

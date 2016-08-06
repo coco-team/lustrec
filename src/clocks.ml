@@ -123,6 +123,9 @@ let rec print_ck_long fmt ck =
 
 let new_id = ref (-1)
 
+let rec bottom =
+  { cdesc = Clink bottom; cid = -666; cscoped = false }
+
 let new_ck desc scoped =
   incr new_id; {cdesc=desc; cid = !new_id; cscoped = scoped}
 

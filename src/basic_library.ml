@@ -111,9 +111,34 @@ let eval_env =
     VE.initial
     defs
 
-let internal_funs = ["+";"-";"*";"/";"mod";"&&";"||";"xor";"equi";"impl";"<";">";"<=";">=";"!=";"=";"uminus";"not"]
+let arith_funs = ["+";"-";"*";"/";"mod"; "uminus"]
+let bool_funs  = ["&&";"||";"xor";"equi";"impl"; "not"]
+let rel_funs   = ["<";">";"<=";">=";"!=";"="]
 
-let is_internal_fun x =
+let internal_funs = arith_funs@bool_funs@rel_funs
+ 
+let rec is_internal_fun x targs =
+(*Format.eprintf "is_internal_fun %s %a@." x Types.print_ty (List.hd targs);*)
+  match targs with
+  | []                              -> assert false
+  | t::_ when Types.is_real_type t  -> List.mem x internal_funs && not !Options.mpfr 
+  | t::_ when Types.is_array_type t -> is_internal_fun x [Types.array_element_type t]
+  | _                               -> List.mem x internal_funs
+
+let is_expr_internal_fun expr =
+  match expr.expr_desc with
+  | Expr_appl (f, e, _) -> is_internal_fun f (Types.type_list_of_type e.expr_type)
+  | _                   -> assert false
+
+let is_value_internal_fun v =
+  match v.value_desc with
+  | Fun (f, vl) -> is_internal_fun f (List.map (fun v -> v.value_type) vl)
+  | _           -> assert false
+
+let is_homomorphic_fun x =
+  List.mem x internal_funs
+
+let is_stateless_fun x =
   List.mem x internal_funs
 
 let pp_c i pp_val fmt vl =

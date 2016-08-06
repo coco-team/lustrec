@@ -1,6 +1,7 @@
 ./tests/tuples/tuples1.lus
 ./tests/tuples/tuples2.lus
 ./tests/arrays_arnaud/dummy_lib.lusi
+./tests/arrays_arnaud/arrays.lusi
 ./tests/arrays_arnaud/arrays.lus,,-check-access
 ./tests/arrays_arnaud/RelOpMatrix.lus
 ./tests/arrays_arnaud/access1.lus,,-check-access
@@ -20,6 +21,7 @@
 ./tests/clocks/oversampling0.lus,,-lusi
 ./tests/clocks/oversampling0.lusi
 ./tests/clocks/oversampling0.lus
+./tests/clocks/oversampling0.lus,,-O 3
 ./tests/lusic/test2.lusi
 ./tests/lusic/test1.lusi
 ./tests/lusic/test1.lus,as_soon_as
