@@ -325,6 +325,7 @@ let rec pp_conditional dependencies (m: machine_t) self fmt c tl el =
 
 and pp_machine_instr dependencies (m: machine_t) self fmt instr =
   match instr with 
+  | MNoReset _ -> ()
   | MReset i ->
     pp_machine_reset m self fmt i
   | MLocalAssign (i,v) ->
@@ -361,7 +362,7 @@ and pp_machine_instr dependencies (m: machine_t) self fmt instr =
 	(pp_c_val self (pp_c_var_read m)) g
 	(Utils.fprintf_list ~sep:"@," (pp_machine_branch dependencies m self)) hl
   | MComment s  -> 
-      fprintf fmt "//%s@ " s
+      fprintf fmt "/*%s*/@ " s
 
 
 and pp_machine_branch dependencies m self fmt (t, h) =

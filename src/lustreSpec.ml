@@ -46,7 +46,7 @@ type clock_dec =
 and clock_dec_desc =
   | Ckdec_any
   | Ckdec_bool of (ident * ident) list 
-  | Ckdec_pclock of int * rat
+
 
 type constant =
   | Const_int of int
@@ -241,6 +241,7 @@ type instr_t =
   | MLocalAssign of var_decl * value_t
   | MStateAssign of var_decl * value_t
   | MReset of ident
+  | MNoReset of ident
   | MStep of var_decl list * ident * value_t list
   | MBranch of value_t * (label * instr_t list) list
   | MComment of string

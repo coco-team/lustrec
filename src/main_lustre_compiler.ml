@@ -88,6 +88,11 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
   end
 
 
+let functional_backend () = 
+  match !Options.output with
+  | "horn" | "lustre" | "acsl" -> true
+  | _ -> false
+
 (* From prog to prog *)
 let stage1 prog dirname basename =
   (* Removing automata *) 
@@ -122,7 +127,7 @@ let stage1 prog dirname basename =
 
   (* Typing *)
   let computed_types_env = type_decls type_env prog in
-  
+
   (* Clock calculus *)
   let computed_clocks_env = clock_decls clock_env prog in
 
@@ -148,7 +153,7 @@ let stage1 prog dirname basename =
   in
   *)
   (* Delay calculus *)
-  (*
+  (* TO BE DONE LATER (Xavier)
     if(!Options.delay_calculus)
     then
     begin
@@ -213,7 +218,7 @@ let stage1 prog dirname basename =
       end
     else
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. keeping FP numbers@,");
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. keeping floating-point numbers@,");
 	prog
       end in
   Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
@@ -221,7 +226,7 @@ let stage1 prog dirname basename =
   (* Checking array accesses *)
   if !Options.check then
     begin
-      Log.report ~level:1 (fun fmt -> fprintf fmt ".. array access checks@,");
+      Log.report ~level:1 (fun fmt -> fprintf fmt ".. checking array accesses@,");
       Access.check_prog prog;
     end;
 
@@ -257,7 +262,7 @@ let stage2 prog =
   let machine_code =
     if !Options.optimization >= 4 && !Options.output <> "horn" then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 3)@,");
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization: common sub-expression elimination@,");
 	Optimize_machine.machines_cse machine_code
       end
     else
@@ -267,7 +272,7 @@ let stage2 prog =
   let machine_code, removed_table = 
     if !Options.optimization >= 2 && !Options.output <> "horn" then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 1)@ ");
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization: constants inlining@,");
 	Optimize_machine.machines_unfold (Corelang.get_consts prog) node_schs machine_code
       end
     else
@@ -277,7 +282,7 @@ let stage2 prog =
   let machine_code = 
     if !Options.optimization >= 3 && !Options.output <> "horn" then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 2)@ ");
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization: minimize stack usage by reusing variables@,");
 	let node_schs    = Scheduling.remove_prog_inlined_locals removed_table node_schs in
 	let reuse_tables = Scheduling.compute_prog_reuse_table node_schs in
 	Optimize_machine.machines_fusion (Optimize_machine.machines_reuse_variables machine_code reuse_tables)
@@ -292,7 +297,7 @@ let stage2 prog =
     if !Options.salsa_enabled then
       begin
 	check_main ();
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. salsa machines optimization (phase 3)@ ");
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. salsa machines optimization: optimizing floating-point accuracy with Salsa@,");
 	(* Selecting float constants for Salsa *)
 	let constEnv = List.fold_left (
 	  fun accu c_topdecl ->
@@ -348,14 +353,14 @@ let stage3 prog machine_code dependencies basename =
 	let source_out = open_out source_file in
 	let fmt = formatter_of_out_channel source_out in
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. hornification@,");
-        Horn_backend.translate fmt basename prog machine_code;
+        Horn_backend.translate fmt basename prog (Machine_code.arrow_machine::machine_code);
 	(* Tracability file if option is activated *)
 	if !Options.traces then (
-	let traces_file = destname ^ ".traces" in (* Could be changed *)
+	let traces_file = destname ^ ".traces.xml" in (* Could be changed *)
 	let traces_out = open_out traces_file in
 	let fmt = formatter_of_out_channel traces_out in
         Log.report ~level:1 (fun fmt -> fprintf fmt ".. tracing info@,");
-	Horn_backend.traces_file fmt basename prog machine_code;
+	Horn_backend_traces.traces_file fmt basename prog machine_code;
 	)
       end
     | "lustre" ->

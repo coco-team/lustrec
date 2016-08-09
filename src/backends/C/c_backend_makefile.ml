@@ -70,7 +70,7 @@ let print_makefile basename nodename (dependencies:  dep_t list) fmt =
   fprintf fmt "@.";
 
   (* Main binary *)
-  fprintf fmt "%s_%s:@." basename nodename;
+  fprintf fmt "%s_%s: %s.c %s_main.c@." basename nodename basename basename;
   fprintf fmt "\t${GCC} -O0 -I${INC} -I. -c %s.c@." basename;  
   fprintf fmt "\t${GCC} -O0 -I${INC} -I. -c %s_main.c@." basename;   
   fprintf_dependencies fmt dependencies;    

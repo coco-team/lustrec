@@ -39,6 +39,46 @@ let rename_eq rename eq =
     eq_lhs = List.map rename eq.eq_lhs; 
     eq_rhs = rename_expr rename eq.eq_rhs
   }
+
+let rec add_expr_reset_cond cond expr =
+  let aux = add_expr_reset_cond cond in
+  let new_desc = 
+    match expr.expr_desc with
+    | Expr_const _
+    | Expr_ident _ -> expr.expr_desc
+    | Expr_tuple el -> Expr_tuple (List.map aux el)
+    | Expr_ite (c, t, e) -> Expr_ite (aux c, aux t, aux e)
+      
+    | Expr_arrow (e1, e2) -> 
+      (* we replace the expression e1 -> e2 by e1 -> (if cond then e1 else e2) *)
+      let e1 = aux e1 and e2 = aux e2 in
+      (* inlining is performed before typing. we can leave the fields free *)
+      let new_e2 = mkexpr expr.expr_loc (Expr_ite (cond, e1, e2)) in
+      Expr_arrow (e1, new_e2) 
+
+    | Expr_fby _ -> assert false (* TODO: deal with fby. This hasn't been much handled yet *)
+
+    | Expr_array el -> Expr_array (List.map aux el)
+    | Expr_access (e, dim) -> Expr_access (aux e, dim)
+    | Expr_power (e, dim) -> Expr_power (aux e, dim)
+    | Expr_pre e -> Expr_pre (aux e)
+    | Expr_when (e, id, l) -> Expr_when (aux e, id, l)
+    | Expr_merge (id, cases) -> Expr_merge (id, List.map (fun (l,e) -> l, aux e) cases)
+
+    | Expr_appl (id, args, reset_opt) -> 
+      (* we "add" cond to the reset field. *)
+      let new_reset = match reset_opt with
+	  None -> cond
+	| Some cond' -> mkpredef_call cond'.expr_loc "||" [cond; cond']
+      in
+      Expr_appl (id, args, Some new_reset)
+      
+
+  in
+  { expr with expr_desc = new_desc }
+
+let add_eq_reset_cond cond eq =
+  { eq with eq_rhs = add_expr_reset_cond cond eq.eq_rhs }
 (*
 let get_static_inputs input_arg_list =
  List.fold_right (fun (vdecl, arg) res ->
@@ -54,6 +94,8 @@ let get_carrier_inputs input_arg_list =
    else res)
    input_arg_list []
 *)
+
+
 (* 
     expr, locals', eqs = inline_call id args' reset locals node nodes
 
@@ -64,12 +106,11 @@ We select the called node equations and variables.
 the resulting expression is tuple_of_renamed_outputs
    
 TODO: convert the specification/annotation/assert and inject them
-DONE: annotations
-TODO: deal with reset
 *)
-let inline_call node orig_expr args reset locals caller =
-  let loc = orig_expr.expr_loc in
-  let uid = orig_expr.expr_tag in
+(** [inline_call node loc uid args reset locals caller] returns a tuple (expr,
+    locals, eqs, asserts)    
+*)
+let inline_call node loc uid args reset locals caller =
   let rename v =
     if v = tag_true || v = tag_false || not (is_node_var node v) then v else
       Corelang.mk_new_node_name caller (Format.sprintf "%s_%i_%s" node.node_id uid v)
@@ -97,35 +138,39 @@ let inline_call node orig_expr args reset locals caller =
 	 v.var_dec_const,
 	 Utils.option_map (rename_expr rename) v.var_dec_value) in
     begin
-(*
-      (try
-	 Format.eprintf "Inliner.inline_call unify %a %a@." Types.print_ty vdecl.var_type Dimension.pp_dimension (List.assoc v.var_id static_inputs);
-	 Typing.unify vdecl.var_type (Type_predef.type_static (List.assoc v.var_id static_inputs) (Types.new_var ()))
-       with Not_found -> ());
-      (try
-Clock_calculus.unify vdecl.var_clock (Clock_predef.ck_carrier (List.assoc v.var_id carrier_inputs) (Clocks.new_var true))
-       with Not_found -> ());
-(*Format.eprintf "Inliner.inline_call res=%a@." Printers.pp_var vdecl;*)
-*)
+      (*
+	(try
+	Format.eprintf "Inliner.inline_call unify %a %a@." Types.print_ty vdecl.var_type Dimension.pp_dimension (List.assoc v.var_id static_inputs);
+	Typing.unify vdecl.var_type (Type_predef.type_static (List.assoc v.var_id static_inputs) (Types.new_var ()))
+	with Not_found -> ());
+	(try
+	Clock_calculus.unify vdecl.var_clock (Clock_predef.ck_carrier (List.assoc v.var_id carrier_inputs) (Clocks.new_var true))
+	with Not_found -> ());
+      (*Format.eprintf "Inliner.inline_call res=%a@." Printers.pp_var vdecl;*)
+      *)
       vdecl
     end
-    (*Format.eprintf "Inliner.rename_var %a@." Printers.pp_var v;*)
+  (*Format.eprintf "Inliner.rename_var %a@." Printers.pp_var v;*)
   in
   let inputs' = List.map (fun (vdecl, _) -> rename_var vdecl) dynamic_inputs in
   let outputs' = List.map rename_var node.node_outputs in
   let locals' =
-      (List.map (fun (vdecl, arg) -> let vdecl' = rename_var vdecl in { vdecl' with var_dec_value = Some (Corelang.expr_of_dimension arg) }) static_inputs)
+    (List.map (fun (vdecl, arg) -> let vdecl' = rename_var vdecl in { vdecl' with var_dec_value = Some (Corelang.expr_of_dimension arg) }) static_inputs)
     @ (List.map rename_var node.node_locals) 
-in
+  in
   (* checking we are at the appropriate (early) step: node_checks and
      node_gencalls should be empty (not yet assigned) *)
   assert (node.node_checks = []);
   assert (node.node_gencalls = []);
 
-  (* Bug included: todo deal with reset *)
-  assert (reset = None);
-
-  let assign_inputs = mkeq loc (List.map (fun v -> v.var_id) inputs', expr_of_expr_list args.expr_loc (List.map snd dynamic_inputs)) in
+  (* Expressing reset locally in equations *)
+  let eqs_r' =
+    match reset with
+      None -> eqs'
+    | Some cond -> List.map (add_eq_reset_cond cond) eqs'
+  in
+  let assign_inputs = mkeq loc (List.map (fun v -> v.var_id) inputs',
+                                expr_of_expr_list args.expr_loc (List.map snd dynamic_inputs)) in
   let expr = expr_of_expr_list loc (List.map expr_of_vdecl outputs')
   in
   let asserts' = (* We rename variables in assert expressions *)
@@ -134,7 +179,7 @@ in
 	{a with assert_expr = 
 	    let expr = a.assert_expr in
 	    rename_expr rename expr
-      })
+	})
       node.node_asserts 
   in
   let annots' =
@@ -142,7 +187,7 @@ in
   in
   expr, 
   inputs'@outputs'@locals'@locals, 
-  assign_inputs::eqs',
+  assign_inputs::eqs_r',
   asserts',
   annots'
 
@@ -194,7 +239,7 @@ let rec inline_expr ?(selection_on_annotation=false) expr locals node nodes =
       let called = node_of_top called in
       let called' = inline_node called nodes in
       let expr, locals', eqs'', asserts'', annots'' = 
-	inline_call called' expr args' reset locals' node in
+	inline_call called' expr.expr_loc expr.expr_tag args' reset locals' node in
       expr, locals', eqs'@eqs'', asserts'@asserts'', annots'@annots''
     else 
       (* let _ =     Format.eprintf "Not inlining call to %s@." id in *)

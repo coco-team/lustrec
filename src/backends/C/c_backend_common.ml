@@ -182,7 +182,7 @@ let rec pp_c_val self pp_var fmt v =
   | Cst c         -> pp_c_const fmt c
   | Array vl      -> fprintf fmt "{%a}" (Utils.fprintf_list ~sep:", " (pp_c_val self pp_var)) vl
   | Access (t, i) -> fprintf fmt "%a[%a]" (pp_c_val self pp_var) t (pp_c_val self pp_var) i
-  | Power (v, n)  -> assert false
+  | Power (v, n)  -> (Format.eprintf "internal error: C_backend_common.pp_c_val %a@." pp_val v; assert false)
   | LocalVar v    -> pp_var fmt v
   | StateVar v    ->
     (* array memory vars are represented by an indirection to a local var with the right type,

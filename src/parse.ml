@@ -32,7 +32,7 @@ let pp_error fmt err =
   | Undefined_token tok   -> fprintf fmt "undefined token '%s'" tok
   | Unfinished_string        -> fprintf fmt "unfinished string"
   | Unfinished_comment  -> fprintf fmt "unfinished comment"
-  | Syntax_error               -> fprintf fmt "syntax error"
+  | Syntax_error               -> fprintf fmt ""
   | Unfinished_annot        -> fprintf fmt "unfinished annotation"
   | Unfinished_node_spec -> fprintf fmt "unfinished node specification"
   | Annot_error s              -> fprintf fmt "impossible to parse the following annotation:@.%s@.@?" s

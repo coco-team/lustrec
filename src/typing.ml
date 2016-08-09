@@ -542,7 +542,7 @@ let type_eq env in_main undefined_vars eq =
    in environment [env] *)
 let type_coreclock env ck id loc =
   match ck.ck_dec_desc with
-  | Ckdec_any | Ckdec_pclock (_,_) -> ()
+  | Ckdec_any -> ()
   | Ckdec_bool cl ->
       let dummy_id_expr = expr_of_ident id loc in
       let when_expr =

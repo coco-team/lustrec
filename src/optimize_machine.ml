@@ -31,6 +31,7 @@ let rec eliminate elim instr =
   | MLocalAssign (i,v) -> MLocalAssign (i, e_expr v)
   | MStateAssign (i,v) -> MStateAssign (i, e_expr v)
   | MReset i           -> instr
+  | MNoReset i         -> instr
   | MStep (il, i, vl)  -> MStep(il, i, List.map e_expr vl)
   | MBranch (g,hl)     -> 
     MBranch
@@ -51,7 +52,11 @@ and eliminate_expr elim expr =
   | Cst _ | StateVar _ -> expr
 
 let eliminate_dim elim dim =
-  Dimension.expr_replace_expr (fun v -> try dimension_of_value (IMap.find v elim) with Not_found -> mkdim_ident dim.dim_loc v) dim
+  Dimension.expr_replace_expr 
+    (fun v -> try
+		dimension_of_value (IMap.find v elim) 
+      with Not_found -> mkdim_ident dim.dim_loc v) 
+    dim
 
 let unfold_expr_offset m offset expr =
   List.fold_left
@@ -100,6 +105,7 @@ let rec simplify_instr_offset m instr =
   | MLocalAssign (v, expr) -> MLocalAssign (v, simplify_expr_offset m expr)
   | MStateAssign (v, expr) -> MStateAssign (v, simplify_expr_offset m expr)
   | MReset id              -> instr
+  | MNoReset id            -> instr
   | MStep (outputs, id, inputs) -> MStep (outputs, id, List.map (simplify_expr_offset m) inputs)
   | MBranch (cond, brl)
     -> MBranch(simplify_expr_offset m cond, List.map (fun (l, il) -> l, simplify_instrs_offset m il) brl)

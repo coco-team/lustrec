@@ -7,6 +7,9 @@ backends/C/C_backend_main
 backends/C/C_backend_makefile
 backends/C/C_backend_spec
 backends/C/C_backend_src
+backends/Horn/Horn_backend_common
+backends/Horn/Horn_backend_printers
+backends/Horn/Horn_backend_collecting_sem
 backends/Horn/Horn_backend
 plugins/scopes/Scopes
 Basic_library

@@ -36,6 +36,7 @@ let rec pp_instr fmt i =
     | MLocalAssign (i,v) -> Format.fprintf fmt "%s<-l- %a" i.var_id pp_val v
     | MStateAssign (i,v) -> Format.fprintf fmt "%s<-s- %a" i.var_id pp_val v
     | MReset i           -> Format.fprintf fmt "reset %s" i
+    | MNoReset i         -> Format.fprintf fmt "noreset %s" i
     | MStep (il, i, vl)  ->
       Format.fprintf fmt "%a = %s (%a)"
 	(Utils.fprintf_list ~sep:", " (fun fmt v -> Format.pp_print_string fmt v.var_id)) il
@@ -135,7 +136,7 @@ let dummy_var_decl name typ =
     var_dec_const = false;
     var_dec_value = None;
     var_type =  typ;
-    var_clock = Clocks.new_ck (Clocks.Cvar Clocks.CSet_all) true;
+    var_clock = Clocks.new_ck Clocks.Cvar true;
     var_loc = Location.dummy_loc
   }
 
@@ -352,7 +353,7 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
     | Expr_appl (id, e, _) when Basic_library.is_expr_internal_fun expr ->
       let nd = node_from_name id in
       Fun (node_name nd, List.map (translate_expr node args) (expr_list_of_expr e))
-    | Expr_ite (g,t,e) -> (
+    (*| Expr_ite (g,t,e) -> (
       (* special treatment depending on the active backend. For horn backend, ite
 	 are preserved in expression. While they are removed for C or Java
 	 backends. *)
@@ -360,7 +361,7 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
 	Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
       | "C" | "java" | _ -> 
 	(Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
-    )
+    )*)
     | _                   -> raise NormalizationError
   in
   mk_val value_desc expr.expr_type
@@ -373,16 +374,18 @@ let translate_guard node args expr =
 let rec translate_act node ((m, si, j, d, s) as args) (y, expr) =
   match expr.expr_desc with
   | Expr_ite   (c, t, e) -> let g = translate_guard node args c in
-			    conditional g [translate_act node args (y, t)]
+			    conditional g
+                              [translate_act node args (y, t)]
                               [translate_act node args (y, e)]
-  | Expr_merge (x, hl)   -> MBranch (translate_ident node args x, List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl)
+  | Expr_merge (x, hl)   -> MBranch (translate_ident node args x,
+                                     List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl)
   | _                    -> MLocalAssign (y, translate_expr node args expr)
 
 let reset_instance node args i r c =
   match r with
   | None        -> []
   | Some r      -> let g = translate_guard node args r in
-                   [control_on_clock node args c (conditional g [MReset i] [])]
+                   [control_on_clock node args c (conditional g [MReset i] [MNoReset i])]
 
 let translate_eq node ((m, si, j, d, s) as args) eq =
   (* Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock; *)
@@ -434,7 +437,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       then []
       else reset_instance node args o r call_ck) @
        (control_on_clock node args call_ck (MStep (var_p, o, vl))) :: s)
-
+(*
    (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
       are preserved. While they are replaced as if g then x = t else x = e in  C or Java
       backends. *)
@@ -450,6 +453,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
 	(MLocalAssign (var_x, translate_expr node args eq.eq_rhs))::s)
     )
 
+*)
   | [x], _                                       -> (
     let var_x = get_node_var x node in
     (m, si, j, d,
@@ -556,9 +560,9 @@ let translate_decl nd sch =
 	(* special treatment depending on the active backend. For horn backend,
 	   common branches are not merged while they are in C or Java
 	   backends. *)
-	match !Options.output with
+	(*match !Options.output with
 	| "horn" -> s
-	| "C" | "java" | _ -> join_guards_list s
+	| "C" | "java" | _ ->*) join_guards_list s
       );
       step_asserts =
 	let exprl = List.map (fun assert_ -> assert_.assert_expr ) nd.node_asserts in
