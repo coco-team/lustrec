@@ -73,13 +73,13 @@ let make_annot lexbuf s =
   try
     let ann = LexerLustreSpec.annot s in
     ANNOT ann
-  with LexerLustreSpec.Error loc -> raise (Parse.Error (Location.shift (Location.curr lexbuf) loc, Annot_error s))
+  with LexerLustreSpec.Error loc -> raise (Parse.Error (Location.shift (Location.curr lexbuf) loc, Parse.Annot_error s))
 
 let make_spec lexbuf s = 
   try
     let ns = LexerLustreSpec.spec s in
     NODESPEC ns
-  with LexerLustreSpec.Error loc -> raise (Parse.Error (Location.shift (Location.curr lexbuf) loc, Node_spec_error s))
+  with LexerLustreSpec.Error loc -> raise (Parse.Error (Location.shift (Location.curr lexbuf) loc, Parse.Node_spec_error s))
    
 }
 
@@ -157,11 +157,11 @@ rule token = parse
 | "^" {POWER}
 | '"' {QUOTE}
 | eof { EOF }
-| _ { raise (Parse.Error (Location.curr lexbuf, Undefined_token (Lexing.lexeme lexbuf))) }
+| _ { raise (Parse.Error (Location.curr lexbuf, Parse.Undefined_token (Lexing.lexeme lexbuf))) }
 
 and comment n = parse
 | eof
-    { raise (Parse.Error (Location.curr lexbuf, Unfinished_comment)) }
+    { raise (Parse.Error (Location.curr lexbuf, Parse.Unfinished_comment)) }
 | "(*"
     { comment (n+1) lexbuf }
 | "*)"
@@ -177,7 +177,7 @@ and annot_singleline = parse
   | _ as c { Buffer.add_char buf c; annot_singleline lexbuf }
 
 and annot_multiline n = parse
-  | eof { raise (Parse.Error (Location.curr lexbuf, Unfinished_annot)) }
+  | eof { raise (Parse.Error (Location.curr lexbuf, Parse.Unfinished_annot)) }
   | "*)" as s { 
     if n > 0 then 
       (Buffer.add_string buf s; annot_multiline (n-1) lexbuf) 
@@ -193,7 +193,7 @@ and spec_singleline = parse
   | _ as c { Buffer.add_char buf c; spec_singleline lexbuf }
 
 and spec_multiline n = parse
-  | eof { raise (Parse.Error (Location.curr lexbuf, Unfinished_node_spec)) }
+  | eof { raise (Parse.Error (Location.curr lexbuf, Parse.Unfinished_node_spec)) }
   | "*)" as s { if n > 0 then 
       (Buffer.add_string buf s; spec_multiline (n-1) lexbuf) 
     else 

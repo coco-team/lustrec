@@ -491,7 +491,6 @@ let pp_initialize m self pp_var fmt var =
     end
 
 let pp_const_initialize pp_var fmt const =
-  let m = Machine_code.empty_machine in
   let var = mk_val (LocalVar (Corelang.var_decl_of_const const)) const.const_type in
   let rec aux indices value fmt typ =
     if Types.is_array_type typ
@@ -508,7 +507,6 @@ let pp_const_initialize pp_var fmt const =
       let indices = List.rev indices in
       let pp_var_suffix fmt var =
 	fprintf fmt "%a%a" (pp_c_val "" pp_var) var pp_array_suffix indices in
-      let pp_value fmt value = pp_c_val "" pp_var fmt value in
       begin
 	Mpfr.pp_inject_init pp_var_suffix fmt var;
 	fprintf fmt "@,";

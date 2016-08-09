@@ -623,7 +623,7 @@ when_list:
 
 ident_list:
   vdecl_ident {[$1]}
-| vdecl_ident COMMA ident_list {$1::$3}
+| ident_list COMMA vdecl_ident {$3::$1}
 
 SCOL_opt:
     SCOL {} | {}
