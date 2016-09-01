@@ -11,7 +11,7 @@ LUSI_MPFR_LIB=include/mpfr_lustre.lusi
 LOCAL_BINDIR=bin
 LOCAL_DOCDIR=doc/manual
 
-lustrec:
+$(LOCAL_BINDIR)/lustrec:
 	@echo Compiling binary lustrec
 	@$(OCAMLBUILD) -cflags -I,@OCAMLGRAPH_PATH@ -lflag @OCAMLGRAPH_PATH@/graph.cmxa -lflag nums.cmxa -I src -I src/backends/C -I src/plugins/scopes src/main_lustre_compiler.native
 	@mkdir -p $(LOCAL_BINDIR)
@@ -31,8 +31,18 @@ dot: doc
 clean:
 	$(OCAMLBUILD) -clean
 
-dist-clean: clean
-	@rm -f Makefile myocamlbuild.ml config.log config.status configure include/*.lusic include/math.h include/conv.h include/mpfr_lustre.h
+dist-src-clean: clean
+	@rm -f config.log config.status include/*.lusic include/math.h include/conv.h include/mpfr_lustre.h
+
+DIST_ARCHIVE_NAME=lustrec-$(shell $(LOCAL_BINDIR)/lustrec -version | grep version | cut -d, -f 2 | sed -e "s/ version //" -e "s/ (/-/" -e "s/ /-/" -e "s/\//-/" -e "s/)//")-src.tar.gz
+
+dist-gzip: $(LOCAL_BINDIR)/lustrec dist-src-clean
+	@rm -f $(shell ls ../*lustrec*src*tar.gz)
+	@tar zcvf ../$(DIST_ARCHIVE_NAME) -C .. --exclude-vcs --exclude=Makefile  --exclude=$(LOCAL_BINDIR) $(shell basename $(PWD))
+	@echo "Source distribution built: ../$(DIST_ARCHIVE_NAME)"
+
+dist-clean: dist-src-clean
+	@rm -f myocamlbuild.ml configure Makefile
 
 %.lusic: %.lusi
 	@echo Compiling $<
