@@ -17,9 +17,9 @@ $(LOCAL_BINDIR)/lustrec: configure Makefile
 	@mkdir -p $(LOCAL_BINDIR)
 	@mv _build/src/main_lustre_compiler.native $(LOCAL_BINDIR)/lustrec
 
-$(srcdir)/configure: configure.ac aclocal.m4
+configure: configure.ac
 	@echo configure.ac has changed relaunching autoconf
-	@cd '$(srcdir)' && autoconf
+	@autoconf
 
 Makefile: Makefile.in config.status
 	@echo Makefile.in has changed relaunching autoconf
