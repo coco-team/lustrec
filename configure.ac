@@ -1,9 +1,9 @@
 define([gitversion], esyscmd([sh -c "git log --oneline | wc -l | tr -d '\n'"]))
 
-AC_INIT([lustrec], [1.2-gitversion], [ploc@garoche.net])
-AC_SUBST(VERSION_CODENAME, "dev")
-#AC_INIT([lustrec], [1.2], [ploc@garoche.net])
-#AC_SUBST(VERSION_CODENAME, "Xia/Tai-Kang")
+#AC_INIT([lustrec], [1.2-gitversion], [ploc@garoche.net])
+#AC_SUBST(VERSION_CODENAME, "dev")
+AC_INIT([lustrec], [1.2], [ploc@garoche.net])
+AC_SUBST(VERSION_CODENAME, "Xia/Tai-Kang")
 
 #AC_DEFINE(SVN_REVISION, "svnversion", [SVN Revision])
 #AC_SUBST(SVN_REVISION)
