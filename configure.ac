@@ -1,7 +1,7 @@
 define([gitversion], esyscmd([sh -c "git log --oneline | wc -l | tr -d '\n'"]))
 
 AC_INIT([lustrec], [1.3-gitversion], [ploc@garoche.net])
-AC_SUBST(VERSION_CODENAME, "dev")
+AC_SUBST(VERSION_CODENAME, "Xia/Zhong-Kang-dev")
 # Next release will be
 #AC_INIT([lustrec], [1.3], [ploc@garoche.net])
 #AC_SUBST(VERSION_CODENAME, "Xia/Zhong-Kang")

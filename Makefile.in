@@ -21,9 +21,9 @@ configure: configure.ac
 	@echo configure.ac has changed relaunching autoconf
 	@autoconf
 
-Makefile: Makefile.in config.status
+Makefile: Makefile.in config.status configure
 	@echo Makefile.in has changed relaunching autoconf
-	@./config.status
+	@./config.status --recheck
 
 doc:
 	@echo Generating doc
