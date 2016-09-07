@@ -324,56 +324,53 @@ let stage2 prog =
 (* printing code *)
 let stage3 prog machine_code dependencies basename =
   let basename    =  Filename.basename basename in
-  let destname = !Options.dest_dir ^ "/" ^ basename in
   match !Options.output with
-      "C" -> 
-	begin
-	  let alloc_header_file = destname ^ "_alloc.h" in (* Could be changed *)
-	  let source_lib_file = destname ^ ".c" in (* Could be changed *)
-	  let source_main_file = destname ^ "_main.c" in (* Could be changed *)
-	  let makefile_file = destname ^ ".makefile" in (* Could be changed *)
-	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,");
-	  C_backend.translate_to_c
-	    alloc_header_file source_lib_file source_main_file makefile_file
-	    basename prog machine_code dependencies
-	end
-    | "java" ->
+    "C" -> 
       begin
-	(Format.eprintf "internal error: sorry, but not yet supported !"; assert false)
-    (*let source_file = basename ^ ".java" in
-      Log.report ~level:1 (fun fmt -> fprintf fmt ".. opening file %s@,@?" source_file);
-      let source_out = open_out source_file in
-      let source_fmt = formatter_of_out_channel source_out in
-      Log.report ~level:1 (fun fmt -> fprintf fmt ".. java code generation@,@?");
-      Java_backend.translate_to_java source_fmt basename normalized_prog machine_code;*)
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,");
+	C_backend.translate_to_c
+	  (* alloc_header_file source_lib_file source_main_file makefile_file *)
+	  basename prog machine_code dependencies
       end
-    | "horn" ->
-      begin
-	let source_file = destname ^ ".smt2" in (* Could be changed *)
-	let source_out = open_out source_file in
-	let fmt = formatter_of_out_channel source_out in
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. hornification@,");
-        Horn_backend.translate fmt basename prog (Machine_code.arrow_machine::machine_code);
-	(* Tracability file if option is activated *)
-	if !Options.traces then (
-	let traces_file = destname ^ ".traces.xml" in (* Could be changed *)
-	let traces_out = open_out traces_file in
-	let fmt = formatter_of_out_channel traces_out in
-        Log.report ~level:1 (fun fmt -> fprintf fmt ".. tracing info@,");
-	Horn_backend_traces.traces_file fmt basename prog machine_code;
-	)
-      end
-    | "lustre" ->
-      begin
-	let source_file = destname ^ ".lustrec.lus" in (* Could be changed *)
-	let source_out = open_out source_file in
-	let fmt = formatter_of_out_channel source_out in
-	Printers.pp_prog fmt prog;
-(*	Lustre_backend.translate fmt basename normalized_prog machine_code *)
-	()
-      end
+  | "java" ->
+     begin
+       (Format.eprintf "internal error: sorry, but not yet supported !"; assert false)
+     (*let source_file = basename ^ ".java" in
+       Log.report ~level:1 (fun fmt -> fprintf fmt ".. opening file %s@,@?" source_file);
+       let source_out = open_out source_file in
+       let source_fmt = formatter_of_out_channel source_out in
+       Log.report ~level:1 (fun fmt -> fprintf fmt ".. java code generation@,@?");
+       Java_backend.translate_to_java source_fmt basename normalized_prog machine_code;*)
+     end
+  | "horn" ->
+     begin
+       let destname = !Options.dest_dir ^ "/" ^ basename in
+       let source_file = destname ^ ".smt2" in (* Could be changed *)
+       let source_out = open_out source_file in
+       let fmt = formatter_of_out_channel source_out in
+       Log.report ~level:1 (fun fmt -> fprintf fmt ".. hornification@,");
+       Horn_backend.translate fmt basename prog (Machine_code.arrow_machine::machine_code);
+       (* Tracability file if option is activated *)
+       if !Options.traces then (
+	 let traces_file = destname ^ ".traces.xml" in (* Could be changed *)
+	 let traces_out = open_out traces_file in
+	 let fmt = formatter_of_out_channel traces_out in
+         Log.report ~level:1 (fun fmt -> fprintf fmt ".. tracing info@,");
+	 Horn_backend_traces.traces_file fmt basename prog machine_code;
+       )
+     end
+  | "lustre" ->
+     begin
+       let destname = !Options.dest_dir ^ "/" ^ basename in
+       let source_file = destname ^ ".lustrec.lus" in (* Could be changed *)
+       let source_out = open_out source_file in
+       let fmt = formatter_of_out_channel source_out in
+       Printers.pp_prog fmt prog;
+       (*	Lustre_backend.translate fmt basename normalized_prog machine_code *)
+       ()
+     end
 
-    | _ -> assert false
+  | _ -> assert false
 
 (* compile a .lus source file *)
 let rec compile_source dirname basename extension =
