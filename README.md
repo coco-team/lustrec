@@ -1,3 +1,4 @@
+[![Stories in Ready](https://badge.waffle.io/coco-team/lustrec.png?label=ready&title=Ready)](https://waffle.io/coco-team/lustrec)
 Current Status:    [![Build Status](https://travis-ci.org/coco-team/lustrec.svg?branch=master)](https://travis-ci.org/coco-team/lustrec)
 # LustreC
 
