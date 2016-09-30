@@ -300,6 +300,7 @@ let rec pp_conditional dependencies (m: machine_t) self fmt c tl el =
 
 and pp_machine_instr dependencies (m: machine_t) self fmt instr =
   match instr with 
+  | MNoReset _ -> ()
   | MReset i ->
     pp_machine_reset m self fmt i
   | MLocalAssign (i,v) ->

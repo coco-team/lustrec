@@ -140,15 +140,27 @@ and pp_expr_annot fmt expr_ann =
 (*
 let pp_node_var fmt id = fprintf fmt "%s%s: %a(%a)%a" (if id.var_dec_const then "const " else "") id.var_id print_dec_ty id.var_dec_type.ty_dec_desc Types.print_ty id.var_type Clocks.print_ck_suffix id.var_clock
 *)
-let pp_node_var fmt id =
+let pp_node_var ?(print_when=false) fmt id =
   begin
-    fprintf fmt "%s%s: %a%a" (if id.var_dec_const then "const " else "") id.var_id Types.print_node_ty id.var_type Clocks.print_ck_suffix id.var_clock;
-    match id.var_dec_value with
-    | None -> () 
-    | Some v -> fprintf fmt " = %a" pp_expr v
+      fprintf fmt "%s%s: %a%t%t" 
+	(if id.var_dec_const then "const " else "") 
+	id.var_id
+	Types.print_node_ty id.var_type
+	(fun fmt -> match id.var_dec_value with
+	| None -> () 
+	| Some v -> fprintf fmt " = %a" pp_expr v
+	)
+	(fun fmt -> if print_when || not ( Clocks.is_clocked id.var_clock ) then
+	    fprintf fmt "%a;"
+	    Clocks.print_ck_suffix id.var_clock
+	  else
+	    fprintf fmt "; -- %a"
+	      Clocks.print_ck_suffix id.var_clock
+	)
   end 
 
-let pp_node_args = fprintf_list ~sep:"; " pp_node_var 
+let pp_node_args = fprintf_list ~sep:" " (pp_node_var ~print_when:true)
+let pp_node_var = pp_node_var ~print_when:false
 
 let pp_node_eq fmt eq = 
   fprintf fmt "%a = %a;" 
@@ -178,7 +190,7 @@ let rec pp_handler fmt handler =
       match locals with [] -> () | _ ->
 	Format.fprintf fmt "@[<v 4>var %a@]@ " 
 	  (Utils.fprintf_list ~sep:"@ " 
-	     (fun fmt v -> Format.fprintf fmt "%a;" pp_node_var v))
+	     (fun fmt v -> pp_node_var fmt v))
 	  locals)
     handler.hand_locals
     pp_node_stmts handler.hand_stmts
@@ -271,7 +283,7 @@ fprintf fmt "@[<v 0>%a%t%s %s (%a) returns (%a)@.%a%alet@.@[<h 2>   @ @[<v>%a@ %
   match locals with [] -> () | _ ->
     fprintf fmt "@[<v 4>var %a@]@ " 
       (fprintf_list ~sep:"@ " 
-	 (fun fmt v -> fprintf fmt "%a;" pp_node_var v))
+	 (fun fmt v -> pp_node_var fmt v))
       locals
   ) nd.node_locals
   (fun fmt checks ->

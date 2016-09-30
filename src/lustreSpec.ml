@@ -46,7 +46,7 @@ type clock_dec =
 and clock_dec_desc =
   | Ckdec_any
   | Ckdec_bool of (ident * ident) list 
-  | Ckdec_pclock of int * rat
+
 
 type constant =
   | Const_int of int

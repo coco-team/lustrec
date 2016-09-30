@@ -80,7 +80,15 @@ res
 )
 
 let rec until_read reads handler =
-  List.fold_left (fun read (_, c, _, _) -> get_expr_vars read c) reads handler.hand_until
+  let res =
+    List.fold_left (fun read (_, c, _, _) -> get_expr_vars read c) reads handler.hand_until
+  in
+(
+(*
+  Format.eprintf "until_reads' %s = %a@." handler.hand_state (fprintf_list ~sep:" , " (fun fmt v -> Format.fprintf fmt "%s" v)) (ISet.elements res);
+*)
+  res
+)
 
 let rec handler_read reads handler =
   let locals = List.fold_left (fun locals v -> ISet.add v.var_id locals) ISet.empty handler.hand_locals in
@@ -95,12 +103,20 @@ let rec handler_read reads handler =
 (*
 Format.eprintf "handler_allvars %s = %a@." handler.hand_state (fprintf_list ~sep:" , " (fun fmt v -> Format.fprintf fmt "%s" v)) (ISet.elements allvars);
 Format.eprintf "handler_read %s = %a@." handler.hand_state (fprintf_list ~sep:" , " (fun fmt v -> Format.fprintf fmt "%s" v)) (ISet.elements res);
-*)
+ *)
 res
 )
 
 and automata_read reads aut =
-  List.fold_left (fun read handler -> until_read (handler_read (unless_read read handler) handler) handler) reads aut.aut_handlers
+  let res =
+    List.fold_left (fun read handler -> until_read (handler_read (unless_read read handler) handler) handler) reads aut.aut_handlers
+  in
+  (
+(*
+    Format.eprintf "automata_read %s = %a@." aut.aut_id (fprintf_list ~sep:" , " (fun fmt v -> Format.fprintf fmt "%s" v)) (ISet.elements res);
+*)
+    res
+  )
 
 let rec handler_write writes handler =
   let locals = List.fold_left (fun locals v -> ISet.add v.var_id locals) ISet.empty handler.hand_locals in
@@ -190,10 +206,11 @@ let node_of_assign_until nused used node aut_id aut_state handler =
   let var_outputs = List.sort IdentModule.compare (node_vars_of_idents node writes) in
   let new_var_outputs = List.map (fun vdecl -> { vdecl with var_id = frename vdecl.var_id }) var_outputs in
   let new_output_eqs = List.map2 (fun o o' -> Eq (mkeq handler.hand_loc ([o'.var_id], mkident handler.hand_loc o.var_id))) var_outputs new_var_outputs in
-  let until_expr = List.fold_right add_branch handler.hand_until (mkidentpair handler.hand_loc aut_state.actual_r.var_id aut_state.actual_s.var_id) in
+  let init_until = mkpair handler.hand_loc (mkconst handler.hand_loc tag_false) (mkconst handler.hand_loc handler.hand_state) in
+  let until_expr = List.fold_right add_branch handler.hand_until init_until in
   let until_eq = Eq (mkeq handler.hand_loc ([aut_state.incoming_r.var_id; aut_state.incoming_s.var_id], until_expr)) in
   let node_id = mk_new_name nused (Format.sprintf "%s__%s_handler_until" aut_id handler.hand_state) in
-  let var_inputs = aut_state.actual_r :: aut_state.actual_s :: var_inputs in
+  (*let var_inputs = aut_state.actual_r :: aut_state.actual_s :: var_inputs in*)
   let args = List.map (fun v -> mkexpr handler.hand_loc (Expr_when (mkident handler.hand_loc v.var_id, aut_state.actual_s.var_id, handler.hand_state))) var_inputs in
   let reset = Some (mkident handler.hand_loc aut_state.actual_r.var_id) in
   List.fold_left (fun res v -> ISet.add v.var_id res) ISet.empty var_outputs,

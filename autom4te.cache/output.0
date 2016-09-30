@@ -1856,7 +1856,7 @@ _ACEOF
 
 
 # Instanciation
-ac_config_files="$ac_config_files Makefile src/Makefile src/myocamlbuild.ml src/version.ml"
+ac_config_files="$ac_config_files Makefile src/Makefile src/version.ml"
 
 
 cat >confcache <<\_ACEOF
@@ -2566,7 +2566,6 @@ do
   case $ac_config_target in
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "src/Makefile") CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
-    "src/myocamlbuild.ml") CONFIG_FILES="$CONFIG_FILES src/myocamlbuild.ml" ;;
     "src/version.ml") CONFIG_FILES="$CONFIG_FILES src/version.ml" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;

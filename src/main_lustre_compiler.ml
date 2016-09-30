@@ -86,6 +86,10 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
   end
 
 
+let functional_backend () = 
+  match !Options.output with
+  | "horn" | "lustre" | "acsl" -> true
+  | _ -> false
 
 (* compile a .lus source file *)
 let rec compile_source dirname basename extension =
@@ -111,9 +115,14 @@ let rec compile_source dirname basename extension =
 
   (* Perform inlining before any analysis *)
   let orig, prog =
-    if !Options.global_inline && !Options.main_node <> "" then
+    if !Options.global_inline && !Options.main_node <> "" then (
+      let inlined_prog = Inliner.global_inline basename prog type_env clock_env in
+      Log.report ~level:4 (fun fmt -> fprintf fmt "After global inlining:@.@[<v 2>@ %a@]@," Printers.pp_prog inlined_prog);
+
       (if !Options.witnesses then prog else []),
-      Inliner.global_inline basename prog type_env clock_env
+      inlined_prog
+
+    )
     else (* if !Option.has_local_inline *)
       [],
       Inliner.local_inline basename prog type_env clock_env
@@ -238,9 +247,10 @@ let rec compile_source dirname basename extension =
 
   (* Optimize machine code *)
   let machine_code =
-    if !Options.optimization >= 4 && !Options.output <> "horn" then
+    if !Options.optimization >= 4 (* && !Options.output <> "horn" *) then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 3)@,");
+	Log.report ~level:1 
+	  (fun fmt -> fprintf fmt ".. machines optimization: sub-expression elimination@,");
 	Optimize_machine.machines_cse machine_code
       end
     else
@@ -249,20 +259,24 @@ let rec compile_source dirname basename extension =
 
   (* Optimize machine code *)
   let machine_code =
-    if !Options.optimization >= 2 && !Options.output <> "horn" then
+    if !Options.optimization >= 2 (* && !Options.output <> "horn" *) then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 1)@,");
+	Log.report ~level:1 
+	  (fun fmt -> fprintf fmt 
+	    ".. machines optimization: const. inlining (partial eval. with const)@,");
 	Optimize_machine.machines_unfold (Corelang.get_consts prog) node_schs machine_code
       end
     else
       machine_code
   in
   (* Optimize machine code *)
-  let machine_code =
-    if !Options.optimization >= 3 && !Options.output <> "horn" then
+  let machine_code = (* TODO reactivate. I disabled it because output variables were removed *)
+    if false && !Options.optimization >= 3 && not (functional_backend ()) then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization (phase 2)@,");
-	Optimize_machine.machines_fusion (Optimize_machine.machines_reuse_variables machine_code node_schs)
+	Log.report ~level:1 
+	  (fun fmt -> fprintf fmt ".. machines optimization: minimize heap alloc by reusing vars@,");
+	Optimize_machine.machines_fusion 
+	  (Optimize_machine.machines_reuse_variables machine_code node_schs)
       end
     else
       machine_code
@@ -301,19 +315,19 @@ let rec compile_source dirname basename extension =
       Java_backend.translate_to_java source_fmt basename normalized_prog machine_code;*)
       end
     | "horn" ->
-       begin
+      begin
 	let source_file = destname ^ ".smt2" in (* Could be changed *)
 	let source_out = open_out source_file in
 	let fmt = formatter_of_out_channel source_out in
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. hornification@,");
-        Horn_backend.translate fmt basename prog machine_code;
+        Horn_backend.translate fmt basename prog (Machine_code.arrow_machine::machine_code);
 	(* Tracability file if option is activated *)
 	if !Options.traces then (
 	let traces_file = destname ^ ".traces.xml" in (* Could be changed *)
 	let traces_out = open_out traces_file in
 	let fmt = formatter_of_out_channel traces_out in
         Log.report ~level:1 (fun fmt -> fprintf fmt ".. tracing info@,");
-	Horn_backend.traces_file fmt basename prog machine_code;
+	Horn_backend_traces.traces_file fmt basename prog machine_code;
 	)
       end
     | "lustre" ->
