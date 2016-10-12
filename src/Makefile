@@ -1,4 +1,4 @@
-OCAMLBUILD=/opt/local/bin/ocamlbuild -classic-display -no-links 
+OCAMLBUILD=/usr/bin/ocamlbuild -classic-display -no-links 
 
 prefix=/usr/local
 exec_prefix=${prefix}

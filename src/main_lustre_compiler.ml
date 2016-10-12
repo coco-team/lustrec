@@ -316,7 +316,8 @@ let rec compile_source dirname basename extension =
       end
     | "horn" ->
       begin
-	let source_file = destname ^ ".smt2" in (* Could be changed *)
+	let source_file = if !Options.dest_file ="" then destname ^ ".smt2" else !Options.dest_file in (* Could be changed *)
+        Printf.eprintf "\n\nOut = %s\n\nOption is : %s\n\n" source_file !Options.dest_file;
 	let source_out = open_out source_file in
 	let fmt = formatter_of_out_channel source_out in
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. hornification@,");
@@ -355,6 +356,7 @@ let compile dirname basename extension =
   | _        -> assert false
 
 let anonymous filename =
+  Printf.eprintf "\n\nAnonymous called with : %s\n" filename;
   let ok_ext, ext = List.fold_left
     (fun (ok, ext) ext' ->
       if not ok && Filename.check_suffix filename ext' then
@@ -373,7 +375,9 @@ let _ =
   Corelang.add_internal_funs ();
   try
     Printexc.record_backtrace true;
-    Arg.parse Options.options anonymous usage
+    Printf.eprintf "\nParsing\n";
+    Arg.parse Options.options anonymous usage;
+    Printf.eprintf "\nDest=%s\n" !Options.dest_file
   with
   | Parse.Syntax_err _ | Lexer_lustre.Error _
   | Types.Error (_,_) | Clocks.Error (_,_)

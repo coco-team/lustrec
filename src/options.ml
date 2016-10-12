@@ -38,11 +38,12 @@ let traces = ref false
 let horntraces = ref false
 let horn_cex = ref false
 let horn_query = ref true
-
+let dest_file = ref ""
 
 let options =
   [ "-d", Arg.Set_string dest_dir,
     "uses the specified directory as root for generated/imported object and C files (default: .)";
+    "-out", Arg.Set_string dest_file, "Destination file for horn output";
     "-node", Arg.Set_string main_node, "specifies the main node";
     "-init", Arg.Set delay_calculus, "performs an initialisation analysis for Lustre nodes <default: no analysis>";
     "-dynamic", Arg.Clear static_mem, "specifies a dynamic allocation scheme for main Lustre node <default: static>";
@@ -65,8 +66,9 @@ let options =
     "-print_clocks", Arg.Set print_clocks, "prints node clocks";
     "-O", Arg.Set_int optimization, " changes optimization level <default: 2>";
     "-verbose", Arg.Set_int verbose_level, " changes verbose level <default: 1>";
-    "-version", Arg.Unit print_version, " displays the version";]
-
+    "-version", Arg.Unit print_version, " displays the version"
+    ]
+ 
 
 let get_witness_dir filename =
   (* Make sure the directory exists *)
