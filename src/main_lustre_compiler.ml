@@ -470,7 +470,7 @@ let _ =
   | Parse.Error _
   | Types.Error (_,_) | Clocks.Error (_,_)
   | Corelang.Error _ (*| Task_set.Error _*)
-  | Causality.Cycle _ -> exit 1
+  | Causality.Error _ -> exit 1
   | Sys_error msg -> (eprintf "Failure: %s@." msg)
   | exc -> (Utils.track_exception (); raise exc)
 

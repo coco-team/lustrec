@@ -151,10 +151,13 @@ let schedule_node n =
     let fanin = Liveness.compute_fanin n gg in
     { node = n'; schedule = sort; unused_vars = unused; fanin_table = fanin; dep_graph = gg; }
 
-  with (Causality.Cycle vl) as exc ->
-    let vl = filter_original n vl in
-    pp_error Format.err_formatter vl;
-    raise exc
+  with (Causality.Error err) as exc ->
+    match err with
+    | DataCycle vl ->
+       let vl = filter_original n vl in
+       Causality.pp_error Format.err_formatter err;
+       raise exc
+    | _ -> raise exc
 
 let compute_node_reuse_table report =
   let disjoint = Disjunction.clock_disjoint_map (get_node_vars report.node) in

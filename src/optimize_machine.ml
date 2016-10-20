@@ -429,6 +429,7 @@ let rec instr_replace_var fvar instr cont =
   | MLocalAssign (i, v) -> instr_cons (MLocalAssign (fvar i, value_replace_var fvar v)) cont
   | MStateAssign (i, v) -> instr_cons (MStateAssign (i, value_replace_var fvar v)) cont
   | MReset i            -> instr_cons instr cont
+  | MNoReset i          -> instr_cons instr cont
   | MStep (il, i, vl)   -> instr_cons (MStep (List.map fvar il, i, List.map (value_replace_var fvar) vl)) cont
   | MBranch (g, hl)     -> instr_cons (MBranch (value_replace_var fvar g, List.map (fun (h, il) -> (h, instrs_replace_var fvar il [])) hl)) cont
 
