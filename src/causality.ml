@@ -20,10 +20,17 @@ open Corelang
 open Graph
 open Format
 
-exception Cycle of ident list
+type error =
+  | DataCycle of ident list
+  | NodeCycle of ident list
+
+exception Error of error
+
 
 module IdentDepGraph = Graph.Imperative.Digraph.ConcreteBidirectional (IdentModule)
-
+(*module DotGraph = Graphviz.Dot (IdentDepGraph)*)
+module Bfs = Traverse.Bfs (IdentDepGraph)
+  
 (* Dependency of mem variables on mem variables is cut off 
    by duplication of some mem vars into local node vars.
    Thus, cylic dependency errors may only arise between no-mem vars.
@@ -311,6 +318,15 @@ module NodeDep = struct
     ) prog g in
   g   
 
+  (* keep subgraph of [gr] consisting of nodes accessible from node [v] *)
+  let slice_graph gr v =
+    begin
+      let gr' = new_graph () in
+      IdentDepGraph.add_vertex gr' v;
+      Bfs.iter_component (fun v -> IdentDepGraph.iter_succ (fun s -> IdentDepGraph.add_vertex gr' s; IdentDepGraph.add_edge gr' v s) gr v) gr v;
+      gr'
+    end
+  
   let rec filter_static_inputs inputs args =
    match inputs, args with
    | []   , [] -> []
@@ -368,7 +384,7 @@ module CycleDetection = struct
     let scc_l = Cycles.scc_list g in
     List.iter (fun partition ->
       if wrong_partition g partition then
-	raise (Cycle partition)
+	raise (Error (DataCycle partition))
       else ()
     ) scc_l
 
@@ -515,9 +531,14 @@ let pp_dep_graph fmt g =
     Format.fprintf fmt "}@."
   end
 
-let pp_error fmt trace =
-  fprintf fmt "@.Causality error, cyclic data dependencies: %a@."
-    (fprintf_list ~sep:", " pp_print_string) trace
+let pp_error fmt err =
+  match err with
+  | DataCycle trace ->
+     fprintf fmt "@.Causality error, cyclic data dependencies: %a@."
+       (fprintf_list ~sep:", " pp_print_string) trace
+  | NodeCycle trace ->
+     fprintf fmt "@.Causality error, cyclic node calls: %a@."
+       (fprintf_list ~sep:", " pp_print_string) trace
 
 (* Merges elements of graph [g2] into graph [g1] *)
 let merge_with g1 g2 =

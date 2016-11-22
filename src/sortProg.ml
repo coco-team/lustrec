@@ -42,8 +42,8 @@ let sort prog =
 	  )
 	  g []
       )
-  with (Causality.Cycle v) as exc ->
-    Causality.pp_error Format.err_formatter v;
+  with (Causality.Error err) as exc ->
+    Causality.pp_error Format.err_formatter err;
     raise exc
   in
   Log.report ~level:3 
