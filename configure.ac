@@ -46,9 +46,9 @@ AC_PATH_PROG([OCAMLBUILD],[ocamlbuild],[:])
 
 # Checks for libraries. OCamlgraph
 AC_MSG_CHECKING(ocamlgraph library)
-   ocamlgraph_lib=`find $OCAMLGRAPH_PATH -iname graph.cmxa -nowarn | grep -m 1 -o "graph.cmxa"`
+   ocamlgraph_lib=`find $OCAMLGRAPH_PATH -iname graph.cmxa | grep -m 1 -o "graph.cmxa"`
    if (test "x$ocamlgraph_lib" = xgraph.cmxa ); then
-	ocamlgraph_lib_full=`find $OCAMLGRAPH_PATH -iname graph.cmxa -nowarn | grep -m 1 "graph.cmxa"`
+	ocamlgraph_lib_full=`find $OCAMLGRAPH_PATH -iname graph.cmxa | grep -m 1 "graph.cmxa"`
       AC_MSG_RESULT(library detected: $ocamlgraph_lib_full )
    else
       AC_MSG_ERROR([ocamlgraph library not installed in $OCAMLGRAPH_PATH])
