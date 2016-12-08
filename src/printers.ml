@@ -16,12 +16,16 @@ open Utils
 (* Prints [v] as [pp_fun] would do, but adds a backslash at each end of line,
    following the C convention for multiple lines macro *)
 let pp_as_c_macro pp_fun fmt v =
-  let (out, flush, newline, spaces) = pp_get_all_formatter_output_functions fmt () in
-  let macro_newline () = (out "\\" 0 1; newline ()) in
+  let formatter_out_funs = pp_get_formatter_out_functions fmt () in
+  let macro_newline () =
+    begin
+      formatter_out_funs.out_string "\\" 0 1;
+      formatter_out_funs.out_newline ()
+    end in
   begin
-    pp_set_all_formatter_output_functions fmt out flush macro_newline spaces;
+    pp_set_formatter_out_functions fmt { formatter_out_funs with out_newline = macro_newline };
     pp_fun fmt v;
-    pp_set_all_formatter_output_functions fmt out flush newline spaces;
+    pp_set_formatter_out_functions fmt formatter_out_funs;
   end
 
 let rec print_dec_struct_ty_field fmt (label, cty) =
@@ -30,8 +34,7 @@ and print_dec_ty fmt cty =
   match (*get_repr_type*) cty with
   | Tydec_any -> fprintf fmt "Any"
   | Tydec_int -> fprintf fmt "int"
-  | Tydec_real 
-  | Tydec_float -> fprintf fmt "real"
+  | Tydec_real -> fprintf fmt "real"
   | Tydec_bool -> fprintf fmt "bool"
   | Tydec_clock cty' -> fprintf fmt "%a clock" print_dec_ty cty'
   | Tydec_const c -> fprintf fmt "%s" c
@@ -57,8 +60,8 @@ let rec pp_struct_const_field fmt (label, c) =
 and pp_const fmt c = 
   match c with
     | Const_int i -> pp_print_int fmt i
-    | Const_real r -> pp_print_string fmt r
-    | Const_float r -> pp_print_float fmt r
+    | Const_real (c, e, s) -> pp_print_string fmt s (*if e = 0 then pp_print_int fmt c else if e < 0 then Format.fprintf fmt "%ie%i" c (-e) else Format.fprintf fmt "%ie-%i" c e *)
+    (* | Const_float r -> pp_print_float fmt r *)
     | Const_tag  t -> pp_print_string fmt t
     | Const_array ca -> Format.fprintf fmt "[%a]" (Utils.fprintf_list ~sep:"," pp_const) ca
     | Const_struct fl -> Format.fprintf fmt "{%a }" (Utils.fprintf_list ~sep:" " pp_struct_const_field) fl
@@ -131,7 +134,7 @@ and pp_eexpr fmt e =
 
 and pp_expr_annot fmt expr_ann =
   let pp_annot fmt (kwds, ee) =
-    Format.fprintf fmt "(*! %t: %a *)"
+    Format.fprintf fmt "(*! %t: %a; *)"
       (fun fmt -> match kwds with | [] -> assert false | [x] -> Format.pp_print_string fmt x | _ -> Format.fprintf fmt "/%a/" (fprintf_list ~sep:"/" Format.pp_print_string) kwds)
       pp_eexpr ee
   in
@@ -217,7 +220,7 @@ and pp_var_type_dec_desc fmt tdesc =
   | Tydec_any -> fprintf fmt "<any>"
   | Tydec_int -> fprintf fmt "int"
   | Tydec_real -> fprintf fmt "real"
-  | Tydec_float -> fprintf fmt "float"
+  (* | Tydec_float -> fprintf fmt "float" *)
   | Tydec_bool -> fprintf fmt "bool"
   | Tydec_clock t -> fprintf fmt "%a clock" pp_var_type_dec_desc t
   | Tydec_const t -> fprintf fmt "%s" t

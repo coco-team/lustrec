@@ -34,10 +34,16 @@ module Main = functor (Mod: MODIFIERS_HDR) ->
 struct
 
 let print_import_standard fmt =
-  fprintf fmt "#include \"%s/arrow.h\"@.@." Version.include_path
+  begin
+    if !Options.mpfr then
+      begin
+	fprintf fmt "#include <mpfr.h>@."
+      end;
+    fprintf fmt "#include \"%s/arrow.h\"@.@." Version.include_path
+  end
 
 let rec print_static_val pp_var fmt v =
-  match v with
+  match v.value_desc with
   | Cst c         -> pp_c_const fmt c
   | LocalVar v    -> pp_var fmt v
   | Fun (n, vl)   -> Basic_library.pp_c n (print_static_val pp_var) fmt vl
@@ -145,40 +151,51 @@ let print_static_alloc_macro fmt (m, attr, inst) =
     inst
 
 let print_machine_decl fmt m =
-  Mod.print_machine_decl_prefix fmt m;
-  if fst (get_stateless_status m) then
-    begin
-      fprintf fmt "extern %a;@.@."
-	print_stateless_prototype
-	(m.mname.node_id, m.mstep.step_inputs, m.mstep.step_outputs)
-    end
-  else
-    begin
-      (* Static allocation *)
-      if !Options.static_mem
-      then
-	begin
-	  let inst = mk_instance m in
-	  let attr = mk_attribute m in
-	  fprintf fmt "%a@.%a@.%a@."
-	    print_static_declare_macro (m, attr, inst)
-	    print_static_link_macro (m, attr, inst)
-	    print_static_alloc_macro (m, attr, inst)
-	end
-      else
-	begin 
-        (* Dynamic allocation *)
-	  fprintf fmt "extern %a;@.@."
-	    print_alloc_prototype (m.mname.node_id, m.mstatic)
-	end;
-      let self = mk_self m in
-      fprintf fmt "extern %a;@.@."
-	(print_reset_prototype self) (m.mname.node_id, m.mstatic);
+  begin
+    Mod.print_machine_decl_prefix fmt m;
+    if fst (get_stateless_status m) then
+      begin
+	fprintf fmt "extern %a;@.@."
+	  print_stateless_prototype
+	  (m.mname.node_id, m.mstep.step_inputs, m.mstep.step_outputs)
+      end
+    else
+      begin
+        (* Static allocation *)
+	if !Options.static_mem
+	then
+	  begin
+	    let inst = mk_instance m in
+	    let attr = mk_attribute m in
+	    fprintf fmt "%a@.%a@.%a@."
+	      print_static_declare_macro (m, attr, inst)
+	      print_static_link_macro (m, attr, inst)
+	      print_static_alloc_macro (m, attr, inst)
+	  end
+	else
+	  begin 
+            (* Dynamic allocation *)
+	    fprintf fmt "extern %a;@.@."
+	      print_alloc_prototype (m.mname.node_id, m.mstatic)
+	  end;
+	let self = mk_self m in
+	fprintf fmt "extern %a;@.@."
+	  (print_reset_prototype self) (m.mname.node_id, m.mstatic);
 
-      fprintf fmt "extern %a;@.@."
-	(print_step_prototype self)
-	(m.mname.node_id, m.mstep.step_inputs, m.mstep.step_outputs)
-    end
+	fprintf fmt "extern %a;@.@."
+	  (print_step_prototype self)
+	  (m.mname.node_id, m.mstep.step_inputs, m.mstep.step_outputs);
+	
+	if !Options.mpfr then
+	  begin
+	    fprintf fmt "extern %a;@.@."
+	      (print_init_prototype self) (m.mname.node_id, m.mstatic);
+
+	    fprintf fmt "extern %a;@.@."
+	      (print_clear_prototype self) (m.mname.node_id, m.mstatic);
+	  end
+      end
+  end
 
 let print_machine_alloc_decl fmt m =
   Mod.print_machine_decl_prefix fmt m;
@@ -215,8 +232,7 @@ let print_machine_decl_from_header fmt inode =
 	  print_stateless_C_prototype
 	  (inode.nodei_id, inode.nodei_inputs, inode.nodei_outputs)
       end
-    else (
-      raise (Invalid_argument ("A node with declared prototype C cannot be stateful, it has to be a function")))
+    else (Format.eprintf "internal error: print_machine_decl_from_header"; assert false)
   else
     if inode.nodei_stateless then
     begin
@@ -233,15 +249,26 @@ let print_machine_decl_from_header fmt inode =
 	let self = mk_new_name used "self" in
 	fprintf fmt "extern %a;@.@."
 	  (print_reset_prototype self) (inode.nodei_id, static_inputs);
-	
+
+	fprintf fmt "extern %a;@.@."
+	  (print_init_prototype self) (inode.nodei_id, static_inputs);
+
+	fprintf fmt "extern %a;@.@."
+	  (print_clear_prototype self) (inode.nodei_id, static_inputs);
+
 	fprintf fmt "extern %a;@.@."
 	  (print_step_prototype self)
 	  (inode.nodei_id, inode.nodei_inputs, inode.nodei_outputs)
       end
 
 let print_const_decl fmt cdecl =
-  fprintf fmt "extern %a;@." 
-    (pp_c_type cdecl.const_id) cdecl.const_type
+  if !Options.mpfr &&  Types.is_real_type (Types.array_base_type cdecl.const_type)
+  then
+    fprintf fmt "extern %a;@." 
+      (pp_c_type cdecl.const_id) (Types.dynamic_type cdecl.const_type) 
+  else
+    fprintf fmt "extern %a;@." 
+      (pp_c_type cdecl.const_id) cdecl.const_type
 
 let rec pp_c_struct_type_field filename cpt fmt (label, tdesc) =
   fprintf fmt "%a;" (pp_c_type_decl filename cpt label) tdesc
@@ -249,8 +276,10 @@ and pp_c_type_decl filename cpt var fmt tdecl =
   match tdecl with
   | Tydec_any           -> assert false
   | Tydec_int           -> fprintf fmt "int %s" var
+  | Tydec_real when !Options.mpfr
+                        -> fprintf fmt "%s %s" Mpfr.mpfr_t var
   | Tydec_real          -> fprintf fmt "double %s" var
-  | Tydec_float         -> fprintf fmt "float %s" var
+  (* | Tydec_float         -> fprintf fmt "float %s" var *)
   | Tydec_bool          -> fprintf fmt "_Bool %s" var
   | Tydec_clock ty      -> pp_c_type_decl filename cpt var fmt ty
   | Tydec_const c       -> fprintf fmt "%s %s" c var
@@ -290,10 +319,9 @@ let reset_type_definitions, print_type_definition_from_header =
 (********************************************************************************************)
 let print_header header_fmt basename prog machines dependencies =
   (* Include once: start *)
-  let baseNAME = String.uppercase basename in
-  let baseNAME = Str.global_replace (Str.regexp "\\.\\|\\ ") "_" baseNAME in
+  let baseNAME = file_to_module_name basename in
   begin
-    (* Print the svn version number and the supported C standard (C90 or C99) *)
+    (* Print the version number and the supported C standard (C90 or C99) *)
     print_version header_fmt;
     fprintf header_fmt "#ifndef _%s@.#define _%s@." baseNAME baseNAME;
     pp_print_newline header_fmt ();
@@ -302,7 +330,7 @@ let print_header header_fmt basename prog machines dependencies =
     print_import_standard header_fmt;
     pp_print_newline header_fmt ();
     (* imports dependencies *)
-    fprintf header_fmt "/* Import Dependencies */@.";
+    fprintf header_fmt "/* Import dependencies */@.";
     fprintf header_fmt "@[<v>";
     List.iter (print_import_prototype header_fmt) dependencies;
     fprintf header_fmt "@]@.";
@@ -314,8 +342,18 @@ let print_header header_fmt basename prog machines dependencies =
     fprintf header_fmt "/* Global constant (declarations, definitions are in C file) */@.";
     List.iter (fun c -> print_const_decl header_fmt (const_of_top c)) (get_consts prog);
     pp_print_newline header_fmt ();
+    if !Options.mpfr then
+      begin
+	fprintf header_fmt "/* Global initialization declaration */@.";
+	fprintf header_fmt "extern %a;@.@."
+	  print_global_init_prototype baseNAME;
+	
+	fprintf header_fmt "/* Global clear declaration */@.";
+	fprintf header_fmt "extern %a;@.@."
+	  print_global_clear_prototype baseNAME;
+      end;
     (* Print the struct declarations of all machines. *)
-    fprintf header_fmt "/* Struct declarations */@.";
+    fprintf header_fmt "/* Structs declarations */@.";
     List.iter (print_machine_struct header_fmt) machines;
     pp_print_newline header_fmt ();
     (* Print the prototypes of all machines *)
@@ -329,8 +367,7 @@ let print_header header_fmt basename prog machines dependencies =
 
 let print_alloc_header header_fmt basename prog machines dependencies =
   (* Include once: start *)
-  let baseNAME = String.uppercase basename in
-  let baseNAME = Str.global_replace (Str.regexp "\\.\\|\\ ") "_" baseNAME in
+  let baseNAME = file_to_module_name basename in
   begin
     (* Print the svn version number and the supported C standard (C90 or C99) *)
     print_version header_fmt;
@@ -362,14 +399,13 @@ let print_alloc_header header_fmt basename prog machines dependencies =
    header. *)
 let print_header_from_header header_fmt basename header =
   (* Include once: start *)
-  let baseNAME = String.uppercase basename in
-  let baseNAME = Str.global_replace (Str.regexp "\\.\\|\\ ") "_" baseNAME in
+  let baseNAME = file_to_module_name basename in
   let types = get_typedefs header in
   let consts = get_consts header in
   let nodes = get_imported_nodes header in
   let dependencies = get_dependencies header in
   begin
-    (* Print the svn version number and the supported C standard (C90 or C99) *)
+    (* Print the version number and the supported C standard (C90 or C99) *)
     print_version header_fmt;
     fprintf header_fmt "#ifndef _%s@.#define _%s@." baseNAME baseNAME;
     pp_print_newline header_fmt ();
@@ -395,8 +431,18 @@ let print_header_from_header header_fmt basename header =
     fprintf header_fmt "/* Global constant (declarations, definitions are in C file) */@.";
     List.iter (fun c -> print_const_decl header_fmt (const_of_top c)) consts;
     pp_print_newline header_fmt ();
+    if !Options.mpfr then
+      begin
+	fprintf header_fmt "/* Global initialization declaration */@.";
+	fprintf header_fmt "extern %a;@.@."
+	  print_global_init_prototype baseNAME;
+	
+	fprintf header_fmt "/* Global clear declaration */@.";
+	fprintf header_fmt "extern %a;@.@."
+	  print_global_clear_prototype baseNAME;
+      end;
     (* Print the struct declarations of all machines. *)
-    fprintf header_fmt "/* Struct declarations */@.";
+    fprintf header_fmt "/* Structs declarations */@.";
     List.iter (fun node -> print_machine_struct_from_header header_fmt (imported_node_of_top node)) nodes;
     pp_print_newline header_fmt ();
     (* Print the prototypes of all machines *)

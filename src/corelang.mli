@@ -29,6 +29,8 @@ val mktop_decl: Location.t -> ident -> bool -> top_decl_desc -> top_decl
 val mkpredef_call: Location.t -> ident -> expr list -> expr
 val mk_new_name: (ident -> bool) -> ident -> ident
 val mk_new_node_name: node_desc -> ident -> ident
+val mktop: top_decl_desc -> top_decl
+
 
 val node_table : (ident, top_decl) Hashtbl.t
 val print_node_table:  Format.formatter -> unit -> unit
@@ -134,7 +136,7 @@ val copy_prog: top_decl list -> top_decl list
 val mkeexpr: Location.t ->  expr -> eexpr
 val merge_node_annot: node_annot -> node_annot -> node_annot 
 val extend_eexpr: (quantifier_type * var_decl list) list -> eexpr -> eexpr
-val update_expr_annot: ident -> expr -> LustreSpec.expr_annot -> expr
+val update_expr_annot: ident -> expr -> expr_annot -> expr
 (* val mkpredef_call: Location.t -> ident -> eexpr list -> eexpr*)
 
 (* Local Variables: *)

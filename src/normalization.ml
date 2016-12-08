@@ -127,16 +127,29 @@ let mk_expr_alias node (defs, vars) expr =
 
 (* Create an alias for [expr], if [expr] is not already an alias (i.e. an ident)
    and [opt] is true *)
-let mk_expr_alias_opt opt node defvars expr =
+let mk_expr_alias_opt opt node (defs, vars) expr =
+(*Format.eprintf "mk_expr_alias_opt %B %a %a %a@." opt Printers.pp_expr expr Types.print_ty expr.expr_type Clocks.print_ck expr.expr_clock;*)
   match expr.expr_desc with
   | Expr_ident alias ->
-    defvars, expr
+    (defs, vars), expr
   | _                ->
-    if opt
-    then
-      mk_expr_alias node defvars expr
-    else
-      defvars, expr
+    match get_expr_alias defs expr with
+    | Some eq ->
+      let aliases = List.map (fun id -> List.find (fun v -> v.var_id = id) vars) eq.eq_lhs in
+      (defs, vars), replace_expr aliases expr
+    | None    ->
+      if opt
+      then
+	let new_aliases =
+	  List.map2
+	    (mk_fresh_var node expr.expr_loc)
+	    (Types.type_list_of_type expr.expr_type)
+	    (Clocks.clock_list_of_clock expr.expr_clock) in
+	let new_def =
+	  mkeq expr.expr_loc (List.map (fun v -> v.var_id) new_aliases, expr)
+	in (new_def::defs, new_aliases@vars), replace_expr new_aliases expr
+      else
+	(defs, vars), expr
 
 (* Create a (normalized) expression from [ref_e],
    replacing description with [norm_d],
@@ -159,7 +172,7 @@ let rec normalize_list alias node offsets norm_element defvars elist =
     ) elist (defvars, [])
 
 let rec normalize_expr ?(alias=true) node offsets defvars expr =
-(*  Format.eprintf "normalize %B %a [%a]@." alias Printers.pp_expr expr (Utils.fprintf_list ~sep:"," Dimension.pp_dimension) offsets;*)
+(*Format.eprintf "normalize %B %a:%a [%a]@." alias Printers.pp_expr expr Types.print_ty expr.expr_type (Utils.fprintf_list ~sep:"," Dimension.pp_dimension) offsets;*)
   match expr.expr_desc with
   | Expr_const _
   | Expr_ident _ -> defvars, unfold_offsets expr offsets
@@ -180,7 +193,7 @@ let rec normalize_expr ?(alias=true) node offsets defvars expr =
       normalize_list alias node offsets (fun alias -> normalize_expr ~alias:alias) defvars elist in
     defvars, mk_norm_expr offsets expr (Expr_tuple norm_elist)
   | Expr_appl (id, args, None)
-      when Basic_library.is_internal_fun id
+      when Basic_library.is_homomorphic_fun id 
 	&& Types.is_array_type expr.expr_type ->
     let defvars, norm_args =
       normalize_list
@@ -192,7 +205,7 @@ let rec normalize_expr ?(alias=true) node offsets defvars expr =
 	(expr_list_of_expr args)
     in
     defvars, mk_norm_expr offsets expr (Expr_appl (id, expr_of_expr_list args.expr_loc norm_args, None))
-  | Expr_appl (id, args, None) when Basic_library.is_internal_fun id ->
+  | Expr_appl (id, args, None) when Basic_library.is_expr_internal_fun expr ->
     let defvars, norm_args = normalize_expr ~alias:true node offsets defvars args in
     defvars, mk_norm_expr offsets expr (Expr_appl (id, norm_args, None))
   | Expr_appl (id, args, r) ->
@@ -203,7 +216,7 @@ let rec normalize_expr ?(alias=true) node offsets defvars expr =
       let defvars, norm_expr = normalize_expr node [] defvars norm_expr in
       normalize_expr ~alias:alias node offsets defvars norm_expr
     else
-      mk_expr_alias_opt (alias && not (Basic_library.is_internal_fun id)) node defvars norm_expr
+      mk_expr_alias_opt (alias && not (Basic_library.is_expr_internal_fun expr)) node defvars norm_expr
   | Expr_arrow (e1,e2) when !unfold_arrow_active && not (is_expr_once expr) -> (* Here we differ from Colaco paper: arrows are pushed to the top *)
     normalize_expr ~alias:alias node offsets defvars (unfold_arrow expr)
   | Expr_arrow (e1,e2) ->
@@ -251,7 +264,7 @@ and normalize_branches node offsets defvars hl =
    hl (defvars, [])
 
 and normalize_array_expr ?(alias=true) node offsets defvars expr =
-(*  Format.eprintf "normalize_array %B %a [%a]@." alias Printers.pp_expr expr (Utils.fprintf_list ~sep:"," Dimension.pp_dimension) offsets;*)
+  (*Format.eprintf "normalize_array %B %a [%a]@." alias Printers.pp_expr expr (Utils.fprintf_list ~sep:"," Dimension.pp_dimension) offsets;*)
   match expr.expr_desc with
   | Expr_power (e1, d) when offsets = [] ->
     let defvars, norm_e1 = normalize_expr node offsets defvars e1 in
@@ -262,7 +275,7 @@ and normalize_array_expr ?(alias=true) node offsets defvars expr =
   | Expr_array elist when offsets = [] ->
     let defvars, norm_elist = normalize_list alias node offsets (fun _ -> normalize_array_expr ~alias:true) defvars elist in
     defvars, mk_norm_expr offsets expr (Expr_array norm_elist)
-  | Expr_appl (id, args, None) when Basic_library.is_internal_fun id ->
+  | Expr_appl (id, args, None) when Basic_library.is_expr_internal_fun expr ->
     let defvars, norm_args = normalize_list alias node offsets (fun _ -> normalize_array_expr ~alias:true) defvars (expr_list_of_expr args) in
     defvars, mk_norm_expr offsets expr (Expr_appl (id, expr_of_expr_list args.expr_loc norm_args, None))
   |  _ -> normalize_expr ~alias:alias node offsets defvars expr
@@ -310,6 +323,7 @@ let decouple_outputs node defvars eq =
   defvars', {eq with eq_lhs = lhs' }
 
 let rec normalize_eq node defvars eq =
+(*Format.eprintf "normalize_eq %a@." Types.print_ty eq.eq_rhs.expr_type;*)
   match eq.eq_rhs.expr_desc with
   | Expr_pre _
   | Expr_fby _  ->
@@ -321,7 +335,7 @@ let rec normalize_eq node defvars eq =
     let (defs', vars'), norm_rhs = normalize_array_expr ~alias:false node [] defvars eq.eq_rhs in
     let norm_eq = { eq with eq_rhs = norm_rhs } in
     (norm_eq::defs', vars')
-  | Expr_appl (id, _, None) when Basic_library.is_internal_fun id && Types.is_array_type eq.eq_rhs.expr_type ->
+  | Expr_appl (id, _, None) when Basic_library.is_homomorphic_fun id && Types.is_array_type eq.eq_rhs.expr_type ->
     let (defs', vars'), norm_rhs = normalize_array_expr ~alias:false node [] defvars eq.eq_rhs in
     let norm_eq = { eq with eq_rhs = norm_rhs } in
     (norm_eq::defs', vars')
@@ -353,10 +367,10 @@ let normalize_node node =
     List.fold_left (
     fun (vars, def_accu, assert_accu) assert_ ->
       let assert_expr = assert_.assert_expr in
-      let (defs, vars'), expr =
-	normalize_expr
-	  ~alias:true
-	  node
+      let (defs, vars'), expr = 
+	normalize_expr 
+	  ~alias:false 
+	  node 
 	  [] (* empty offset for arrays *)
 	  ([], vars) (* defvar only contains vars *)
 	  assert_expr
@@ -382,7 +396,7 @@ let normalize_node node =
 		List.find (fun eq -> List.exists (fun v' -> v' = v.var_id ) eq.eq_lhs) (defs@assert_defs) 
 	      with Not_found -> 
 		(
-		  Format.eprintf "Traceability annotation generation: var %s not found@.Eqs: " v.var_id; 
+		  Format.eprintf "Traceability annotation generation: var %s not found@." v.var_id; 
 		  assert false
 		) 
 	    in

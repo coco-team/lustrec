@@ -1,9 +1,13 @@
-define([svnversion], esyscmd([sh -c "svnversion|sed "s/:.*//"|tr -d '\n'"]))dnl
-AC_INIT([lustrec], [1.1-svnversion], [ploc@garoche.net])
+define([gitversion], esyscmd([sh -c "git log --oneline | wc -l | tr -d '\n'"]))
 
+AC_INIT([lustrec], [1.3-gitversion], [ploc@garoche.net])
+AC_SUBST(VERSION_CODENAME, "Xia/Zhong-Kang-dev")
+# Next release will be
+#AC_INIT([lustrec], [1.3], [ploc@garoche.net])
+#AC_SUBST(VERSION_CODENAME, "Xia/Zhong-Kang")
 
-AC_DEFINE(SVN_REVISION, "svnversion", [SVN Revision])
-AC_SUBST(SVN_REVISION)
+#AC_DEFINE(SVN_REVISION, "svnversion", [SVN Revision])
+#AC_SUBST(SVN_REVISION)
 
 AC_CONFIG_SRCDIR([src/main_lustre_compiler.ml])
 
@@ -23,14 +27,15 @@ AC_ARG_WITH([ocamlgraph-path],
 )
 AC_SUBST(OCAMLGRAPH_PATH)
 
+AC_SUBST(SRC_PATH, esyscmd([sh -c "pwd" | tr -d '\n']))
 
 AC_PATH_PROG([OCAMLC],[ocamlc],[:])
 AC_MSG_CHECKING(OCaml version)
 ocamlc_version=`$OCAMLC -v | grep version | rev| cut -d \  -f 1 | rev`
 major=`echo $ocamlc_version | cut -d . -f 1`
 minor=`echo $ocamlc_version | cut -d . -f 2`
-if (test "$major" -lt 3 -a "$minor" -lt 11 ); then
-  AC_MSG_ERROR([Ocaml version must be at least 3.11. You have version $ocamlc_version])
+if (test "$major" -lt 4 -a "$minor" -lt 0 ); then
+  AC_MSG_ERROR([Ocaml version must be at least 4.0. You have version $ocamlc_version])
 fi
 AC_MSG_RESULT(valid ocaml version detected: $ocamlc_version)
 
@@ -43,11 +48,21 @@ AC_PATH_PROG([OCAMLBUILD],[ocamlbuild],[:])
 AC_MSG_CHECKING(ocamlgraph library)
    ocamlgraph_lib=`find $OCAMLGRAPH_PATH -iname graph.cmxa | grep -m 1 -o "graph.cmxa"`
    if (test "x$ocamlgraph_lib" = xgraph.cmxa ); then
-	ocamlgraph_lib_full=`find $OCAMLGRAPH_PATH -iname graph.cmxa  | grep -m 1 "graph.cmxa"`
+	ocamlgraph_lib_full=`find $OCAMLGRAPH_PATH -iname graph.cmxa | grep -m 1 "graph.cmxa"`
       AC_MSG_RESULT(library detected: $ocamlgraph_lib_full )
    else
       AC_MSG_ERROR([ocamlgraph library not installed in $OCAMLGRAPH_PATH])
    fi
+
+AC_CHECK_LIB(gmp, __gmpz_init, 
+      [gmp=yes],
+      [AC_MSG_RESULT([GNU MP not found])
+      gmp=no])
+
+AC_CHECK_LIB(mpfr, mpfr_add, [mpfr=yes], 
+		   [AC_MSG_RESULT(
+[MPFR not found])
+mpfr=no])
 
 
 # Workaround to solve an issue with ocamlbuild and C libraries.
@@ -86,10 +101,28 @@ AC_DEFINE_DIR([abs_datadir], [datadir])
 # Instanciation
 AC_CONFIG_FILES([Makefile
 		 src/Makefile
-		 src/version.ml])
+                 src/myocamlbuild.ml
+		 src/version.ml
+		 test/test-compile.sh
+		 ])
 
 AC_OUTPUT
 
 
 # summary
-dnl AC_MSG_NOTICE(******** Configuration ********)
+AC_MSG_NOTICE(******** Configuration ********)
+AC_MSG_NOTICE(bin path:     $prefix/bin)
+AC_MSG_NOTICE(include path: $prefix/include)
+AC_MSG_NOTICE(********    Plugins    ********)
+
+  if (test "x$gmp" = xyes -a "x$mpfr" = xyes ); then
+       AC_MSG_NOTICE([-mpfr option enable])
+
+   else 
+       AC_MSG_WARN([MPFR option cannot be activated. Requires GMP and MPFR libs])
+      
+   fi
+ 
+AC_MSG_NOTICE
+AC_MSG_NOTICE(******** Configuration ********)
+

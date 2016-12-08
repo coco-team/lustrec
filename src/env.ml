@@ -13,6 +13,7 @@
     clock-calculus. *)
 open Utils
 
+type 'a t  = 'a IMap.t
 (* Same namespace for nodes, variables and constants *)
 let initial = IMap.empty
 

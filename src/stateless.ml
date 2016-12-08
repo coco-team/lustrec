@@ -13,8 +13,9 @@ open LustreSpec
 open Corelang
 
 type error =
-| Stateful_kwd of ident
-| Stateful_imp of ident
+| Stateful_kwd   of ident
+| Stateful_imp   of ident
+| Stateful_ext_C of ident
 
 exception Error of Location.t * error
 
@@ -34,7 +35,7 @@ let rec check_expr expr =
   | Expr_merge (i, hl) -> List.for_all (fun (t, h) -> check_expr h) hl 
   | Expr_appl (i, e', i') ->
     check_expr e' &&
-      (Basic_library.is_internal_fun i || check_node (node_from_name i))
+      (Basic_library.is_stateless_fun i || check_node (node_from_name i))
 and compute_node nd =
  List.for_all (fun eq -> check_expr eq.eq_rhs) (get_node_eqs nd)
 and check_node td =
@@ -50,11 +51,27 @@ and check_node td =
 	else (nd.node_dec_stateless <- stateless; stateless)
       end
     | Some stl -> stl)
-  | ImportedNode nd -> nd.nodei_stateless
+  | ImportedNode nd ->
+     begin
+       (if nd.nodei_prototype = Some "C" && not nd.nodei_stateless
+	then raise (Error (td.top_decl_loc, Stateful_ext_C nd.nodei_id)));
+       nd.nodei_stateless
+     end
   | _ -> true
 
 let check_prog decls =
   List.iter (fun td -> ignore (check_node td)) decls
+
+
+let force_prog decls =
+  let force_node td =
+    match td.top_decl_desc with 
+    | Node nd         -> (
+      nd.node_dec_stateless <- false;
+      nd.node_stateless <- Some false)
+    | _ -> ()
+  in
+  List.iter (fun td -> ignore (force_node td)) decls
 
 let check_compat_decl decl =
  match decl.top_decl_desc with
@@ -75,13 +92,17 @@ let check_compat header =
 let pp_error fmt err =
   match err with
   | Stateful_kwd nd ->
-    Format.fprintf fmt
-      "node %s should be stateless but is actually stateful.@."
-      nd
+     Format.fprintf fmt
+       "node %s should be stateless but is actually stateful.@."
+       nd
   | Stateful_imp nd ->
-    Format.fprintf fmt
-      "node %s is declared stateless but is actually stateful.@."
-      nd
+     Format.fprintf fmt
+       "node %s is declared stateless but is actually stateful.@."
+       nd
+  | Stateful_ext_C nd ->
+     Format.fprintf fmt
+       "node %s with declared prototype C cannot be stateful, it has to be a function.@."
+       nd
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
