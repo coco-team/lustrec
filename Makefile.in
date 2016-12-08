@@ -7,14 +7,23 @@ datadir = ${prefix}/share
 includedir = ${prefix}/include
 
 LUSI_LIBS=include/math.lusi include/conv.lusi
+LUSI_MPFR_LIB=include/mpfr_lustre.lusi
 LOCAL_BINDIR=bin
 LOCAL_DOCDIR=doc/manual
 
-lustrec:
+$(LOCAL_BINDIR)/lustrec: configure Makefile
 	@echo Compiling binary lustrec
-	@$(OCAMLBUILD) -cflags -I,@OCAMLGRAPH_PATH@ -lflag @OCAMLGRAPH_PATH@/graph.cmxa -I src -I src/backends/C src/main_lustre_compiler.native
+	@$(OCAMLBUILD) -cflags -I,@OCAMLGRAPH_PATH@ -lflag @OCAMLGRAPH_PATH@/graph.cmxa -lflag nums.cmxa -I src -I src/backends/C -I src/plugins/scopes src/main_lustre_compiler.native
 	@mkdir -p $(LOCAL_BINDIR)
 	@mv _build/src/main_lustre_compiler.native $(LOCAL_BINDIR)/lustrec
+
+configure: configure.ac
+	@echo configure.ac has changed relaunching autoconf
+	@autoconf
+
+Makefile: Makefile.in config.status configure
+	@echo Makefile.in has changed relaunching autoconf
+	@./config.status --recheck
 
 doc:
 	@echo Generating doc
@@ -30,8 +39,18 @@ dot: doc
 clean:
 	$(OCAMLBUILD) -clean
 
-dist-clean: clean
-	@rm -f Makefile myocamlbuild.ml config.log config.status configure include/*.lusic include/math.h include/conv.h
+dist-src-clean: clean
+	@rm -f config.log config.status include/*.lusic include/math.h include/conv.h include/mpfr_lustre.h
+
+DIST_ARCHIVE_NAME=lustrec-$(shell $(LOCAL_BINDIR)/lustrec -version | grep version | cut -d, -f 2 | sed -e "s/ version //" -e "s/ (/-/" -e "s/ /-/" -e "s/\//-/" -e "s/)//")-src.tar.gz
+
+dist-gzip: $(LOCAL_BINDIR)/lustrec dist-src-clean
+	@rm -f $(shell ls ../*lustrec*src*tar.gz)
+	@tar zcvf ../$(DIST_ARCHIVE_NAME) -C .. --exclude-vcs --exclude=Makefile  --exclude=$(LOCAL_BINDIR) $(shell basename $(PWD))
+	@echo "Source distribution built: ../$(DIST_ARCHIVE_NAME)"
+
+dist-clean: dist-src-clean
+	@rm -f myocamlbuild.ml configure Makefile
 
 %.lusic: %.lusi
 	@echo Compiling $<
@@ -39,10 +58,15 @@ dist-clean: clean
 
 clean-lusic:
 	@rm -f $(LUSI_LIBS:%.lusi=%.lusic)
+	@rm -f $(LUSI_MPFR_LIB:%.lusi=%.lusic)
 
 compile-lusi: $(LUSI_LIBS:%.lusi=%.lusic)
 
-install: clean-lusic compile-lusi
+compile-mpfr-lusi: $(LUSI_MPFR_LIB)
+	@echo Compiling $<
+	@$(LOCAL_BINDIR)/lustrec -verbose 0 -mpfr 1 -d include $<
+
+install: clean-lusic compile-lusi compile-mpfr-lusi
 	mkdir -p ${bindir}
 	install -m 0755 $(LOCAL_BINDIR)/* ${bindir}
 	mkdir -p ${includedir}/lustrec

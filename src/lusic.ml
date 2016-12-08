@@ -33,7 +33,7 @@ let extract_header dirname basename prog =
   let owner = dirname ^ "/" ^ basename in
  List.fold_right
    (fun decl header ->
-(*Format.eprintf "Lusic.extract_header: owner = %s decl_owner = %s@." owner decl.top_decl_owner;*)
+     (*Format.eprintf "Lusic.extract_header: header = %B, owner = %s, decl_owner = %s@." decl.top_decl_itf owner decl.top_decl_owner;*)
      if decl.top_decl_itf || decl.top_decl_owner <> owner then header else
     match decl.top_decl_desc with
     | Node nd        -> { decl with top_decl_desc = ImportedNode (Corelang.get_node_interface nd) } :: header 
@@ -51,6 +51,7 @@ let write_lusic lusi (header : top_decl list) basename extension =
   let target_name = basename ^ extension in
   let outchan = open_out_bin target_name in
   begin
+    (*Format.eprintf "write_lusic: %i items.@." (List.length header);*)
     Marshal.to_channel outchan (Version.number, lusi : string * bool) [];
     Marshal.to_channel outchan (header : top_decl list) [];
     close_out outchan
@@ -89,6 +90,7 @@ let print_lusic_to_h basename extension =
   let h_fmt = formatter_of_out_channel h_out in
   begin
     assert (not lusic.obsolete);
+    (*Format.eprintf "lusic to h: %i items.@." (List.length lusic.contents);*)
     Typing.uneval_prog_generics lusic.contents;
     Clock_calculus.uneval_prog_generics lusic.contents;
     Header.print_header_from_header h_fmt (Filename.basename basename) lusic.contents;

@@ -21,25 +21,9 @@ module OrdVarDecl:Map.OrderedType with type t=var_decl =
 
 module ISet = Set.Make(OrdVarDecl)
 
-type value_t =
-  | Cst of constant
-  | LocalVar of var_decl
-  | StateVar of var_decl
-  | Fun of ident * value_t list
-  | Array of value_t list
-  | Access of value_t * value_t
-  | Power of value_t * value_t
-
-type instr_t =
-  | MLocalAssign of var_decl * value_t
-  | MStateAssign of var_decl * value_t
-  | MReset of ident
-  | MStep of var_decl list * ident * value_t list
-  | MBranch of value_t * (label * instr_t list) list
-
 let rec pp_val fmt v =
-  match v with
-    | Cst c         -> Printers.pp_const fmt c
+  match v.value_desc with
+    | Cst c         -> Printers.pp_const fmt c 
     | LocalVar v    -> Format.pp_print_string fmt v.var_id
     | StateVar v    -> Format.pp_print_string fmt v.var_id
     | Array vl      -> Format.fprintf fmt "[%a]" (Utils.fprintf_list ~sep:", " pp_val)  vl
@@ -52,6 +36,7 @@ let rec pp_instr fmt i =
     | MLocalAssign (i,v) -> Format.fprintf fmt "%s<-l- %a" i.var_id pp_val v
     | MStateAssign (i,v) -> Format.fprintf fmt "%s<-s- %a" i.var_id pp_val v
     | MReset i           -> Format.fprintf fmt "reset %s" i
+    | MNoReset i         -> Format.fprintf fmt "noreset %s" i
     | MStep (il, i, vl)  ->
       Format.fprintf fmt "%a = %s (%a)"
 	(Utils.fprintf_list ~sep:", " (fun fmt v -> Format.pp_print_string fmt v.var_id)) il
@@ -61,6 +46,7 @@ let rec pp_instr fmt i =
       Format.fprintf fmt "@[<v 2>case(%a) {@,%a@,}@]"
 	pp_val g
 	(Utils.fprintf_list ~sep:"@," pp_branch) hl
+    | MComment s -> Format.pp_print_string fmt s
 
 and pp_branch fmt (t, h) =
   Format.fprintf fmt "@[<v 2>%s:@,%a@]" t (Utils.fprintf_list ~sep:"@," pp_instr) h
@@ -119,6 +105,12 @@ let pp_machine fmt m =
     (fun fmt -> match m.mspec with | None -> () | Some spec -> Printers.pp_spec fmt spec)
     (Utils.fprintf_list ~sep:"@ " Printers.pp_expr_annot) m.mannot
 
+let rec is_const_value v =
+  match v.value_desc with
+  | Cst _          -> true
+  | Fun (id, args) -> Basic_library.is_value_internal_fun v && List.for_all is_const_value args
+  | _              -> false
+
 (* Returns the declared stateless status and the computed one. *)
 let get_stateless_status m =
  (m.mname.node_dec_stateless, Utils.desome m.mname.node_stateless)
@@ -144,7 +136,7 @@ let dummy_var_decl name typ =
     var_dec_const = false;
     var_dec_value = None;
     var_type =  typ;
-    var_clock = Clocks.new_ck (Clocks.Cvar Clocks.CSet_all) true;
+    var_clock = Clocks.new_ck Clocks.Cvar true;
     var_loc = Location.dummy_loc
   }
 
@@ -177,29 +169,73 @@ let arrow_top_decl =
     top_decl_loc = Location.dummy_loc
   }
 
+let mk_val v t = { value_desc = v; 
+		   value_type = t; 
+		   value_annot = None }
+
 let arrow_machine =
   let state = "_first" in
   let var_state = dummy_var_decl state (Types.new_ty Types.Tbool) in
   let var_input1 = List.nth arrow_desc.node_inputs 0 in
   let var_input2 = List.nth arrow_desc.node_inputs 1 in
   let var_output = List.nth arrow_desc.node_outputs 0 in
+  let cst b = mk_val (Cst (const_of_bool b)) Type_predef.type_bool in
+  let t_arg = Types.new_univar () in (* TODO Xavier: c'est bien la bonne def ? *)
   {
     mname = arrow_desc;
     mmemory = [var_state];
     mcalls = [];
     minstances = [];
-    minit = [MStateAssign(var_state, Cst (const_of_bool true))];
-    mconst = [];
+    minit = [MStateAssign(var_state, cst true)];
     mstatic = [];
+    mconst = [];
     mstep = {
       step_inputs = arrow_desc.node_inputs;
       step_outputs = arrow_desc.node_outputs;
       step_locals = [];
       step_checks = [];
-      step_instrs = [conditional (StateVar var_state)
-			         [MStateAssign(var_state, Cst (const_of_bool false));
-                                  MLocalAssign(var_output, LocalVar var_input1)]
-                                 [MLocalAssign(var_output, LocalVar var_input2)] ];
+      step_instrs = [conditional (mk_val (StateVar var_state) Type_predef.type_bool)
+			         [MStateAssign(var_state, cst false);
+                                  MLocalAssign(var_output, mk_val (LocalVar var_input1) t_arg)]
+                                 [MLocalAssign(var_output, mk_val (LocalVar var_input2) t_arg)] ];
+      step_asserts = [];
+    };
+    mspec = None;
+    mannot = [];
+  }
+
+let empty_desc =
+  {
+    node_id = arrow_id;
+    node_type = Types.bottom;
+    node_clock = Clocks.bottom;
+    node_inputs= [];
+    node_outputs= [];
+    node_locals= [];
+    node_gencalls = [];
+    node_checks = [];
+    node_asserts = [];
+    node_stmts= [];
+    node_dec_stateless = true;
+    node_stateless = Some true;
+    node_spec = None;
+    node_annot = [];  }
+
+let empty_machine =
+  {
+    mname = empty_desc;
+    mmemory = [];
+    mcalls = [];
+    minstances = [];
+    minit = [];
+    mstatic = [];
+    mconst = [];
+    mstep = {
+      step_inputs = [];
+      step_outputs = [];
+      step_locals = [];
+      step_checks = [];
+      step_instrs = [];
       step_asserts = [];
     };
     mspec = None;
@@ -233,14 +269,21 @@ let translate_ident node (m, si, j, d, s) id =
   try (* id is a node var *)
     let var_id = get_node_var id node in
     if ISet.exists (fun v -> v.var_id = id) m
-    then StateVar var_id
-    else LocalVar var_id
+    then mk_val (StateVar var_id) var_id.var_type
+    else mk_val (LocalVar var_id) var_id.var_type
   with Not_found ->
     try (* id is a constant *)
-      LocalVar (Corelang.var_decl_of_const (const_of_top (Hashtbl.find Corelang.consts_table id)))
+      let vdecl = (Corelang.var_decl_of_const (const_of_top (Hashtbl.find Corelang.consts_table id))) in
+      mk_val (LocalVar vdecl) vdecl.var_type
     with Not_found ->
       (* id is a tag *)
-      Cst (Const_tag id)
+      (* DONE construire une liste des enum declarés et alors chercher dedans la liste
+	 qui contient id *)
+      try
+        let typ = (typedef_of_top (Hashtbl.find Corelang.tag_table id)).tydef_id in
+        mk_val (Cst (Const_tag id)) (Type_predef.type_const typ)
+      with Not_found -> (Format.eprintf "internal error: Machine_code.translate_ident %s" id;
+                         assert false)
 
 let rec control_on_clock node ((m, si, j, d, s) as args) ck inst =
  match (Clocks.repr ck).cdesc with
@@ -292,36 +335,36 @@ let specialize_op expr =
   | "C" -> specialize_to_c expr
   | _   -> expr
 
-let rec translate_expr ?(ite=false) node ((m, si, j, d, s) as args) expr =
+let rec translate_expr node ((m, si, j, d, s) as args) expr =
   let expr = specialize_op expr in
- match expr.expr_desc with
- | Expr_const v                     -> Cst v
- | Expr_ident x                     -> translate_ident node args x
- | Expr_array el                    -> Array (List.map (translate_expr node args) el)
- | Expr_access (t, i)               -> Access (translate_expr node args t, translate_expr node args (expr_of_dimension i))
- | Expr_power  (e, n)               -> Power  (translate_expr node args e, translate_expr node args (expr_of_dimension n))
- | Expr_tuple _
- | Expr_arrow _
- | Expr_fby _
- | Expr_pre _                       -> (Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
- | Expr_when    (e1, _, _)          -> translate_expr node args e1
- | Expr_merge   (x, _)              -> raise NormalizationError
- | Expr_appl (id, e, _) when Basic_library.is_internal_fun id ->
-   let nd = node_from_name id in
-   Fun (node_name nd, List.map (translate_expr node args) (expr_list_of_expr e))
- | Expr_ite (g,t,e) -> (
-   (* special treatment depending on the active backend. For horn backend, ite
-      are preserved in expression. While they are removed for C or Java
-      backends. *)
-   match !Options.output with
-   | "horn" ->
-     Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
-   | ("C" | "java") when ite ->
-     Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
-   | _ ->
-     (Format.eprintf "option:%s@." !Options.output; Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
- )
- | _                   -> raise NormalizationError
+  let value_desc = 
+    match expr.expr_desc with
+    | Expr_const v                     -> Cst v
+    | Expr_ident x                     -> (translate_ident node args x).value_desc
+    | Expr_array el                    -> Array (List.map (translate_expr node args) el)
+    | Expr_access (t, i)               -> Access (translate_expr node args t, translate_expr node args (expr_of_dimension i))
+    | Expr_power  (e, n)               -> Power  (translate_expr node args e, translate_expr node args (expr_of_dimension n))
+    | Expr_tuple _
+    | Expr_arrow _ 
+    | Expr_fby _
+    | Expr_pre _                       -> (Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
+    | Expr_when    (e1, _, _)          -> (translate_expr node args e1).value_desc
+    | Expr_merge   (x, _)              -> raise NormalizationError
+    | Expr_appl (id, e, _) when Basic_library.is_expr_internal_fun expr ->
+      let nd = node_from_name id in
+      Fun (node_name nd, List.map (translate_expr node args) (expr_list_of_expr e))
+    (*| Expr_ite (g,t,e) -> (
+      (* special treatment depending on the active backend. For horn backend, ite
+	 are preserved in expression. While they are removed for C or Java
+	 backends. *)
+      match !Options.output with | "horn" -> 
+	Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
+      | "C" | "java" | _ -> 
+	(Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
+    )*)
+    | _                   -> raise NormalizationError
+  in
+  mk_val value_desc expr.expr_type
 
 let translate_guard node args expr =
   match expr.expr_desc with
@@ -331,17 +374,18 @@ let translate_guard node args expr =
 let rec translate_act node ((m, si, j, d, s) as args) (y, expr) =
   match expr.expr_desc with
   | Expr_ite   (c, t, e) -> let g = translate_guard node args c in
-			    conditional g [translate_act node args (y, t)]
+			    conditional g
+                              [translate_act node args (y, t)]
                               [translate_act node args (y, e)]
-  | Expr_merge (x, hl)   -> MBranch (translate_ident node args x, List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl)
-  | _                    ->
-    MLocalAssign (y, translate_expr node args expr)
+  | Expr_merge (x, hl)   -> MBranch (translate_ident node args x,
+                                     List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl)
+  | _                    -> MLocalAssign (y, translate_expr node args expr)
 
 let reset_instance node args i r c =
   match r with
   | None        -> []
   | Some r      -> let g = translate_guard node args r in
-                   [control_on_clock node args c (conditional g [MReset i] [])]
+                   [control_on_clock node args c (conditional g [MReset i] [MNoReset i])]
 
 let translate_eq node ((m, si, j, d, s) as args) eq =
   (* Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock; *)
@@ -371,7 +415,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
      d,
      control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e2)) :: s)
 
-  | p  , Expr_appl (f, arg, r) when not (Basic_library.is_internal_fun f) ->
+  | p  , Expr_appl (f, arg, r) when not (Basic_library.is_expr_internal_fun eq.eq_rhs) ->
     let var_p = List.map (fun v -> get_node_var v node) p in
     let el = expr_list_of_expr arg in
     let vl = List.map (translate_expr node args) el in
@@ -393,7 +437,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       then []
       else reset_instance node args o r call_ck) @
        (control_on_clock node args call_ck (MStep (var_p, o, vl))) :: s)
-
+(*
    (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
       are preserved. While they are replaced as if g then x = t else x = e in  C or Java
       backends. *)
@@ -409,6 +453,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
 	(MLocalAssign (var_x, translate_expr node args eq.eq_rhs))::s)
     )
 
+*)
   | [x], _                                       -> (
     let var_x = get_node_var x node in
     (m, si, j, d,
@@ -421,7 +466,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
   )
   | _                                            ->
     begin
-      Format.eprintf "unsupported equation: %a@?" Printers.pp_node_eq eq;
+      Format.eprintf "internal error: Machine_code.translate_eq %a@?" Printers.pp_node_eq eq;
       assert false
     end
 
@@ -444,9 +489,9 @@ let find_eq xl eqs =
    to the computed schedule [sch]
 *)
 let sort_equations_from_schedule nd sch =
-(*Format.eprintf "%s schedule: %a@."
-		 nd.node_id
-		 (Utils.fprintf_list ~sep:" ; " Scheduling.pp_eq_schedule) sch;*)
+  (* Format.eprintf "%s schedule: %a@." *)
+  (* 		 nd.node_id *)
+  (* 		 (Utils.fprintf_list ~sep:" ; " Scheduling.pp_eq_schedule) sch; *)
   let split_eqs = Splitting.tuple_split_eq_list (get_node_eqs nd) in
   let eqs_rev, remainder =
     List.fold_left
@@ -515,9 +560,9 @@ let translate_decl nd sch =
 	(* special treatment depending on the active backend. For horn backend,
 	   common branches are not merged while they are in C or Java
 	   backends. *)
-	match !Options.output with
+	(*match !Options.output with
 	| "horn" -> s
-	| "C" | "java" | _ -> join_guards_list s
+	| "C" | "java" | _ ->*) join_guards_list s
       );
       step_asserts =
 	let exprl = List.map (fun assert_ -> assert_.assert_expr ) nd.node_asserts in
@@ -554,32 +599,49 @@ let get_const_assign m id =
   with Not_found -> assert false
 
 
-let value_of_ident m id =
+let value_of_ident loc m id =
   (* is is a state var *)
   try
-    StateVar (List.find (fun v -> v.var_id = id) m.mmemory)
+    let v = List.find (fun v -> v.var_id = id) m.mmemory
+    in mk_val (StateVar v) v.var_type 
   with Not_found ->
-  try (* id is a node var *)
-    LocalVar (get_node_var id m.mname)
+    try (* id is a node var *)
+      let v = get_node_var id m.mname
+      in mk_val (LocalVar v) v.var_type
   with Not_found ->
     try (* id is a constant *)
-      LocalVar (Corelang.var_decl_of_const (const_of_top (Hashtbl.find Corelang.consts_table id)))
+      let c = Corelang.var_decl_of_const (const_of_top (Hashtbl.find Corelang.consts_table id))
+      in mk_val (LocalVar c) c.var_type
     with Not_found ->
       (* id is a tag *)
-      Cst (Const_tag id)
+      let t = Const_tag id
+      in mk_val (Cst t) (Typing.type_const loc t)
+
+(* type of internal fun used in dimension expression *)
+let type_of_value_appl f args =
+  if List.mem f Basic_library.arith_funs
+  then (List.hd args).value_type
+  else Type_predef.type_bool
 
 let rec value_of_dimension m dim =
   match dim.Dimension.dim_desc with
-  | Dimension.Dbool b         -> Cst (Const_tag (if b then Corelang.tag_true else Corelang.tag_false))
-  | Dimension.Dint i          -> Cst (Const_int i)
-  | Dimension.Dident v        -> value_of_ident m v
-  | Dimension.Dappl (f, args) -> Fun (f, List.map (value_of_dimension m) args)
-  | Dimension.Dite (i, t, e)  -> Fun ("ite", List.map (value_of_dimension m) [i; t; e])
+  | Dimension.Dbool b         ->
+     mk_val (Cst (Const_tag (if b then Corelang.tag_true else Corelang.tag_false))) Type_predef.type_bool
+  | Dimension.Dint i          ->
+     mk_val (Cst (Const_int i)) Type_predef.type_int
+  | Dimension.Dident v        -> value_of_ident dim.Dimension.dim_loc m v
+  | Dimension.Dappl (f, args) ->
+     let vargs = List.map (value_of_dimension m) args
+     in mk_val (Fun (f, vargs)) (type_of_value_appl f vargs) 
+  | Dimension.Dite (i, t, e)  ->
+     (match List.map (value_of_dimension m) [i; t; e] with
+     | [vi; vt; ve] -> mk_val (Fun ("ite", [vi; vt; ve])) vt.value_type
+     | _            -> assert false)
   | Dimension.Dlink dim'      -> value_of_dimension m dim'
   | _                         -> assert false
 
 let rec dimension_of_value value =
-  match value with
+  match value.value_desc with
   | Cst (Const_tag t) when t = Corelang.tag_true  -> Dimension.mkdim_bool  Location.dummy_loc true
   | Cst (Const_tag t) when t = Corelang.tag_false -> Dimension.mkdim_bool  Location.dummy_loc false
   | Cst (Const_int i)                             -> Dimension.mkdim_int   Location.dummy_loc i

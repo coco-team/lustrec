@@ -42,11 +42,8 @@ let rec occurs cvar ck =
   | Ctuple ckl ->
       List.exists (occurs cvar) ckl
   | Con (ck',_,_) -> occurs cvar ck'
-  | Pck_up (ck',_) -> occurs cvar ck'
-  | Pck_down (ck',_) -> occurs cvar ck'
-  | Pck_phase (ck',_) -> occurs cvar ck'
-  | Cvar _ -> ck=cvar
-  | Cunivar _ | Pck_const (_,_) -> false
+  | Cvar  -> ck=cvar
+  | Cunivar   -> false
   | Clink ck' -> occurs cvar ck'
   | Ccarrying (_,ck') -> occurs cvar ck'
 
@@ -70,14 +67,11 @@ let rec generalize ck =
     | Ctuple clist ->
         List.iter generalize clist
     | Con (ck',cr,_) -> generalize ck'; generalize_carrier cr
-    | Cvar cset ->
+    | Cvar ->
         if ck.cscoped then
           raise (Scope_clock ck);
-        ck.cdesc <- Cunivar cset
-    | Pck_up (ck',_) -> generalize ck'
-    | Pck_down (ck',_) -> generalize ck'
-    | Pck_phase (ck',_) -> generalize ck'
-    | Pck_const (_,_) | Cunivar _ -> ()
+        ck.cdesc <- Cunivar 
+    | Cunivar -> () 
     | Clink ck' ->
         generalize ck'
     | Ccarrying (cr,ck') ->
@@ -123,59 +117,21 @@ let rec instantiate inst_ck_vars inst_cr_vars ck =
   | Con (ck',c,l) ->
       let c' = instantiate_carrier c inst_cr_vars in
       {ck with cdesc = Con ((instantiate inst_ck_vars inst_cr_vars ck'),c',l)}
-  | Cvar _ | Pck_const (_,_) -> ck
-  | Pck_up (ck',k) ->
-      {ck with cdesc = Pck_up ((instantiate inst_ck_vars inst_cr_vars ck'),k)}
-  | Pck_down (ck',k) ->
-      {ck with cdesc = Pck_down ((instantiate inst_ck_vars inst_cr_vars ck'),k)}
-  | Pck_phase (ck',q) ->
-      {ck with cdesc = Pck_phase ((instantiate inst_ck_vars inst_cr_vars ck'),q)}
+  | Cvar  -> ck
   | Clink ck' ->
       {ck with cdesc = Clink (instantiate inst_ck_vars inst_cr_vars ck')}
   | Ccarrying (cr,ck') ->
       let cr' = instantiate_carrier cr inst_cr_vars in
         {ck with cdesc =
          Ccarrying (cr',instantiate inst_ck_vars inst_cr_vars ck')}
-  | Cunivar cset ->
+  | Cunivar ->
       try
         List.assoc ck.cid !inst_ck_vars
       with Not_found ->
-        let var = new_ck (Cvar cset) true in
+        let var = new_ck Cvar true in
 	inst_ck_vars := (ck.cid, var)::!inst_ck_vars;
 	var
 
-(** [subsume pck1 cset1] subsumes clock [pck1] by clock subset
-    [cset1]. The clock constraint is actually recursively transfered to
-    the clock variable appearing in [pck1] *)
-let subsume pck1 cset1 =
-  let rec aux pck cset =
-    match cset with
-    | CSet_all ->
-        ()
-    | CSet_pck (k,(a,b)) ->
-        match pck.cdesc with
-        | Cvar cset' ->
-            pck.cdesc <- Cvar (intersect cset' cset)
-        | Pck_up (pck',k') ->
-            let rat = if a=0 then (0,1) else (a,b*k') in
-            aux pck' (CSet_pck ((k*k'),rat))
-        | Pck_down (pck',k') ->
-            let k''=k/(gcd k k') in
-            aux pck' (CSet_pck (k'',(a*k',b)))
-        | Pck_phase (pck',(a',b')) ->
-            let (a'',b'')= max_rat (sum_rat (a,b) (-a',b')) (0,1) in
-            aux pck' (CSet_pck (k, (a'',b'')))
-        | Pck_const (n,(a',b')) ->
-            if n mod k <> 0 || (max_rat (a,b) (a',b')) <> (a',b') then
-              raise (Subsume (pck1, cset1))
-        | Clink pck' ->
-            aux pck' cset
-        | Cunivar _ -> ()
-        | Ccarrying (_,ck') ->
-            aux ck' cset
-        | _ -> raise (Subsume (pck1, cset1))
-  in
-  aux pck1 cset1
 
 let rec update_scope_carrier scoped cr =
   if (not scoped) then
@@ -196,22 +152,13 @@ let rec update_scope scoped ck =
       | Ctuple clist ->
           List.iter (update_scope scoped) clist
       | Con (ck',cr,_) -> update_scope scoped ck'(*; update_scope_carrier scoped cr*)
-      | Cvar cset ->
-          ck.cdesc <- Cvar cset
-      | Pck_up (ck',_) -> update_scope scoped ck'
-      | Pck_down (ck',_) -> update_scope scoped ck'
-      | Pck_phase (ck',_) -> update_scope scoped ck'
-      | Pck_const (_,_) | Cunivar _ -> ()
+      | Cvar | Cunivar -> ()
       | Clink ck' ->
           update_scope scoped ck'
       | Ccarrying (cr,ck') ->
           update_scope_carrier scoped cr; update_scope scoped ck'
     end
 
-(* Unifies two static pclocks. *)
-let unify_static_pck ck1 ck2 =
-  if (period ck1 <> period ck2) || (phase ck1 <> phase ck2) then
-    raise (Unify (ck1,ck2))
 
 (* Unifies two clock carriers *)
 let unify_carrier cr1 cr2 =
@@ -279,8 +226,6 @@ let try_unify_carrier ck1 ck2 loc =
   with
   | Unify (ck1',ck2') ->
     raise (Error (loc, Clock_clash (ck1',ck2')))
-  | Subsume (ck,cset) ->
-    raise (Error (loc, Clock_set_mismatch (ck,cset)))
   | Mismatch (cr1,cr2) ->
     raise (Error (loc, Carrier_mismatch (cr1,cr2)))
 
@@ -292,102 +237,40 @@ let rec unify ck1 ck2 =
   if ck1==ck2 then
     ()
   else
-    let left_const = is_concrete_pck ck1 in
-    let right_const = is_concrete_pck ck2 in
-    if left_const && right_const then
-      unify_static_pck ck1 ck2
-    else
-      match ck1.cdesc,ck2.cdesc with
-      | Cvar cset1,Cvar cset2->
-          if ck1.cid < ck2.cid then
-            begin
-              ck2.cdesc <- Clink (simplify ck1);
-              update_scope ck2.cscoped ck1;
-              subsume ck1 cset2
-            end
-          else
-            begin
-              ck1.cdesc <- Clink (simplify ck2);
-              update_scope ck1.cscoped ck2;
-              subsume ck2 cset1
-            end
-      | Cvar cset, Pck_up (_,_) | Cvar cset, Pck_down (_,_)
-      | Cvar cset, Pck_phase (_,_) | Cvar cset, Pck_const (_,_) ->
-          if (occurs ck1 ck2) then
-            begin
-              if (simplify ck2 = ck1) then
-                ck2.cdesc <- Clink (simplify ck1)
-              else
-                raise (Unify (ck1,ck2));
-              end
-          else
-            begin
-              ck1.cdesc <- Clink (simplify ck2);
-              subsume ck2 cset
-            end
-      | Pck_up (_,_), Cvar cset | Pck_down (_,_), Cvar cset
-      | Pck_phase (_,_), Cvar cset | Pck_const (_,_), Cvar cset ->
-            if (occurs ck2 ck1) then
-              begin
-                if ((simplify ck1) = ck2) then
-                  ck1.cdesc <- Clink (simplify ck2)
-                else
-                  raise (Unify (ck1,ck2));
-              end
-            else
-              begin
-                ck2.cdesc <- Clink (simplify ck1);
-                subsume ck1 cset
-              end
-      | (Cvar cset,_) when (not (occurs ck1 ck2)) ->
-          subsume ck2 cset;
-          update_scope ck1.cscoped ck2;
-          ck1.cdesc <- Clink (simplify ck2)
-      | (_, (Cvar cset)) when (not (occurs ck2 ck1)) ->
-          subsume ck1 cset;
-          update_scope ck2.cscoped ck1;
-          ck2.cdesc <- Clink (simplify ck1)
-      | Ccarrying (cr1,ck1'),Ccarrying (cr2,ck2') ->
-          unify_carrier cr1 cr2;
-          unify ck1' ck2'
-      | Ccarrying (_,_),_ | _,Ccarrying (_,_) ->
-          raise (Unify (ck1,ck2))
-      | Carrow (c1,c2), Carrow (c1',c2') ->
-          unify c1 c1'; unify c2 c2'
-      | Ctuple ckl1, Ctuple ckl2 ->
-          if (List.length ckl1) <> (List.length ckl2) then
-            raise (Unify (ck1,ck2));
-          List.iter2 unify ckl1 ckl2
-      | Con (ck',c1,l1), Con (ck'',c2,l2) when l1=l2 ->
-          unify_carrier c1 c2;
-          unify ck' ck''
-      | Pck_const (i,r), Pck_const (i',r') ->
-          if i<>i' || r <> r' then
-            raise (Unify (ck1,ck2))
-      | (_, Pck_up (pck2',k)) when (not right_const) ->
-          let ck1' = simplify (new_ck (Pck_down (ck1,k)) true) in
-          unify ck1' pck2'
-      | (_,Pck_down (pck2',k)) when (not right_const) ->
-          subsume ck1 (CSet_pck (k,(0,1)));
-          let ck1' = simplify (new_ck (Pck_up (ck1,k)) true) in
-          unify ck1' pck2'
-      | (_,Pck_phase (pck2',(a,b))) when (not right_const) ->
-          subsume ck1 (CSet_pck (b,(a,b)));
-          let ck1' = simplify (new_ck (Pck_phase (ck1,(-a,b))) true) in
-          unify ck1' pck2'
-      | Pck_up (pck1',k),_ ->
-          let ck2' = simplify (new_ck (Pck_down (ck2,k)) true) in
-          unify pck1' ck2'
-      | Pck_down (pck1',k),_ ->
-          subsume ck2 (CSet_pck (k,(0,1)));
-          let ck2' = simplify (new_ck (Pck_up (ck2,k)) true) in
-          unify pck1' ck2'
-      | Pck_phase (pck1',(a,b)),_ ->
-          subsume ck2 (CSet_pck (b,(a,b)));
-          let ck2' = simplify (new_ck (Pck_phase (ck2,(-a,b))) true) in
-          unify pck1' ck2'
-      | Cunivar _, _ | _, Cunivar _ -> ()
-      | _,_ -> raise (Unify (ck1,ck2))
+    match ck1.cdesc,ck2.cdesc with
+    | Cvar, Cvar ->
+      if ck1.cid < ck2.cid then
+        begin
+          ck2.cdesc <- Clink (simplify ck1);
+          update_scope ck2.cscoped ck1
+        end
+      else
+        begin
+          ck1.cdesc <- Clink (simplify ck2);
+          update_scope ck1.cscoped ck2
+        end
+    | (Cvar, _) when (not (occurs ck1 ck2)) ->
+      update_scope ck1.cscoped ck2;
+      ck1.cdesc <- Clink (simplify ck2)
+    | (_, Cvar) when (not (occurs ck2 ck1)) ->
+      update_scope ck2.cscoped ck1;
+      ck2.cdesc <- Clink (simplify ck1)
+    | Ccarrying (cr1,ck1'),Ccarrying (cr2,ck2') ->
+      unify_carrier cr1 cr2;
+      unify ck1' ck2'
+    | Ccarrying (_,_),_ | _,Ccarrying (_,_) ->
+      raise (Unify (ck1,ck2))
+    | Carrow (c1,c2), Carrow (c1',c2') ->
+      unify c1 c1'; unify c2 c2'
+    | Ctuple ckl1, Ctuple ckl2 ->
+      if (List.length ckl1) <> (List.length ckl2) then
+        raise (Unify (ck1,ck2));
+      List.iter2 unify ckl1 ckl2
+    | Con (ck',c1,l1), Con (ck'',c2,l2) when l1=l2 ->
+      unify_carrier c1 c2;
+      unify ck' ck''
+    | Cunivar, _ | _, Cunivar -> ()
+    | _,_ -> raise (Unify (ck1,ck2))
 
 (** [unify ck1 ck2] semi-unifies clocks [ck1] and [ck2]. Raises [Unify
     (ck1,ck2)] if the clocks are not semi-unifiable.*)
@@ -398,7 +281,7 @@ let rec semi_unify ck1 ck2 =
     ()
   else
       match ck1.cdesc,ck2.cdesc with
-      | Cvar cset1,Cvar cset2->
+      | Cvar, Cvar ->
           if ck1.cid < ck2.cid then
             begin
               ck2.cdesc <- Clink (simplify ck1);
@@ -409,8 +292,8 @@ let rec semi_unify ck1 ck2 =
               ck1.cdesc <- Clink (simplify ck2);
               update_scope ck1.cscoped ck2
             end
-      | (Cvar cset,_) -> raise (Unify (ck1,ck2))
-      | (_, (Cvar cset)) when (not (occurs ck2 ck1)) ->
+      | (Cvar, _) -> raise (Unify (ck1,ck2))
+      | (_, Cvar) when (not (occurs ck2 ck1)) ->
           update_scope ck2.cscoped ck1;
           ck2.cdesc <- Clink (simplify ck1)
       | Ccarrying (cr1,ck1'),Ccarrying (cr2,ck2') ->
@@ -430,7 +313,7 @@ let rec semi_unify ck1 ck2 =
       | Con (ck',c1,l1), Con (ck'',c2,l2) when l1=l2 ->
           semi_unify_carrier c1 c2;
           semi_unify ck' ck''
-      | Cunivar _, _ | _, Cunivar _ -> ()
+      | Cunivar, _ | _, Cunivar -> ()
       | _,_ -> raise (Unify (ck1,ck2))
 
 (* Returns the value corresponding to a pclock (integer) factor
@@ -456,8 +339,6 @@ let try_unify ck1 ck2 loc =
   with
   | Unify (ck1',ck2') ->
     raise (Error (loc, Clock_clash (ck1',ck2')))
-  | Subsume (ck,cset) ->
-    raise (Error (loc, Clock_set_mismatch (ck,cset)))
   | Mismatch (cr1,cr2) ->
     raise (Error (loc, Carrier_mismatch (cr1,cr2)))
 
@@ -467,8 +348,6 @@ let try_semi_unify ck1 ck2 loc =
   with
   | Unify (ck1',ck2') ->
     raise (Error (loc, Clock_clash (ck1',ck2')))
-  | Subsume (ck,cset) ->
-    raise (Error (loc, Clock_set_mismatch (ck,cset)))
   | Mismatch (cr1,cr2) ->
     raise (Error (loc, Carrier_mismatch (cr1,cr2)))
 
@@ -500,8 +379,6 @@ let try_sub_unify sub ck1 ck2 loc =
   with
   | Unify (ck1',ck2') ->
     raise (Error (loc, Clock_clash (ck1',ck2')))
-  | Subsume (ck,cset) ->
-    raise (Error (loc, Clock_set_mismatch (ck,cset)))
   | Mismatch (cr1,cr2) ->
     raise (Error (loc, Carrier_mismatch (cr1,cr2)))
 
@@ -515,7 +392,7 @@ let unify_tuple_clock ref_ck_opt ck loc =
   let rec aux ck =
     match (repr ck).cdesc with
     | Con _
-    | Cvar _ ->
+    | Cvar ->
         begin
           match !ck_var with
           | None ->
@@ -539,7 +416,7 @@ let unify_imported_clock ref_ck_opt ck loc =
   let ck_var = ref ref_ck_opt in
   let rec aux ck =
     match (repr ck).cdesc with
-    | Cvar _ ->
+    | Cvar ->
         begin
           match !ck_var with
           | None ->
@@ -608,7 +485,7 @@ and clock_subtyping_arg env ?(sub=true) real_arg formal_clock =
 (* computes clocks for node application *)
 and clock_appl env f args clock_reset loc =
  let args = expr_list_of_expr args in
-  if Basic_library.is_internal_fun f && List.exists is_tuple_expr args
+  if Basic_library.is_homomorphic_fun f && List.exists is_tuple_expr args
   then
       let args = Utils.transpose_list (List.map expr_list_of_expr args) in
       Clocks.clock_of_clock_list (List.map (fun args -> clock_call env f args clock_reset loc) args)
@@ -744,10 +621,6 @@ let clock_eq env eq =
 let clock_coreclock env cck id loc scoped =
   match cck.ck_dec_desc with
   | Ckdec_any -> new_var scoped
-  | Ckdec_pclock (n,(a,b)) ->
-      let ck = new_ck (Pck_const (n,(a,b))) scoped in
-      if n mod b <> 0 then raise (Error (loc,Invalid_const ck));
-      ck
   | Ckdec_bool cl ->
       let temp_env = Env.add_value env id (new_var true) in
       (* We just want the id to be present in the environment *)
@@ -837,19 +710,9 @@ let check_imported_pclocks loc ck_node =
     | Carrow (ck1,ck2) -> aux ck1; aux ck2
     | Ctuple cl -> List.iter aux cl
     | Con (ck',_,_) -> aux ck'
-    | Pck_up (_,_) | Pck_down (_,_) | Pck_phase (_,_) -> 
-        raise (Error (loc, (Invalid_imported_clock ck_node)))
-    | Pck_const (n,p) ->
-        begin
-          match !pck with
-          | None -> pck := Some (n,p)
-          | Some (n',p') ->
-              if (n,p) <> (n',p') then
-                raise (Error (loc, (Invalid_imported_clock ck_node)))
-        end
     | Clink ck' -> aux ck'
     | Ccarrying (_,ck') -> aux ck'
-    | Cvar _ | Cunivar _ ->
+    | Cvar | Cunivar  ->
         match !pck with
         | None -> ()
         | Some (_,_) ->

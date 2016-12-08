@@ -5,10 +5,10 @@ eval set -- $(getopt -n $0 -o "-aciwvh:" -- "$@")
 declare c i w h a v
 declare -a files
 
-SRC_PREFIX=/Users/Teme/Documents/GitHub/onera_lustrec-tests/
+SRC_PREFIX=@SRC_PATH@-tests/
 #SRC_PREFIX=`svn info --xml | grep wcroot | sed "s/<[^>]*>//g"`/lustre_compiler
 NOW=`date "+%y%m%d%H%M"`
-report=`pwd`/report-1.3-     459-$NOW
+report=`pwd`/report-@PACKAGE_VERSION@-$NOW
 LUSTREC=lustrec
 mkdir -p build
 build=`pwd`"/build"

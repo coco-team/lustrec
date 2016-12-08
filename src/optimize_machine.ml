@@ -26,10 +26,12 @@ let pp_elim fmt elim =
 
 let rec eliminate elim instr =
   let e_expr = eliminate_expr elim in
-  match instr with  
+  match instr with
+  | MComment _         -> instr
   | MLocalAssign (i,v) -> MLocalAssign (i, e_expr v)
   | MStateAssign (i,v) -> MStateAssign (i, e_expr v)
   | MReset i           -> instr
+  | MNoReset i         -> instr
   | MStep (il, i, vl)  -> MStep(il, i, List.map e_expr vl)
   | MBranch (g,hl)     -> 
     MBranch
@@ -41,50 +43,59 @@ let rec eliminate elim instr =
       )
     
 and eliminate_expr elim expr =
-  match expr with
-  | StateVar v
+  match expr.value_desc with
   | LocalVar v -> (try IMap.find v.var_id elim with Not_found -> expr)
-  | Fun (id, vl) -> Fun (id, List.map (eliminate_expr elim) vl)
-  | Array(vl) -> Array(List.map (eliminate_expr elim) vl)
-  | Access(v1, v2) -> Access(eliminate_expr elim v1, eliminate_expr elim v2)
-  | Power(v1, v2) -> Power(eliminate_expr elim v1, eliminate_expr elim v2)
-  | Cst _ -> expr
+  | Fun (id, vl) -> {expr with value_desc = Fun (id, List.map (eliminate_expr elim) vl)}
+  | Array(vl) -> {expr with value_desc = Array(List.map (eliminate_expr elim) vl)}
+  | Access(v1, v2) -> { expr with value_desc = Access(eliminate_expr elim v1, eliminate_expr elim v2)}
+  | Power(v1, v2) -> { expr with value_desc = Power(eliminate_expr elim v1, eliminate_expr elim v2)}
+  | Cst _ | StateVar _ -> expr
 
 let eliminate_dim elim dim =
-  Dimension.expr_replace_expr (fun v -> try dimension_of_value (IMap.find v elim) with Not_found -> mkdim_ident dim.dim_loc v) dim
+  Dimension.expr_replace_expr 
+    (fun v -> try
+		dimension_of_value (IMap.find v elim) 
+      with Not_found -> mkdim_ident dim.dim_loc v) 
+    dim
 
 let unfold_expr_offset m offset expr =
-  List.fold_left (fun res -> (function Index i -> Access(res, value_of_dimension m i) | Field f -> failwith "not yet implemented")) expr offset
+  List.fold_left
+    (fun res -> (function | Index i -> mk_val (Access (res, value_of_dimension m i))
+					      (Types.array_element_type res.value_type)
+                          | Field f -> Format.eprintf "internal error: not yet implemented !"; assert false))
+    expr offset
 
-let rec simplify_cst_expr m offset cst =
+let rec simplify_cst_expr m offset typ cst =
     match offset, cst with
     | []          , _
-        -> Cst cst
+      -> mk_val (Cst cst) typ
     | Index i :: q, Const_array cl when Dimension.is_dimension_const i
-	-> simplify_cst_expr m q (List.nth cl (Dimension.size_const_dimension i))
+      -> let elt_typ = Types.array_element_type typ in
+         simplify_cst_expr m q elt_typ (List.nth cl (Dimension.size_const_dimension i))
     | Index i :: q, Const_array cl
-        -> unfold_expr_offset m [Index i] (Array (List.map (simplify_cst_expr m q) cl))
+      -> let elt_typ = Types.array_element_type typ in
+         unfold_expr_offset m [Index i] (mk_val (Array (List.map (simplify_cst_expr m q elt_typ) cl)) typ)
     | Field f :: q, Const_struct fl
-        -> simplify_cst_expr m q (List.assoc f fl)
+      -> let fld_typ = Types.struct_field_type typ f in
+         simplify_cst_expr m q fld_typ (List.assoc f fl)
     | _ -> (Format.eprintf "internal error: Optimize_machine.simplify_cst_expr %a@." Printers.pp_const cst; assert false)
 
 let simplify_expr_offset m expr =
   let rec simplify offset expr =
-    match offset, expr with
+    match offset, expr.value_desc with
     | Field f ::q , _                -> failwith "not yet implemented"
-    | _           , Fun (id, vl) when Basic_library.is_internal_fun id
-                                     -> Fun (id, List.map (simplify offset) vl)
+    | _           , Fun (id, vl) when Basic_library.is_value_internal_fun expr
+                                     -> mk_val (Fun (id, List.map (simplify offset) vl)) expr.value_type
     | _           , Fun _
     | _           , StateVar _
     | _           , LocalVar _       -> unfold_expr_offset m offset expr
-    | _           , Cst cst          -> simplify_cst_expr m offset cst
+    | _           , Cst cst          -> simplify_cst_expr m offset expr.value_type cst
     | _           , Access (expr, i) -> simplify (Index (dimension_of_value i) :: offset) expr
     | []          , _                -> expr
     | Index _ :: q, Power (expr, _)  -> simplify q expr
     | Index i :: q, Array vl when Dimension.is_dimension_const i
                                      -> simplify q (List.nth vl (Dimension.size_const_dimension i))
-    | Index i :: q, Array vl         -> unfold_expr_offset m [Index i] (Array (List.map (simplify q) vl))
-    | _ -> (Format.eprintf "internal error: Optimize_machine.simplify_expr_offset %a@." pp_val expr; assert false)
+    | Index i :: q, Array vl         -> unfold_expr_offset m [Index i] (mk_val (Array (List.map (simplify q) vl)) expr.value_type)
     (*Format.eprintf "simplify_expr %a %a = %a@." pp_val expr (Utils.fprintf_list ~sep:"" Printers.pp_offset) offset pp_val res; res)
      with e -> (Format.eprintf "simplify_expr %a %a = <FAIL>@." pp_val expr (Utils.fprintf_list ~sep:"" Printers.pp_offset) offset; raise e*)
   in simplify [] expr
@@ -94,18 +105,19 @@ let rec simplify_instr_offset m instr =
   | MLocalAssign (v, expr) -> MLocalAssign (v, simplify_expr_offset m expr)
   | MStateAssign (v, expr) -> MStateAssign (v, simplify_expr_offset m expr)
   | MReset id              -> instr
+  | MNoReset id            -> instr
   | MStep (outputs, id, inputs) -> MStep (outputs, id, List.map (simplify_expr_offset m) inputs)
   | MBranch (cond, brl)
     -> MBranch(simplify_expr_offset m cond, List.map (fun (l, il) -> l, simplify_instrs_offset m il) brl)
+  | MComment _             -> instr
 
 and simplify_instrs_offset m instrs =
   List.map (simplify_instr_offset m) instrs
 
 let is_scalar_const c =
   match c with
-  | Const_int _
   | Const_real _
-  | Const_float _
+  | Const_int _
   | Const_tag _   -> true
   | _             -> false
 
@@ -119,7 +131,6 @@ let is_unfoldable_expr fanin expr =
     match offset, cst with
     | _           , Const_int _
     | _           , Const_real _
-    | _           , Const_float _
     | _           , Const_tag _     -> true
     | Field f :: q, Const_struct fl -> unfold_const q (List.assoc f fl)
     | []          , Const_struct _  -> false
@@ -128,7 +139,7 @@ let is_unfoldable_expr fanin expr =
     | _           , Const_array _   -> false
     | _                             -> assert false in
   let rec unfold offset expr =
-    match offset, expr with
+    match offset, expr.value_desc with
     | _           , Cst cst                      -> unfold_const offset cst
     | _           , LocalVar _
     | _           , StateVar _                   -> true
@@ -139,28 +150,22 @@ let is_unfoldable_expr fanin expr =
                                                  -> unfold q (List.nth vl (Dimension.size_const_dimension i))
     | _           , Array _                      -> false
     | _           , Access (v, i)                -> unfold (Index (dimension_of_value i) :: offset) v
-    | _           , Fun (id, vl) when fanin < 2 && Basic_library.is_internal_fun id
+    | _           , Fun (id, vl) when fanin < 2 && Basic_library.is_value_internal_fun expr
                                                  -> List.for_all (unfold offset) vl
     | _           , Fun _                        -> false
     | _                                          -> assert false
   in unfold [] expr
 
-let unfoldable_assign fanin v expr =
+let basic_unfoldable_assign fanin v expr =
   try
     let d = Hashtbl.find fanin v.var_id
     in is_unfoldable_expr d expr
   with Not_found -> false
-(*
+
 let unfoldable_assign fanin v expr =
-  try
-    let d = Hashtbl.find fanin v.var_id
-    in is_basic_expr expr ||
-    match expr with
-    | Cst c when d < 2                                           -> true
-    | Fun (id, _) when d < 2 && Basic_library.is_internal_fun id -> true
-    | _                                                          -> false
-  with Not_found -> false
-*)
+   (if !Options.mpfr then Mpfr.unfoldable_value expr else true)
+&& basic_unfoldable_assign fanin v expr
+
 let merge_elim elim1 elim2 =
   let merge k e1 e2 =
     match e1, e2 with
@@ -189,8 +194,8 @@ and instr_unfold fanin instrs elim instr =
 (*  Format.eprintf "SHOULD WE STORE THE EXPRESSION IN INSTR %a TO ELIMINATE IT@." pp_instr instr;*)
   match instr with
   (* Simple cases*)
-  | MStep([v], id, vl) when Basic_library.is_internal_fun id
-    -> instr_unfold fanin instrs elim (MLocalAssign (v, Fun (id, vl)))
+  | MStep([v], id, vl) when Basic_library.is_value_internal_fun (mk_val (Fun (id, vl)) v.var_type)
+    -> instr_unfold fanin instrs elim (MLocalAssign (v, mk_val (Fun (id, vl)) v.var_type))
   | MLocalAssign(v, expr) when unfoldable_assign fanin v expr
     -> (IMap.add v.var_id expr elim, instrs)
   | MBranch(g, hl) when false
@@ -242,26 +247,29 @@ let machine_unfold fanin elim machine =
       mconst = mconst;
       minstances = minstances;
       mcalls = mcalls;
-  }
+  },
+  elim_vars
 
 let instr_of_const top_const =
   let const = const_of_top top_const in
   let vdecl = mkvar_decl Location.dummy_loc (const.const_id, mktyp Location.dummy_loc Tydec_any, mkclock Location.dummy_loc Ckdec_any, true, None) in
   let vdecl = { vdecl with var_type = const.const_type }
-  in MLocalAssign (vdecl, Cst const.const_value)
+  in MLocalAssign (vdecl, mk_val (Cst const.const_value) vdecl.var_type)
 
 let machines_unfold consts node_schs machines =
-  List.map
-    (fun m ->
-      let fanin = (IMap.find m.mname.node_id node_schs).Scheduling.fanin_table in
-      let elim_consts, _ = instrs_unfold fanin IMap.empty (List.map instr_of_const consts)
-      in machine_unfold fanin elim_consts m)
+  List.fold_right (fun m (machines, removed) ->
+    let fanin = (IMap.find m.mname.node_id node_schs).Scheduling.fanin_table in
+    let elim_consts, _ = instrs_unfold fanin IMap.empty (List.map instr_of_const consts) in
+    let (m, removed_m) =  machine_unfold fanin elim_consts m in
+    (m::machines, IMap.add m.mname.node_id removed_m removed)
+    )
     machines
+    ([], IMap.empty)
 
 let get_assign_lhs instr =
   match instr with
-  | MLocalAssign(v, _) -> LocalVar v
-  | MStateAssign(v, _) -> StateVar v
+  | MLocalAssign(v, e) -> mk_val (LocalVar v) e.value_type
+  | MStateAssign(v, e) -> mk_val (StateVar v) e.value_type
   | _                  -> assert false
 
 let get_assign_rhs instr =
@@ -277,7 +285,7 @@ let is_assign instr =
   | _              -> false
 
 let mk_assign v e =
- match v with
+ match v.value_desc with
  | LocalVar v -> MLocalAssign(v, e)
  | StateVar v -> MStateAssign(v, e)
  | _          -> assert false
@@ -315,18 +323,19 @@ let subst_instr subst instrs instr =
   let e = get_assign_rhs instr in
   try
     let instr' = List.find (fun instr' -> is_assign instr' && get_assign_rhs instr' = e) instrs in
-    match v with
+    match v.value_desc with
     | LocalVar v ->
       IMap.add v.var_id (get_assign_lhs instr') subst, instrs
-    | StateVar v ->
-      (match get_assign_lhs instr' with
+    | StateVar stv ->
+       let lhs = get_assign_lhs instr' in
+      (match lhs.value_desc with
       | LocalVar v' ->
-	let instr = eliminate subst (mk_assign (StateVar v) (LocalVar v')) in
+        let instr = eliminate subst (mk_assign v lhs) in
 	subst, instr :: instrs
-      | StateVar v' ->
-	let subst_v' = IMap.add v'.var_id (StateVar v) IMap.empty in
+      | StateVar stv' ->
+	let subst_v' = IMap.add stv'.var_id v IMap.empty in
 	let instrs' = snd (List.fold_right (fun instr (ok, instrs) -> (ok || instr = instr', if ok then instr :: instrs else if instr = instr' then instrs else eliminate subst_v' instr :: instrs)) instrs (false, [])) in
-	IMap.add v'.var_id (StateVar v) subst, instr :: instrs'
+	IMap.add stv'.var_id v subst, instr :: instrs'
       | _           -> assert false)
     | _          -> assert false
   with Not_found -> subst, instr :: instrs
@@ -341,8 +350,8 @@ let subst_instr subst instrs instr =
 let rec instr_cse (subst, instrs) instr =
   match instr with
   (* Simple cases*)
-  | MStep([v], id, vl) when Basic_library.is_internal_fun id
-      -> instr_cse (subst, instrs) (MLocalAssign (v, Fun (id, vl)))
+  | MStep([v], id, vl) when Basic_library.is_internal_fun id (List.map (fun v -> v.value_type) vl)
+      -> instr_cse (subst, instrs) (MLocalAssign (v, mk_val (Fun (id, vl)) v.var_type))
   | MLocalAssign(v, expr) when is_unfoldable_expr 2 expr
       -> (IMap.add v.var_id expr subst, instr :: instrs)
   | _ when is_assign instr
@@ -384,8 +393,8 @@ let machines_cse machines =
 (* checks whether an [instr] is skip and can be removed from program *)
 let rec instr_is_skip instr =
   match instr with
-  | MLocalAssign (i, LocalVar v) when i = v -> true
-  | MStateAssign (i, StateVar v) when i = v -> true
+  | MLocalAssign (i, { value_desc = (LocalVar v) ; _}) when i = v -> true
+  | MStateAssign (i, { value_desc = StateVar v; _}) when i = v -> true
   | MBranch (g, hl) -> List.for_all (fun (_, il) -> instrs_are_skip il) hl
   | _               -> false
 and instrs_are_skip instrs =
@@ -396,8 +405,8 @@ let instr_cons instr cont =
 
 let rec instr_remove_skip instr cont =
   match instr with
-  | MLocalAssign (i, LocalVar v) when i = v -> cont
-  | MStateAssign (i, StateVar v) when i = v -> cont
+  | MLocalAssign (i, { value_desc = LocalVar v; _ }) when i = v -> cont
+  | MStateAssign (i, { value_desc = StateVar v; _ }) when i = v -> cont
   | MBranch (g, hl) -> MBranch (g, List.map (fun (h, il) -> (h, instrs_remove_skip il [])) hl) :: cont
   | _               -> instr::cont
 
@@ -405,20 +414,22 @@ and instrs_remove_skip instrs cont =
   List.fold_right instr_remove_skip instrs cont
 
 let rec value_replace_var fvar value =
-  match value with
+  match value.value_desc with
   | Cst c -> value
-  | LocalVar v -> LocalVar (fvar v)
+  | LocalVar v -> { value with value_desc = LocalVar (fvar v) }
   | StateVar v -> value
-  | Fun (id, args) -> Fun (id, List.map (value_replace_var fvar) args) 
-  | Array vl -> Array (List.map (value_replace_var fvar) vl)
-  | Access (t, i) -> Access(value_replace_var fvar t, i)
-  | Power (v, n) -> Power(value_replace_var fvar v, n)
+  | Fun (id, args) -> { value with value_desc = Fun (id, List.map (value_replace_var fvar) args) }
+  | Array vl -> { value with value_desc = Array (List.map (value_replace_var fvar) vl)}
+  | Access (t, i) -> { value with value_desc = Access(value_replace_var fvar t, i)}
+  | Power (v, n) -> { value with value_desc = Power(value_replace_var fvar v, n)}
 
 let rec instr_replace_var fvar instr cont =
   match instr with
+  | MComment _          -> instr_cons instr cont
   | MLocalAssign (i, v) -> instr_cons (MLocalAssign (fvar i, value_replace_var fvar v)) cont
   | MStateAssign (i, v) -> instr_cons (MStateAssign (i, value_replace_var fvar v)) cont
   | MReset i            -> instr_cons instr cont
+  | MNoReset i          -> instr_cons instr cont
   | MStep (il, i, vl)   -> instr_cons (MStep (List.map fvar il, i, List.map (value_replace_var fvar) vl)) cont
   | MBranch (g, hl)     -> instr_cons (MBranch (value_replace_var fvar g, List.map (fun (h, il) -> (h, instrs_replace_var fvar il [])) hl)) cont
 
@@ -457,10 +468,10 @@ let machine_reuse_variables m reuse =
     with Not_found -> v in
   machine_replace_variables fvar m
 
-let machines_reuse_variables prog node_schs =
+let machines_reuse_variables prog reuse_tables =
   List.map 
     (fun m -> 
-      machine_reuse_variables m (Utils.IMap.find m.mname.node_id node_schs).Scheduling.reuse_table
+      machine_reuse_variables m (Utils.IMap.find m.mname.node_id reuse_tables)
     ) prog
 
 let rec instr_assign res instr =
@@ -476,8 +487,8 @@ and instrs_assign res instrs =
 
 let rec instr_constant_assign var instr =
   match instr with
-  | MLocalAssign (i, Cst (Const_tag _))
-  | MStateAssign (i, Cst (Const_tag _)) -> i = var
+  | MLocalAssign (i, { value_desc = Cst (Const_tag _); _ })
+  | MStateAssign (i, { value_desc = Cst (Const_tag _); _ }) -> i = var
   | MBranch (g, hl)                     -> List.for_all (fun (h, b) -> instrs_constant_assign var b) hl
   | _                                   -> false
 
@@ -486,8 +497,8 @@ and instrs_constant_assign var instrs =
 
 let rec instr_reduce branches instr1 cont =
   match instr1 with
-  | MLocalAssign (_, Cst (Const_tag c)) -> instr1 :: (List.assoc c branches @ cont)
-  | MStateAssign (_, Cst (Const_tag c)) -> instr1 :: (List.assoc c branches @ cont)
+  | MLocalAssign (_, { value_desc = Cst (Const_tag c); _}) -> instr1 :: (List.assoc c branches @ cont)
+  | MStateAssign (_, { value_desc = Cst (Const_tag c); _}) -> instr1 :: (List.assoc c branches @ cont)
   | MBranch (g, hl)                     -> MBranch (g, List.map (fun (h, b) -> (h, instrs_reduce branches b [])) hl) :: cont
   | _                                   -> instr1 :: cont
 
@@ -502,9 +513,9 @@ let rec instrs_fusion instrs =
   | []
   | [_]                                                               ->
     instrs
-  | i1::(MBranch (LocalVar v, hl))::q when instr_constant_assign v i1 ->
+  | i1::(MBranch ({ value_desc = LocalVar v; _}, hl))::q when instr_constant_assign v i1 ->
     instr_reduce (List.map (fun (h, b) -> h, instrs_fusion b) hl) i1 (instrs_fusion q)
-  | i1::(MBranch (StateVar v, hl))::q when instr_constant_assign v i1 ->
+  | i1::(MBranch ({ value_desc = StateVar v; _}, hl))::q when instr_constant_assign v i1 ->
     instr_reduce (List.map (fun (h, b) -> h, instrs_fusion b) hl) i1 (instrs_fusion q) 
   | i1::i2::q                                                         ->
     i1 :: instrs_fusion (i2::q)

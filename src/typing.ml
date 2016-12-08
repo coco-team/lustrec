@@ -103,7 +103,7 @@ let rec type_coretype type_dim cty =
   | Tydec_any -> new_var ()
   | Tydec_int -> Type_predef.type_int
   | Tydec_real -> Type_predef.type_real
-  | Tydec_float -> Type_predef.type_real
+  (* | Tydec_float -> Type_predef.type_real *)
   | Tydec_bool -> Type_predef.type_bool
   | Tydec_clock ty -> Type_predef.type_clock (type_coretype type_dim ty)
   | Tydec_const c -> Type_predef.type_const c
@@ -261,7 +261,7 @@ and type_const loc c =
   match c with
   | Const_int _     -> Type_predef.type_int
   | Const_real _    -> Type_predef.type_real
-  | Const_float _   -> Type_predef.type_real
+  (* | Const_float _   -> Type_predef.type_real *)
   | Const_array ca  -> let d = Dimension.mkdim_int loc (List.length ca) in
 		      let ty = new_var () in
 		      List.iter (fun e -> try_unify ty (type_const loc e) loc) ca;
@@ -344,7 +344,7 @@ and type_subtyping_arg env in_main ?(sub=true) const real_arg formal_type =
 *)
 and type_appl env in_main loc const f args =
   let targs = List.map (type_expr env in_main const) args in
-  if Basic_library.is_internal_fun f && List.exists is_tuple_type targs
+  if Basic_library.is_homomorphic_fun f && List.exists is_tuple_type targs
   then
     try
       let targs = Utils.transpose_list (List.map type_list_of_type targs) in
@@ -542,7 +542,7 @@ let type_eq env in_main undefined_vars eq =
    in environment [env] *)
 let type_coreclock env ck id loc =
   match ck.ck_dec_desc with
-  | Ckdec_any | Ckdec_pclock (_,_) -> ()
+  | Ckdec_any -> ()
   | Ckdec_bool cl ->
       let dummy_id_expr = expr_of_ident id loc in
       let when_expr =
@@ -575,14 +575,13 @@ let type_var_decl vd_env env vdecl =
   let type_dim d =
     begin
       type_subtyping_arg (env, vd_env) false true (expr_of_dimension d) Type_predef.type_int;
-
       Dimension.eval Basic_library.eval_env eval_const d;
     end in
   let ty = type_coretype type_dim vdecl.var_dec_type.ty_dec_desc in
 
   let ty_static =
     if vdecl.var_dec_const
-    then  Type_predef.type_static (Dimension.mkdim_var ()) ty
+    then Type_predef.type_static (Dimension.mkdim_var ()) ty
     else ty in
   (match vdecl.var_dec_value with
   | None   -> ()

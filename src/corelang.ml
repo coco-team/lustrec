@@ -245,14 +245,14 @@ let mktop = mktop_decl Location.dummy_loc Version.include_path false
 
 let top_int_type = mktop (TypeDef {tydef_id = "int"; tydef_desc = Tydec_int})
 let top_bool_type = mktop (TypeDef {tydef_id = "bool"; tydef_desc = Tydec_bool})
-let top_float_type = mktop (TypeDef {tydef_id = "float"; tydef_desc = Tydec_float})
+(* let top_float_type = mktop (TypeDef {tydef_id = "float"; tydef_desc = Tydec_float}) *)
 let top_real_type = mktop (TypeDef {tydef_id = "real"; tydef_desc = Tydec_real})
 
 let type_table =
   Utils.create_hashtable 20 [
     Tydec_int  , top_int_type;
     Tydec_bool , top_bool_type;
-    Tydec_float, top_float_type;
+    (* Tydec_float, top_float_type; *)
     Tydec_real , top_real_type
   ]
 
@@ -270,7 +270,7 @@ let print_type_table fmt () =
 let rec is_user_type typ =
   match typ with
   | Tydec_int | Tydec_bool | Tydec_real 
-  | Tydec_float | Tydec_any | Tydec_const _ -> false
+  (* | Tydec_float *) | Tydec_any | Tydec_const _ -> false
   | Tydec_clock typ' -> is_user_type typ'
   | _ -> true
 
@@ -289,7 +289,7 @@ let rec coretype_equal ty1 ty2 =
   | _                   , Tydec_const _         -> coretype_equal ty2 ty1
   | Tydec_int           , Tydec_int
   | Tydec_real          , Tydec_real
-  | Tydec_float         , Tydec_float
+  (* | Tydec_float         , Tydec_float *)
   | Tydec_bool          , Tydec_bool            -> true
   | Tydec_clock ty1     , Tydec_clock ty2       -> coretype_equal ty1 ty2
   | Tydec_array (d1,ty1), Tydec_array (d2, ty2) -> Dimension.is_eq_dimension d1 d2 && coretype_equal ty1 ty2
@@ -461,7 +461,7 @@ let rec dimension_of_expr expr =
   match expr.expr_desc with
   | Expr_const c  -> dimension_of_const expr.expr_loc c
   | Expr_ident id -> mkdim_ident expr.expr_loc id
-  | Expr_appl (f, args, None) when Basic_library.is_internal_fun f ->
+  | Expr_appl (f, args, None) when Basic_library.is_expr_internal_fun expr ->
       let k = Types.get_static_value (Env.lookup_value Basic_library.type_env f) in
       if k = None then raise InvalidDimension;
       mkdim_appl expr.expr_loc f (List.map dimension_of_expr (expr_list_of_expr args))
@@ -501,7 +501,7 @@ let mk_new_node_name nd id =
   mk_new_name used id
 
 let get_var id var_list =
-    List.find (fun v -> v.var_id = id) var_list
+  List.find (fun v -> v.var_id = id) var_list
 
 let get_node_var id node =
   get_var id (get_node_vars node)
@@ -579,7 +579,7 @@ let get_node_interface nd =
   nodei_stateless = nd.node_dec_stateless;
   nodei_spec = nd.node_spec;
   nodei_prototype = None;
-  nodei_in_lib = None;
+  nodei_in_lib = [];
  }
 
 (************************************************************************)
@@ -624,16 +624,15 @@ let rec rename_carrier rename cck =
  let eq_replace_rhs_var pvar fvar eq =
    let pvar l = List.exists pvar l in
    let rec replace lhs rhs =
-     { rhs with expr_desc = replace_desc lhs rhs.expr_desc }
-   and replace_desc lhs rhs_desc =
+     { rhs with expr_desc =
      match lhs with
      | []  -> assert false
-     | [_] -> if pvar lhs then expr_desc_replace_var fvar rhs_desc else rhs_desc
+     | [_] -> if pvar lhs then expr_desc_replace_var fvar rhs.expr_desc else rhs.expr_desc
      | _   ->
-       (match rhs_desc with
+       (match rhs.expr_desc with
        | Expr_tuple tl ->
 	 Expr_tuple (List.map2 (fun v e -> replace [v] e) lhs tl)
-       | Expr_appl (f, arg, None) when Basic_library.is_internal_fun f ->
+       | Expr_appl (f, arg, None) when Basic_library.is_expr_internal_fun rhs ->
 	 let args = expr_list_of_expr arg in
 	 Expr_appl (f, expr_of_expr_list arg.expr_loc (List.map (replace lhs) args), None)
        | Expr_array _
@@ -643,8 +642,8 @@ let rec rename_carrier rename cck =
        | Expr_ident _
        | Expr_appl _   ->
 	 if pvar lhs
-	 then expr_desc_replace_var fvar rhs_desc
-	 else rhs_desc
+	 then expr_desc_replace_var fvar rhs.expr_desc
+	 else rhs.expr_desc
        | Expr_ite (c, t, e)   -> Expr_ite (replace lhs c, replace lhs t, replace lhs e)
        | Expr_arrow (e1, e2)  -> Expr_arrow (replace lhs e1, replace lhs e2) 
        | Expr_fby (e1, e2)    -> Expr_fby (replace lhs e1, replace lhs e2)
@@ -654,6 +653,7 @@ let rec rename_carrier rename cck =
        | Expr_merge (i, hl)   -> let i' = if pvar lhs then fvar i else i
 				 in Expr_merge (i', List.map (fun (t, h) -> (t, replace lhs h)) hl)
        )
+     }
    in { eq with eq_rhs = replace eq.eq_lhs eq.eq_rhs }
 
 
@@ -792,15 +792,15 @@ let pp_prog_clock fmt prog =
   Utils.fprintf_list ~sep:"" pp_decl_clock fmt prog
 
 let pp_error fmt = function
-  | Main_not_found ->
-      fprintf fmt "cannot compile node %s: could not find the node definition.@."
-	!Options.main_node
+    Main_not_found ->
+      fprintf fmt "Could not find the definition of main node %s.@."
+	!Global.main_node
   | Main_wrong_kind ->
     fprintf fmt
-      "name %s does not correspond to a (non-imported) node definition.@." 
-      !Options.main_node
+      "Node %s does not correspond to a valid main node definition.@." 
+      !Global.main_node 
   | No_main_specified ->
-    fprintf fmt "no main node specified.@."
+    fprintf fmt "No main node specified (use -node option)@."
   | Unbound_symbol sym ->
     fprintf fmt
       "%s is undefined.@."
@@ -844,7 +844,7 @@ let mk_internal_node id =
 	nodei_stateless = Types.get_static_value ty <> None;
 	nodei_spec = spec;
 	nodei_prototype = None;
-       	nodei_in_lib = None;
+       	nodei_in_lib = [];
        })
 
 let add_internal_funs () =
@@ -927,10 +927,8 @@ let rec substitute_expr vars_to_replace defs e =
 
      *)
 let rec get_expr_calls nodes e =
-  get_calls_expr_desc nodes e.expr_desc
-and get_calls_expr_desc nodes expr_desc =
   let get_calls = get_expr_calls nodes in
-  match expr_desc with
+  match e.expr_desc with
   | Expr_const _ 
    | Expr_ident _ -> Utils.ISet.empty
    | Expr_tuple el
@@ -944,7 +942,7 @@ and get_calls_expr_desc nodes expr_desc =
    | Expr_fby (e1, e2) -> Utils.ISet.union (get_calls e1) (get_calls e2)
    | Expr_merge (_, hl) -> List.fold_left (fun accu (_, h) -> Utils.ISet.union accu (get_calls h)) Utils.ISet.empty  hl
    | Expr_appl (i, e', i') -> 
-     if Basic_library.is_internal_fun i then 
+     if Basic_library.is_expr_internal_fun e then 
        (get_calls e') 
      else
        let calls =  Utils.ISet.add i (get_calls e') in

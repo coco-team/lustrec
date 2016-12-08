@@ -21,7 +21,7 @@ let rec tuple_split_expr expr =
   | Expr_ident _ -> [expr]
   | Expr_tuple elist -> elist
   | Expr_appl (id, args, r) ->
-    if Basic_library.is_internal_fun id
+    if Basic_library.is_homomorphic_fun id 
     then
       let args_list = List.map tuple_split_expr (expr_list_of_expr args) in
       List.map
