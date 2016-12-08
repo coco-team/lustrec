@@ -42,8 +42,7 @@ let pp_horn_tag fmt t =
 let rec pp_horn_const fmt c =
   match c with
     | Const_int i    -> pp_print_int fmt i
-    | Const_real r   -> pp_print_string fmt r
-    | Const_float r  -> pp_print_float fmt r
+    | Const_real (_,_,s)   -> pp_print_string fmt s
     | Const_tag t    -> pp_horn_tag fmt t
     | _              -> assert false
 
@@ -52,7 +51,7 @@ let rec pp_horn_const fmt c =
    but an offset suffix may be added for array variables
 *)
 let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
-  match v with
+  match v.value_desc with
     | Cst c         -> pp_horn_const fmt c
     | Array _
     | Access _ -> assert false (* no arrays *)
@@ -66,7 +65,7 @@ let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
 
 (* Prints a [value] indexed by the suffix list [loop_vars] *)
 let rec pp_value_suffix self pp_value fmt value =
- match value with
+ match value.value_desc with
  | Fun (n, vl)  ->
    Basic_library.pp_horn n (pp_value_suffix self pp_value) fmt vl
  |  _            ->
@@ -78,7 +77,7 @@ let rec pp_value_suffix self pp_value fmt value =
    - [value]: assigned value
    - [pp_var]: printer for variables
 *)
-let pp_assign m pp_var fmt var_type var_name value =
+let pp_assign m pp_var fmt var_name value =
   let self = m.mname.node_id in
   fprintf fmt "(= %a %a)" 
     (pp_horn_val ~is_lhs:true self pp_var) var_name
@@ -157,7 +156,7 @@ let pp_instance_call machines reset_instances m fmt i inputs outputs =
       | "_arrow", [i1; i2], [o], [mem_m], [mem_x] -> begin
 	fprintf fmt "@[<v 5>(and ";
 	fprintf fmt "(= %a (ite %a %a %a))"
-	  (pp_horn_val ~is_lhs:true self (pp_horn_var m)) (LocalVar o) (* output var *)
+	  (pp_horn_val ~is_lhs:true self (pp_horn_var m)) (mk_val (LocalVar o) o.var_type) (* output var *)
 	  (pp_horn_var m) mem_m 
 	  (pp_horn_val self (pp_horn_var m)) i1
 	  (pp_horn_val self (pp_horn_var m)) i2
@@ -173,7 +172,7 @@ let pp_instance_call machines reset_instances m fmt i inputs outputs =
 	  (Utils.fprintf_list ~sep:"@ " (pp_horn_val self (pp_horn_var m))) inputs
 	  (Utils.pp_final_char_if_non_empty "@ " inputs)
 	  (Utils.fprintf_list ~sep:"@ " (pp_horn_val self (pp_horn_var m)))
-	  (List.map (fun v -> LocalVar v) outputs)
+	  (List.map (fun v -> mk_val (LocalVar v) v.var_type) outputs)
 	  (Utils.pp_final_char_if_non_empty "@ " outputs)
 	  (Utils.fprintf_list ~sep:"@ " (pp_horn_var m)) (mid_mems@next_mems)
 	
@@ -187,13 +186,14 @@ let pp_instance_call machines reset_instances m fmt i inputs outputs =
       inputs
       (Utils.pp_final_char_if_non_empty "@ " inputs)
       (Utils.fprintf_list ~sep:"@ " (pp_horn_val self (pp_horn_var m)))
-      (List.map (fun v -> LocalVar v) outputs)
+      (List.map (fun v -> mk_val (LocalVar v) v.var_type) outputs)
   )
     
     
 (* Print the instruction and update the set of reset instances *)
 let rec pp_machine_instr machines reset_instances (m: machine_t) fmt instr : ident list =
   match instr with
+  | MComment _ -> reset_instances
   | MNoReset i -> (* we assign middle_mem with mem_m. And declare i as reset *)
     pp_no_reset machines m fmt i;
     i::reset_instances
@@ -203,14 +203,14 @@ let rec pp_machine_instr machines reset_instances (m: machine_t) fmt instr : ide
   | MLocalAssign (i,v) ->
     pp_assign
       m (pp_horn_var m) fmt
-      i.var_type (LocalVar i) v;
+      (mk_val (LocalVar i) i.var_type) v;
     reset_instances
   | MStateAssign (i,v) ->
     pp_assign
       m (pp_horn_var m) fmt
-      i.var_type (StateVar i) v;
+      (mk_val (StateVar i) i.var_type) v;
     reset_instances
-  | MStep ([i0], i, vl) when Basic_library.is_internal_fun i  ->
+  | MStep ([i0], i, vl) when Basic_library.is_internal_fun i (List.map (fun v -> v.value_type) vl) ->
     assert false (* This should not happen anymore *)
   | MStep (il, i, vl) ->
     (* if reset instance, just print the call over mem_m , otherwise declare mem_m =
