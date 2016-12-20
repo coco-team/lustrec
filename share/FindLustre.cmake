@@ -17,7 +17,7 @@
 #                  LUS_FILES <Lustre files>
 #                  [USER_C_FILES <C files>]
 #                  [VERBOSE <level>]
-#		   [LUSI]
+#                  [LUSI]
 #                  LIBNAME <libraryName>)
 #
 # When used the Lustre_Compile macro define the variable
@@ -80,7 +80,7 @@ function(Lustre_Compile)
 
   if(LUS_LUSI)
     set(LUSTRE_LUSI_OPT "-lusi")
-  endif()    
+  endif()
 
   if (NOT LUS_LIBNAME)
     message(FATAL_ERROR "You should specify LIBNAME for each Lustre_Compile call.")
@@ -118,9 +118,7 @@ function(Lustre_Compile)
     if (LUS_LUSI)
       add_custom_command(
          OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${LFILE}i
-         #OUTPUT ${LUSTRE_OUTPUT_DIR}/${L}.lusi
-      	 COMMAND ${LUSTRE_COMPILER} ${LUSTRE_LUSI_OPT} ${LFILE}
-	 #COMMAND ${CMAKE_COMMAND} -E rename ${L}.lusi ${LUSTRE_OUTPUT_DIR}/${L}.lusi
+         COMMAND ${LUSTRE_COMPILER} ${LUSTRE_LUSI_OPT} ${LFILE}
          DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${LFILE}
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
          COMMENT "Compile Lustre source(s): ${LFILE} with option -lusi."
