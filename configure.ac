@@ -1,10 +1,10 @@
 define([gitversion], esyscmd([sh -c "git log --oneline | wc -l | tr -d '\n'"]))
 
+AC_INIT([lustrec], [1.4-gitversion], [ploc@garoche.net])
+AC_SUBST(VERSION_CODENAME, "Xia/Xiang-dev")
 # Next release will be
-#AC_INIT([lustrec], [1.4-gitversion], [ploc@garoche.net])
-#AC_SUBST(VERSION_CODENAME, "Xia/Xiang-dev")
-AC_INIT([lustrec], [1.3], [ploc@garoche.net])
-AC_SUBST(VERSION_CODENAME, "Xia/Zhong-Kang")
+#AC_INIT([lustrec], [1.5], [ploc@garoche.net])
+#AC_SUBST(VERSION_CODENAME, "Xia/Shao Kang")
 
 AC_CONFIG_SRCDIR([src/main_lustre_compiler.ml])
 
