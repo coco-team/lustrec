@@ -1,0 +1,58 @@
+This file tries to describe the current Lustre release process.
+Current version is written for a Lustre administrator
+and may certainly be only readable for them.
+
+Lustre releases should be done with the following steps:
+    
+1) Edit lustrec/configure.ac
+   and bump the version to the right number with
+ 
+   AC_INIT([lustrec], [1.3], [ploc@garoche.net])
+   AC_SUBST(VERSION_CODENAME, "Xia/Zhong-Kang")
+
+
+3) commit the modified files
+   lustrec/configure.ac
+   with a meaningful comment saying you are preparing a Lustre version
+
+4) Do a fresh checkout somewhere
+    Build lustre from your pristine source tree
+    git clone https://cavale.enseeiht.fr/git/lustrec lustrec-1.3
+
+    cd lustre-1.3
+    autoconf
+    ./configure
+    make
+
+5) (optional) do any testing you usually do.
+
+6) Tag lustre tree with appropriate version (inside source tree)
+
+     git tag lustrec-1.3-Xia-Zhong-Kang
+     git push --tags 
+
+7) Make lustre packages
+
+    git archive --format tgz -o $HOME/lustrec-1.3-Xia-Zhong-Kang-src.tgz --prefix lustrec/ master
+    cd $HOME
+    tar xvf lustrec-1.3-Xia-Zhong-Kang-src.tgz
+   cd lustrec
+   autoconf
+   cd ..
+   tar zcvf lustrec-1.3-Xia-Zhong-Kang-src.tgz lustrec
+
+8) (optional) Tests your packages or ask for help to test them
+    
+9) put your package in
+    https://cavale.enseeiht.fr/redmine/projects/lustrec/files
+
+10) Advertise your freshly release package on every social network you belong to.
+
+You are right this process IS painful and should be automated (a lot...)
+be sure we are working on it :))
+
+12) Re-edit lustre/configure.ac 
+  and bump the version to the the next number with svn
+
+  #AC_INIT([lustrec], [1.4-gitversion], [ploc@garoche.net])
+  #AC_SUBST(VERSION_CODENAME, "Xia/Xiang-dev")
