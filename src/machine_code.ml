@@ -161,13 +161,22 @@ let arrow_desc =
     node_spec = None;
     node_annot = [];  }
 
-let arrow_top_decl =
+(*let arrow_top_decl =
   {
     top_decl_desc = Node arrow_desc;
     top_decl_owner = Version.include_path;
     top_decl_itf = false;
     top_decl_loc = Location.dummy_loc
+  }*)
+
+let arrow_top_decl =
+  {
+    top_decl_desc = Node arrow_desc;
+    top_decl_owner = !Options.include_dir;
+    top_decl_itf = false;
+    top_decl_loc = Location.dummy_loc
   }
+
 
 let mk_val v t = { value_desc = v; 
 		   value_type = t; 

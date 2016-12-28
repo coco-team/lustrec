@@ -1,6 +1,6 @@
 OCAMLBUILD=/opt/local/bin/ocamlbuild -classic-display -use-ocamlfind -no-links 
 
-prefix=/Users/Teme/Documents/GitHub/lustrec/cocosim
+prefix=/usr/local
 exec_prefix=${prefix}
 bindir=${exec_prefix}/bin
 datarootdir = ${prefix}/share

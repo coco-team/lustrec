@@ -167,7 +167,8 @@ let print_main_code fmt basename m =
   fprintf fmt "@]@ }@."       
 
 let print_main_header fmt =
-  fprintf fmt "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/io_frontend.h\"@." Version.include_path 
+(*fprintf fmt "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/io_frontend.h\"@." Version.include_path*)
+fprintf fmt "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/io_frontend.h\"@." !Options.include_dir
 
 
 let print_main_c main_fmt main_machine basename prog machines _ (*dependencies*) =

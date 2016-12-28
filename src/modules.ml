@@ -113,9 +113,13 @@ let add_const itf name value =
     | _       -> assert false
   with Not_found -> Hashtbl.add consts_table name value
 
-let name_dependency (local, dep) =
-  ((if local then !Options.dest_dir else Version.include_path) ^ "/") ^ dep
+(*let name_dependency (local, dep) =
+      ((if local then !Options.dest_dir else Version.include_path) ^ "/") ^ dep
+      *)
 
+let name_dependency (local, dep) =
+  ((if local then !Options.dest_dir else !Options.include_dir) ^ "/") ^ dep
+  
 let import_dependency_aux loc (local, dep) =
   let basename = name_dependency (local, dep) in
   let extension = ".lusic" in 
