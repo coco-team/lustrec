@@ -48,6 +48,15 @@ if !Options.main_node <> "" then
     )
 end
 
+
+let load_file f =
+  let ic = open_in f in
+  let n = in_channel_length ic in
+  let s = String.create n in
+  really_input ic s 0 n;
+  close_in ic;
+  (s)
+
 let print_type_definitions fmt =
   let cpt_type = ref 0 in
   Hashtbl.iter (fun typ decl ->
@@ -68,8 +77,25 @@ let print_type_definitions fmt =
     | _        -> ()) type_table
 
 
-let translate fmt basename prog machines =
+
+
+let print_dep fmt prog =
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>.. extracting Horn libraries@,");
+  fprintf fmt "; Statically linked libraries@";
+  let dependencies = Corelang.get_dependencies prog in
+  List.iter
+    (fun dep ->
+      let (local, s) = Corelang.dependency_of_top dep in
+      let basename = ((if local then !Options.dest_dir else !Options.include_dir)) ^ s ^ ".smt2" in
+      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@[<v 0> Horn Library %s@," basename);
+      let horn = load_file basename in
+      fprintf fmt "@.%s@." horn;
+    )
+    dependencies
+
+let translate fmt basename prog machines=
   (* We print typedef *)
+  print_dep fmt prog;
   print_type_definitions fmt;
   List.iter (print_machine machines fmt) (List.rev machines);
   main_print machines fmt

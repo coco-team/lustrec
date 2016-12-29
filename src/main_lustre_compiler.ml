@@ -15,7 +15,7 @@ open Log
 open Utils
 open LustreSpec
 open Compiler_common
- 
+
 exception StopPhase1 of program
 
 let usage = "Usage: lustrec [options] \x1b[4msource file\x1b[0m"
@@ -88,14 +88,14 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
   end
 
 
-let functional_backend () = 
+let functional_backend () =
   match !Options.output with
   | "horn" | "lustre" | "acsl" -> true
   | _ -> false
 
 (* From prog to prog *)
 let stage1 prog dirname basename =
-  (* Removing automata *) 
+  (* Removing automata *)
   let prog = expand_automata prog in
 
   Log.report ~level:4 (fun fmt -> fprintf fmt ".. after automata expansion:@.@[<v 2>@ %a@]@," Printers.pp_prog prog);
@@ -137,12 +137,12 @@ let stage1 prog dirname basename =
        exported as a lusi *)
     raise (StopPhase1 prog);
 
- (* Optimization of prog: 
-     - Unfold consts 
+ (* Optimization of prog:
+     - Unfold consts
      - eliminate trivial expressions
  *)
   (*
-  let prog = 
+  let prog =
     if !Options.const_unfold || !Options.optimization >= 5 then
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. eliminating constants and aliases@,");
@@ -193,7 +193,7 @@ let stage1 prog dirname basename =
 	!Options.main_node
 	orig prog type_env clock_env
     end;
-  
+
   (* Computes and stores generic calls for each node,
      only useful for ANSI C90 compliant generic node compilation *)
   if !Options.ansi then Causality.NodeDep.compute_generic_calls prog;
@@ -233,7 +233,7 @@ let stage1 prog dirname basename =
   prog, dependencies
 
 (* from source to machine code, with optimization *)
-let stage2 prog =    
+let stage2 prog =
   (* Computation of node equation scheduling. It also breaks dependency cycles
      and warns about unused input or memory variables *)
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. scheduling@,");
@@ -245,7 +245,7 @@ let stage2 prog =
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
 
 
-  (* TODO Salsa optimize prog: 
+  (* TODO Salsa optimize prog:
      - emits warning for programs with pre inside expressions
      - make sure each node arguments and memory is bounded by a local annotation
      - introduce fresh local variables for each real pure subexpression
@@ -269,7 +269,7 @@ let stage2 prog =
       machine_code
   in
   (* Optimize machine code *)
-  let machine_code, removed_table = 
+  let machine_code, removed_table =
     if !Options.optimization >= 2 && !Options.output <> "horn" then
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization: constants inlining@,");
@@ -277,9 +277,9 @@ let stage2 prog =
       end
     else
       machine_code, IMap.empty
-  in  
+  in
   (* Optimize machine code *)
-  let machine_code = 
+  let machine_code =
     if !Options.optimization >= 3 && !Options.output <> "horn" then
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization: minimize stack usage by reusing variables@,");
@@ -290,10 +290,10 @@ let stage2 prog =
     else
       machine_code
   in
-  
+
   (* Salsa optimize machine code *)
   (*
-  let machine_code = 
+  let machine_code =
     if !Options.salsa_enabled then
       begin
 	check_main ();
@@ -305,11 +305,11 @@ let stage2 prog =
 	    | Const c when Types.is_real_type c.const_type  ->
 	      (c.const_id, c.const_value) :: accu
 	    | _ -> accu
-	) [] (Corelang.get_consts prog) 
+	) [] (Corelang.get_consts prog)
 	in
-	List.map 
-	  (Machine_salsa_opt.machine_t2machine_t_optimized_by_salsa constEnv) 
-	  machine_code 
+	List.map
+	  (Machine_salsa_opt.machine_t2machine_t_optimized_by_salsa constEnv)
+	  machine_code
       end
     else
       machine_code
@@ -325,7 +325,7 @@ let stage2 prog =
 let stage3 prog machine_code dependencies basename =
   let basename    =  Filename.basename basename in
   match !Options.output with
-    "C" -> 
+    "C" ->
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,");
 	C_backend.translate_to_c
@@ -387,8 +387,8 @@ let rec compile_source dirname basename extension =
     else
       prog
   in
-  let prog, dependencies = 
-    try 
+  let prog, dependencies =
+    try
       stage1 prog dirname basename
     with StopPhase1 prog -> (
       if !Options.lusi then
@@ -404,8 +404,8 @@ let rec compile_source dirname basename extension =
     )
   in
 
-  let machine_code = 
-    stage2 prog 
+  let machine_code =
+    stage2 prog
   in
   if Scopes.Plugin.show_scopes () then
     begin
@@ -415,16 +415,16 @@ let rec compile_source dirname basename extension =
 	Format.printf "Possible scopes are:@   ";
       Format.printf "@[<v>%a@ @]@.@?" Scopes.print_scopes all_scopes;
       exit 0
-	
+
     end;
 
-  let machine_code = 
+  let machine_code =
     if Scopes.Plugin.is_active () then
       Scopes.Plugin.process_scopes !Options.main_node prog machine_code
     else
       machine_code
   in
-  
+
   stage3 prog machine_code dependencies basename;
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. done @ @]@.");
     (* We stop the process here *)
@@ -457,14 +457,14 @@ let _ =
   try
     Printexc.record_backtrace true;
 
-    let options = Options.options @ 
+    let options = Options.options @
       List.flatten (
 	List.map Options.plugin_opt [
 	  Scopes.Plugin.name, Scopes.Plugin.activate, Scopes.Plugin.options
 	]
       )
     in
-    
+
     Arg.parse options anonymous usage
   with
   | Parse.Error _

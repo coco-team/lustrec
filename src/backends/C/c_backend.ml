@@ -29,7 +29,7 @@ let gen_files funs basename prog machines dependencies =
   let destname = !Options.dest_dir ^ "/" ^ basename in
   let source_main_file = destname ^ "_main.c" in (* Could be changed *)
   let makefile_file = destname ^ ".makefile" in (* Could be changed *)
-  
+
   let print_header, print_lib_c, print_main_c, print_makefile = funs in
 
   (* Generating H file *)
@@ -38,7 +38,7 @@ let gen_files funs basename prog machines dependencies =
   let header_fmt = formatter_of_out_channel header_out in
   print_header header_fmt basename prog machines dependencies;
   close_out header_out;
-  
+
   (* Generating Lib C file *)
   let source_lib_file = destname ^ ".c" in (* Could be changed *)
   let source_lib_out = open_out source_lib_file in
@@ -63,7 +63,7 @@ let gen_files funs basename prog machines dependencies =
 
       (* Generating Main C file *)
       print_main_c source_main_fmt m basename prog machines dependencies;
-      
+
       (* Generating Makefile *)
       print_makefile basename main_node dependencies makefile_fmt;
 
@@ -86,13 +86,13 @@ let translate_to_c basename prog machines dependencies =
     let module SourceMain = C_backend_main.Main (SourceMainMod) in
     let module Makefile = C_backend_makefile.Main (MakefileMod) in
 
-    let funs = 
-      Header.print_alloc_header, 
-      Source.print_lib_c, 
-      SourceMain.print_main_c, 
-      Makefile.print_makefile 
+    let funs =
+      Header.print_alloc_header,
+      Source.print_lib_c,
+      SourceMain.print_main_c,
+      Makefile.print_makefile
     in
-    gen_files funs basename prog machines dependencies 
+    gen_files funs basename prog machines dependencies
 
   end
   | "acsl" -> begin
@@ -107,13 +107,13 @@ let translate_to_c basename prog machines dependencies =
     let module SourceMain = C_backend_main.Main (SourceMainMod) in
     let module Makefile = C_backend_makefile.Main (MakefileMod) in
 
-    let funs = 
-      Header.print_alloc_header, 
+    let funs =
+      Header.print_alloc_header,
       Source.print_lib_c,
       SourceMain.print_main_c,
-      Makefile.print_makefile 
+      Makefile.print_makefile
     in
-    gen_files funs basename prog machines dependencies 
+    gen_files funs basename prog machines dependencies
 
   end
   | "c" -> begin

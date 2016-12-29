@@ -10,7 +10,7 @@
 (********************************************************************)
 
 open Utils
-open Format 
+open Format
 open LustreSpec
 open Corelang
 
@@ -50,7 +50,7 @@ let parse_header own filename =
       close_in h_in;
       header
     with
-    | (Parse.Error err) as exc -> 
+    | (Parse.Error err) as exc ->
       Parse.report_error err;
       raise exc
     | Corelang.Error (loc, err) as exc -> (
@@ -68,7 +68,7 @@ let parse_source source_name =
   Location.init lexbuf source_name;
 
   (* Parsing *)
-  Log.report ~level:1 
+  Log.report ~level:1
     (fun fmt -> fprintf fmt ".. parsing source file %s@," source_name);
   try
     let prog = Parse.prog Parser_lustre.prog Lexer_lustre.token lexbuf in
@@ -76,7 +76,7 @@ let parse_source source_name =
     close_in s_in;
     prog
   with
-  | (Parse.Error err) as exc -> 
+  | (Parse.Error err) as exc ->
     Parse.report_error err;
     raise exc
   | Corelang.Error (loc, err) as exc ->
@@ -115,9 +115,9 @@ let force_stateful_decls decls =
       Location.pp_loc loc;
     raise exc
 
-let type_decls env decls =  
+let type_decls env decls =
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. typing@ ");
-  let new_env = 
+  let new_env =
     begin
       try
 	Typing.type_prog env decls
@@ -126,13 +126,13 @@ let type_decls env decls =
 	  Types.pp_error err
 	  Location.pp_loc loc;
 	raise exc
-    end 
+    end
   in
   if !Options.print_types then
     Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>  %a@]@ " Corelang.pp_prog_type decls);
   new_env
-      
-let clock_decls env decls = 
+
+let clock_decls env decls =
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. clock calculus@ ");
   let new_env =
     begin
@@ -221,7 +221,7 @@ let check_compatibility (prog, computed_types_env, computed_clocks_env) (header,
 let is_stateful topdecl =
   match topdecl.top_decl_desc with
   | Node nd -> (match nd.node_stateless with Some b -> not b | None -> not nd.node_dec_stateless)
-  | ImportedNode nd -> not nd.nodei_stateless 
+  | ImportedNode nd -> not nd.nodei_stateless
   | _ -> false
 
 
@@ -248,4 +248,3 @@ let import_dependencies prog =
     Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
     deps
   end
-
