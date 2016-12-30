@@ -93,11 +93,33 @@ let print_dep fmt prog =
     )
     dependencies
 
+let check_sfunction mannot =
+ (*Check if its an sfunction*)
+  match mannot with
+    [] -> false
+  | [x] -> match x.annots with
+             [] -> false
+            |[(key,va)] -> match key with
+                             [] -> false
+                           | ["c_code"] -> true
+                           | ["matlab"] -> true
+                           | _ -> false
+  | _  -> false
+
 let translate fmt basename prog machines=
   (* We print typedef *)
-  print_dep fmt prog;
+  print_dep fmt prog; (*print static library e.g. math*)
   print_type_definitions fmt;
-  List.iter (print_machine machines fmt) (List.rev machines);
+  (*List.iter (print_machine machines fmt) (List.rev machines);*)
+  List.iter(fun m ->
+      let is_sfunction = check_sfunction m.mannot in
+      if is_sfunction then(
+        Log.report ~level:1 (fun fmt -> fprintf fmt ".. detected sfunction: %s@," m.mname.node_id);
+        print_sfunction machines fmt m
+      ) else (
+         print_machine machines fmt m)
+         )
+           (List.rev machines);
   main_print machines fmt
 
 (* Local Variables: *)

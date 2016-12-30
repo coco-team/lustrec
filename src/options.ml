@@ -15,7 +15,7 @@ let include_dir = ref "."
 let include_path =
 if (!include_dir != ".") then Version.prefix ^ !include_dir
 else Version.include_path
-    
+
 
 
 
@@ -52,6 +52,8 @@ let horn_query = ref true
 
 let salsa_enabled = ref true
 
+let sfunction = ref ""
+
 let set_mpfr prec =
   if prec > 0 then (
     mpfr := true;
@@ -60,7 +62,7 @@ let set_mpfr prec =
   )
   else
     failwith "mpfr requires a positive integer"
-			
+
 let options =
 [ "-d", Arg.Set_string dest_dir,
 "uses the specified directory \x1b[4mdir\x1b[0m as root for generated/imported object and C files <default: .>";
@@ -87,13 +89,14 @@ let options =
     "-print_clocks", Arg.Set print_clocks, "prints node clocks";
     "-O", Arg.Set_int optimization, "changes optimization \x1b[4mlevel\x1b[0m <default: 2>";
     "-verbose", Arg.Set_int verbose_level, "changes verbose \x1b[4mlevel\x1b[0m <default: 1>";
+    "-horn-sfunction", Arg.Set_string sfunction, "Get the endpoint predicate of the sfunction";
     "-version", Arg.Unit print_version, " displays the version";]
 
 
 let plugin_opt (name, activate, options) =
   ( "-" ^ name , Arg.Unit activate, "activate plugin " ^ name ) ::
     (List.map (fun (opt, act, desc) -> "-" ^ name ^ opt, act, desc) options)
- 
+
 
 let get_witness_dir filename =
   (* Make sure the directory exists *)

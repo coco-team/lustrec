@@ -66,6 +66,8 @@ let keyword_table =
   "assumes", ASSUMES;
   "exists", EXISTS;
   "forall", FORALL;
+  "c_code", CCODE;
+  "matlab", MATLAB;
   ]
 
 }
