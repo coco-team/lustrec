@@ -459,7 +459,7 @@ let _ =
     Printexc.record_backtrace true;
     Printf.eprintf "\nParsing\n";
     Arg.parse Options.options anonymous usage;
-    Printf.eprintf "\nDest=%s\n" !Options.dest_file
+    Printf.eprintf "\nDest=%s\n" !Options.dest_file;
 
 
     let options = Options.options @

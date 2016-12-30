@@ -49,37 +49,41 @@ let rec pp_horn_const fmt c =
 let rec get_type_cst c =
   match c with
   | Const_int(n) -> new_ty Tint
-  | Const_real(x) -> new_ty Treal
-  | Const_float(f) -> new_ty Treal
+  | Const_real _ -> new_ty Treal
+  (* | Const_float _ -> new_ty Treal *)
   | Const_array(l) -> new_ty (Tarray(Dimension.mkdim_int (Location.dummy_loc) (List.length l), get_type_cst (List.hd l)))
   | Const_tag(tag) -> new_ty Tbool
   | Const_string(str) ->  assert false(* used only for annotations *)
   | Const_struct(l) -> new_ty (Tstruct(List.map (fun (label, t) -> (label, get_type_cst t)) l))
 
-let rec get_type v = 
+let rec get_type v =
   match v with
-  | Cst c -> get_type_cst c             
+  | Cst c -> get_type_cst c
   | Access(tab, index) -> begin
-                           let rec remove_link ltype = match (dynamic_type ltype).tdesc with 
-                             | Tlink t -> t
-                             | _ -> ltype
-                           in
-                            match (dynamic_type (remove_link (get_type tab))).tdesc with
-                            | Tarray(size, t) -> remove_link t
-                            | Tvar -> Format.eprintf "Type of access is a variable... "; assert false
-                            | Tunivar -> Format.eprintf "Type of access is a variable... "; assert false
-                            | _ -> Format.eprintf "Type of access is not an array "; assert false
+      let rec remove_link ltype =
+        match (dynamic_type ltype).tdesc with
+        | Tlink t -> t
+        | _ -> ltype
+      in
+      match (dynamic_type (remove_link (get_type tab))).tdesc with
+      | Tarray(size, t) -> remove_link t
+      | Tvar -> Format.eprintf "Type of access is a variable... "; assert false
+      | Tunivar -> Format.eprintf "Type of access is a variable... "; assert false
+      | _ -> Format.eprintf "Type of access is not an array "; assert false
                           end
   | Power(v, n) -> assert false
   | LocalVar v -> v.var_type
   | StateVar v -> v.var_type
   | Fun(n, vl) -> begin match n with
-                  | "+" 
-                  | "-" 
+                  | "+"
+                  | "-"
                   | "*" -> get_type (List.hd vl)
                   | _ -> Format.eprintf "Function undealt with : %s" n ;assert false
                   end
-  | Array(l) -> new_ty (Tarray(Dimension.mkdim_int (Location.dummy_loc) (List.length l), get_type (List.hd l)))
+  | Array(l) -> new_ty (Tarray(Dimension.mkdim_int
+                                 (Location.dummy_loc)
+                                 (List.length l),
+                               get_type (List.hd l)))
   | _ -> assert false
 
 
@@ -116,7 +120,7 @@ let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
                               let rec print tab x =
                                 match tab with
                                 | [] -> default_val fmt (get_type v)(*fprintf fmt "YAY"*)
-                                | h::t -> fprintf fmt "(store "; print t (x+1); fprintf fmt " %i " x; pp_horn_val ~is_lhs:is_lhs self pp_var fmt h; fprintf fmt ")" 
+                                | h::t -> fprintf fmt "(store "; print t (x+1); fprintf fmt " %i " x; pp_horn_val ~is_lhs:is_lhs self pp_var fmt h; fprintf fmt ")"
                               in
                               print initlist 0
     | Access(tab,index)      -> fprintf fmt "(select "; pp_horn_val ~is_lhs:is_lhs self pp_var fmt tab; fprintf fmt " "; pp_horn_val ~is_lhs:is_lhs self pp_var fmt index; fprintf fmt ")"
@@ -458,7 +462,7 @@ let print_machine machines fmt m =
 
 
 let mk_flags arity =
- let b_range =
+  let b_range =
    let rec range i j =
      if i > arity then [] else i :: (range (i+1) j) in
    range 2 arity;
