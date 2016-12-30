@@ -26,7 +26,6 @@ let type_arrow ty1 ty2 = new_ty (Tarrow (ty1, ty2))
 let type_array d ty = new_ty (Tarray (d, ty))
 let type_static d ty = new_ty (Tstatic (d, ty))
 
-
 let type_unary_bool_op =
   new_ty (Tarrow (type_bool, type_bool))
 

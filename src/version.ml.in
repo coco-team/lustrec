@@ -1,6 +1,8 @@
 
 let number = "@PACKAGE_VERSION@"
 
+let codename ="@VERSION_CODENAME@"
+
 let prefix = "@prefix@"
 
 let include_path = prefix ^ "/include/lustrec"

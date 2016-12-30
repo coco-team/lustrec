@@ -102,6 +102,9 @@ let rec print_ck_long fmt ck =
 
 let new_id = ref (-1)
 
+let rec bottom =
+  { cdesc = Clink bottom; cid = -666; cscoped = false }
+
 let new_ck desc scoped =
   incr new_id; {cdesc=desc; cid = !new_id; cscoped = scoped}
 
@@ -296,19 +299,31 @@ let disjoint ck1 ck2 =
 let print_cvar fmt cvar =
   match cvar.cdesc with
   | Cvar ->
-    fprintf fmt "_%s"
-      (name_of_type cvar.cid)
-
+ (*
+      if cvar.cscoped
+      then
+	fprintf fmt "[_%s]"
+	  (name_of_type cvar.cid)
+      else
+ *)
+	fprintf fmt "_%s"
+	  (name_of_type cvar.cid)
   | Cunivar ->
-    fprintf fmt "'%s"
-      (name_of_type cvar.cid)
+ (*
+      if cvar.cscoped
+      then
+	fprintf fmt "['%s]"
+	  (name_of_type cvar.cid)
+      else
+ *)
+	fprintf fmt "'%s"
+	  (name_of_type cvar.cid)
   | _ -> failwith "Internal error print_cvar"
 
 (* Nice pretty-printing. Simplifies expressions before printing them. Non-linear
    complexity. *)
 let print_ck fmt ck =
   let rec aux fmt ck =
-    let ck = simplify ck in
     match ck.cdesc with
     | Carrow (ck1,ck2) ->
       fprintf fmt "%a -> %a" aux ck1 aux ck2
@@ -318,8 +333,20 @@ let print_ck fmt ck =
     | Con (ck,c,l) ->
       fprintf fmt "%a on %s(%a)" aux ck l print_carrier c
     | Cvar ->
+(*
+      if ck.cscoped
+      then
+        fprintf fmt "[_%s]" (name_of_type ck.cid)
+      else
+*)
 	fprintf fmt "_%s" (name_of_type ck.cid)
     | Cunivar ->
+(*
+      if ck.cscoped
+      then
+        fprintf fmt "['%s]" (name_of_type ck.cid)
+      else
+*)
         fprintf fmt "'%s" (name_of_type ck.cid)
     | Clink ck' ->
         aux fmt ck'
@@ -334,7 +361,6 @@ let print_ck fmt ck =
 
 (* prints only the Con components of a clock, useful for printing nodes *)
 let rec print_ck_suffix fmt ck =
-  let ck = simplify ck in
   match ck.cdesc with
   | Carrow _
   | Ctuple _
@@ -347,11 +373,6 @@ let rec print_ck_suffix fmt ck =
   | Ccarrying (cr,ck') ->
     fprintf fmt "%a" print_ck_suffix ck'
 
-let rec is_clocked ck =
-  match (simplify ck).cdesc with
-  | Carrow _ | Ctuple _ | Cvar  | Cunivar    -> false
-  | Con (ck,c,l) -> true
-  | Clink ck' | Ccarrying (_,ck') -> is_clocked ck'    
 
 let pp_error fmt = function
   | Clock_clash (ck1,ck2) ->

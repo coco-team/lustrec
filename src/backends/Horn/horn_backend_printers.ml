@@ -42,8 +42,7 @@ let pp_horn_tag fmt t =
 let rec pp_horn_const fmt c =
   match c with
     | Const_int i    -> pp_print_int fmt i
-    | Const_real r   -> pp_print_string fmt r
-    | Const_float r  -> pp_print_float fmt r
+    | Const_real (_,_,s)   -> pp_print_string fmt s
     | Const_tag t    -> pp_horn_tag fmt t
     | _              -> assert false
 
@@ -111,7 +110,7 @@ let rec default_val fmt t =
    but an offset suffix may be added for array variables
 *)
 let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
-  match v with
+  match v.value_desc with
     | Cst c         -> pp_horn_const fmt c
     | Array initlist       -> (*Format.fprintf err_formatter "init %a" (pp_horn_val ~is_lhs:is_lhs self pp_var) (List.hd initlist);*)
                               let rec print tab x =
@@ -131,7 +130,7 @@ let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
 
 (* Prints a [value] indexed by the suffix list [loop_vars] *)
 let rec pp_value_suffix self pp_value fmt value =
- match value with
+ match value.value_desc with
  | Fun (n, vl)  ->
    Basic_library.pp_horn n (pp_value_suffix self pp_value) fmt vl
  |  _            ->
@@ -143,19 +142,19 @@ let rec pp_value_suffix self pp_value fmt value =
    - [value]: assigned value
    - [pp_var]: printer for variables
 *)
-let pp_assign m pp_var fmt var_type var_name value =
+let pp_assign m pp_var fmt var_name value =
   let self = m.mname.node_id in
-  fprintf fmt "(= %a %a)" 
+  fprintf fmt "(= %a %a)"
     (pp_horn_val ~is_lhs:true self pp_var) var_name
     (pp_value_suffix self pp_var) value
-    
+
 
 (* In case of no reset call, we define mid_mem = current_mem *)
 let pp_no_reset machines m fmt i =
   let (n,_) = List.assoc i m.minstances in
   let target_machine = List.find (fun m  -> m.mname.node_id = (node_name n)) machines in
 
-  let m_list = 
+  let m_list =
     rename_machine_list
       (concat m.mname.node_id i)
       (rename_mid_list (full_memory_vars machines target_machine))
@@ -170,10 +169,10 @@ let pp_no_reset machines m fmt i =
     fprintf fmt "(= %a %a)"
       (pp_horn_var m) mhd
       (pp_horn_var m) chd
-  
+
   | _ -> (
     fprintf fmt "@[<v 0>(and @[<v 0>";
-    List.iter2 (fun mhd chd -> 
+    List.iter2 (fun mhd chd ->
       fprintf fmt "(= %a %a)@ "
       (pp_horn_var m) mhd
       (pp_horn_var m) chd
@@ -186,15 +185,15 @@ let pp_no_reset machines m fmt i =
 let pp_instance_reset machines m fmt i =
   let (n,_) = List.assoc i m.minstances in
   let target_machine = List.find (fun m  -> m.mname.node_id = (node_name n)) machines in
-  
+
   fprintf fmt "(%a @[<v 0>%a)@]"
     pp_machine_reset_name (node_name n)
-    (Utils.fprintf_list ~sep:"@ " (pp_horn_var m)) 
+    (Utils.fprintf_list ~sep:"@ " (pp_horn_var m))
     (
       (rename_machine_list
 	 (concat m.mname.node_id i)
 	 (rename_current_list (full_memory_vars machines target_machine))
-      ) 
+      )
       @
 	(rename_machine_list
 	   (concat m.mname.node_id i)
@@ -212,7 +211,7 @@ let pp_instance_call machines reset_instances m fmt i inputs outputs =
       if not (List.mem i reset_instances) then
 	(* If not, declare mem_m = mem_c *)
 	pp_no_reset machines m fmt i;
-      
+
       let mems = full_memory_vars machines target_machine in
       let rename_mems f = rename_machine_list (concat m.mname.node_id i) (f mems) in
       let mid_mems = rename_mems rename_mid_list in
@@ -222,8 +221,8 @@ let pp_instance_call machines reset_instances m fmt i inputs outputs =
       | "_arrow", [i1; i2], [o], [mem_m], [mem_x] -> begin
 	fprintf fmt "@[<v 5>(and ";
 	fprintf fmt "(= %a (ite %a %a %a))"
-	  (pp_horn_val ~is_lhs:true self (pp_horn_var m)) (LocalVar o) (* output var *)
-	  (pp_horn_var m) mem_m 
+	  (pp_horn_val ~is_lhs:true self (pp_horn_var m)) (mk_val (LocalVar o) o.var_type) (* output var *)
+	  (pp_horn_var m) mem_m
 	  (pp_horn_val self (pp_horn_var m)) i1
 	  (pp_horn_val self (pp_horn_var m)) i2
 	;
@@ -238,10 +237,10 @@ let pp_instance_call machines reset_instances m fmt i inputs outputs =
 	  (Utils.fprintf_list ~sep:"@ " (pp_horn_val self (pp_horn_var m))) inputs
 	  (Utils.pp_final_char_if_non_empty "@ " inputs)
 	  (Utils.fprintf_list ~sep:"@ " (pp_horn_val self (pp_horn_var m)))
-	  (List.map (fun v -> LocalVar v) outputs)
+	  (List.map (fun v -> mk_val (LocalVar v) v.var_type) outputs)
 	  (Utils.pp_final_char_if_non_empty "@ " outputs)
 	  (Utils.fprintf_list ~sep:"@ " (pp_horn_var m)) (mid_mems@next_mems)
-	
+
       end
     end
   with Not_found -> ( (* stateless node instance *)
@@ -252,13 +251,14 @@ let pp_instance_call machines reset_instances m fmt i inputs outputs =
       inputs
       (Utils.pp_final_char_if_non_empty "@ " inputs)
       (Utils.fprintf_list ~sep:"@ " (pp_horn_val self (pp_horn_var m)))
-      (List.map (fun v -> LocalVar v) outputs)
+      (List.map (fun v -> mk_val (LocalVar v) v.var_type) outputs)
   )
-    
-    
+
+
 (* Print the instruction and update the set of reset instances *)
 let rec pp_machine_instr machines reset_instances (m: machine_t) fmt instr : ident list =
   match instr with
+  | MComment _ -> reset_instances
   | MNoReset i -> (* we assign middle_mem with mem_m. And declare i as reset *)
     pp_no_reset machines m fmt i;
     i::reset_instances
@@ -268,14 +268,14 @@ let rec pp_machine_instr machines reset_instances (m: machine_t) fmt instr : ide
   | MLocalAssign (i,v) ->
     pp_assign
       m (pp_horn_var m) fmt
-      i.var_type (LocalVar i) v;
+      (mk_val (LocalVar i) i.var_type) v;
     reset_instances
   | MStateAssign (i,v) ->
     pp_assign
       m (pp_horn_var m) fmt
-      i.var_type (StateVar i) v;
+      (mk_val (StateVar i) i.var_type) v;
     reset_instances
-  | MStep ([i0], i, vl) when Basic_library.is_internal_fun i  ->
+  | MStep ([i0], i, vl) when Basic_library.is_internal_fun i (List.map (fun v -> v.value_type) vl) ->
     assert false (* This should not happen anymore *)
   | MStep (il, i, vl) ->
     (* if reset instance, just print the call over mem_m , otherwise declare mem_m =
@@ -295,8 +295,8 @@ let rec pp_machine_instr machines reset_instances (m: machine_t) fmt instr : ide
        statement. *)
     let self = m.mname.node_id in
     let pp_branch fmt (tag, instrs) =
-      fprintf fmt 
-	"@[<v 3>(or (not (= %a %s))@ " 
+      fprintf fmt
+	"@[<v 3>(or (not (= %a %s))@ "
 	(*"@[<v 3>(=> (= %a %s)@ "*)  (* Issues with some versions of Z3. It
 					  seems that => within Horn predicate
 					  may cause trouble. I have hard time
@@ -309,20 +309,20 @@ let rec pp_machine_instr machines reset_instances (m: machine_t) fmt instr : ide
       () (* rs *)
     in
     pp_conj pp_branch fmt hl;
-    reset_instances 
+    reset_instances
 
-and pp_machine_instrs machines reset_instances m fmt instrs = 
+and pp_machine_instrs machines reset_instances m fmt instrs =
   let ppi rs fmt i = pp_machine_instr machines rs m fmt i in
   match instrs with
-  | [x] -> ppi reset_instances fmt x 
+  | [x] -> ppi reset_instances fmt x
   | _::_ ->
     fprintf fmt "(and @[<v 0>";
-    let rs = List.fold_left (fun rs i -> 
+    let rs = List.fold_left (fun rs i ->
       let rs = ppi rs fmt i in
       fprintf fmt "@ ";
       rs
     )
-      reset_instances instrs 
+      reset_instances instrs
     in
     fprintf fmt "@])";
     rs
@@ -334,7 +334,7 @@ let pp_machine_reset machines fmt m =
   fprintf fmt "@[<v 5>(and @ ";
 
   (* print "x_m = x_c" for each local memory *)
-  (Utils.fprintf_list ~sep:"@ " (fun fmt v -> 
+  (Utils.fprintf_list ~sep:"@ " (fun fmt v ->
     fprintf fmt "(= %a %a)"
       (pp_horn_var m) (rename_mid v)
       (pp_horn_var m) (rename_current v)
@@ -346,14 +346,14 @@ let pp_machine_reset machines fmt m =
   *)
   (Utils.fprintf_list ~sep:"@ " (fun fmt (id, (n, _)) ->
     let name = node_name n in
-    if name = "_arrow" then ( 
+    if name = "_arrow" then (
       fprintf fmt "(= %s._arrow._first_m true)"
-	(concat m.mname.node_id id)  
+	(concat m.mname.node_id id)
     ) else (
-      let machine_n = get_machine machines name in 
-      fprintf fmt "(%s_reset @[<hov 0>%a@])" 
+      let machine_n = get_machine machines name in
+      fprintf fmt "(%s_reset @[<hov 0>%a@])"
 	name
-	(Utils.fprintf_list ~sep:"@ " (pp_horn_var m)) 
+	(Utils.fprintf_list ~sep:"@ " (pp_horn_var m))
 	(rename_machine_list (concat m.mname.node_id id) (reset_vars machines machine_n))
     )
    )) fmt m.minstances;
@@ -379,7 +379,7 @@ let print_machine machines fmt m =
   else
     begin
       fprintf fmt "; %s@." m.mname.node_id;
-      
+
       (* Printing variables *)
       Utils.fprintf_list ~sep:"@." pp_decl_var fmt
 	(
@@ -423,7 +423,7 @@ let print_machine machines fmt m =
 
 	  (* Rule for reset *)
 	  fprintf fmt "@[<v 2>(rule (=> @ %a@ (%a @[<v 0>%a)@]@]@.))@.@."
-	    (pp_machine_reset machines) m 
+	    (pp_machine_reset machines) m
 	    pp_machine_reset_name m.mname.node_id
 	    (Utils.fprintf_list ~sep:"@ " (pp_horn_var m)) (reset_vars machines m);
 
@@ -438,12 +438,12 @@ let print_machine machines fmt m =
 		pp_machine_step_name m.mname.node_id
 		(Utils.fprintf_list ~sep:"@ " (pp_horn_var m)) (step_vars machines m);
 	    end
-	  | assertsl -> 
+	  | assertsl ->
 	    begin
 	      let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id (pp_horn_var m) in
 	      (* print_string pp_val; *)
 	      fprintf fmt "; with Assertions @.";
-	      
+
 	      (*Rule for step*)
 	      fprintf fmt "@[<v 2>(rule (=> @ (and @ ";
 	      ignore (pp_machine_instrs machines [] m fmt m.mstep.step_instrs);
@@ -451,12 +451,116 @@ let print_machine machines fmt m =
 		pp_machine_step_name m.mname.node_id
 		(Utils.fprintf_list ~sep:" " (pp_horn_var m)) (step_vars machines m);
 	    end
-	      
-	      
+
+
 	end
     end
 
 
+let mk_flags arity =
+ let b_range =
+   let rec range i j =
+     if i > arity then [] else i :: (range (i+1) j) in
+   range 2 arity;
+ in
+ List.fold_left (fun acc x -> acc ^ " false") "true" b_range
+
+
+  (*Get sfunction infos from command line*)
+let get_sf_info() =
+  let splitted = Str.split (Str.regexp "@") !Options.sfunction in
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. sfunction name: %s@," !Options.sfunction);
+  let sf_name, flags, arity = match splitted with
+      [h;flg;par] -> h, flg, par
+    | _ -> failwith "Wrong Sfunction info"
+
+  in
+  Log.report ~level:1 (fun fmt -> fprintf fmt "... sf_name: %s@, .. flags: %s@ .. arity: %s@," sf_name flags arity);
+  sf_name, flags, arity
+
+
+    (*a function to print the rules in case we have an s-function*)
+  let print_sfunction machines fmt m =
+      if m.mname.node_id = arrow_id then
+        (* We don't print arrow function *)
+        ()
+      else
+        begin
+          Format.fprintf fmt "; SFUNCTION@.";
+          Format.fprintf fmt "; %s@." m.mname.node_id;
+          Format.fprintf fmt "; EndPoint Predicate %s." !Options.sfunction;
+
+          (* Check if there is annotation for s-function *)
+          if m.mannot != [] then(
+              Format.fprintf fmt "; @[%a@]@]@\n" (Utils.fprintf_list ~sep:"@ " Printers.pp_s_function) m.mannot;
+            );
+
+       (* Printing variables *)
+          Utils.fprintf_list ~sep:"@." pp_decl_var fmt
+                             ((step_vars machines m)@
+    	                        (rename_machine_list m.mname.node_id m.mstep.step_locals));
+          Format.pp_print_newline fmt ();
+          let sf_name, flags, arity = get_sf_info() in
+
+       if is_stateless m then
+         begin
+           (* Declaring single predicate *)
+           Format.fprintf fmt "(declare-rel %a (%a))@."
+    	                  pp_machine_stateless_name m.mname.node_id
+    	                  (Utils.fprintf_list ~sep:" " pp_type)
+    	                  (List.map (fun v -> v.var_type) (reset_vars machines m));
+           Format.pp_print_newline fmt ();
+           (* Rule for single predicate *)
+           let str_flags = sf_name ^ " " ^ mk_flags (int_of_string flags) in
+           Format.fprintf fmt "@[<v 2>(rule (=> @ (%s %a) (%a %a)@]@.))@.@."
+                          str_flags
+                          (Utils.fprintf_list ~sep:" " (pp_horn_var m)) (reset_vars machines m)
+	                  pp_machine_stateless_name m.mname.node_id
+	                  (Utils.fprintf_list ~sep:" " (pp_horn_var m)) (reset_vars machines m);
+         end
+      else
+         begin
+           (* Declaring predicate *)
+           Format.fprintf fmt "(declare-rel %a (%a))@."
+    	                  pp_machine_reset_name m.mname.node_id
+    	                  (Utils.fprintf_list ~sep:" " pp_type)
+    	                  (List.map (fun v -> v.var_type) (inout_vars machines m));
+
+           Format.fprintf fmt "(declare-rel %a (%a))@."
+    	                  pp_machine_step_name m.mname.node_id
+    	                  (Utils.fprintf_list ~sep:" " pp_type)
+    	                  (List.map (fun v -> v.var_type) (step_vars machines m));
+
+           Format.pp_print_newline fmt ();
+          (* Adding assertions *)
+           match m.mstep.step_asserts with
+	  | [] ->
+	    begin
+
+	      (* Rule for step*)
+	      fprintf fmt "@[<v 2>(rule (=> @ ";
+	      ignore (pp_machine_instrs machines [] m fmt m.mstep.step_instrs);
+	      fprintf fmt "@ (%a @[<v 0>%a)@]@]@.))@.@."
+		pp_machine_step_name m.mname.node_id
+		(Utils.fprintf_list ~sep:"@ " (pp_horn_var m)) (step_vars machines m);
+	    end
+	  | assertsl ->
+	    begin
+	      let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id (pp_horn_var m) in
+	      (* print_string pp_val; *)
+	      fprintf fmt "; with Assertions @.";
+
+	      (*Rule for step*)
+	      fprintf fmt "@[<v 2>(rule (=> @ (and @ ";
+	      ignore (pp_machine_instrs machines [] m fmt m.mstep.step_instrs);
+	      fprintf fmt "@. %a)(%a @[<v 0>%a)@]@]@.))@.@." (pp_conj pp_val) assertsl
+		pp_machine_step_name m.mname.node_id
+		(Utils.fprintf_list ~sep:" " (pp_horn_var m)) (step_vars machines m);
+	    end
+
+         end
+
+        end
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)
 (* End: *)

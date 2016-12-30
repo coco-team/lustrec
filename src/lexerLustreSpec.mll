@@ -15,9 +15,9 @@
   open Parser_lustre
   open Utils
 
-  let str_buf = Buffer.create 1024
-
   exception Error of Location.t
+ 
+  let str_buf = Buffer.create 1024
 
 (* As advised by Caml documentation. This way a single lexer rule is
    used to handle all the possible keywords. *)
@@ -44,7 +44,7 @@ let keyword_table =
   "wcet", WCET;
   "int", TINT;
   "bool", TBOOL;
-  "float", TFLOAT;
+  (* "float", TFLOAT; *)
   "real", TREAL;
   "clock", TCLOCK;
   "not", NOT;
@@ -66,6 +66,8 @@ let keyword_table =
   "assumes", ASSUMES;
   "exists", EXISTS;
   "forall", FORALL;
+  "c_code", CCODE;
+  "matlab", MATLAB;
   ]
 
 }
@@ -86,11 +88,12 @@ rule token = parse
 	token lexbuf }
   | blank +
       {token lexbuf}
-  | '-'? ['0'-'9'] ['0'-'9']* '.' ['0'-'9']*
-      {FLOAT (float_of_string (Lexing.lexeme lexbuf))}
+  | (('-'? ['0'-'9'] ['0'-'9']* as l) '.' (['0'-'9']* as r)) as s
+      {REAL (Num.num_of_string (l^r), String.length r, s)}
+  | (('-'? ['0'-'9']+ as l)  '.' (['0'-'9']+ as r) ('E'|'e') (('+'|'-') ['0'-'9'] ['0'-'9']* as exp)) as s
+      {REAL (Num.num_of_string (l^r), String.length r + -1 * int_of_string exp, s)}
   | '-'? ['0'-'9']+ 
       {INT (int_of_string (Lexing.lexeme lexbuf)) }
-  | '-'? ['0'-'9']+ '.' ['0'-'9']+ ('E'|'e') ('+'|'-') ['0'-'9'] ['0'-'9'] as s {REAL s}
  (* | '/' (['_' 'A'-'Z' 'a'-'z'] ['A'-'Z' 'a'-'z' '_' '0'-'9']* '/')+ as s
       {IDENT s}
  *)
@@ -126,10 +129,10 @@ rule token = parse
   | "^" {POWER}
   | '"' { Buffer.clear str_buf; string_parse lexbuf }
   | eof { EOF }
-  | _ { raise (Error (Location.curr lexbuf)) }
+  | _ { raise (Parse.Error (Location.curr lexbuf, Unexpected_eof)) }
 and comment_line n = parse
 | eof
-    { raise (Error (Location.curr lexbuf)) }
+    { raise (Parse.Error (Location.curr lexbuf, Unfinished_comment)) }
 | "(*"
     { comment_line (n+1) lexbuf }
 | "*)"
@@ -139,6 +142,7 @@ and comment_line n = parse
       comment_line n lexbuf }
 | _ { comment_line n lexbuf }
 and string_parse = parse
+  | eof { raise (Parse.Error (Location.curr lexbuf, Unfinished_string)) }
   | "\\\"" as s { Buffer.add_string str_buf s; string_parse lexbuf}
   | '"' { STRING (Buffer.contents str_buf) }
   | _ as c  { Buffer.add_char str_buf c; string_parse lexbuf }
@@ -146,18 +150,20 @@ and string_parse = parse
 {
 
   let annot s =
-    let lb = Lexing.from_string s in
+    let lexbuf = Lexing.from_string s in
    try
-     Parser_lustre.lustre_annot(* ParserLustreSpec.lustre_annot *) token lb
+     Parser_lustre.lustre_annot(* ParserLustreSpec.lustre_annot *) token lexbuf
    with Parsing.Parse_error as _e -> (
      Format.eprintf "Lexing error at position %a:@.unexpected token %s@.@?"
-       (fun fmt p -> Format.fprintf fmt "%s l%i c%i" p.Lexing.pos_fname p.Lexing.pos_lnum p.Lexing.pos_cnum) lb.Lexing.lex_curr_p
-       (Lexing.lexeme lb);
-     raise Parsing.Parse_error)
+       (fun fmt p -> Format.fprintf fmt "%s l%i c%i" p.Lexing.pos_fname p.Lexing.pos_lnum p.Lexing.pos_cnum) lexbuf.Lexing.lex_curr_p
+       (Lexing.lexeme lexbuf);
+     raise (Error (Location.curr lexbuf)))
      
 
   let spec s =
-    let lb = Lexing.from_string s in
-    Parser_lustre.lustre_spec (*ParserLustreSpec.lustre_spec*) token lb
-
+    let lexbuf = Lexing.from_string s in
+    try
+      Parser_lustre.lustre_spec (*ParserLustreSpec.lustre_spec*) token lexbuf
+    with Parsing.Parse_error ->
+      raise (Error (Location.curr lexbuf))
 }

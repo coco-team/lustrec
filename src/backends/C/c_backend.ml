@@ -25,28 +25,36 @@ let makefile_opt print basename dependencies makefile_fmt machines =
   )
 *)
 
-let gen_files funs basename prog machines dependencies header_file source_lib_file source_main_file makefile_file machines =
-
-  let header_out = open_out header_file in
-  let header_fmt = formatter_of_out_channel header_out in
-  let source_lib_out = open_out source_lib_file in
-  let source_lib_fmt = formatter_of_out_channel source_lib_out in
+let gen_files funs basename prog machines dependencies =
+  let destname = !Options.dest_dir ^ "/" ^ basename in
+  let source_main_file = destname ^ "_main.c" in (* Could be changed *)
+  let makefile_file = destname ^ ".makefile" in (* Could be changed *)
 
   let print_header, print_lib_c, print_main_c, print_makefile = funs in
+
   (* Generating H file *)
+  let alloc_header_file = destname ^ "_alloc.h" in (* Could be changed *)
+  let header_out = open_out alloc_header_file in
+  let header_fmt = formatter_of_out_channel header_out in
   print_header header_fmt basename prog machines dependencies;
- 
-  (* Generating Lib C file *)
-  print_lib_c source_lib_fmt basename prog machines dependencies;
- 
   close_out header_out;
+
+  (* Generating Lib C file *)
+  let source_lib_file = destname ^ ".c" in (* Could be changed *)
+  let source_lib_out = open_out source_lib_file in
+  let source_lib_fmt = formatter_of_out_channel source_lib_out in
+  print_lib_c source_lib_fmt basename prog machines dependencies;
   close_out source_lib_out;
 
   match !Options.main_node with
-  | "" ->  () (* No main node: we do not genenrate main nor makefile *)
+  | "" ->  () (* No main node: we do not generate main nor makefile *)
   | main_node -> (
     match Machine_code.get_machine_opt main_node machines with
-    | None -> Format.eprintf "Unable to find a main node named %s@.@?" main_node; assert false
+    | None -> begin
+      Global.main_node := main_node;
+      Format.eprintf "Code generation error: %a@." Corelang.pp_error LustreSpec.Main_not_found;
+      raise (Corelang.Error (Location.dummy_loc, LustreSpec.Main_not_found))
+    end
     | Some m -> begin
       let source_main_out = open_out source_main_file in
       let source_main_fmt = formatter_of_out_channel source_main_out in
@@ -55,9 +63,9 @@ let gen_files funs basename prog machines dependencies header_file source_lib_fi
 
       (* Generating Main C file *)
       print_main_c source_main_fmt m basename prog machines dependencies;
-      
+
       (* Generating Makefile *)
-     print_makefile basename main_node dependencies makefile_fmt;
+      print_makefile basename main_node dependencies makefile_fmt;
 
      close_out source_main_out;
      close_out makefile_out
@@ -65,7 +73,7 @@ let gen_files funs basename prog machines dependencies header_file source_lib_fi
     end
   )
 
-let translate_to_c header source_lib source_main makefile basename prog machines dependencies =
+let translate_to_c basename prog machines dependencies =
   match !Options.spec with
   | "no" -> begin
     let module HeaderMod = C_backend_header.EmptyMod in
@@ -78,15 +86,13 @@ let translate_to_c header source_lib source_main makefile basename prog machines
     let module SourceMain = C_backend_main.Main (SourceMainMod) in
     let module Makefile = C_backend_makefile.Main (MakefileMod) in
 
-    let funs = 
-      Header.print_alloc_header, 
-      Source.print_lib_c, 
-      SourceMain.print_main_c, 
-      Makefile.print_makefile 
+    let funs =
+      Header.print_alloc_header,
+      Source.print_lib_c,
+      SourceMain.print_main_c,
+      Makefile.print_makefile
     in
-    gen_files 
-      funs basename prog machines dependencies 
-      header source_lib source_main makefile machines
+    gen_files funs basename prog machines dependencies
 
   end
   | "acsl" -> begin
@@ -101,15 +107,13 @@ let translate_to_c header source_lib source_main makefile basename prog machines
     let module SourceMain = C_backend_main.Main (SourceMainMod) in
     let module Makefile = C_backend_makefile.Main (MakefileMod) in
 
-    let funs = 
-      Header.print_alloc_header, 
+    let funs =
+      Header.print_alloc_header,
       Source.print_lib_c,
       SourceMain.print_main_c,
-      Makefile.print_makefile 
+      Makefile.print_makefile
     in
-    gen_files
-      funs basename prog machines dependencies
-      header source_lib source_main makefile machines
+    gen_files funs basename prog machines dependencies
 
   end
   | "c" -> begin
