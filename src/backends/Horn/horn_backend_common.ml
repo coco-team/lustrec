@@ -25,8 +25,8 @@ let rec pp_type fmt t =
   | Types.Treal           -> fprintf fmt "Real"
   | Types.Tconst ty       -> pp_print_string fmt ty
   | Types.Tclock t        -> pp_type fmt t
-  | Types.Tarray _
-  | Types.Tstatic _
+  | Types.Tarray(dim,ty)   -> fprintf fmt "(Array Int "; pp_type fmt ty; fprintf fmt ")"
+  | Types.Tstatic(d, ty)-> pp_type fmt ty
   | Types.Tarrow _
   | _                     -> eprintf "internal error: pp_type %a@."
     Types.print_ty t; assert false

@@ -291,7 +291,7 @@ let stage2 prog =
       machine_code
   in
 
-  (* Salsa optimize machine code *)
+ (* Salsa optimize machine code *)
   (*
   let machine_code =
     if !Options.salsa_enabled then
@@ -437,6 +437,7 @@ let compile dirname basename extension =
   | _        -> assert false
 
 let anonymous filename =
+  Printf.eprintf "\n\nAnonymous called with : %s\n" filename;
   let ok_ext, ext = List.fold_left
     (fun (ok, ext) ext' ->
       if not ok && Filename.check_suffix filename ext' then
@@ -456,6 +457,10 @@ let _ =
   Corelang.add_internal_funs ();
   try
     Printexc.record_backtrace true;
+    Printf.eprintf "\nParsing\n";
+    Arg.parse Options.options anonymous usage;
+    Printf.eprintf "\nDest=%s\n" !Options.dest_file
+
 
     let options = Options.options @
       List.flatten (
@@ -466,6 +471,7 @@ let _ =
     in
 
     Arg.parse options anonymous usage
+
   with
   | Parse.Error _
   | Types.Error (_,_) | Clocks.Error (_,_)
