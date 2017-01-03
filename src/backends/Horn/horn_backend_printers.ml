@@ -46,19 +46,24 @@ let rec pp_horn_const fmt c =
     | Const_tag t    -> pp_horn_tag fmt t
     | _              -> assert false
 
-let rec get_type_cst c =
-  match c with
-  | Const_int(n) -> new_ty Tint
-  | Const_real _ -> new_ty Treal
-  (* | Const_float _ -> new_ty Treal *)
-  | Const_array(l) -> new_ty (Tarray(Dimension.mkdim_int (Location.dummy_loc) (List.length l), get_type_cst (List.hd l)))
-  | Const_tag(tag) -> new_ty Tbool
-  | Const_string(str) ->  assert false(* used only for annotations *)
-  | Const_struct(l) -> new_ty (Tstruct(List.map (fun (label, t) -> (label, get_type_cst t)) l))
+(* PL comment 2017/01/03: Useless code, the function existed before in typing.ml *)
+(* let rec get_type_cst c = *)
+(*   match c with *)
+(*   | Const_int(n) -> new_ty Tint *)
+(*   | Const_real _ -> new_ty Treal *)
+(*   (\* | Const_float _ -> new_ty Treal *\) *)
+(*   | Const_array(l) -> new_ty (Tarray(Dimension.mkdim_int (Location.dummy_loc) (List.length l), *)
+(* 				     get_type_cst (List.hd l))) *)
+(*   | Const_tag(tag) -> new_ty Tbool *)
+(*   | Const_string(str) ->  assert false(\* used only for annotations *\) *)
+(*   | Const_struct(l) -> new_ty (Tstruct(List.map (fun (label, t) -> (label, get_type_cst t)) l)) *)
 
+(* PL comment 2017/01/03: the following function get_type seems useless to me: it looks like computing the type of a machine code expression v while v.value_type should contain this information. The code is kept for the moment in case I missed something *)
+
+(*
 let rec get_type v =
   match v with
-  | Cst c -> get_type_cst c
+  | Cst c -> Typing.type_const Location.dummy_loc c (* get_type_cst c*)
   | Access(tab, index) -> begin
       let rec remove_link ltype =
         match (dynamic_type ltype).tdesc with
@@ -85,25 +90,22 @@ let rec get_type v =
                                  (List.length l),
                                get_type (List.hd l)))
   | _ -> assert false
+*)
 
-
-let rec default_val fmt t =
+(* Default value for each type, used when building arrays. Eg integer array
+   [2;7] is defined as (store (store (0) 1 7) 0 2) where 0 is this default value
+   for the type integer (arrays).
+*)
+let rec pp_default_val fmt t =
   match (dynamic_type t).tdesc with
   | Tint -> fprintf fmt "0"
   | Treal -> fprintf fmt "0"
   | Tbool -> fprintf fmt "true"
-  | Tarray(dim, l) -> let valt = array_element_type t in
-                      fprintf fmt "((as const (Array Int ";
-                      begin try
-                        pp_type fmt valt
-                      with
-                      | _ -> fprintf fmt "failed"; end;
-                      fprintf fmt ")) ";
-                      begin try
-                        default_val fmt valt
-                      with
-                      | _ -> fprintf fmt "failed"; end;
-                      fprintf fmt ")"
+  | Tarray(dim, l) -> (* TODO PL: this strange code has to be (heavily) checked *)
+     let valt = array_element_type t in
+     fprintf fmt "((as const (Array Int %a)) %a)"
+       pp_type valt 
+       pp_default_val valt
   | Tstruct(l) -> assert false
   | Ttuple(l) -> assert false
   |_ -> assert false
@@ -115,22 +117,48 @@ let rec default_val fmt t =
 *)
 let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
   match v.value_desc with
-    | Cst c         -> pp_horn_const fmt c
-    | Array initlist       -> (*Format.fprintf err_formatter "init %a" (pp_horn_val ~is_lhs:is_lhs self pp_var) (List.hd initlist);*)
-                              let rec print tab x =
-                                match tab with
-                                | [] -> default_val fmt (get_type v)(*fprintf fmt "YAY"*)
-                                | h::t -> fprintf fmt "(store "; print t (x+1); fprintf fmt " %i " x; pp_horn_val ~is_lhs:is_lhs self pp_var fmt h; fprintf fmt ")"
-                              in
-                              print initlist 0
-    | Access(tab,index)      -> fprintf fmt "(select "; pp_horn_val ~is_lhs:is_lhs self pp_var fmt tab; fprintf fmt " "; pp_horn_val ~is_lhs:is_lhs self pp_var fmt index; fprintf fmt ")"
-    | Power (v, n)  -> assert false
-    | LocalVar v    -> pp_var fmt (rename_machine self v)
-    | StateVar v    ->
-      if Types.is_array_type v.var_type
-      then begin assert false; eprintf "toto called\n";fprintf fmt "TOTO" end
-      else pp_var fmt (rename_machine self ((if is_lhs then rename_next else rename_current) (* self *) v))
-    | Fun (n, vl)   -> fprintf fmt "%a" (Basic_library.pp_horn n (pp_horn_val self pp_var)) vl
+  | Cst c       -> pp_horn_const fmt c
+
+  (* Code specific for arrays *)
+  | Array il    ->
+     (* An array definition: 
+	(store (
+	  ...
+ 	    (store (
+	       store (
+	          default_val
+	       ) 
+	       idx_n val_n
+	    ) 
+	    idx_n-1 val_n-1)
+	  ... 
+	  idx_1 val_1
+	) *)
+     let rec print fmt (tab, x) =
+       match tab with
+       | [] -> pp_default_val fmt v.value_type(* (get_type v) *)
+       | h::t ->
+	  fprintf fmt "(store %a %i %a)"
+	    print (t, (x+1))
+	    x
+	    (pp_horn_val ~is_lhs:is_lhs self pp_var) h
+     in
+     print fmt (il, 0)
+       
+  | Access(tab,index) ->
+     fprintf fmt "(select %a %a)"
+       (pp_horn_val ~is_lhs:is_lhs self pp_var) tab
+       (pp_horn_val ~is_lhs:is_lhs self pp_var) index
+
+  (* Code specific for arrays *)
+    
+  | Power (v, n)  -> assert false
+  | LocalVar v    -> pp_var fmt (rename_machine self v)
+  | StateVar v    ->
+     if Types.is_array_type v.var_type
+     then assert false
+     else pp_var fmt (rename_machine self ((if is_lhs then rename_next else rename_current) (* self *) v))
+  | Fun (n, vl)   -> fprintf fmt "%a" (Basic_library.pp_horn n (pp_horn_val self pp_var)) vl
 
 (* Prints a [value] indexed by the suffix list [loop_vars] *)
 let rec pp_value_suffix self pp_value fmt value =
