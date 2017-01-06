@@ -39,7 +39,7 @@ let compute_mems machines m =
 
 
 (* We extract the annotation dealing with traceability *)
-let machines_traces machines = 
+let machines_traces machines =
   List.map (fun m ->
     let traces : (ident * expr) list=
       let all_annots = List.flatten (List.map (fun ann -> ann.annots) m.mannot) in
@@ -61,12 +61,12 @@ let machines_traces machines =
     m, traces
 
   ) machines
-  
+
 let memories_old machines m =
   List.map (fun (p, v) ->
     let machine = match p with | [] -> m | (_,m')::_ -> m' in
     let traces = List.assoc machine (machines_traces machines) in
-    if List.mem_assoc v.var_id traces then 
+    if List.mem_assoc v.var_id traces then
       (
 	(* We take the expression associated to variable v in the trace
 	   info *)
@@ -75,20 +75,20 @@ let memories_old machines m =
 	   Printers.pp_expr (List.assoc v.var_id traces); *)
 	p, List.assoc v.var_id traces
       )
-    else 
+    else
       begin
 
 	(* We keep the variable as is: we create an expression v *)
 
 	(* eprintf "Unable to found variable %a in traces (%a)@."  pp_var v
 	   (Utils.fprintf_list ~sep:", " pp_print_string) (List.map fst
-	   traces); *)	    
+	   traces); *)
 
 	p, mkexpr Location.dummy_loc (Expr_ident v.var_id)
       end
 
   ) (compute_mems machines m)
-      
+
 let memories_next  machines m = (* We remove the topest pre in each expression *)
   List.map
     (fun (prefix, ee) ->
@@ -102,15 +102,15 @@ let memories_next  machines m = (* We remove the topest pre in each expression *
       	Printers.pp_expr ee;
       	assert false)
     (memories_old machines m)
-      
+
 
 
 let pp_prefix_rev fmt prefix =
-  Utils.fprintf_list ~sep:"." 
-    (fun fmt (id,n) -> fprintf fmt "(%s,%s)" id n.mname.node_id) 
-    fmt 
+  Utils.fprintf_list ~sep:"."
+    (fun fmt (id,n) -> fprintf fmt "(%s,%s)" id n.mname.node_id)
+    fmt
     (List.rev prefix)
-      
+
 
 let traces_file fmt basename prog machines =
   fprintf fmt "<?xml version=\"1.0\"?>@.";
@@ -120,10 +120,10 @@ let traces_file fmt basename prog machines =
       let pp_var = pp_horn_var m in
       let memories_old = memories_old  machines m in
       let memories_next = memories_next  machines m in
-      
+
       (* fprintf fmt "; Node %s@." m.mname.node_id; *)
       fprintf fmt "@[<v 2><Node name=\"%s\">@ " m.mname.node_id;
-      
+
       let input_vars = (rename_machine_list m.mname.node_id m.mstep.step_inputs) in
       let output_vars = (rename_machine_list m.mname.node_id m.mstep.step_outputs) in
       fprintf fmt "<input name=\"%a\" type=\"%a\">%a</input>@ "
@@ -135,11 +135,11 @@ let traces_file fmt basename prog machines =
 	(Utils.fprintf_list ~sep:" | " pp_var)  output_vars
 	(Utils.fprintf_list ~sep:" | "  (fun fmt id -> pp_type fmt id.var_type)) output_vars
 	(Utils.fprintf_list ~sep:" | " pp_var) (m.mstep.step_outputs);
-      
-      let init_local_vars = 
-	
-	  (rename_next_list (try full_memory_vars ~without_arrow:true machines m with Not_found -> Format.eprintf "mahine %s@.@?" m.mname.node_id; assert false)) 
-	
+
+      let init_local_vars =
+	(rename_next_list
+           (try full_memory_vars ~without_arrow:true machines m with Not_found -> Format.eprintf "mahine %s@.@?" m.mname.node_id; assert false))
+
 
       in
       let step_local_vars = (rename_current_list (full_memory_vars ~without_arrow:true machines m)) in
@@ -160,7 +160,7 @@ let traces_file fmt basename prog machines =
       fprintf fmt "@]@ </Node>";
      )) (List.rev machines);
   fprintf fmt "</Traces>@."
-  
+
 
 (* (Utils.fprintf_list ~sep:" | " (fun fmt (prefix, ee) -> fprintf fmt
    "%a%a" pp_prefix_rev prefix Printers.pp_expr ee)) memories_next; *)

@@ -69,7 +69,7 @@ let get_machine machines node_name =
 
 let local_memory_vars machines machine =
   rename_machine_list machine.mname.node_id machine.mmemory
-    
+
 let instances_memory_vars ?(without_arrow=false) machines machine =
   let rec aux fst prefix m =
     (
@@ -81,10 +81,10 @@ let instances_memory_vars ?(without_arrow=false) machines machine =
       List.fold_left (fun accu (id, (n, _)) ->
 	let name = node_name n in
 	if without_arrow && name = "_arrow" then
-	  accu 
+	  accu
 	else
 	  let machine_n = get_machine machines name in
-	  ( aux false (concat prefix 
+	  ( aux false (concat prefix
 			 (if fst then id else concat m.mname.node_id id))
 	      machine_n ) @ accu
       ) [] (m.minstances)
@@ -101,16 +101,16 @@ let inout_vars machines m =
 
 let step_vars machines m =
   (inout_vars machines m)
-  @ (rename_current_list (full_memory_vars machines m)) 
+  @ (rename_current_list (full_memory_vars machines m))
   @ (rename_next_list (full_memory_vars machines m))
 
 let step_vars_m_x machines m =
   (inout_vars machines m)
-  @ (rename_mid_list (full_memory_vars machines m)) 
+  @ (rename_mid_list (full_memory_vars machines m))
   @ (rename_next_list (full_memory_vars machines m))
 
 let reset_vars machines m =
-  (rename_current_list (full_memory_vars machines m)) 
+  (rename_current_list (full_memory_vars machines m))
   @ (rename_mid_list (full_memory_vars machines m))
 
 

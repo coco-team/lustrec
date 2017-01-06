@@ -1,7 +1,7 @@
 
-let number = "1.1-Unversioned directory"
+let number = "1.3-      55"
 
-let codename ="@VERSION_CODENAME@"
+let codename ="Xia/Zhong-Kang-dev"
 
 let prefix = "/usr/local"
 
