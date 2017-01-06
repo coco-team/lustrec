@@ -97,14 +97,20 @@ let check_sfunction mannot =
  (*Check if its an sfunction*)
   match mannot with
     [] -> false
-  | [x] -> match x.annots with
-             [] -> false
-            |[(key,va)] -> match key with
-                             [] -> false
-                           | ["c_code"] -> true
-                           | ["matlab"] -> true
-                           | _ -> false
-  | _  -> false
+  | [x] ->
+     begin
+       match x.annots with
+         [] -> false
+        |[(key,va)] ->
+          begin
+            match key with
+              [] -> false
+            | [x]  -> x == "c_code" || x =="matlab"
+            | _ -> false
+          end
+        |(_,_)::_ -> false
+     end
+  | _::_ -> false
 
 let translate fmt basename prog machines=
   (* We print typedef *)
