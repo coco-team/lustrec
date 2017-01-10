@@ -17,6 +17,7 @@
 #                  LUS_FILES <Lustre files>
 #                  [USER_C_FILES <C files>]
 #                  [VERBOSE <level>]
+#                  [LUSI]
 #                  LIBNAME <libraryName>)
 #
 # When used the Lustre_Compile macro define the variable
@@ -72,10 +73,14 @@ find_path(LUSTRE_INCLUDE_DIR
 # Macros used to compile a lustre library
 include(CMakeParseArguments)
 function(Lustre_Compile)
-  set(options "")
+  set(options LUSI)
   set(oneValueArgs NODE LIBNAME VERBOSE)
   set(multiValueArgs LUS_FILES USER_C_FILES)
   cmake_parse_arguments(LUS "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+  if(LUS_LUSI)
+    set(LUSTRE_LUSI_OPT "-lusi")
+  endif()
 
   if (NOT LUS_LIBNAME)
     message(FATAL_ERROR "You should specify LIBNAME for each Lustre_Compile call.")
@@ -114,6 +119,16 @@ function(Lustre_Compile)
     endif()
     list(APPEND GLOBAL_LUSTRE_GENERATED_C_FILES ${LUSTRE_GENERATED_FILES})
     set(LUSTRE_GENERATED_FILES ${LUSTRE_GENERATED_FILES} ${LUSTRE_OUTPUT_DIR}/${L}.lusic)
+    if (LUS_LUSI)
+      add_custom_command(
+         OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/${LFILE}i
+         COMMAND ${LUSTRE_COMPILER} ${LUSTRE_LUSI_OPT} ${LFILE}
+         DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${LFILE}
+         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+         COMMENT "Compile Lustre source(s): ${LFILE} with option -lusi."
+         )
+      message(STATUS "lustrec will produce lusi file: ${LFILE}i")
+    endif()
     add_custom_command(
       OUTPUT ${LUSTRE_GENERATED_FILES}
       COMMAND ${LUSTRE_COMPILER} ${LUSTRE_VERBOSE_OPT} ${LUSTRE_NODE_OPT} -d ${LUSTRE_OUTPUT_DIR} ${LFILE}

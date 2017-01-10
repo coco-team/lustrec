@@ -1,13 +1,10 @@
 define([gitversion], esyscmd([sh -c "git log --oneline | wc -l | tr -d '\n'"]))
 
-AC_INIT([lustrec], [1.3-gitversion], [ploc@garoche.net])
-AC_SUBST(VERSION_CODENAME, "Xia/Zhong-Kang-dev")
+AC_INIT([lustrec], [1.4-gitversion], [ploc@garoche.net])
+AC_SUBST(VERSION_CODENAME, "Xia/Xiang-dev")
 # Next release will be
-#AC_INIT([lustrec], [1.3], [ploc@garoche.net])
-#AC_SUBST(VERSION_CODENAME, "Xia/Zhong-Kang")
-
-#AC_DEFINE(SVN_REVISION, "svnversion", [SVN Revision])
-#AC_SUBST(SVN_REVISION)
+#AC_INIT([lustrec], [1.5], [ploc@garoche.net])
+#AC_SUBST(VERSION_CODENAME, "Xia/Shao Kang")
 
 AC_CONFIG_SRCDIR([src/main_lustre_compiler.ml])
 
@@ -46,9 +43,9 @@ AC_PATH_PROG([OCAMLBUILD],[ocamlbuild],[:])
 
 # Checks for libraries. OCamlgraph
 AC_MSG_CHECKING(ocamlgraph library)
-   ocamlgraph_lib=`find $OCAMLGRAPH_PATH -iname graph.cmxa -nowarn | grep -m 1 -o "graph.cmxa"`
+   ocamlgraph_lib=`find $OCAMLGRAPH_PATH -iname graph.cmxa | grep -m 1 -o "graph.cmxa"`
    if (test "x$ocamlgraph_lib" = xgraph.cmxa ); then
-	ocamlgraph_lib_full=`find $OCAMLGRAPH_PATH -iname graph.cmxa -nowarn | grep -m 1 "graph.cmxa"`
+	ocamlgraph_lib_full=`find $OCAMLGRAPH_PATH -iname graph.cmxa | grep -m 1 "graph.cmxa"`
       AC_MSG_RESULT(library detected: $ocamlgraph_lib_full )
    else
       AC_MSG_ERROR([ocamlgraph library not installed in $OCAMLGRAPH_PATH])
