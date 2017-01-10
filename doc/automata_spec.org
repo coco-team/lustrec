@@ -135,8 +135,75 @@ different design choices:
 
     On the contrary, let us consider the following automaton:
 
-    TODO mettre un exemple avec un pre dans le unless et montrer qu'en inlinant
-    ca marche.
+    node triangle (r :bool) returns (o: int );
+    let
+      automaton trivial
+        state One:
+        unless r or (pre o = 100) restart One
+        let
+           o = 0 -> 1 + pre o;
+        tel
+    tel
+
+    Our produced v4 code with clocks is the following:
+
+    type trivial__type = enum {One };
+  
+    node trivial__One_handler_until (trivial__restart_act: bool) returns (trivial__restart_in: bool; trivial__state_in: trivial__type; o_out: int)
+    var __trivial__One_handler_until_2: int;
+        __trivial__One_handler_until_1: bool;
+        o: int;
+    let
+      trivial__restart_in, trivial__state_in = (false,One);
+      o_out = o;
+      o = (if __trivial__One_handler_until_1 then 0 else (1 + __trivial__One_handler_until_2));
+      __trivial__One_handler_until_2 = pre o;
+      __trivial__One_handler_until_1 = (true -> false);    
+    tel
+
+    node trivial__One_unless (trivial__restart_in: bool; r: bool; o: int) returns (trivial__restart_act: bool; trivial__state_act: trivial__type)
+    var __trivial__One_unless_2: bool;
+        __trivial__One_unless_1: int;
+    let 
+      trivial__restart_act, trivial__state_act = (if __trivial__One_unless_2 then (true,One) else (trivial__restart_in,One));
+      __trivial__One_unless_2 = (r or (__trivial__One_unless_1 = 100));
+      __trivial__One_unless_1 = pre o;
+    tel
+ 
+    node triangle (r: bool) returns (o: int)
+    var trivial__state_in: trivial__type clock;
+        trivial__state_act: trivial__type clock;
+        __triangle_7: bool;
+        __triangle_8: trivial__type;
+        __triangle_6: bool;
+        __triangle_3: bool when One(trivial__state_act);
+        __triangle_4: trivial__type when One(trivial__state_act);
+        __triangle_5: int when One(trivial__state_act);
+        __triangle_1: bool when One(trivial__state_in);
+        __triangle_2: trivial__type when One(trivial__state_in);
+        trivial__next_restart_in: bool;
+        trivial__restart_in: bool;
+        trivial__restart_act: bool;
+        trivial__next_state_in: trivial__type;
+    let    
+        trivial__restart_in, trivial__state_in = (if __triangle_6 then (false,One) else (__triangle_7,__triangle_8));
+        __triangle_7, __triangle_8 = pre (trivial__next_restart_in,trivial__next_state_in);
+        __triangle_6 = (true -> false);
+        trivial__next_restart_in, trivial__next_state_in, o = merge trivial__state_act (One -> (__triangle_3,__triangle_4,__triangle_5));
+        __triangle_3, __triangle_4, __triangle_5 = trivial__One_handler_until (trivial__restart_act when One(trivial__state_act)) every (trivial__restart_act);
+        trivial__restart_act, trivial__state_act = merge trivial__state_in (One -> (__triangle_1,__triangle_2));
+        __triangle_1, __triangle_2 = trivial__One_unless (trivial__restart_in when One(trivial__state_in),r when One(trivial__state_in),o when One(trivial__state_in)) every (trivial__restart_in);
+    tel
+ 
+    The use of a stateful trivial__One_unless function leads to a scheduling
+    error, hence a possible algebraic loop: o, __triangle_1, trivial__state_act,
+    __triangle_5, trivial__restart_act, node trivial__One_handler_until_50_2,
+    __triangle_2, node trivial__One_unless_52_1.
+
+    In practice, if one inlines (manually) the function trivial__One_unless, we
+    obtain the following valid code (for our compiler):
+    
+    __triangle_1, __triangle_2 = (if (r or (pre o = 100)) then (true, One) else (trivial__restart_in, One)) when One(trivial__state_in);
 
 
 ** Scade automata [SQRC]
