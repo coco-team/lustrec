@@ -14,6 +14,7 @@ open Corelang
 open Machine_code
 open Format
 open C_backend_common
+open Utils
 
 module type MODIFIERS_MAINSRC =
 sig
@@ -31,12 +32,12 @@ struct
 (********************************************************************************************)
 
 let print_get_inputs fmt m =
-  let pi fmt (v', v) =
+  let pi fmt (id, v', v) =
   match (Types.unclock_type v.var_type).Types.tdesc with
-    | Types.Tint -> fprintf fmt "%s = _get_int(\"%s\")" v.var_id v'.var_id
-    | Types.Tbool -> fprintf fmt "%s = _get_bool(\"%s\")" v.var_id v'.var_id
-    | Types.Treal when !Options.mpfr -> fprintf fmt "mpfr_set_d(%s, _get_double(\"%s\"), %i)" v.var_id v'.var_id (Mpfr.mpfr_prec ())
-    | Types.Treal -> fprintf fmt "%s = _get_double(\"%s\")" v.var_id v'.var_id
+    | Types.Tint -> fprintf fmt "%s = _get_int(f_in%i, \"%s\")" v.var_id id v'.var_id
+    | Types.Tbool -> fprintf fmt "%s = _get_bool(f_in%i, \"%s\")" v.var_id id v'.var_id
+    | Types.Treal when !Options.mpfr -> fprintf fmt "mpfr_set_d(%s, _get_double(f_in%i, \"%s\"), %i)" v.var_id id v'.var_id (Mpfr.mpfr_prec ())
+    | Types.Treal -> fprintf fmt "%s = _get_double(f_in%i, \"%s\")" v.var_id id v'.var_id
     | _ ->
       begin
 	Global.main_node := !Options.main_node;
@@ -46,30 +47,39 @@ let print_get_inputs fmt m =
 	raise (Error (v'.var_loc, Main_wrong_kind))
       end
   in
-  List.iter2 (fun v' v -> fprintf fmt "@ %a;" pi (v', v)) m.mname.node_inputs m.mstep.step_inputs
+  List.iteri2 (fun idx v' v ->
+    fprintf fmt "@ %a;" pi ((idx+1), v', v);
+  ) m.mname.node_inputs m.mstep.step_inputs
 
 let print_put_outputs fmt m = 
-  let po fmt (o', o) =
+  let po fmt (id, o', o) =
     match (Types.unclock_type o.var_type).Types.tdesc with
-    | Types.Tint -> fprintf fmt "_put_int(\"%s\", %s)" o'.var_id o.var_id
-    | Types.Tbool -> fprintf fmt "_put_bool(\"%s\", %s)" o'.var_id o.var_id
-    | Types.Treal when !Options.mpfr -> fprintf fmt "_put_double(\"%s\", mpfr_get_d(%s, %s))" o'.var_id o.var_id (Mpfr.mpfr_rnd ())
-    | Types.Treal -> fprintf fmt "_put_double(\"%s\", %s)" o'.var_id o.var_id
+    | Types.Tint -> fprintf fmt "_put_int(f_out%i, \"%s\", %s)" id o'.var_id o.var_id
+    | Types.Tbool -> fprintf fmt "_put_bool(f_out%i, \"%s\", %s)" id o'.var_id o.var_id
+    | Types.Treal when !Options.mpfr -> fprintf fmt "_put_double(f_out%i, \"%s\", mpfr_get_d(%s, %s))" id o'.var_id o.var_id (Mpfr.mpfr_rnd ())
+    | Types.Treal -> fprintf fmt "_put_double(f_out%i, \"%s\", %s)" id o'.var_id o.var_id
     | _ -> assert false
   in
-  List.iter2 (fun v' v -> fprintf fmt "@ %a;" po (v', v)) m.mname.node_outputs m.mstep.step_outputs
+  Utils.List.iteri2 (fun idx v' v -> fprintf fmt "@ %a;" po ((idx+1), v', v)) m.mname.node_outputs m.mstep.step_outputs
 
-let print_main_inout_declaration fmt m =
-  begin
-    fprintf fmt "/* Declaration of inputs/outputs variables */@ ";
-    List.iter 
-      (fun v -> fprintf fmt "%a;@ " (pp_c_type v.var_id) v.var_type
-      ) m.mstep.step_inputs;
-    List.iter 
-      (fun v -> fprintf fmt "%a;@ " (pp_c_type v.var_id) v.var_type
-      ) m.mstep.step_outputs
-  end
+let print_main_inout_declaration basename fmt m =
+  let mname = m.mname.node_id in
+  fprintf fmt "/* Declaration of inputs/outputs variables */@ ";
+  List.iteri 
+    (fun idx v ->
+      fprintf fmt "%a;@ " (pp_c_type v.var_id) v.var_type;
+      fprintf fmt "FILE *f_in%i;@ " (idx+1); (* we start from 1: in1, in2, ... *)
+      fprintf fmt "f_in%i = fopen(\"%s_%s_simu.in%i\", \"w\");@ " (idx+1) basename mname (idx+1);
+    ) m.mstep.step_inputs;
+  List.iteri 
+    (fun idx v ->
+      fprintf fmt "%a;@ " (pp_c_type v.var_id) v.var_type;
+      fprintf fmt "FILE *f_out%i;@ " (idx+1); (* we start from 1: in1, in2, ... *)
+      fprintf fmt "f_out%i = fopen(\"%s_%s_simu.out%i\", \"w\");@ " (idx+1) basename mname (idx+1);
+    ) m.mstep.step_outputs
 
+
+  
 let print_main_memory_allocation mname main_mem fmt m =
   if not (fst (get_stateless_status m)) then
   begin  
@@ -132,6 +142,8 @@ let print_main_loop mname main_mem fmt m =
     fprintf fmt "@ /* Infinite loop */@ ";
     fprintf fmt "@[<v 2>while(1){@ ";
     fprintf fmt  "fflush(stdout);@ ";
+    List.iteri (fun idx _ -> fprintf fmt "fflush(f_in%i);@ " (idx+1)) m.mstep.step_inputs;
+    List.iteri (fun idx _ -> fprintf fmt "fflush(f_out%i);@ " (idx+1)) m.mstep.step_outputs;
     fprintf fmt "%a@ %t%a"
       print_get_inputs m
       (fun fmt -> pp_main_call mname main_mem fmt m input_values m.mstep.step_outputs)
@@ -145,7 +157,7 @@ let print_main_code fmt basename m =
     then "&main_mem"
     else "main_mem" in
   fprintf fmt "@[<v 2>int main (int argc, char *argv[]) {@ ";
-  print_main_inout_declaration fmt m;
+  print_main_inout_declaration basename fmt m;
   print_main_memory_allocation mname main_mem fmt m;
   if !Options.mpfr then
     begin

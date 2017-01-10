@@ -361,6 +361,27 @@ let last_tag = ref (-1)
 let new_tag () =
   incr last_tag; !last_tag
 
+
+module List =
+struct
+  include List 
+  let iteri2 f l1 l2 =
+    if List.length l1 <> List.length l2 then
+      raise (Invalid_argument "iteri2: lists have different lengths")
+    else
+      let rec run idx l1 l2 =
+	match l1, l2 with
+	| [], [] -> ()
+	| hd1::tl1, hd2::tl2 -> (
+	  f idx hd1 hd2;
+	  run (idx+1) tl1 tl2
+	)
+	| _ -> assert false
+      in
+      run 0 l1 l2
+end
+
+  
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)
