@@ -28,10 +28,10 @@ open Horn_backend_common
 (********************************************************************************************)
 
 let pp_horn_var m fmt id =
-  if Types.is_array_type id.var_type
+  (*if Types.is_array_type id.var_type
   then
     assert false (* no arrays in Horn output *)
-  else
+  else*)
     fprintf fmt "%s" id.var_id
 
 (* Used to print boolean constants *)
@@ -46,22 +46,119 @@ let rec pp_horn_const fmt c =
     | Const_tag t    -> pp_horn_tag fmt t
     | _              -> assert false
 
+(* PL comment 2017/01/03: Useless code, the function existed before in typing.ml *)
+(* let rec get_type_cst c = *)
+(*   match c with *)
+(*   | Const_int(n) -> new_ty Tint *)
+(*   | Const_real _ -> new_ty Treal *)
+(*   (\* | Const_float _ -> new_ty Treal *\) *)
+(*   | Const_array(l) -> new_ty (Tarray(Dimension.mkdim_int (Location.dummy_loc) (List.length l), *)
+(* 				     get_type_cst (List.hd l))) *)
+(*   | Const_tag(tag) -> new_ty Tbool *)
+(*   | Const_string(str) ->  assert false(\* used only for annotations *\) *)
+(*   | Const_struct(l) -> new_ty (Tstruct(List.map (fun (label, t) -> (label, get_type_cst t)) l)) *)
+
+(* PL comment 2017/01/03: the following function get_type seems useless to me: it looks like computing the type of a machine code expression v while v.value_type should contain this information. The code is kept for the moment in case I missed something *)
+
+(*
+let rec get_type v =
+  match v with
+  | Cst c -> Typing.type_const Location.dummy_loc c (* get_type_cst c*)
+  | Access(tab, index) -> begin
+      let rec remove_link ltype =
+        match (dynamic_type ltype).tdesc with
+        | Tlink t -> t
+        | _ -> ltype
+      in
+      match (dynamic_type (remove_link (get_type tab))).tdesc with
+      | Tarray(size, t) -> remove_link t
+      | Tvar -> Format.eprintf "Type of access is a variable... "; assert false
+      | Tunivar -> Format.eprintf "Type of access is a variable... "; assert false
+      | _ -> Format.eprintf "Type of access is not an array "; assert false
+                          end
+  | Power(v, n) -> assert false
+  | LocalVar v -> v.var_type
+  | StateVar v -> v.var_type
+  | Fun(n, vl) -> begin match n with
+                  | "+"
+                  | "-"
+                  | "*" -> get_type (List.hd vl)
+                  | _ -> Format.eprintf "Function undealt with : %s" n ;assert false
+                  end
+  | Array(l) -> new_ty (Tarray(Dimension.mkdim_int
+                                 (Location.dummy_loc)
+                                 (List.length l),
+                               get_type (List.hd l)))
+  | _ -> assert false
+*)
+
+(* Default value for each type, used when building arrays. Eg integer array
+   [2;7] is defined as (store (store (0) 1 7) 0 2) where 0 is this default value
+   for the type integer (arrays).
+*)
+let rec pp_default_val fmt t =
+  match (Types.dynamic_type t).Types.tdesc with
+  | Types.Tint -> fprintf fmt "0"
+  | Types.Treal -> fprintf fmt "0"
+  | Types.Tbool -> fprintf fmt "true"
+  | Types.Tarray(dim, l) -> (* TODO PL: this strange code has to be (heavily) checked *)
+     let valt = Types.array_element_type t in
+     fprintf fmt "((as const (Array Int %a)) %a)"
+       pp_type valt 
+       pp_default_val valt
+  | Types.Tstruct(l) -> assert false
+  | Types.Ttuple(l) -> assert false
+  |_ -> assert false
+
+
 (* Prints a value expression [v], with internal function calls only.
    [pp_var] is a printer for variables (typically [pp_c_var_read]),
    but an offset suffix may be added for array variables
 *)
 let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
   match v.value_desc with
-    | Cst c         -> pp_horn_const fmt c
-    | Array _
-    | Access _ -> assert false (* no arrays *)
-    | Power (v, n)  -> assert false
-    | LocalVar v    -> pp_var fmt (rename_machine self v)
-    | StateVar v    ->
-      if Types.is_array_type v.var_type
-      then assert false
-      else pp_var fmt (rename_machine self ((if is_lhs then rename_next else rename_current) (* self *) v))
-    | Fun (n, vl)   -> fprintf fmt "%a" (Basic_library.pp_horn n (pp_horn_val self pp_var)) vl
+  | Cst c       -> pp_horn_const fmt c
+
+  (* Code specific for arrays *)
+  | Array il    ->
+     (* An array definition: 
+	(store (
+	  ...
+ 	    (store (
+	       store (
+	          default_val
+	       ) 
+	       idx_n val_n
+	    ) 
+	    idx_n-1 val_n-1)
+	  ... 
+	  idx_1 val_1
+	) *)
+     let rec print fmt (tab, x) =
+       match tab with
+       | [] -> pp_default_val fmt v.value_type(* (get_type v) *)
+       | h::t ->
+	  fprintf fmt "(store %a %i %a)"
+	    print (t, (x+1))
+	    x
+	    (pp_horn_val ~is_lhs:is_lhs self pp_var) h
+     in
+     print fmt (il, 0)
+       
+  | Access(tab,index) ->
+     fprintf fmt "(select %a %a)"
+       (pp_horn_val ~is_lhs:is_lhs self pp_var) tab
+       (pp_horn_val ~is_lhs:is_lhs self pp_var) index
+
+  (* Code specific for arrays *)
+    
+  | Power (v, n)  -> assert false
+  | LocalVar v    -> pp_var fmt (rename_machine self v)
+  | StateVar v    ->
+     if Types.is_array_type v.var_type
+     then assert false
+     else pp_var fmt (rename_machine self ((if is_lhs then rename_next else rename_current) (* self *) v))
+  | Fun (n, vl)   -> fprintf fmt "%a" (Basic_library.pp_horn n (pp_horn_val self pp_var)) vl
 
 (* Prints a [value] indexed by the suffix list [loop_vars] *)
 let rec pp_value_suffix self pp_value fmt value =
@@ -392,6 +489,110 @@ let print_machine machines fmt m =
     end
 
 
+let mk_flags arity =
+  let b_range =
+   let rec range i j =
+     if i > arity then [] else i :: (range (i+1) j) in
+   range 2 arity;
+ in
+ List.fold_left (fun acc x -> acc ^ " false") "true" b_range
+
+
+  (*Get sfunction infos from command line*)
+let get_sf_info() =
+  let splitted = Str.split (Str.regexp "@") !Options.sfunction in
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. sfunction name: %s@," !Options.sfunction);
+  let sf_name, flags, arity = match splitted with
+      [h;flg;par] -> h, flg, par
+    | _ -> failwith "Wrong Sfunction info"
+
+  in
+  Log.report ~level:1 (fun fmt -> fprintf fmt "... sf_name: %s@, .. flags: %s@ .. arity: %s@," sf_name flags arity);
+  sf_name, flags, arity
+
+
+    (*a function to print the rules in case we have an s-function*)
+  let print_sfunction machines fmt m =
+      if m.mname.node_id = arrow_id then
+        (* We don't print arrow function *)
+        ()
+      else
+        begin
+          Format.fprintf fmt "; SFUNCTION@.";
+          Format.fprintf fmt "; %s@." m.mname.node_id;
+          Format.fprintf fmt "; EndPoint Predicate %s." !Options.sfunction;
+
+          (* Check if there is annotation for s-function *)
+          if m.mannot != [] then(
+              Format.fprintf fmt "; @[%a@]@]@\n" (Utils.fprintf_list ~sep:"@ " Printers.pp_s_function) m.mannot;
+            );
+
+       (* Printing variables *)
+          Utils.fprintf_list ~sep:"@." pp_decl_var fmt
+                             ((step_vars machines m)@
+    	                        (rename_machine_list m.mname.node_id m.mstep.step_locals));
+          Format.pp_print_newline fmt ();
+          let sf_name, flags, arity = get_sf_info() in
+
+       if is_stateless m then
+         begin
+           (* Declaring single predicate *)
+           Format.fprintf fmt "(declare-rel %a (%a))@."
+    	                  pp_machine_stateless_name m.mname.node_id
+    	                  (Utils.fprintf_list ~sep:" " pp_type)
+    	                  (List.map (fun v -> v.var_type) (reset_vars machines m));
+           Format.pp_print_newline fmt ();
+           (* Rule for single predicate *)
+           let str_flags = sf_name ^ " " ^ mk_flags (int_of_string flags) in
+           Format.fprintf fmt "@[<v 2>(rule (=> @ (%s %a) (%a %a)@]@.))@.@."
+                          str_flags
+                          (Utils.fprintf_list ~sep:" " (pp_horn_var m)) (reset_vars machines m)
+	                  pp_machine_stateless_name m.mname.node_id
+	                  (Utils.fprintf_list ~sep:" " (pp_horn_var m)) (reset_vars machines m);
+         end
+      else
+         begin
+           (* Declaring predicate *)
+           Format.fprintf fmt "(declare-rel %a (%a))@."
+    	                  pp_machine_reset_name m.mname.node_id
+    	                  (Utils.fprintf_list ~sep:" " pp_type)
+    	                  (List.map (fun v -> v.var_type) (inout_vars machines m));
+
+           Format.fprintf fmt "(declare-rel %a (%a))@."
+    	                  pp_machine_step_name m.mname.node_id
+    	                  (Utils.fprintf_list ~sep:" " pp_type)
+    	                  (List.map (fun v -> v.var_type) (step_vars machines m));
+
+           Format.pp_print_newline fmt ();
+          (* Adding assertions *)
+           match m.mstep.step_asserts with
+	  | [] ->
+	    begin
+
+	      (* Rule for step*)
+	      fprintf fmt "@[<v 2>(rule (=> @ ";
+	      ignore (pp_machine_instrs machines [] m fmt m.mstep.step_instrs);
+	      fprintf fmt "@ (%a @[<v 0>%a)@]@]@.))@.@."
+		pp_machine_step_name m.mname.node_id
+		(Utils.fprintf_list ~sep:"@ " (pp_horn_var m)) (step_vars machines m);
+	    end
+	  | assertsl ->
+	    begin
+	      let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id (pp_horn_var m) in
+	      (* print_string pp_val; *)
+	      fprintf fmt "; with Assertions @.";
+
+	      (*Rule for step*)
+	      fprintf fmt "@[<v 2>(rule (=> @ (and @ ";
+	      ignore (pp_machine_instrs machines [] m fmt m.mstep.step_instrs);
+	      fprintf fmt "@. %a)(%a @[<v 0>%a)@]@]@.))@.@." (pp_conj pp_val) assertsl
+		pp_machine_step_name m.mname.node_id
+		(Utils.fprintf_list ~sep:" " (pp_horn_var m)) (step_vars machines m);
+	    end
+
+         end
+
+        end
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)
 (* End: *)

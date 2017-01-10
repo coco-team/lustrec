@@ -131,6 +131,24 @@ and pp_eexpr fmt e =
     (fun fmt -> match e.eexpr_quantifiers with [] -> () | _ -> fprintf fmt ";")
     pp_expr e.eexpr_qfexpr
 
+and  pp_sf_value fmt e =
+   fprintf fmt "%a"
+     (* (Utils.fprintf_list ~sep:"; " pp_quantifiers) e.eexpr_quantifiers *)
+     (* (fun fmt -> match e.eexpr_quantifiers *)
+     (*             with [] -> () *)
+     (*                | _ -> fprintf fmt ";") *)
+     pp_expr e.eexpr_qfexpr
+
+and pp_s_function fmt expr_ann =
+  let pp_annot fmt (kwds, ee) =
+    Format.fprintf fmt " %t : %a"
+                   (fun fmt -> match kwds with
+                               | [] -> assert false
+                               | [x] -> Format.pp_print_string fmt x
+                               | _ -> Format.fprintf fmt "%a" (fprintf_list ~sep:"/" Format.pp_print_string) kwds)
+                   pp_sf_value ee
+  in
+  fprintf_list ~sep:"@ " pp_annot fmt expr_ann.annots
 
 and pp_expr_annot fmt expr_ann =
   let pp_annot fmt (kwds, ee) =

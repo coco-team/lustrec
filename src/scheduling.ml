@@ -154,7 +154,7 @@ let schedule_node n =
   with (Causality.Error err) as exc ->
     match err with
     | DataCycle vl ->
-       let vl = filter_original n vl in
+       let _ (*vl*) = filter_original n vl in
        Causality.pp_error Format.err_formatter err;
        raise exc
     | _ -> raise exc

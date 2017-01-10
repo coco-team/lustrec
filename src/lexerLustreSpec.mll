@@ -66,6 +66,8 @@ let keyword_table =
   "assumes", ASSUMES;
   "exists", EXISTS;
   "forall", FORALL;
+  "c_code", CCODE;
+  "matlab", MATLAB;
   ]
 
 }
@@ -127,10 +129,10 @@ rule token = parse
   | "^" {POWER}
   | '"' { Buffer.clear str_buf; string_parse lexbuf }
   | eof { EOF }
-  | _ { raise (Parse.Error (Location.curr lexbuf, Unexpected_eof)) }
+  | _ { raise (Parse.Error (Location.curr lexbuf, Parse.Unexpected_eof)) }
 and comment_line n = parse
 | eof
-    { raise (Parse.Error (Location.curr lexbuf, Unfinished_comment)) }
+    { raise (Parse.Error (Location.curr lexbuf, Parse.Unfinished_comment)) }
 | "(*"
     { comment_line (n+1) lexbuf }
 | "*)"
@@ -140,7 +142,7 @@ and comment_line n = parse
       comment_line n lexbuf }
 | _ { comment_line n lexbuf }
 and string_parse = parse
-  | eof { raise (Parse.Error (Location.curr lexbuf, Unfinished_string)) }
+  | eof { raise (Parse.Error (Location.curr lexbuf, Parse.Unfinished_string)) }
   | "\\\"" as s { Buffer.add_string str_buf s; string_parse lexbuf}
   | '"' { STRING (Buffer.contents str_buf) }
   | _ as c  { Buffer.add_char str_buf c; string_parse lexbuf }

@@ -39,7 +39,8 @@ let print_import_standard fmt =
       begin
 	fprintf fmt "#include <mpfr.h>@."
       end;
-    fprintf fmt "#include \"%s/arrow.h\"@.@." Version.include_path
+  fprintf fmt "#include \"%s/arrow.h\"@.@." !Options.include_dir
+
   end
 
 let rec print_static_val pp_var fmt v =

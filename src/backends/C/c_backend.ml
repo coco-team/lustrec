@@ -28,7 +28,7 @@ let makefile_opt print basename dependencies makefile_fmt machines =
 let gen_files funs basename prog machines dependencies =
   let destname = !Options.dest_dir ^ "/" ^ basename in
   
-  let print_header, print_lib_c, print_main_c, print_makefile, print_cmake = funs in
+  let print_header, print_lib_c, print_main_c, print_makefile(* , print_cmake *) = funs in
 
   (* Generating H file *)
   let alloc_header_file = destname ^ "_alloc.h" in (* Could be changed *)
@@ -87,17 +87,17 @@ let gen_files funs basename prog machines dependencies =
     print_makefile basename main_node dependencies makefile_fmt;
     
     close_out makefile_out
-  ));
+  ))(* ; *)
   
-  (* Case 2 *)
-  let cmake_file = "lustrec-" ^ basename ^ ".cmake" in
-  let cmake_file_full_path = !Options.dest_dir ^ "/" ^ cmake_file in
-  let cmake_out = open_out cmake_file_full_path in
-  let cmake_fmt = formatter_of_out_channel cmake_out in
-  (* Generating Makefile *)
-  print_cmake basename main_node dependencies makefile_fmt;
+  (* (\* Case 2 *\) *)
+  (* let cmake_file = "lustrec-" ^ basename ^ ".cmake" in *)
+  (* let cmake_file_full_path = !Options.dest_dir ^ "/" ^ cmake_file in *)
+  (* let cmake_out = open_out cmake_file_full_path in *)
+  (* let cmake_fmt = formatter_of_out_channel cmake_out in *)
+  (* (\* Generating Makefile *\) *)
+  (* print_cmake basename main_node dependencies makefile_fmt; *)
     
-    close_out makefile_out
+  (*   close_out makefile_out *)
   
 
 let translate_to_c basename prog machines dependencies =
@@ -112,14 +112,14 @@ let translate_to_c basename prog machines dependencies =
     let module Source = C_backend_src.Main (SourceMod) in
     let module SourceMain = C_backend_main.Main (SourceMainMod) in
     let module Makefile = C_backend_makefile.Main (MakefileMod) in
-    let module CMakefile = C_backend_cmake.Main (MakefileMod) in
+    (* let module CMakefile = C_backend_cmake.Main (MakefileMod) in *)
     
     let funs = 
       Header.print_alloc_header, 
       Source.print_lib_c, 
       SourceMain.print_main_c, 
-      Makefile.print_makefile,
-      CMakefile.print_makefile
+      Makefile.print_makefile(* , *)
+      (* CMakefile.print_makefile *)
     in
     gen_files funs basename prog machines dependencies 
 
@@ -135,14 +135,14 @@ let translate_to_c basename prog machines dependencies =
     let module Source = C_backend_src.Main (SourceMod) in
     let module SourceMain = C_backend_main.Main (SourceMainMod) in
     let module Makefile = C_backend_makefile.Main (MakefileMod) in
-    let module CMakefile = C_backend_cmake.Main (MakefileMod) in
+    (* let module CMakefile = C_backend_cmake.Main (MakefileMod) in *)
     
     let funs = 
       Header.print_alloc_header, 
       Source.print_lib_c,
       SourceMain.print_main_c,
-      Makefile.print_makefile,
-      CMakefile.print_makefile 
+      Makefile.print_makefile(* , *)
+      (* CMakefile.print_makefile  *)
     in
     gen_files funs basename prog machines dependencies 
 

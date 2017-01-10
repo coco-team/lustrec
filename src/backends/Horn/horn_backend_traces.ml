@@ -136,9 +136,9 @@ let traces_file fmt basename prog machines =
 	(Utils.fprintf_list ~sep:" | "  (fun fmt id -> pp_type fmt id.var_type)) output_vars
 	(Utils.fprintf_list ~sep:" | " pp_var) (m.mstep.step_outputs);
       
-      let init_local_vars = 
-	
-	  (rename_next_list (try full_memory_vars ~without_arrow:true machines m with Not_found -> Format.eprintf "mahine %s@.@?" m.mname.node_id; assert false)) 
+      let init_local_vars =
+	(rename_next_list
+	   (try full_memory_vars ~without_arrow:true machines m with Not_found -> Format.eprintf "mahine %s@.@?" m.mname.node_id; assert false)) 
 	
 
       in

@@ -11,11 +11,18 @@
 
 let version = Version.number
 let codename = Version.codename
-let include_path = Version.include_path
+let include_dir = ref "."
+let include_path =
+if (!include_dir != ".") then Version.prefix ^ !include_dir
+else Version.include_path
+
+
+
 
 let print_version () =
   Format.printf "Lustrec compiler, version %s (%s)@." version codename;
-  Format.printf "Include directory: %s@." include_path
+  Format.printf "Include directory: %s@." include_path;
+  Format.printf "User selected Include directory: %s@." !include_dir
 
 let main_node = ref ""
 let static_mem = ref true
@@ -44,6 +51,8 @@ let horn_query = ref true
 
 let salsa_enabled = ref true
 
+let sfunction = ref ""
+
 let set_mpfr prec =
   if prec > 0 then (
     mpfr := true;
@@ -54,8 +63,9 @@ let set_mpfr prec =
     failwith "mpfr requires a positive integer"
 			
 let options =
-  [ "-d", Arg.Set_string dest_dir,
-    "uses the specified directory \x1b[4mdir\x1b[0m as root for generated/imported object and C files <default: .>";
+[ "-d", Arg.Set_string dest_dir,
+"uses the specified directory \x1b[4mdir\x1b[0m as root for generated/imported object and C files <default: .>";
+"-I", Arg.Set_string include_dir, "Include directory";
     "-node", Arg.Set_string main_node, "specifies the \x1b[4mmain\x1b[0m node";
     "-init", Arg.Set delay_calculus, "performs an initialisation analysis for Lustre nodes <default: no analysis>";
     "-dynamic", Arg.Clear static_mem, "specifies a dynamic allocation scheme for main Lustre node <default: static>";
@@ -70,6 +80,7 @@ let options =
     "-horn-traces", Arg.Unit (fun () -> output := "horn"; traces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
     "-horn-cex", Arg.Unit (fun () -> output := "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
     "-horn-query", Arg.Unit (fun () -> output := "horn"; horn_query:=true), "generate queries in generated Horn file. Enable the horn backend (work in progress)";
+    "-horn-sfunction", Arg.Set_string sfunction, "Get the endpoint predicate of the sfunction";
     "-print_reuse", Arg.Set print_reuse, "prints variable reuse policy";
     "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";
     "-inline", Arg.Unit (fun () -> global_inline := true; const_unfold := true), "inline all node calls (require a main node). Implies constant unfolding";

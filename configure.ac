@@ -98,7 +98,6 @@ AC_DEFINE_DIR([abs_datadir], [datadir])
 # Instanciation
 AC_CONFIG_FILES([Makefile
 		 src/Makefile
-                 src/myocamlbuild.ml
 		 src/version.ml
 		 test/test-compile.sh
 		 ])

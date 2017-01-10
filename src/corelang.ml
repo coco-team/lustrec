@@ -241,7 +241,7 @@ let is_imported_node td =
 
 (* alias and type definition table *)
 
-let mktop = mktop_decl Location.dummy_loc Version.include_path false 
+let mktop = mktop_decl Location.dummy_loc !Options.include_dir false
 
 let top_int_type = mktop (TypeDef {tydef_id = "int"; tydef_desc = Tydec_int})
 let top_bool_type = mktop (TypeDef {tydef_id = "bool"; tydef_desc = Tydec_bool})

@@ -52,7 +52,7 @@
 %token PRE ARROW
 %token EOF
 %token REQUIRES ENSURES OBSERVER
-%token INVARIANT BEHAVIOR ASSUMES
+%token INVARIANT BEHAVIOR ASSUMES CCODE MATLAB
 %token EXISTS FORALL
 
 %nonassoc prec_exists prec_forall
@@ -295,6 +295,8 @@ lustre_annot_list:
 | IDENT COL expr SCOL lustre_annot_list { ([$1],$3)::$5 }
 | INVARIANT COL expr SCOL lustre_annot_list{ (["invariant"],$3)::$5 }
 | OBSERVER COL expr SCOL lustre_annot_list { (["observer"],$3)::$5 }
+| CCODE COL const lustre_annot_list{ (["c_code"],$3)::$5 }
+| MATLAB COL const lustre_annot_list{ (["matlab"],$3)::$5 }
 
 kwd:
 DIV { [] }

@@ -63,6 +63,8 @@ let keyword_table =
   "assert", ASSERT;
   "lib", LIB;
   "prototype", PROTOTYPE;
+  "c_code", CCODE; (* not sure how it is used *)
+  "matlab", MATLAB; (* same as above *)
 ]
 
 
