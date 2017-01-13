@@ -135,14 +135,15 @@ let traces_file fmt basename prog machines =
 	(Utils.fprintf_list ~sep:" | " pp_var)  output_vars
 	(Utils.fprintf_list ~sep:" | "  (fun fmt id -> pp_type fmt id.var_type)) output_vars
 	(Utils.fprintf_list ~sep:" | " pp_var) (m.mstep.step_outputs);
-      
-      let init_local_vars =
-	(rename_next_list
-	   (try full_memory_vars ~without_arrow:true machines m with Not_found -> Format.eprintf "mahine %s@.@?" m.mname.node_id; assert false)) 
-	
 
+      let local_vars =
+	(try
+	   full_memory_vars ~without_arrow:true machines m
+	 with Not_found -> Format.eprintf "machine %s@.@?" m.mname.node_id; assert false
+	)
       in
-      let step_local_vars = (rename_current_list (full_memory_vars ~without_arrow:true machines m)) in
+      let init_local_vars = rename_next_list local_vars in
+      let step_local_vars = rename_current_list local_vars in
 
       fprintf fmt "<localInit name=\"%a\" type=\"%a\">%t%a</localInit>@ "
 	(Utils.fprintf_list ~sep:" | " pp_var) init_local_vars
@@ -157,6 +158,13 @@ let traces_file fmt basename prog machines =
 	(Utils.fprintf_list ~sep:" | " (fun fmt (prefix,ee) -> fprintf fmt "(%a)"
           Printers.pp_expr ee)) (memories_old);
 
+      let arrow_vars = arrow_vars machines m in
+      let arrow_vars_mid = rename_mid_list arrow_vars and
+	  arrow_vars_next = rename_next_list arrow_vars
+      in
+      Utils.fprintf_list ~sep:"@ "
+      	(fun fmt v -> fprintf fmt "<reset name=\"%a\"/>" pp_var v)
+      	fmt (arrow_vars_mid@arrow_vars_next);
       fprintf fmt "@]@ </Node>";
      )) (List.rev machines);
   fprintf fmt "</Traces>@."

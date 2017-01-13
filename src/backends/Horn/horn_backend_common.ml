@@ -60,17 +60,17 @@ let rename_next = rename (fun n -> n ^ "_x")
 let rename_next_list = List.map rename_next
 
 let get_machine machines node_name =
-(*  try *)
+  try 
   List.find (fun m  -> m.mname.node_id = node_name) machines
-(* with Not_found -> Format.eprintf "Unable to find machine %s in machines %a@.@?"  *)
-(*   node_name *)
-(*   (Utils.fprintf_list ~sep:", " (fun fmt m -> pp_print_string fmt m.mname.node_id)) machines *)
-(*   ; assert false *)
+with Not_found -> Format.eprintf "Unable to find machine %s in machines %a@.@?"
+  node_name
+  (Utils.fprintf_list ~sep:", " (fun fmt m -> pp_print_string fmt m.mname.node_id)) machines
+  ; assert false
 
 let local_memory_vars machines machine =
   rename_machine_list machine.mname.node_id machine.mmemory
 
-let instances_memory_vars ?(without_arrow=false) machines machine =
+let instances_memory_vars ?(without_arrow=false) machines machine : LustreSpec.var_decl list =
   let rec aux fst prefix m =
     (
       if not fst then (
@@ -88,6 +88,26 @@ let instances_memory_vars ?(without_arrow=false) machines machine =
 			 (if fst then id else concat m.mname.node_id id))
 	      machine_n ) @ accu
       ) [] (m.minstances)
+  in
+  aux true machine.mname.node_id machine
+
+(* Extract the arrows of a given node/machine *)
+let arrow_vars machines machine : LustreSpec.var_decl list =
+  let rec aux fst prefix m =
+    List.fold_left (fun accu (id, (n, _)) ->
+      let name = node_name n in
+      if name = "_arrow" then
+	let arrow_machine = Machine_code.arrow_machine in
+	(rename_machine_list
+	  (concat prefix (concat (if fst then id else concat m.mname.node_id id) "_arrow"))
+	  arrow_machine.mmemory
+	) @ accu
+      else
+	let machine_n = get_machine machines name in
+	( aux false (concat prefix
+		       (if fst then id else concat m.mname.node_id id))
+	    machine_n ) @ accu
+    ) [] (m.minstances)
   in
   aux true machine.mname.node_id machine
 
