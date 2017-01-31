@@ -75,7 +75,7 @@ let options =
     "-no-spec", Arg.Unit (fun () -> spec := "no"), "do not generate any specification";
     "-acsl-spec", Arg.Unit (fun () -> spec := "acsl"), "generates an ACSL encoding of the specification. Only meaningful for the C backend <default>";
     "-c-spec", Arg.Unit (fun () -> spec := "c"), "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
-    "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C";
+    (* "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C"; *)
     "-horn", Arg.Unit (fun () -> output := "horn"), "generates Horn clauses encoding output instead of C";
     "-horn-traces", Arg.Unit (fun () -> output := "horn"; traces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
     "-horn-cex", Arg.Unit (fun () -> output := "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
@@ -83,6 +83,7 @@ let options =
     "-horn-sfunction", Arg.Set_string sfunction, "Get the endpoint predicate of the sfunction";
     "-print_reuse", Arg.Set print_reuse, "prints variable reuse policy";
     "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";
+    "-emf", Arg.Unit (fun () -> output := "emf"), "generates EMF output, to be used by CocoSim";
     "-inline", Arg.Unit (fun () -> global_inline := true; const_unfold := true), "inline all node calls (require a main node). Implies constant unfolding";
     "-witnesses", Arg.Set witnesses, "enable production of witnesses during compilation";
     "-print_types", Arg.Set print_types, "prints node types";

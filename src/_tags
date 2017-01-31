@@ -1,5 +1,6 @@
 "backends/C": include
 "backends/Horn": include
+"backends/EMF": include
 "plugins/scopes": include
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic

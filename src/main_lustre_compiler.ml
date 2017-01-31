@@ -90,7 +90,7 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
 
 let functional_backend () = 
   match !Options.output with
-  | "horn" | "lustre" | "acsl" -> true
+  | "horn" | "lustre" | "emf" | "acsl" -> true
   | _ -> false
 
 (* From prog to prog *)
@@ -367,6 +367,15 @@ let stage3 prog machine_code dependencies basename =
        let fmt = formatter_of_out_channel source_out in
        Printers.pp_prog fmt prog;
        (*	Lustre_backend.translate fmt basename normalized_prog machine_code *)
+       ()
+     end
+  | "emf" ->
+     begin
+       let destname = !Options.dest_dir ^ "/" ^ basename in
+       let source_file = destname ^ ".emf" in (* Could be changed *)
+       let source_out = open_out source_file in
+       let fmt = formatter_of_out_channel source_out in
+       EMF_backend.translate fmt prog;
        ()
      end
 

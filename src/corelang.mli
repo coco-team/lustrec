@@ -118,7 +118,7 @@ val get_dependencies : program -> top_decl list
 val rename_static: (ident -> Dimension.dim_expr) -> type_dec_desc -> type_dec_desc
 val rename_carrier: (ident -> ident) -> clock_dec_desc -> clock_dec_desc
 
-val get_expr_vars: Utils.ISet.t -> expr -> Utils.ISet.t
+val get_expr_vars: expr -> Utils.ISet.t
 val expr_replace_var: (ident -> ident) -> expr -> expr
 val eq_replace_rhs_var: (ident -> bool) -> (ident -> ident) -> eq -> eq
 

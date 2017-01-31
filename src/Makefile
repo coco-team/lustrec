@@ -1,4 +1,4 @@
-OCAMLBUILD=/usr/bin/ocamlbuild -classic-display -use-ocamlfind -no-links 
+OCAMLBUILD=/home/ploc/.opam/4.03.0+trunk/bin/ocamlbuild -classic-display -use-ocamlfind -no-links 
 
 prefix=/home/ploc/Local
 exec_prefix=${prefix}

@@ -69,7 +69,7 @@ let expr_of_exit loc restart state conds tag =
 
 let rec unless_read reads handler =
   let res =
-  List.fold_left (fun read (_, c, _, _) -> get_expr_vars read c) reads handler.hand_unless
+  List.fold_left (fun read (_, c, _, _) -> Utils.ISet.union read (get_expr_vars c)) reads handler.hand_unless
   in
 (
 (*
@@ -80,14 +80,14 @@ res
 )
 
 let rec until_read reads handler =
-  List.fold_left (fun read (_, c, _, _) -> get_expr_vars read c) reads handler.hand_until
+  List.fold_left (fun read (_, c, _, _) -> Utils.ISet.union read (get_expr_vars c)) reads handler.hand_until
 
 let rec handler_read reads handler =
   let locals = List.fold_left (fun locals v -> ISet.add v.var_id locals) ISet.empty handler.hand_locals in
   let allvars =
     List.fold_left (fun read stmt ->
       match stmt with
-      | Eq eq -> get_expr_vars read eq.eq_rhs
+      | Eq eq -> Utils.ISet.union read (get_expr_vars eq.eq_rhs)
       | Aut aut -> automata_read read aut) reads handler.hand_stmts
   in let res = ISet.diff allvars locals
      in

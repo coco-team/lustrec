@@ -959,12 +959,14 @@ and get_eq_calls nodes eq =
 and get_node_calls nodes node =
   List.fold_left (fun accu eq -> Utils.ISet.union (get_eq_calls nodes eq) accu) Utils.ISet.empty (get_node_eqs node)
 
-let rec get_expr_vars vars e =
-  get_expr_desc_vars vars e.expr_desc
-and get_expr_desc_vars vars expr_desc =
+let get_expr_vars e =
+  let rec get_expr_vars vars e =
+    get_expr_desc_vars vars e.expr_desc
+  and get_expr_desc_vars vars expr_desc =
+    Format.eprintf "get_expr_desc_vars expr=%a@." Printers.pp_expr (mkexpr Location.dummy_loc expr_desc);
   match expr_desc with
   | Expr_const _ -> vars
-  | Expr_ident x -> Utils.ISet.add x vars
+  | Expr_ident x -> Format.eprintf "%s is an ident!@." x; Utils.ISet.add x vars
   | Expr_tuple el
   | Expr_array el -> List.fold_left get_expr_vars vars el
   | Expr_pre e1 -> get_expr_vars vars e1
@@ -977,7 +979,8 @@ and get_expr_desc_vars vars expr_desc =
   | Expr_merge (c, hl) -> List.fold_left (fun vars (_, h) -> get_expr_vars vars h) (Utils.ISet.add c vars) hl
   | Expr_appl (_, arg, None)   -> get_expr_vars vars arg
   | Expr_appl (_, arg, Some r) -> List.fold_left get_expr_vars vars [arg; r]
-
+  in
+  get_expr_vars Utils.ISet.empty e 
 
 let rec expr_has_arrows e =
   expr_desc_has_arrows e.expr_desc
