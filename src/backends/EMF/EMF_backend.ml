@@ -26,7 +26,7 @@ let pp_expr vars fmt expr =
     | Expr_access (a, d) -> fprintf fmt "%a[%a]" pp_expr a Dimension.pp_dimension d
     | Expr_power (a, d) -> fprintf fmt "(%a^%a)" pp_expr a Dimension.pp_dimension d
     | Expr_tuple el -> fprintf fmt "(%a)" pp_tuple el
-    | Expr_ite (c, t, e) -> fprintf fmt "(if %a then %a else %a)" pp_expr c pp_expr t pp_expr e
+    | Expr_ite (c, t, e) -> fprintf fmt "if %a; %a; else %a; end" pp_expr c pp_expr t pp_expr e
     | Expr_arrow (e1, e2) ->(
       match e1.expr_desc, e2.expr_desc with
       | Expr_const c1, Expr_const c2 -> if c1 = Corelang.const_of_bool true && c2 = Corelang.const_of_bool false then fprintf fmt "STEP" else assert false (* only handle true -> false *)
@@ -99,7 +99,7 @@ let pp_stmt fmt stmt =
      (* first, we extract the expression and associated variables *)
 	let vars = Utils.ISet.elements (Corelang.get_expr_vars eq.eq_rhs) in
 	
-	fprintf fmt "\"%s\": @[<v 2>{ \"expr\": \"%a\";@ \"vars\": [%a] @]}"
+	fprintf fmt "\"%s\": @[<v 2>{ \"expr\": \"%a\",@ \"vars\": [%a] @]}"
 	  var
 	  (pp_expr vars) eq.eq_rhs (* todo_pp_expr expr *)
 	  (fprintf_list ~sep:", " pp_var_string) vars
@@ -109,12 +109,12 @@ let pp_stmt fmt stmt =
   | _ -> assert false (* should not happen with EMF backend *)
 
 let pp_node fmt nd =
-  fprintf fmt "@[<v 2>\"%s\": {@ \"inputs\": [%a];@ \"outputs\": [%a];@ "
+  fprintf fmt "@[<v 2>\"%s\": {@ \"inputs\": [%a],@ \"outputs\": [%a],@ "
     nd.node_id
     pp_node_args nd.node_inputs
     pp_node_args nd.node_outputs;
   fprintf fmt "\"exprs\": {@[<v 1> %a@]@ }"
-    (fprintf_list ~sep:";@ " pp_stmt ) nd.node_stmts;
+    (fprintf_list ~sep:",@ " pp_stmt ) nd.node_stmts;
   fprintf fmt "@]@ }"
     
 let pp_decl fmt decl =
@@ -128,6 +128,6 @@ let pp_decl fmt decl =
 
 let translate fmt prog =
   fprintf fmt "@[<v 0>{@ ";
-  fprintf_list ~sep:"@ " pp_decl fmt prog;
+  fprintf_list ~sep:",@ " pp_decl fmt prog;
   fprintf fmt "@ @]}"
 
