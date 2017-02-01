@@ -26,7 +26,7 @@ let pp_expr vars fmt expr =
     | Expr_access (a, d) -> fprintf fmt "%a[%a]" pp_expr a Dimension.pp_dimension d
     | Expr_power (a, d) -> fprintf fmt "(%a^%a)" pp_expr a Dimension.pp_dimension d
     | Expr_tuple el -> fprintf fmt "(%a)" pp_tuple el
-    | Expr_ite (c, t, e) -> fprintf fmt "if %a; y=(%a); else y=(%a); end" pp_expr c pp_expr t pp_expr e
+    | Expr_ite (c, t, e) -> fprintf fmt "if %a; %a; else %a; end" pp_expr c pp_expr t pp_expr e
     | Expr_arrow (e1, e2) ->(
       match e1.expr_desc, e2.expr_desc with
       | Expr_const c1, Expr_const c2 -> if c1 = Corelang.const_of_bool true && c2 = Corelang.const_of_bool false then fprintf fmt "STEP" else assert false (* only handle true -> false *)
@@ -62,8 +62,8 @@ let pp_expr vars fmt expr =
     | "<=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a <= %a)" pp_expr e1 pp_expr e2
     | ">", Expr_tuple([e1;e2]) -> fprintf fmt "(%a > %a)" pp_expr e1 pp_expr e2
     | ">=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a >= %a)" pp_expr e1 pp_expr e2
-    | "!=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a ~= %a)" pp_expr e1 pp_expr e2
-    | "=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a == %a)" pp_expr e1 pp_expr e2
+    | "!=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a != %a)" pp_expr e1 pp_expr e2
+    | "=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a = %a)" pp_expr e1 pp_expr e2
     | "not", _ -> fprintf fmt "(~%a)" pp_expr e
     | _, Expr_tuple _ -> fprintf fmt "%s %a" id pp_expr e
     | _ -> fprintf fmt "%s (%a)" id pp_expr e
@@ -98,7 +98,7 @@ let pp_stmt fmt stmt =
       [var] -> (
      (* first, we extract the expression and associated variables *)
 	let vars = Utils.ISet.elements (Corelang.get_expr_vars eq.eq_rhs) in
-
+	
 	fprintf fmt "\"%s\": @[<v 2>{ \"expr\": \"%a\",@ \"vars\": [%a] @]}"
 	  var
 	  (pp_expr vars) eq.eq_rhs (* todo_pp_expr expr *)
