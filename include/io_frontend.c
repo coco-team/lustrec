@@ -8,7 +8,7 @@ int ISATTY;
 /* Standard Input procedures **************/
 _Bool _get_bool(FILE* file, char* n){
    char b[512];
-   _Bool r = 0;
+   int r = 0;
    int s = 1;
    char c;
    do {
@@ -23,7 +23,7 @@ _Bool _get_bool(FILE* file, char* n){
       if((c == '1') || (c == 't') || (c == 'T')) r = 1;
    } while((s != 1) || (r == -1));
    fprintf(file, "%i\n",r);
-   return r;
+   return (_Bool)r;
 }
 
 int _get_int(FILE* file, char* n){
