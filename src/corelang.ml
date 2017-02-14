@@ -473,8 +473,21 @@ let rec dimension_of_expr expr =
 let sort_handlers hl =
  List.sort (fun (t, _) (t', _) -> compare t t') hl
 
+let num_10 = Num.num_of_int 10
+  
+let rec is_eq_const c1 c2 =
+  match c1, c2 with
+  | Const_real (n1, i1, _), Const_real (n2, i2, _)
+    -> Num.(let n1 = n1 // (num_10 **/ (num_of_int i1)) in
+	    let n2 = n2 // (num_10 **/ (num_of_int i2)) in
+	    eq_num n1 n2)
+  | Const_struct lcl1, Const_struct lcl2
+    -> List.length lcl1 = List.length lcl2
+    && List.for_all2 (fun (l1, c1) (l2, c2) -> l1 = l2 && is_eq_const c1 c2) lcl1 lcl2
+  | _  -> c1 = c2
+
 let rec is_eq_expr e1 e2 = match e1.expr_desc, e2.expr_desc with
-  | Expr_const c1, Expr_const c2 -> c1 = c2
+  | Expr_const c1, Expr_const c2 -> is_eq_const c1 c2
   | Expr_ident i1, Expr_ident i2 -> i1 = i2
   | Expr_array el1, Expr_array el2 
   | Expr_tuple el1, Expr_tuple el2 -> 

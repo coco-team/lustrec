@@ -80,8 +80,8 @@ let mk_fresh_var node loc ty ck =
 let get_expr_alias defs expr =
  try Some (List.find (fun eq -> is_eq_expr eq.eq_rhs expr) defs)
  with
-   Not_found -> None
-
+ | Not_found -> None
+  
 (* Replace [expr] with (tuple of) [locals] *)
 let replace_expr locals expr =
  match locals with
@@ -156,13 +156,13 @@ let mk_expr_alias_opt opt node (defs, vars) expr =
    taking propagated [offsets] into account
    in order to change expression type *)
 let mk_norm_expr offsets ref_e norm_d =
-(*Format.eprintf "mk_norm_expr %a %a @." Printers.pp_expr ref_e Printers.pp_expr { ref_e with expr_desc = norm_d};*)
+  (*Format.eprintf "mk_norm_expr %a %a @." Printers.pp_expr ref_e Printers.pp_expr { ref_e with expr_desc = norm_d};*)
   let drop_array_type ty =
     Types.map_tuple_type Types.array_element_type ty in
   { ref_e with
     expr_desc = norm_d;
     expr_type = Utils.repeat (List.length offsets) drop_array_type ref_e.expr_type }
-
+														
 (* normalize_<foo> : defs * used vars -> <foo> -> (updated defs * updated vars) * normalized <foo> *)
 let rec normalize_list alias node offsets norm_element defvars elist =
   List.fold_right
@@ -172,7 +172,7 @@ let rec normalize_list alias node offsets norm_element defvars elist =
     ) elist (defvars, [])
 
 let rec normalize_expr ?(alias=true) node offsets defvars expr =
-(*Format.eprintf "normalize %B %a:%a [%a]@." alias Printers.pp_expr expr Types.print_ty expr.expr_type (Utils.fprintf_list ~sep:"," Dimension.pp_dimension) offsets;*)
+  (*Format.eprintf "normalize %B %a:%a [%a]@." alias Printers.pp_expr expr Types.print_ty expr.expr_type (Utils.fprintf_list ~sep:"," Dimension.pp_dimension) offsets;*)
   match expr.expr_desc with
   | Expr_const _
   | Expr_ident _ -> defvars, unfold_offsets expr offsets
