@@ -26,14 +26,14 @@ let pp_expr vars fmt expr =
     | Expr_access (a, d) -> fprintf fmt "%a[%a]" pp_expr a Dimension.pp_dimension d
     | Expr_power (a, d) -> fprintf fmt "(%a^%a)" pp_expr a Dimension.pp_dimension d
     | Expr_tuple el -> fprintf fmt "(%a)" pp_tuple el
-    | Expr_ite (c, t, e) -> fprintf fmt "if %a; %a; else %a; end" pp_expr c pp_expr t pp_expr e
+    | Expr_ite (c, t, e) -> fprintf fmt "if %a; y=(%a); else y=(%a); end" pp_expr c pp_expr t pp_expr e
     | Expr_arrow (e1, e2) ->(
       match e1.expr_desc, e2.expr_desc with
       | Expr_const c1, Expr_const c2 -> if c1 = Corelang.const_of_bool true && c2 = Corelang.const_of_bool false then fprintf fmt "STEP" else assert false (* only handle true -> false *)
       | _ -> assert false (* only handle true -> false *)
     )
     | Expr_fby (e1, e2) -> assert false (* not covered yet *)
-    | Expr_pre e -> fprintf fmt "UNITDELAY" 
+    | Expr_pre e -> fprintf fmt "UNITDELAY"
     | Expr_when (e, id, l) -> assert false (* clocked based expressions are not handled yet *)
     | Expr_merge (id, hl) -> assert false (* clocked based expressions are not handled yet *)
     | Expr_appl (id, e, r) -> pp_app fmt id e r
@@ -62,8 +62,8 @@ let pp_expr vars fmt expr =
     | "<=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a <= %a)" pp_expr e1 pp_expr e2
     | ">", Expr_tuple([e1;e2]) -> fprintf fmt "(%a > %a)" pp_expr e1 pp_expr e2
     | ">=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a >= %a)" pp_expr e1 pp_expr e2
-    | "!=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a != %a)" pp_expr e1 pp_expr e2
-    | "=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a = %a)" pp_expr e1 pp_expr e2
+    | "!=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a ~= %a)" pp_expr e1 pp_expr e2
+    | "=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a == %a)" pp_expr e1 pp_expr e2
     | "not", _ -> fprintf fmt "(~%a)" pp_expr e
     | _, Expr_tuple _ -> fprintf fmt "%s %a" id pp_expr e
     | _ -> fprintf fmt "%s (%a)" id pp_expr e
@@ -86,11 +86,11 @@ let rec translate_expr expr vars =
     | Expr_fby (e1, e2) -> fprintf fmt "%a fby %a" pp_expr e1 pp_expr e2
     | Expr_pre e -> fprintf fmt "pre %a" pp_expr e
     | Expr_when (e, id, l) -> fprintf fmt "%a when %s(%s)" pp_expr e l id
-    | Expr_merge (id, hl) -> 
+    | Expr_merge (id, hl) ->
       fprintf fmt "merge %s %a" id pp_handlers hl
     | Expr_appl (id, e, r) -> pp_app fmt id e r
 *)
-    
+
 let pp_stmt fmt stmt =
   match stmt with
   | Eq eq -> (
@@ -98,7 +98,7 @@ let pp_stmt fmt stmt =
       [var] -> (
      (* first, we extract the expression and associated variables *)
 	let vars = Utils.ISet.elements (Corelang.get_expr_vars eq.eq_rhs) in
-	
+
 	fprintf fmt "\"%s\": @[<v 2>{ \"expr\": \"%a\",@ \"vars\": [%a] @]}"
 	  var
 	  (pp_expr vars) eq.eq_rhs (* todo_pp_expr expr *)
@@ -116,13 +116,13 @@ let pp_node fmt nd =
   fprintf fmt "\"exprs\": {@[<v 1> %a@]@ }"
     (fprintf_list ~sep:",@ " pp_stmt ) nd.node_stmts;
   fprintf fmt "@]@ }"
-    
+
 let pp_decl fmt decl =
   match decl.top_decl_desc with
   | Node nd -> fprintf fmt "%a@ " pp_node nd
-  | ImportedNode _ 
+  | ImportedNode _
   | Const _
-  | Open _ 
+  | Open _
   | TypeDef _ -> eprintf "should not happen in EMF backend"
 
 
@@ -130,4 +130,3 @@ let translate fmt prog =
   fprintf fmt "@[<v 0>{@ ";
   fprintf_list ~sep:",@ " pp_decl fmt prog;
   fprintf fmt "@ @]}"
-
