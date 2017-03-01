@@ -588,8 +588,9 @@ let print_step_code dependencies fmt m self =
 let print_global_init_code fmt basename prog dependencies =
   let baseNAME = file_to_module_name basename in
   let constants = List.map const_of_top (get_consts prog) in
-  fprintf fmt "@[<v 2>%a {@,static _Bool init = 0;@,@[<v 2>if (!init) { @,init = 1;@,%a%t%a@]@,}@,return;@]@,}@.@."
+  fprintf fmt "@[<v 2>%a {@,static %s init = 0;@,@[<v 2>if (!init) { @,init = 1;@,%a%t%a@]@,}@,return;@]@,}@.@."
     print_global_init_prototype baseNAME
+    (pp_c_basic_type_desc Types.Tbool)
     (* constants *) 
     (Utils.fprintf_list ~sep:"@," (pp_const_initialize (pp_c_var_read Machine_code.empty_machine))) constants
     (Utils.pp_final_char_if_non_empty "@," dependencies)
@@ -599,8 +600,9 @@ let print_global_init_code fmt basename prog dependencies =
 let print_global_clear_code  fmt basename prog dependencies =
   let baseNAME = file_to_module_name basename in
   let constants = List.map const_of_top (get_consts prog) in
-  fprintf fmt "@[<v 2>%a {@,static _Bool clear = 0;@,@[<v 2>if (!clear) { @,clear = 1;@,%a%t%a@]@,}@,return;@]@,}@.@."
+  fprintf fmt "@[<v 2>%a {@,static %s clear = 0;@,@[<v 2>if (!clear) { @,clear = 1;@,%a%t%a@]@,}@,return;@]@,}@.@."
     print_global_clear_prototype baseNAME
+    (pp_c_basic_type_desc Types.Tbool)
     (* constants *) 
     (Utils.fprintf_list ~sep:"@," (pp_const_clear (pp_c_var_read Machine_code.empty_machine))) constants
     (Utils.pp_final_char_if_non_empty "@," dependencies)

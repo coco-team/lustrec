@@ -51,6 +51,10 @@ let horn_query = ref true
 
 let salsa_enabled = ref true
 
+let cpp       = ref false
+let int_type  = ref "int"
+let real_type = ref "double"
+
 let sfunction = ref ""
 
 let set_mpfr prec =
@@ -89,7 +93,12 @@ let options =
     "-print_clocks", Arg.Set print_clocks, "prints node clocks";
     "-O", Arg.Set_int optimization, "changes optimization \x1b[4mlevel\x1b[0m <default: 2>";
     "-verbose", Arg.Set_int verbose_level, "changes verbose \x1b[4mlevel\x1b[0m <default: 1>";
-    "-version", Arg.Unit print_version, " displays the version";]
+    "-version", Arg.Unit print_version, " displays the version";
+
+    "-c++" , Arg.Set        cpp      , "c++ backend";
+    "-int" , Arg.Set_string int_type , "specifies the integer type (default=\"int\")";
+    "-real", Arg.Set_string real_type, "specifies the real type (default=\"double\" without mpfr option)";
+]
 
 
 let plugin_opt (name, activate, options) =

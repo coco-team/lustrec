@@ -1,6 +1,6 @@
 OCAMLBUILD=/usr/bin/ocamlbuild -classic-display -use-ocamlfind -no-links 
 
-prefix=/home/ploc/Local
+prefix=/usr/local
 exec_prefix=${prefix}
 bindir=${exec_prefix}/bin
 datarootdir = ${prefix}/share

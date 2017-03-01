@@ -38,7 +38,7 @@ let gen_files funs basename prog machines dependencies =
   close_out header_out;
   
   (* Generating Lib C file *)
-  let source_lib_file = destname ^ ".c" in (* Could be changed *)
+  let source_lib_file = (if !Options.cpp then destname ^ ".cpp" else destname ^ ".c") in (* Could be changed *)
   let source_lib_out = open_out source_lib_file in
   let source_lib_fmt = formatter_of_out_channel source_lib_out in
   print_lib_c source_lib_fmt basename prog machines dependencies;
@@ -54,7 +54,7 @@ let gen_files funs basename prog machines dependencies =
       raise (Corelang.Error (Location.dummy_loc, LustreSpec.Main_not_found))
     end
     | Some m -> begin
-      let source_main_file = destname ^ "_main.c" in (* Could be changed *)
+      let source_main_file = (if !Options.cpp then destname ^ "_main.cpp" else destname ^ "_main.c") in (* Could be changed *)
       let source_main_out = open_out source_main_file in
       let source_main_fmt = formatter_of_out_channel source_main_out in
 

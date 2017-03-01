@@ -124,13 +124,16 @@ let is_basic_c_type t =
   | Types.Tbool | Types.Treal | Types.Tint  -> true
   | _                                       -> false
 
-let pp_basic_c_type fmt t =
-  match (Types.repr t).Types.tdesc with
-  | Types.Tbool                    -> fprintf fmt "_Bool"
-  | Types.Treal when !Options.mpfr -> fprintf fmt "%s" Mpfr.mpfr_t
-  | Types.Treal                    -> fprintf fmt "double"
-  | Types.Tint                     -> fprintf fmt "int"
+let pp_c_basic_type_desc t_dsec =
+  match (t_dsec) with
+  | Types.Tbool when !Options.cpp  -> "bool"
+  | Types.Tbool                    -> "_Bool"
+  | Types.Tint                     -> !Options.int_type
+  | Types.Treal when !Options.mpfr -> Mpfr.mpfr_t
+  | Types.Treal                    -> !Options.real_type
   | _ -> assert false (* Not a basic C type. Do not handle arrays or pointers *)
+
+let pp_basic_c_type fmt t = fprintf fmt "%s" (pp_c_basic_type_desc (Types.repr t).Types.tdesc)
 
 let pp_c_type var fmt t =
   let rec aux t pp_suffix =
