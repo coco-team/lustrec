@@ -9,3 +9,4 @@
 <*.ml{,i}>: package(ocamlgraph)
 <*.ml{,i}>: use_str
 <*.ml{,i}>: use_unix
+

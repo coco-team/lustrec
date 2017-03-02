@@ -2,6 +2,7 @@
 #ifndef _ARROW_CPP
 #define _ARROW_CPP
 
+#include <stdint.h>
 #include <stdlib.h>
 
 struct _arrow_mem {

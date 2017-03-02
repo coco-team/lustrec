@@ -55,6 +55,8 @@ let cpp       = ref false
 let int_type  = ref "int"
 let real_type = ref "double"
 
+let mauve = ref ""
+
 let sfunction = ref ""
 
 let set_mpfr prec =
@@ -98,6 +100,8 @@ let options =
     "-c++" , Arg.Set        cpp      , "c++ backend";
     "-int" , Arg.Set_string int_type , "specifies the integer type (default=\"int\")";
     "-real", Arg.Set_string real_type, "specifies the real type (default=\"double\" without mpfr option)";
+
+    "-mauve", Arg.String (fun node -> mauve := node; cpp := true; static_mem := false), "generates the mauve code";
 ]
 
 

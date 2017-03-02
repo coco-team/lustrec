@@ -125,7 +125,7 @@ let is_basic_c_type t =
   | _                                       -> false
 
 let pp_c_basic_type_desc t_dsec =
-  match (t_dsec) with
+  match t_dsec with
   | Types.Tbool when !Options.cpp  -> "bool"
   | Types.Tbool                    -> "_Bool"
   | Types.Tint                     -> !Options.int_type
