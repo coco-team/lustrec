@@ -392,6 +392,11 @@ let print_alloc_instance fmt (i, (m, static)) =
     pp_machine_alloc_name (node_name m)
     (Utils.fprintf_list ~sep:", " Dimension.pp_dimension) static
 
+let print_dealloc_instance fmt (i, (m, _)) =
+  fprintf fmt "%a (_alloc->%s);@,"
+    pp_machine_dealloc_name (node_name m)
+    i
+
 let print_alloc_const fmt m =
   let const_locals = List.filter (fun vdecl -> vdecl.var_dec_const) m.mstep.step_locals in
   fprintf fmt "%a%t"
@@ -409,6 +414,10 @@ let print_alloc_array fmt vdecl =
     (pp_c_type "") base_type
     vdecl.var_id
 
+let print_dealloc_array fmt vdecl =
+  fprintf fmt "free (_alloc->_reg.%s);@,"
+    vdecl.var_id
+
 let print_alloc_code fmt m =
   let array_mem = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
   fprintf fmt "%a *_alloc;@,_alloc = (%a *) malloc(sizeof(%a));@,assert(_alloc);@,%a%areturn _alloc;"
@@ -417,6 +426,12 @@ let print_alloc_code fmt m =
     pp_machine_memtype_name m.mname.node_id
     (Utils.fprintf_list ~sep:"" print_alloc_array) array_mem
     (Utils.fprintf_list ~sep:"" print_alloc_instance) m.minstances
+
+let print_dealloc_code fmt m =
+  let array_mem = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
+  fprintf fmt "%a%afree (_alloc);@,return;"
+    (Utils.fprintf_list ~sep:"" print_dealloc_array) array_mem
+    (Utils.fprintf_list ~sep:"" print_dealloc_instance) m.minstances
 
 let print_stateless_init_code dependencies fmt m self =
   let minit = List.map (function MReset i -> i | _ -> assert false) m.minit in
@@ -615,13 +630,18 @@ let print_machine dependencies fmt m =
     end
   else
     begin
-      (* Alloc function, only if non static mode *)
+      (* Alloc functions, only if non static mode *)
       if (not !Options.static_mem) then  
 	begin
 	  fprintf fmt "@[<v 2>%a {@,%a%a@]@,}@.@."
 	    print_alloc_prototype (m.mname.node_id, m.mstatic)
 	    print_alloc_const m
 	    print_alloc_code m;
+
+	  fprintf fmt "@[<v 2>%a {@,%a%a@]@,}@.@."
+	    print_dealloc_prototype m.mname.node_id
+	    print_alloc_const m
+	    print_dealloc_code m;
 	end;
       let self = mk_self m in
       (* Reset function *)
@@ -682,7 +702,12 @@ let print_lib_c source_fmt basename prog machines dependencies =
       fprintf source_fmt "@]@.";
       fprintf source_fmt "/* Node allocation function prototypes */@.";
       fprintf source_fmt "@[<v>";
-      List.iter (fun m -> fprintf source_fmt "%a;@." print_alloc_prototype (m.mname.node_id, m.mstatic)) machines;
+      List.iter
+	(fun m -> fprintf source_fmt "%a;@.@.%a;@.@."
+	  print_alloc_prototype (m.mname.node_id, m.mstatic)
+	  print_dealloc_prototype m.mname.node_id
+	)
+	machines;
       fprintf source_fmt "@]@.";
     end;
 

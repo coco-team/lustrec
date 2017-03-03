@@ -177,7 +177,10 @@ let print_machine_decl fmt m =
 	  begin 
             (* Dynamic allocation *)
 	    fprintf fmt "extern %a;@.@."
-	      print_alloc_prototype (m.mname.node_id, m.mstatic)
+	      print_alloc_prototype (m.mname.node_id, m.mstatic);
+
+	    fprintf fmt "extern %a;@.@."
+	      print_dealloc_prototype m.mname.node_id;
 	  end;
 	let self = mk_self m in
 	fprintf fmt "extern %a;@.@."
@@ -219,8 +222,11 @@ let print_machine_alloc_decl fmt m =
       else
 	begin 
           (* Dynamic allocation *)
-	  fprintf fmt "extern %a;@."
-		  print_alloc_prototype (m.mname.node_id, m.mstatic)
+	  fprintf fmt "extern %a;@.@."
+	    print_alloc_prototype (m.mname.node_id, m.mstatic);
+
+	  fprintf fmt "extern %a;@.@."
+	    print_dealloc_prototype m.mname.node_id
 	end
     end
 

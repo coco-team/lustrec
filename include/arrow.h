@@ -6,6 +6,8 @@ struct _arrow_mem {struct _arrow_reg {_Bool _first; } _reg; };
 
 extern struct _arrow_mem *_arrow_alloc ();
 
+extern void _arrow_dealloc (struct _arrow_mem *);
+
 #define _arrow_DECLARE(attr, inst)\
   attr struct _arrow_mem inst;
   
