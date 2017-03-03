@@ -80,7 +80,7 @@ let print_mauve_shell fmt mauve_machine basename prog machines _ (*dependencies*
     (fun v ->
       let v_name = v.var_id in
       let v_type = pp_c_basic_type_desc (Types.repr v.var_type).Types.tdesc in
-      fprintf fmt "\tReadPort<%s> port_%s = mk_readPort<%s>(\"%s\", " v_type v_name v_type v_name;
+      fprintf fmt "\tReadPort<%s> & port_%s = mk_readPort<%s>(\"%s\", " v_type v_name v_type v_name;
       print_mauve_default fmt mauve_machine v;
       fprintf fmt ");@.";
     ) mauve_machine.mstep.step_inputs;
@@ -90,7 +90,7 @@ let print_mauve_shell fmt mauve_machine basename prog machines _ (*dependencies*
     (fun v ->
       let v_name = v.var_id in
       let v_type = pp_c_basic_type_desc (Types.repr v.var_type).Types.tdesc in
-      fprintf fmt "\tWritePort<%s> port_%s = mk_writePort<%s>(\"%s\");@." v_type v_name v_type v_name;
+      fprintf fmt "\tWritePort<%s> & port_%s = mk_writePort<%s>(\"%s\");@." v_type v_name v_type v_name;
     ) mauve_machine.mstep.step_outputs;
 
   fprintf fmt "};@.";
