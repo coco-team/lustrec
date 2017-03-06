@@ -160,7 +160,7 @@ let print_mauve_core fmt mauve_machine basename prog machines _ (*dependencies*)
   (* Cleanup *)
   fprintf fmt "\tvoid cleanup_hook() override {@.";
   fprintf fmt "\t\t%s_reset(node);@." node_name;
-  fprintf fmt "\t\tfree(node);@.";
+  fprintf fmt "\t\t%s_dealloc(node);@." node_name;
   fprintf fmt "\t}@.";
   fprintf fmt "};@.";
   pp_print_newline fmt ()
