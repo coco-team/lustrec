@@ -116,9 +116,14 @@ let set_mpfr prec =
   else
     failwith "mpfr requires a positive integer"
 
-let common_options =
-  [ "-d", Arg.Set_string dest_dir, "uses the specified \x1b[4mdirectory\x1b[0m as root for generated/imported object and C files <default: .>";
-    "-I", Arg.String add_include_dir, "sets include \x1b[4mdirectory\x1b[0m";
+let set_backend s =
+  output := s;
+  Backends.setup s
+  
+let options =
+[ "-d", Arg.Set_string dest_dir,
+"uses the specified directory \x1b[4mdir\x1b[0m as root for generated/imported object and C files <default: .>";
+"-I", Arg.Set_string include_dir, "Include directory";
     "-node", Arg.Set_string main_node, "specifies the \x1b[4mmain\x1b[0m node";
     "-print-types", Arg.Set print_types, "prints node types";
     "-print-clocks", Arg.Set print_clocks, "prints node clocks";
