@@ -457,7 +457,7 @@ let _ =
   try
     Printexc.record_backtrace true;
 
-    let options = Options.options @ 
+    let options = Options.lustrec_options @ 
       List.flatten (
 	List.map Options.plugin_opt [
 	  Scopes.Plugin.name, Scopes.Plugin.activate, Scopes.Plugin.options

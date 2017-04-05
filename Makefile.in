@@ -11,11 +11,19 @@ LUSI_MPFR_LIB=include/mpfr_lustre.lusi
 LOCAL_BINDIR=bin
 LOCAL_DOCDIR=doc/manual
 
+all: $(LOCAL_BINDIR)/lustrec $(LOCAL_BINDIR)/lustret
+
 $(LOCAL_BINDIR)/lustrec: configure Makefile
 	@echo Compiling binary lustrec
-	@$(OCAMLBUILD) -cflags -I,@OCAMLGRAPH_PATH@ -lflag @OCAMLGRAPH_PATH@/graph.cmxa -lflag nums.cmxa -I src -I src/backends/C -I src/plugins/scopes src/main_lustre_compiler.native
+	@$(OCAMLBUILD) -cflags -I,@OCAMLGRAPH_PATH@ -lflag @OCAMLGRAPH_PATH@/graph.cmxa -lflag -I src -I src/backends/C -I src/plugins/scopes src/main_lustre_compiler.native
 	@mkdir -p $(LOCAL_BINDIR)
 	@mv _build/src/main_lustre_compiler.native $(LOCAL_BINDIR)/lustrec
+
+$(LOCAL_BINDIR)/lustret: configure Makefile
+	@echo Compiling binary lustret
+	@$(OCAMLBUILD) -cflags -I,@OCAMLGRAPH_PATH@ -lflag @OCAMLGRAPH_PATH@/graph.cmxa -lflag nums.cmxa -I src -I src/backends/C -I src/plugins/scopes src/main_lustre_testgen.native
+	@mkdir -p $(LOCAL_BINDIR)
+	@mv _build/src/main_lustre_testgen.native $(LOCAL_BINDIR)/lustret
 
 configure: configure.ac
 	@echo configure.ac has changed relaunching autoconf
@@ -74,5 +82,5 @@ install: clean-lusic compile-lusi compile-mpfr-lusi
 	mkdir -p ${datadir}
 	install -m 0655 share/FindLustre.cmake ${datadir}
 
-.PHONY: compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean
+.PHONY: compile-lusi doc dot lustrec lustret lustrec.odocl clean install dist-clean
 
