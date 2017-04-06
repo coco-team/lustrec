@@ -79,7 +79,7 @@ let rec compute_neg_expr cpt_pre expr =
       (compute_neg_expr (cpt_pre+1) e)
 
   | Expr_appl (op_name, args, r) when List.mem op_name rel_op -> 
-    [(expr, cpt_pre), mkpredef_unary_call Location.dummy_loc "not" expr]
+    [(expr, cpt_pre), mkpredef_call expr.expr_loc "not" [expr]]
 
   | Expr_appl (op_name, args, r) -> 
     List.map 
@@ -87,7 +87,7 @@ let rec compute_neg_expr cpt_pre expr =
 	(compute_neg_expr cpt_pre args)
 
   | Expr_ident _ when (Types.repr expr.expr_type).Types.tdesc = Types.Tbool ->
-    [(expr, cpt_pre), mkpredef_unary_call Location.dummy_loc "not" expr]
+    [(expr, cpt_pre), mkpredef_call expr.expr_loc "not" [expr]]
   | _ -> []
 
 and  
@@ -133,9 +133,14 @@ let mcdc_node_eq eq =
   | _::_, Types.Ttuple tl, Expr_tuple rhs -> List.iter2 mcdc_var_def eq.eq_lhs rhs
   | _ -> mcdc_expr 0 eq.eq_rhs 
 
+let mcdc_node_stmt stmt =
+  match stmt with
+  | Eq eq -> mcdc_node_eq eq
+  | Aut aut -> assert false
+
 let mcdc_top_decl td = 
   match td.top_decl_desc with
-  | Node nd -> List.iter mcdc_node_eq nd.node_eqs
+  | Node nd -> List.iter mcdc_node_stmt nd.node_stmts
   | _ -> ()
 
 

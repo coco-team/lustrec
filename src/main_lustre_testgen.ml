@@ -59,11 +59,6 @@ let stage1 prog dirname basename =
   (* Creating destination directory if needed *)
   create_dest_dir ();
 
-  (* Compatibility with Lusi *)
-  (* Checking the existence of a lusi (Lustre Interface file) *)
-  let extension = ".lusi" in
-  compile_source_to_header prog computed_types_env computed_clocks_env dirname basename extension;
-
   Typing.uneval_prog_generics prog;
   Clock_calculus.uneval_prog_generics prog;
 

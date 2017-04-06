@@ -7,6 +7,10 @@
 "main_lustre_compiler.native": use_str
 "main_lustre_compiler.native": use_unix
 "main_lustre_compiler.native": use_nums
+"main_lustre_testgen.native": package(ocamlgraph)
+"main_lustre_testgen.native": use_str
+"main_lustre_testgen.native": use_unix
+"main_lustre_testgen.native": use_nums
 <*.ml{,i}>: package(ocamlgraph)
 <*.ml{,i}>: use_str
 <*.ml{,i}>: use_unix

@@ -1,3 +1,4 @@
+open LustreSpec
 open Corelang
 open Log
 open Format
@@ -103,12 +104,12 @@ let rec compute_records_expr expr =
 let compute_records_eq eq = compute_records_expr eq.eq_rhs
 
 let compute_records_node nd = 
-  merge_records (List.map compute_records_eq nd.node_eqs)
+  merge_records (List.map compute_records_eq (get_node_eqs nd))
 
 let compute_records_top_decl td =
   match td.top_decl_desc with
   | Node nd -> compute_records_node nd
-  | Consts constsl -> merge_records (List.map (fun c -> compute_records_const_value c.const_value) constsl)
+  | Const cst -> compute_records_const_value cst.const_value
   | _ -> empty_records
 
 let compute_records prog = 
@@ -150,11 +151,20 @@ let rdm_mutate_int i =
   else
     i
   
-let rdm_mutate_float f =
+let rdm_mutate_real r =
   if Random.int 100 > threshold_random_float then
-    Random.float 10.
+    (* interval [0, bound] for random values *)
+    let bound = 10 in
+    (* max number of digits after comma *)
+    let digits = 5 in
+    (* number of digits after comma *)
+    let shift = Random.int (digits + 1) in
+    let eshift = 10. ** (float_of_int shift) in
+    let i = Random.int (1 + bound * (int_of_float eshift)) in
+    let f = float_of_int i /. eshift in
+    (Num.num_of_int i, shift, string_of_float f)
   else 
-    f
+    r
 
 let rdm_mutate_op op = 
 match op with
@@ -174,7 +184,7 @@ let rdm_mutate_var expr =
   match (Types.repr expr.expr_type).Types.tdesc with 
   | Types.Tbool ->
     (* if Random.int 100 > threshold_negate_bool_var then *)
-    let new_e = mkpredef_unary_call Location.dummy_loc "not" expr in
+    let new_e = mkpredef_call expr.expr_loc "not" [expr] in
     Some (expr, new_e), new_e
     (* else  *)
     (*   expr *)
@@ -188,9 +198,10 @@ let rdm_mutate_pre orig_expr =
 let rdm_mutate_const_value c =
   match c with
   | Const_int i -> Const_int (rdm_mutate_int i)
-  | Const_real s ->  Const_real s (* those are string, let's leave them *)
-  | Const_float f -> Const_float (rdm_mutate_float f)
+  | Const_real (n, i, s) -> let (n', i', s') = rdm_mutate_real (n, i, s) in Const_real (n', i', s')
   | Const_array _
+  | Const_string _
+  | Const_struct _
   | Const_tag _ -> c
 
 let rdm_mutate_const c =
@@ -249,7 +260,6 @@ let rec rdm_mutate_expr expr =
     else
       let mut, new_args = rdm_mutate_expr args in
       mut, mk_e (Expr_appl (op_id, new_args, r))
-	
   (* Other constructs are kept.
   | Expr_fby of expr * expr
   | Expr_array of expr list
@@ -260,34 +270,38 @@ let rec rdm_mutate_expr expr =
   | Expr_uclock of expr * int
   | Expr_dclock of expr * int
   | Expr_phclock of expr * rat *)
-  (* | _ -> expr.expr_desc *)
+   | _ -> None, expr
   
 
 let rdm_mutate_eq eq =
   let mutation, new_rhs = rdm_mutate_expr eq.eq_rhs in
   mutation, { eq with eq_rhs = new_rhs }
 
-let rdm_mutate_node nd = 
-  let mutation, new_node_eqs =       
-    select_in_list 
-      nd.node_eqs 
-      (fun eq -> let mut, new_eq = rdm_mutate_eq eq in
+let rnd_mutate_stmt stmt =
+  match stmt with
+  | Eq eq   -> let mut, new_eq = rdm_mutate_eq eq in
 		 report ~level:1 
 		   (fun fmt -> fprintf fmt "mutation: %a becomes %a@." 
 		     Printers.pp_node_eq eq
 		     Printers.pp_node_eq new_eq);
-		 mut, new_eq )
+		 mut, Eq new_eq 
+  | Aut aut -> assert false
+
+let rdm_mutate_node nd = 
+  let mutation, new_node_stmts =       
+    select_in_list 
+      nd.node_stmts rnd_mutate_stmt
   in
-  mutation, { nd with node_eqs = new_node_eqs }
+  mutation, { nd with node_stmts = new_node_stmts }
 
 let rdm_mutate_top_decl td =
   match td.top_decl_desc with
   | Node nd -> 
     let mutation, new_node = rdm_mutate_node nd in 
     mutation, { td with top_decl_desc = Node new_node}
-  | Consts constsl -> 
-    let mut, new_constsl = select_in_list constsl rdm_mutate_const in
-    mut, { td with top_decl_desc = Consts new_constsl }
+  | Const cst -> 
+    let mut, new_cst = rdm_mutate_const cst in
+    mut, { td with top_decl_desc = Const new_cst }
   | _ -> None, td
     
 (* Create a single mutant with the provided random seed *)
@@ -394,7 +408,7 @@ let fold_mutate_boolexpr expr =
   match !target with
   | Some (Boolexpr 0) -> (
     target := None;
-    mkpredef_unary_call Location.dummy_loc "not" expr
+    mkpredef_call expr.expr_loc "not" [expr]
   )
   | Some (Boolexpr n) ->
       (target := Some (Boolexpr (n-1)); expr)
@@ -474,17 +488,22 @@ let rec fold_mutate_expr expr =
 let fold_mutate_eq eq =
   { eq with eq_rhs = fold_mutate_expr eq.eq_rhs }
 
+let fold_mutate_stmt stmt =
+  match stmt with
+  | Eq eq   -> Eq (fold_mutate_eq eq)
+  | Aut aut -> assert false
+
 let fold_mutate_node nd = 
   { nd with 
-    node_eqs = 
-      List.fold_right (fun e res -> (fold_mutate_eq e)::res) nd.node_eqs [];
+    node_stmts = 
+      List.fold_right (fun stmt res -> (fold_mutate_stmt stmt)::res) nd.node_stmts [];
     node_id = rename_app nd.node_id
   }
 
 let fold_mutate_top_decl td =
   match td.top_decl_desc with
-  | Node nd -> { td with top_decl_desc = Node (fold_mutate_node nd)}
-  | Consts constsl -> { td with top_decl_desc = Consts (List.fold_right (fun e res -> (fold_mutate_const e)::res) constsl [])}
+  | Node nd   -> { td with top_decl_desc = Node  (fold_mutate_node nd)}
+  | Const cst -> { td with top_decl_desc = Const (fold_mutate_const cst)}
   | _ -> td
     
 (* Create a single mutant with the provided random seed *)

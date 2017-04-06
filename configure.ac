@@ -7,6 +7,7 @@ AC_SUBST(VERSION_CODENAME, "Xia/Xiang-dev")
 #AC_SUBST(VERSION_CODENAME, "Xia/Shao Kang")
 
 AC_CONFIG_SRCDIR([src/main_lustre_compiler.ml])
+AC_CONFIG_SRCDIR([src/main_lustre_testgen.ml])
 
 # default prefix is /usr/local
 AC_PREFIX_DEFAULT(/usr/local)
