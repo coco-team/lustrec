@@ -24,7 +24,7 @@ let print_version fmt =
     (if !Options.mpfr then "MPFR multi-precision" else "(double) floating-point")
 
 let file_to_module_name basename =
-  let baseNAME = String.uppercase basename in
+  let baseNAME = String.uppercase_ascii basename in
   let baseNAME = Str.global_replace (Str.regexp "\\.\\|\\ ") "_" baseNAME in
   baseNAME
 
