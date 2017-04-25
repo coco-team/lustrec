@@ -42,7 +42,7 @@ let pp_horn_tag fmt t =
 let rec pp_horn_const fmt c =
   match c with
     | Const_int i    -> pp_print_int fmt i
-    | Const_real (c,e,s)   -> assert false (* TODO rational pp_print_string fmt r *)
+    | Const_real (c,e,s)   -> Format.fprintf fmt "(/ %s %i)" (Num.string_of_num c) (10 * e)
     (* | Const_float r  -> pp_print_float fmt r *)
     | Const_tag t    -> pp_horn_tag fmt t
     | _              -> assert false
@@ -382,8 +382,8 @@ let print_machine machines fmt m =
 	      (*Rule for step*)
 	      fprintf fmt "@[<v 2>(rule (=> @ (and @ ";
 	      ignore (pp_machine_instrs machines [] m fmt m.mstep.step_instrs);
-	      fprintf fmt "@. %a)" (pp_conj pp_val) assertsl;
-	      fprintf fmt "(%a @[<v 0>%a)@]@]@.))@.@."
+	      fprintf fmt "@. %a)@ " (pp_conj pp_val) assertsl;
+	      fprintf fmt "@ (%a @[<v 0>%a)@]@]@.))@.@."
 		pp_machine_step_name m.mname.node_id
 		(Utils.fprintf_list ~sep:" " (pp_horn_var m)) (step_vars machines m);
 	    end
