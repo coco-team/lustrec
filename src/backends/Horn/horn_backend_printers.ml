@@ -245,7 +245,8 @@ let rec pp_machine_instr machines reset_instances (m: machine_t) fmt instr : ide
     in
     pp_conj pp_branch fmt hl;
     reset_instances 
-
+  | MComment _ -> []
+     
 and pp_machine_instrs machines reset_instances m fmt instrs = 
   let ppi rs fmt i = pp_machine_instr machines rs m fmt i in
   match instrs with
@@ -294,7 +295,6 @@ let pp_machine_reset machines fmt m =
    )) fmt m.minstances;
 
   fprintf fmt "@]@ )"
-
 
 
 (**************************************************************)
@@ -375,14 +375,15 @@ let print_machine machines fmt m =
 	    end
 	  | assertsl -> 
 	    begin
-	      let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id (pp_horn_var m) in
+	       let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id (pp_horn_var m) in 
 	      (* print_string pp_val; *)
 	      fprintf fmt "; with Assertions @.";
 	      
 	      (*Rule for step*)
 	      fprintf fmt "@[<v 2>(rule (=> @ (and @ ";
 	      ignore (pp_machine_instrs machines [] m fmt m.mstep.step_instrs);
-	      fprintf fmt "@. %a)(%a @[<v 0>%a)@]@]@.))@.@." (pp_conj pp_val) assertsl
+	      fprintf fmt "@. %a)" (pp_conj pp_val) assertsl;
+	      fprintf fmt "(%a @[<v 0>%a)@]@]@.))@.@."
 		pp_machine_step_name m.mname.node_id
 		(Utils.fprintf_list ~sep:" " (pp_horn_var m)) (step_vars machines m);
 	    end
