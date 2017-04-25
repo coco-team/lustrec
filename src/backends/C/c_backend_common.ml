@@ -136,7 +136,7 @@ let pp_c_type var fmt t =
     | Types.Tstatic (_, t') -> fprintf fmt "const "; aux t' pp_suffix
     | Types.Tconst ty       -> fprintf fmt "%s %s" ty var
     | Types.Tarrow (_, _)   -> fprintf fmt "void (*%s)()" var
-    | _                     -> eprintf "internal error: C_backend_common.pp_c_type %a@." Types.print_ty t; assert false
+    | _                     -> eprintf "internal error: C_backend_common.pp_c_type var %s: %a@." var Types.print_ty t; assert false
   in aux t (fun fmt () -> ())
 (*
 let rec pp_c_initialize fmt t = 
