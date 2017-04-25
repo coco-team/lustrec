@@ -88,10 +88,6 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
   end
 
 
-let functional_backend () = 
-  match !Options.output with
-  | "horn" | "lustre" | "acsl" -> true
-  | _ -> false
 
 (* From prog to prog *)
 let stage1 prog dirname basename =
@@ -296,7 +292,7 @@ let stage2 prog =
   in  
   (* Optimize machine code *)
   let machine_code =  (* TODO reactivate. I disabled it because output variables were removed *)
-    if false && !Options.optimization >= 3 && not (functional_backend ()) then
+    if false && !Options.optimization >= 3 && not (Corelang.functional_backend ()) then
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization: minimize heap alloc by reusing vars@,");
 	let node_schs    = Scheduling.remove_prog_inlined_locals removed_table node_schs in
