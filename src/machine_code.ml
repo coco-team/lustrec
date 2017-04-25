@@ -81,6 +81,7 @@ type machine_t = {
 }
 
 let machine_vars m = m.mstep.step_inputs @ m.mstep.step_locals @ m.mstep.step_outputs @ m.mmemory
+
 let pp_step fmt s =
   Format.fprintf fmt "@[<v>inputs : %a@ outputs: %a@ locals : %a@ checks : %a@ instrs : @[%a@]@ asserts : @[%a@]@]@ "
     (Utils.fprintf_list ~sep:", " Printers.pp_var) s.step_inputs
@@ -318,10 +319,14 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
       (* special treatment depending on the active backend. For horn backend, ite
 	 are preserved in expression. While they are removed for C or Java
 	 backends. *)
-      match !Options.output with | "horn" -> 
-	Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
+      match !Options.output with
+      | "horn" -> 
+	 Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
       | "C" | "java" | _ -> 
-	(Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
+	 (Format.eprintf "Normalization error for backend %s: %a@."
+	    !Options.output
+	    Printers.pp_expr expr;
+	  raise NormalizationError)
     )
     | _                   -> raise NormalizationError
   in
@@ -488,14 +493,47 @@ let translate_decl nd sch =
 
   let sorted_eqs = sort_equations_from_schedule nd sch in
   let constant_eqs = constant_equations nd in
-  
-  let init_args = ISet.empty, [], Utils.IMap.empty, List.fold_right (fun l -> ISet.add l) nd.node_locals ISet.empty, [] in
+
+  (* In case of non functional backend (eg. C), additional local variables have
+     to be declared for each assert *)
+  let new_locals, assert_instrs, nd_node_asserts =
+    let exprl = List.map (fun assert_ -> assert_.assert_expr ) nd.node_asserts in
+    if Corelang.functional_backend () then
+      [], [], exprl  
+    else (* Each assert(e) is associated to a fresh variable v and declared as
+	    v=e; assert (v); *)
+      let _, vars, eql, assertl =
+	List.fold_left (fun (i, vars, eqlist, assertlist) expr ->
+	  let loc = expr.expr_loc in
+	  let var_id = nd.node_id ^ "_assert_" ^ string_of_int i in
+	  let assert_var =
+	    mkvar_decl
+	      loc
+	      ~orig:false (* fresh var *)
+	      (var_id,
+	       mktyp loc Tydec_bool,
+	       mkclock loc Ckdec_any,
+	       false, (* not a constant *)
+	       None (* no default value *)
+	      )
+	  in
+	  assert_var.var_type <- Types.new_ty (Types.Tbool); 
+	  let eq = mkeq loc ([var_id], expr) in
+	  (i+1, assert_var::vars, eq::eqlist, {expr with expr_desc = Expr_ident var_id}::assertlist)
+	) (1, [], [], []) exprl
+      in
+      vars, eql, assertl
+  in
+  let locals_list = nd.node_locals @ new_locals in
+
+  let nd = { nd with node_locals = locals_list } in
+  let init_args = ISet.empty, [], Utils.IMap.empty, List.fold_right (fun l -> ISet.add l) locals_list ISet.empty, [] in
   (* memories, init instructions, node calls, local variables (including memories), step instrs *)
   let m0, init0, j0, locals0, s0 = translate_eqs nd init_args constant_eqs in
   assert (ISet.is_empty m0);
   assert (init0 = []);
   assert (Utils.IMap.is_empty j0);
-  let m, init, j, locals, s = translate_eqs nd (m0, init0, j0, locals0, []) sorted_eqs in
+  let m, init, j, locals, s = translate_eqs nd (m0, init0, j0, locals0, []) (sorted_eqs@assert_instrs) in
   let mmap = Utils.IMap.fold (fun i n res -> (i, n)::res) j [] in
   {
     mname = nd;
@@ -518,10 +556,7 @@ let translate_decl nd sch =
 	(* | "horn" -> s TODO 16/12 *)
 	| "C" | "java" | _ -> join_guards_list s
       );
-      step_asserts = 
-	let exprl = List.map (fun assert_ -> assert_.assert_expr ) nd.node_asserts in
-	List.map (translate_expr nd init_args) exprl
-	;
+      step_asserts = List.map (translate_expr nd init_args) nd_node_asserts;
     };
     mspec = nd.node_spec;
     mannot = nd.node_annot;
@@ -578,8 +613,11 @@ let rec value_of_dimension m dim =
   | Dimension.Dident v        -> value_of_ident m v
   | Dimension.Dappl (f, args) -> let typ = if Basic_library.is_numeric_operator f then Type_predef.type_int else Type_predef.type_bool
                                  in mk_val (Fun (f, List.map (value_of_dimension m) args)) typ
-  | Dimension.Dite (i, t, e)  -> let [vi; vt; ve] = List.map (value_of_dimension m) [i; t; e] in
-				 mk_val (Fun ("ite", [vi; vt; ve])) vt.value_type
+  | Dimension.Dite (i, t, e)  -> (
+    match List.map (value_of_dimension m) [i; t; e] with
+    | [vi; vt; ve] ->  mk_val (Fun ("ite", [vi; vt; ve])) vt.value_type
+    | _ -> assert false (* could not happen *)
+  )
   | Dimension.Dlink dim'      -> value_of_dimension m dim'
   | _                         -> assert false
 
