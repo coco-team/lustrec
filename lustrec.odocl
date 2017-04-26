@@ -33,13 +33,17 @@ Log
 Lusic
 LustreSpec
 Machine_code
+Mmap
+Mutation
 Main_lustre_compiler
+Main_lustre_testgen
 Modules
 Mpfr
 Normalization
 Optimize_machine
 Optimize_prog
 Options
+PathConditions
 Parse
 Parser_lustre
 Plugins

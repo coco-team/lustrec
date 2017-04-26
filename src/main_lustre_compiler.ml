@@ -261,7 +261,6 @@ let stage2 prog =
     else
       machine_code
   in
-
   (* Optimize machine code *)
   let machine_code, removed_table = 
     if !Options.optimization >= 2 (*&& !Options.output <> "horn"*) then
@@ -449,7 +448,7 @@ let _ =
   try
     Printexc.record_backtrace true;
 
-    let options = Options.options @ (Plugins.options ()) in
+    let options = Options.lustrec_options @ (Plugins.options ()) in
     
     Arg.parse options anonymous usage
   with

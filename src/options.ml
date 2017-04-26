@@ -22,7 +22,7 @@ else Version.include_path
 let print_version () =
   Format.printf "Lustrec compiler, version %s (%s)@." version codename;
   Format.printf "Include directory: %s@." include_path;
-  Format.printf "User selected Include directory: %s@." !include_dir
+  Format.printf "User selected include directory: %s@." !include_dir
 
 let main_node = ref ""
 let static_mem = ref true
@@ -52,6 +52,12 @@ let horn_query = ref true
 
 let sfunction = ref ""
 
+(* test generation options *)
+let nb_mutants = ref 1000
+let gen_mcdc = ref false
+let no_mutation_suffix = ref false
+
+
 let set_mpfr prec =
   if prec > 0 then (
     mpfr := true;
@@ -60,12 +66,20 @@ let set_mpfr prec =
   )
   else
     failwith "mpfr requires a positive integer"
-			
-let options =
-[ "-d", Arg.Set_string dest_dir,
-"uses the specified directory \x1b[4mdir\x1b[0m as root for generated/imported object and C files <default: .>";
-"-I", Arg.Set_string include_dir, "Include directory";
+
+let common_options =
+  [ "-d", Arg.Set_string dest_dir, "uses the specified \x1b[4mdirectory\x1b[0m as root for generated/imported object and C files <default: .>";
+    "-I", Arg.Set_string include_dir, "sets include \x1b[4mdirectory\x1b[0m";
     "-node", Arg.Set_string main_node, "specifies the \x1b[4mmain\x1b[0m node";
+    "-print-types", Arg.Set print_types, "prints node types";
+    "-print-clocks", Arg.Set print_clocks, "prints node clocks";
+    "-verbose", Arg.Set_int verbose_level, "changes verbose \x1b[4mlevel\x1b[0m <default: 1>";
+    "-version", Arg.Unit print_version, " displays the version";
+  ]
+
+let lustrec_options =
+   common_options @
+  [ 
     "-init", Arg.Set delay_calculus, "performs an initialisation analysis for Lustre nodes <default: no analysis>";
     "-dynamic", Arg.Clear static_mem, "specifies a dynamic allocation scheme for main Lustre node <default: static>";
     "-check-access", Arg.Set check, "checks at runtime that array accesses always lie within bounds <default: no check>";
@@ -76,20 +90,25 @@ let options =
     "-c-spec", Arg.Unit (fun () -> spec := "c"), "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
     "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C";
     "-horn", Arg.Unit (fun () -> output := "horn"), "generates Horn clauses encoding output instead of C";
-    "-horn-traces", Arg.Unit (fun () -> output := "horn"; traces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
-    "-horn-cex", Arg.Unit (fun () -> output := "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
-    "-horn-query", Arg.Unit (fun () -> output := "horn"; horn_query:=true), "generate queries in generated Horn file. Enable the horn backend (work in progress)";
-    "-horn-sfunction", Arg.Set_string sfunction, "Get the endpoint predicate of the sfunction";
-    "-print_reuse", Arg.Set print_reuse, "prints variable reuse policy";
+    "-horn-traces", Arg.Unit (fun () -> output := "horn"; traces:=true), "produces traceability file for Horn backend. Enable the horn backend.";
+    "-horn-cex", Arg.Unit (fun () -> output := "horn"; horn_cex:=true), "generates cex enumeration. Enable the horn backend (work in progress)";
+    "-horn-query", Arg.Unit (fun () -> output := "horn"; horn_query:=true), "generates queries in generated Horn file. Enable the horn backend (work in progress)";
+    "-horn-sfunction", Arg.Set_string sfunction, "gets the endpoint predicate of the \x1b[4msfunction\x1b[0m";
+    "-print-reuse", Arg.Set print_reuse, "prints variable reuse policy";
     "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";
-    "-inline", Arg.Unit (fun () -> global_inline := true; const_unfold := true), "inline all node calls (require a main node). Implies constant unfolding";
-    "-witnesses", Arg.Set witnesses, "enable production of witnesses during compilation";
-    "-print_types", Arg.Set print_types, "prints node types";
-    "-print_clocks", Arg.Set print_clocks, "prints node clocks";
+    "-inline", Arg.Unit (fun () -> global_inline := true; const_unfold := true), "inlines all node calls (require a main node). Implies constant unfolding";
+    "-witnesses", Arg.Set witnesses, "enables production of witnesses during compilation";
     "-O", Arg.Set_int optimization, "changes optimization \x1b[4mlevel\x1b[0m <default: 2>";
     "-verbose", Arg.Set_int verbose_level, "changes verbose \x1b[4mlevel\x1b[0m <default: 1>";
-    "-version", Arg.Unit print_version, " displays the version";]
+    "-version", Arg.Unit print_version, " displays the version";
+  ]
 
+let lustret_options =
+  common_options @
+  [ "-nb-mutants", Arg.Set_int nb_mutants, "\x1b[4mnumber\x1b[0m of mutants to produce <default: 1000>";
+    "-mcdc-cond", Arg.Set gen_mcdc, "generates MC/DC coverage";
+    "-no-mutation-suffix", Arg.Set no_mutation_suffix, "does not rename node with the _mutant suffix"
+  ]
 
 let plugin_opt (name, activate, options) =
   ( "-" ^ name , Arg.Unit activate, "activate plugin " ^ name ) ::

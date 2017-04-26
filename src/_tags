@@ -5,11 +5,11 @@
 "plugins/mpfr": include
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic
-"main_lustre_compiler.native": package(ocamlgraph)
-"main_lustre_compiler.native": use_str
-"main_lustre_compiler.native": use_unix
-#"main_lustre_compiler.native": use_num
-"main_lustre_compiler.native": package(salsa)
+
+<**/*.native>: package(ocamlgraph)
+<**/*.native>: use_str
+<**/*.native>: use_unix
+<**/*.native>: package(salsa)
 
 #<*.ml{,i}>: package(ocamlgraph)
 #<*.ml{,i}>: package(salsa)
