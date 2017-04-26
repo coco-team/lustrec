@@ -212,7 +212,7 @@ let rec inline_expr ?(selection_on_annotation=false) expr locals node nodes =
   let inline_pair e1 e2 = 
     let el', l', eqs', asserts', annots' = inline_tuple [e1;e2] in
     match el' with
-    | [e1'; e2'] -> e1', e2', l', eqs', asserts'
+    | [e1'; e2'] -> e1', e2', l', eqs', asserts', annots'
     | _ -> assert false
   in
   let inline_triple e1 e2 e3 = 

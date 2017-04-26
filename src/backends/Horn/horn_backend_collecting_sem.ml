@@ -92,7 +92,7 @@ let check_prop machines fmt node machine =
     (pp_conj (pp_horn_var machine)) main_output
     (Utils.fprintf_list ~sep:" " (pp_horn_var machine)) main_memory_next
     ;
-   if !Options.horn_queries then fprintf fmt "(query ERR)@."
+   if !Options.horn_query then fprintf fmt "(query ERR)@."
 
 
 let cex_computation machines fmt node machine =

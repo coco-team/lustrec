@@ -227,7 +227,11 @@ let update_machine machine =
   }
     
 
-module Plugin : PluginType.PluginType =
+module Plugin : (
+  sig
+    include PluginType.PluginType
+    val show_scopes: unit -> bool
+    end) =
 struct
   let name = "scopes"
   let is_active () = 

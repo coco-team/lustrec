@@ -61,7 +61,7 @@ let eliminate_dim elim dim =
 
 (* 8th Jan 2016: issues when merging salsa with horn_encoding: The following
    functions seem unsused. They have to be adapted to the new type for expr
-
+*)
 
 let unfold_expr_offset m offset expr =
   List.fold_left

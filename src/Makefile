@@ -1,4 +1,4 @@
-OCAMLBUILD=/usr/bin/ocamlbuild -classic-display -use-ocamlfind -no-links 
+OCAMLBUILD=/home/ploc/.opam/4.04.0/bin/ocamlbuild -classic-display -use-ocamlfind -no-links 
 
 prefix=/home/ploc/Local
 exec_prefix=${prefix}
@@ -15,6 +15,13 @@ lustrec:
 	@$(OCAMLBUILD) main_lustre_compiler.native
 	@mkdir -p $(LOCAL_BINDIR)
 	@mv _build/main_lustre_compiler.native $(LOCAL_BINDIR)/lustrec
+
+lustret:
+	@echo Compiling binary lustrec
+	@$(OCAMLBUILD) main_lustre_compiler.native
+	@mkdir -p $(LOCAL_BINDIR)
+	@mv _build/main_lustre_compiler.native $(LOCAL_BINDIR)/lustrec
+
 
 doc:
 	@echo Generating doc
