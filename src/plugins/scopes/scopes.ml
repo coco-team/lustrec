@@ -227,7 +227,7 @@ let update_machine machine =
   }
     
 
-module Plugin =
+module Plugin : PluginType.PluginType =
 struct
   let name = "scopes"
   let is_active () = 
@@ -250,7 +250,8 @@ struct
   let activate () = 
     option_scopes := true;
     Options.optimization := 0; (* no optimization *)
-    Options.salsa_enabled := false; (* No salsa *)
+    
+    (* Options.salsa_enabled := false; (\* No salsa *\) TODO *)
     ()
 
   let rec is_valid_path path nodename prog machines =
@@ -312,6 +313,31 @@ struct
 
   let pp fmt = pp_scopes fmt !scopes_map
 
+  let check_force_stateful () = !option_scopes
+
+  let refine_machine_code prog machine_code =
+    if show_scopes () then
+      begin
+	let all_scopes = compute_scopes prog !Options.main_node in
+      (* Printing scopes *)
+      if !Options.verbose_level >= 1 then
+	Format.printf "Possible scopes are:@   ";
+	Format.printf "@[<v>%a@ @]@.@?" print_scopes all_scopes;
+	exit 0
+      end;
+    if is_active () then
+      process_scopes !Options.main_node prog machine_code
+    else
+      machine_code
+	
+
+
+  let c_backend_main_loop_body_suffix fmt () =
+    if is_active () then
+      begin
+	Format.fprintf fmt "@ %t" pp 
+      end;    
+ 
 end
     
 (* Local Variables: *)

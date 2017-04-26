@@ -1,12 +1,19 @@
 "backends/C": include
 "backends/Horn": include
+"plugins/salsa": include
 "plugins/scopes": include
+"plugins/mpfr": include
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic
 "main_lustre_compiler.native": package(ocamlgraph)
 "main_lustre_compiler.native": use_str
 "main_lustre_compiler.native": use_unix
-"main_lustre_compiler.native": use_nums
-<*.ml{,i}>: package(ocamlgraph)
-<*.ml{,i}>: use_str
-<*.ml{,i}>: use_unix
+#"main_lustre_compiler.native": use_num
+"main_lustre_compiler.native": package(salsa)
+
+#<*.ml{,i}>: package(ocamlgraph)
+#<*.ml{,i}>: package(salsa)
+<**/*.cm?>: package(ocamlgraph)
+#<*.ml{,i}>: use_str
+#<*.ml{,i}>: use_unix
+<**/*.cm?>: package(salsa)

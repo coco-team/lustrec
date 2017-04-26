@@ -49,7 +49,6 @@ let traces = ref false
 let horn_cex = ref false
 let horn_query = ref true
 
-let salsa_enabled = ref true
 
 let sfunction = ref ""
 
@@ -57,7 +56,7 @@ let set_mpfr prec =
   if prec > 0 then (
     mpfr := true;
     mpfr_prec := prec;
-    salsa_enabled := false; (* We deactivate salsa *)
+    (* salsa_enabled := false; (* We deactivate salsa *) TODO *)
   )
   else
     failwith "mpfr requires a positive integer"

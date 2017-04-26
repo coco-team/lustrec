@@ -3,7 +3,7 @@ OCAMLBUILD=@OCAMLBUILD@ -classic-display -no-links
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 bindir=@bindir@
-datadir = ${prefix}/share
+datarootdir = ${prefix}/share
 includedir = ${prefix}/include
 
 LUSI_LIBS=include/math.lusi include/conv.lusi
@@ -11,11 +11,15 @@ LUSI_MPFR_LIB=include/mpfr_lustre.lusi
 LOCAL_BINDIR=bin
 LOCAL_DOCDIR=doc/manual
 
-$(LOCAL_BINDIR)/lustrec: configure Makefile
+all: lustrec lustret
+
+lustrec:
 	@echo Compiling binary lustrec
-	@$(OCAMLBUILD) -cflags -I,@OCAMLGRAPH_PATH@ -lflag @OCAMLGRAPH_PATH@/graph.cmxa -lflag nums.cmxa -I src -I src/backends/C -I src/plugins/scopes src/main_lustre_compiler.native
-	@mkdir -p $(LOCAL_BINDIR)
-	@mv _build/src/main_lustre_compiler.native $(LOCAL_BINDIR)/lustrec
+	@make -C src lustrec
+
+lustret:
+	@echo Compiling binary lustret
+	@make -C src lustret
 
 configure: configure.ac
 	@echo configure.ac has changed relaunching autoconf
@@ -27,18 +31,14 @@ Makefile: Makefile.in config.status configure
 
 doc:
 	@echo Generating doc
-	@$(OCAMLBUILD) lustrec.docdir/index.html
-	@rm -rf $(LOCAL_DOCDIR)
-	@cp -rf _build/lustrec.docdir $(LOCAL_DOCDIR)
+	@make -C src doc
 
 dot: doc
-	$(OCAMLBUILD) lustrec.docdir/lustrec.dot
-	dot -T ps -o lustrec.dot _build/lustrec.docdir/lustrec.dot
-	mv _build/lustrec.docdir/lustrec.dot $(LOCAL_DOCDIR)
+	@make -C src dot
 
-clean:
-	$(OCAMLBUILD) -clean
-
+clean: clean-lusic
+	@make -C src clean
+	
 dist-src-clean: clean
 	@rm -f config.log config.status include/*.lusic include/math.h include/conv.h include/mpfr_lustre.h
 
@@ -50,7 +50,7 @@ dist-gzip: $(LOCAL_BINDIR)/lustrec dist-src-clean
 	@echo "Source distribution built: ../$(DIST_ARCHIVE_NAME)"
 
 dist-clean: dist-src-clean
-	@rm -f myocamlbuild.ml configure Makefile
+	@rm -f configure Makefile
 
 %.lusic: %.lusi
 	@echo Compiling $<
@@ -74,5 +74,5 @@ install: clean-lusic compile-lusi compile-mpfr-lusi
 	mkdir -p ${datadir}
 	install -m 0655 share/FindLustre.cmake ${datadir}
 
-.PHONY: compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean
+.PHONY: all compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean
 

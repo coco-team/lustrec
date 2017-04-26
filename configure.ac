@@ -8,6 +8,19 @@ AC_SUBST(VERSION_CODENAME, "Xia/Xiang-dev")
 
 AC_CONFIG_SRCDIR([src/main_lustre_compiler.ml])
 
+AC_PATH_PROG([OCAMLC],[ocamlc],[:])
+AC_MSG_CHECKING(OCaml version)
+ocamlc_version=`$OCAMLC -v | grep version | rev| cut -d \  -f 1 | rev`
+major=`echo $ocamlc_version | cut -d . -f 1`
+minor=`echo $ocamlc_version | cut -d . -f 2`
+if (test "$major" -lt 3 -a "$minor" -lt 11 ); then
+  AC_MSG_ERROR([Ocaml version must be at least 3.11. You have version $ocamlc_version])
+fi
+AC_MSG_RESULT(valid ocaml version detected: $ocamlc_version)
+
+AC_PATH_PROG([OCAMLBUILD],[ocamlbuild],[:])
+
+
 # default prefix is /usr/local
 AC_PREFIX_DEFAULT(/usr/local)
 
@@ -23,20 +36,6 @@ AC_ARG_WITH([ocamlgraph-path],
         [OCAMLGRAPH_PATH=$(ocamlfind query ocamlgraph)]
 )
 AC_SUBST(OCAMLGRAPH_PATH)
-
-AC_SUBST(SRC_PATH, esyscmd([sh -c "pwd" | tr -d '\n']))
-
-AC_PATH_PROG([OCAMLC],[ocamlc],[:])
-AC_MSG_CHECKING(OCaml version)
-ocamlc_version=`$OCAMLC -v | grep version | rev| cut -d \  -f 1 | rev`
-major=`echo $ocamlc_version | cut -d . -f 1`
-minor=`echo $ocamlc_version | cut -d . -f 2`
-if (test "$major" -lt 4 -a "$minor" -lt 0 ); then
-  AC_MSG_ERROR([Ocaml version must be at least 4.0. You have version $ocamlc_version])
-fi
-AC_MSG_RESULT(valid ocaml version detected: $ocamlc_version)
-
-AC_PATH_PROG([OCAMLBUILD],[ocamlbuild],[:])
 
 
 # Checking libs
@@ -98,9 +97,7 @@ AC_DEFINE_DIR([abs_datadir], [datadir])
 # Instanciation
 AC_CONFIG_FILES([Makefile
 		 src/Makefile
-		 src/version.ml
-		 test/test-compile.sh
-		 ])
+		 src/version.ml])
 
 AC_OUTPUT
 

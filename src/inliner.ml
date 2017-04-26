@@ -94,8 +94,6 @@ let get_carrier_inputs input_arg_list =
    else res)
    input_arg_list []
 *)
-
-
 (* 
     expr, locals', eqs = inline_call id args' reset locals node nodes
 
@@ -150,14 +148,14 @@ let inline_call node loc uid args reset locals caller =
       *)
       vdecl
     end
-  (*Format.eprintf "Inliner.rename_var %a@." Printers.pp_var v;*)
+    (*Format.eprintf "Inliner.rename_var %a@." Printers.pp_var v;*)
   in
   let inputs' = List.map (fun (vdecl, _) -> rename_var vdecl) dynamic_inputs in
   let outputs' = List.map rename_var node.node_outputs in
   let locals' =
-    (List.map (fun (vdecl, arg) -> let vdecl' = rename_var vdecl in { vdecl' with var_dec_value = Some (Corelang.expr_of_dimension arg) }) static_inputs)
+      (List.map (fun (vdecl, arg) -> let vdecl' = rename_var vdecl in { vdecl' with var_dec_value = Some (Corelang.expr_of_dimension arg) }) static_inputs)
     @ (List.map rename_var node.node_locals) 
-  in
+in
   (* checking we are at the appropriate (early) step: node_checks and
      node_gencalls should be empty (not yet assigned) *)
   assert (node.node_checks = []);
@@ -214,7 +212,7 @@ let rec inline_expr ?(selection_on_annotation=false) expr locals node nodes =
   let inline_pair e1 e2 = 
     let el', l', eqs', asserts', annots' = inline_tuple [e1;e2] in
     match el' with
-    | [e1'; e2'] -> e1', e2', l', eqs', asserts', annots'
+    | [e1'; e2'] -> e1', e2', l', eqs', asserts'
     | _ -> assert false
   in
   let inline_triple e1 e2 e3 = 
@@ -444,10 +442,20 @@ let global_inline basename prog type_env clock_env =
 	| _ -> main_opt, nodes, top::others) 
       prog (None, [], []) 
   in
+
   (* Recursively each call of a node in the top node is replaced *)
   let main_node = Utils.desome main_node in
   let main_node' = inline_all_calls main_node other_nodes in
   let res = List.map (fun top -> if check_node_name !Options.main_node top then main_node' else top) prog in
+ (* Code snippet from unstable branch. May be used when reactivating witnesses. 
+ let res = main_node'::other_tops in
+  if !Options.witnesses then (
+    witness 
+      basename
+      (match main_node.top_decl_desc  with Node nd -> nd.node_id | _ -> assert false) 
+      prog res type_env clock_env
+  );
+*)
   res
 
 let local_inline basename prog type_env clock_env =

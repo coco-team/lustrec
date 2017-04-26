@@ -92,7 +92,7 @@ let check_prop machines fmt node machine =
     (pp_conj (pp_horn_var machine)) main_output
     (Utils.fprintf_list ~sep:" " (pp_horn_var machine)) main_memory_next
     ;
-   if !Options.horn_query then fprintf fmt "(query ERR)@."
+   if !Options.horn_queries then fprintf fmt "(query ERR)@."
 
 
 let cex_computation machines fmt node machine =
@@ -146,8 +146,7 @@ let cex_computation machines fmt node machine =
     (Utils.fprintf_list ~sep:" " (pp_horn_var machine)) cex_memory_next ;
 
   fprintf fmt "; Inductive def@.";
-  (* Declare dummy inputs. Outputs should have been declared previously with collecting sem *)
-  (Utils.fprintf_list ~sep:" " (fun fmt v -> fprintf fmt "%a@." pp_decl_var v)) fmt cex_output_dummy;
+    (* Declare dummy inputs. Outputs should have been declared previously with collecting sem *)
   (Utils.fprintf_list ~sep:" " (fun fmt v -> fprintf fmt "%a@." pp_decl_var v)) fmt cex_input_dummy;
   fprintf fmt "(declare-var cexcpt Int)@.";
   fprintf fmt

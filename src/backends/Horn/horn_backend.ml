@@ -27,7 +27,6 @@ open Horn_backend_collecting_sem
 (*
 TODO:
 - gerer les traces. Ca merde pour l'instant dans le calcul des memoires sur les arrows
-
 - gerer le reset --- DONE
 - reconstruire les rechable states DONE
 - reintroduire le cex/traces ... DONE

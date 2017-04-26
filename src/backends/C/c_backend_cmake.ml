@@ -62,33 +62,43 @@ module Main = functor (Mod: MODIFIERS_MKF) ->
 struct
 
 
-let print_makefile basename nodename (dependencies:  dep_t list) fmt =
-  fprintf fmt "GCC=gcc -O0@.";
-  fprintf fmt "LUSTREC=%s@." Sys.executable_name;
-  fprintf fmt "LUSTREC_BASE=%s@." (Filename.dirname (Filename.dirname Sys.executable_name));
-  fprintf fmt "INC=${LUSTREC_BASE}/include/lustrec@.";
-  fprintf fmt "@.";
+  let print_cmake basename nodename (dependencies:  dep_t list) fmt =
 
-  (* Main binary *)
-  fprintf fmt "%s_%s: %s.c %s_main.c@." basename nodename basename basename;
-  fprintf fmt "\t${GCC} -I${INC} -I. -c %s.c@." basename;  
-  fprintf fmt "\t${GCC} -I${INC} -I. -c %s_main.c@." basename;   
-  fprintf_dependencies fmt dependencies;    
-  fprintf fmt "\t${GCC} -o %s_%s io_frontend.o %a %s.o %s_main.o %a@." basename nodename 
-    (Utils.fprintf_list ~sep:" " (fun fmt (Dep (_, s, _, _)) -> Format.fprintf fmt "%s.o" s)) 
-    (compiled_dependencies dependencies)
-    basename (* library .o *)
-    basename (* main function . o *) 
-    (Utils.fprintf_list ~sep:" " (fun fmt lib -> fprintf fmt "-l%s" lib)) (lib_dependencies dependencies)
+    (* Printing the basic file CMakeLists.txt *)
+    let fmt_CMakeLists_txt = formatter_of_out_channel (open_out (!Options.dest_dir ^ "/CMakeLists.txt")) in
+    fprintf fmt_CMakeLists_txt "cmake_minimum_required(VERSION 3.0)@.";
+    fprintf fmt_CMakeLists_txt "project(%s C)@." basename;
+    fprintf mt_CMakeLists_txt "@.";
+    fprintf mt_CMakeLists_txt "set(LUSTREC_DEFINE_TARGETS ON)@.";
+    fprintf mt_CMakeLists_txt "include(lustrec-%s.cmake)" basename;
+
+    
+    fprintf fmt "GCC=gcc@.";
+    fprintf fmt "LUSTREC=%s@." Sys.executable_name;
+    fprintf fmt "LUSTREC_BASE=%s@." (Filename.dirname (Filename.dirname Sys.executable_name));
+    fprintf fmt "INC=${LUSTREC_BASE}/include/lustrec@.";
+    fprintf fmt "@.";
+
+    (* Main binary *)
+    fprintf fmt "%s_%s: %s.c %s_main.c@." basename nodename basename basename;
+    fprintf fmt "\t${GCC} -O0 -I${INC} -I. -c %s.c@." basename;  
+    fprintf fmt "\t${GCC} -O0 -I${INC} -I. -c %s_main.c@." basename;   
+    fprintf_dependencies fmt dependencies;    
+    fprintf fmt "\t${GCC} -O0 -o %s_%s io_frontend.o %a %s.o %s_main.o %a@." basename nodename 
+      (Utils.fprintf_list ~sep:" " (fun fmt (Dep (_, s, _, _)) -> Format.fprintf fmt "%s.o" s)) 
+      (compiled_dependencies dependencies)
+      basename (* library .o *)
+      basename (* main function . o *) 
+      (Utils.fprintf_list ~sep:" " (fun fmt lib -> fprintf fmt "-l%s" lib)) (lib_dependencies dependencies)
     ;
- fprintf fmt "@.";
- fprintf fmt "clean:@.";
- fprintf fmt "\t\\rm -f *.o %s_%s@." basename nodename;
- fprintf fmt "@.";
- fprintf fmt ".PHONY: %s_%s@." basename nodename;
- fprintf fmt "@.";
- Mod.other_targets fmt basename nodename dependencies;
- fprintf fmt "@.";
+    fprintf fmt "@.";
+    fprintf fmt "clean:@.";
+    fprintf fmt "\t\\rm -f *.o %s_%s@." basename nodename;
+    fprintf fmt "@.";
+    fprintf fmt ".PHONY: %s_%s@." basename nodename;
+    fprintf fmt "@.";
+    Mod.other_targets fmt basename nodename dependencies;
+    fprintf fmt "@.";
 
 end
 
