@@ -16,5 +16,5 @@
 <*.ml{,i}>: package(ocamlgraph)
 
 # Plugin dependencies
-<**/*.native> or <plugins/salsa/*.cm?> : package(salsa)
+@SALSA_TAG@
 
