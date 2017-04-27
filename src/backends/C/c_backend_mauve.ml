@@ -41,7 +41,8 @@ let print_mauve_header fmt mauve_machine basename prog machines _ (*dependencies
 (* -------------------------------------------------- *)
 
 let mauve_default_value v =
-  let v_name = v.var_id in
+  (* let v_name = v.var_id in *)
+
   let v_type = (Types.repr v.var_type).Types.tdesc in
   match v_type with
   | Types.Tbool -> "false"

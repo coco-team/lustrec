@@ -336,7 +336,7 @@ let rec pp_machine_instr machines reset_instances (m: machine_t) fmt instr : ide
 					  fix here as (not a) or b *)
 	(pp_horn_val self (pp_horn_var m)) g
 	tag;
-      let rs = pp_machine_instrs machines reset_instances m fmt instrs in
+      let _ (* rs *) = pp_machine_instrs machines reset_instances m fmt instrs in 
       fprintf fmt "@])";
       () (* rs *)
     in

@@ -59,20 +59,32 @@ let rec compute_neg_expr cpt_pre expr =
     let neg = List.map (compute_neg_expr cpt_pre) l in
     combine (fun l' -> {expr with expr_desc = Expr_tuple l'}) neg l
 
-  | Expr_ite (i,t,e) when (Types.repr t.expr_type).Types.tdesc = Types.Tbool -> 
+  | Expr_ite (i,t,e) when (Types.repr t.expr_type).Types.tdesc = Types.Tbool -> (
     let list = [i; t; e] in
     let neg = List.map (compute_neg_expr cpt_pre) list in
-    combine (fun [i'; t'; e'] -> {expr with expr_desc = Expr_ite(i', t', e')}) neg list
+    combine (fun l ->
+      match l with
+      | [i'; t'; e'] -> {expr with expr_desc = Expr_ite(i', t', e')}
+      | _ -> assert false
+    ) neg list
+  )
   | Expr_ite (i,t,e) -> ( (* We return the guard as a new guard *)
     gen_mcdc_cond_guard i;
     let list = [i; t; e] in
     let neg = List.map (compute_neg_expr cpt_pre) list in
-    combine (fun [i'; t'; e'] -> {expr with expr_desc = Expr_ite(i', t', e')}) neg list
+    combine (fun l ->
+      match l with
+      | [i'; t'; e'] -> {expr with expr_desc = Expr_ite(i', t', e')}
+      | _ -> assert false
+    ) neg list
   )
   | Expr_arrow (e1, e2) -> 
     let e1' = compute_neg_expr cpt_pre e1 in
     let e2' = compute_neg_expr cpt_pre e2 in
-    combine (fun [x;y] -> { expr with expr_desc = Expr_arrow (x, y) }) [e1'; e2'] [e1; e2]
+    combine (fun l -> match l with
+    | [x;y] -> { expr with expr_desc = Expr_arrow (x, y) }
+    | _ -> assert false
+    ) [e1'; e2'] [e1; e2]
   | Expr_pre e -> 
     List.map 
       (fun (v, negv) -> (v, { expr with expr_desc = Expr_pre negv } ))

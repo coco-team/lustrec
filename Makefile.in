@@ -1,5 +1,3 @@
-OCAMLBUILD=@OCAMLBUILD@ -classic-display -no-links 
-
 prefix=@prefix@
 exec_prefix=@exec_prefix@
 bindir=@bindir@

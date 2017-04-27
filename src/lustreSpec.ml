@@ -9,8 +9,6 @@
 (*                                                                  *)
 (********************************************************************)
 
-open Format
-
 type ident = Utils.ident
 type rat = Utils.rat
 type tag = Utils.tag

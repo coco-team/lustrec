@@ -51,10 +51,10 @@ let stage1 prog dirname basename =
   check_stateless_decls prog;
   
   (* Typing *)
-  let computed_types_env = type_decls type_env prog in
+  let _ (*computed_types_env*) = type_decls type_env prog in
 
   (* Clock calculus *)
-  let computed_clocks_env = clock_decls clock_env prog in
+  let _ (*computed_clocks_env*) = clock_decls clock_env prog in
 
   (* Creating destination directory if needed *)
   create_dest_dir ();

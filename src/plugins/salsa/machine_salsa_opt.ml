@@ -57,6 +57,7 @@ let rec get_read_vars instrs =
       List.fold_left (fun vars (_, b) -> Vars.union vars (get_read_vars b) ) vars branches
     )
     | LT.MReset _ 
+    | LT.MNoReset _ 
     | LT.MComment _ -> Vars.empty  
   )
 
@@ -73,6 +74,7 @@ let rec get_written_vars instrs =
       List.fold_left (fun vars (_, b) -> Vars.union vars (get_written_vars b) ) vars_tl branches
     )
     | LT.MReset _ 
+    | LT.MNoReset _ 
     | LT.MComment _ -> Vars.empty    
   )
 
@@ -440,7 +442,7 @@ let rec rewrite_instrs nodename constEnv  vars_env m instrs ranges formalEnv pri
 						  produced within branches *)
 
 
-	 | LT.MReset(_) | LT.MComment _ ->
+	 | LT.MReset(_) | LT.MNoReset _ | LT.MComment _ ->
 			   if debug then Format.eprintf "Untouched %a (non real)@ " MC.pp_instr hd_instr;
 
 			   (* Untouched instruction *)

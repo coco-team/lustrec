@@ -236,12 +236,18 @@ let rec rdm_mutate_expr expr =
   | Expr_tuple l -> 
     let mut, l' = select_in_list l rdm_mutate_expr in
     mut, mk_e (Expr_tuple l')
-  | Expr_ite (i,t,e) -> 
-    let mut, [i'; t'; e'] = select_in_list [i; t; e] rdm_mutate_expr in
-    mut, mk_e (Expr_ite (i', t', e'))
-  | Expr_arrow (e1, e2) -> 
-    let mut, [e1'; e2'] = select_in_list [e1; e2] rdm_mutate_expr in
-    mut, mk_e (Expr_arrow (e1', e2'))
+  | Expr_ite (i,t,e) -> (
+    let mut, l = select_in_list [i; t; e] rdm_mutate_expr in
+    match l with
+    | [i'; t'; e'] -> mut, mk_e (Expr_ite (i', t', e'))
+    | _ -> assert false
+  )
+  | Expr_arrow (e1, e2) -> (
+    let mut, l = select_in_list [e1; e2] rdm_mutate_expr in
+    match l with
+    | [e1'; e2'] -> mut, mk_e (Expr_arrow (e1', e2'))
+    | _ -> assert false
+  )
   | Expr_pre e -> 
     let select_pre = Random.bool () in
     if select_pre then

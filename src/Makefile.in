@@ -1,4 +1,4 @@
-OCAMLBUILD=@OCAMLBUILD@ -classic-display -use-ocamlfind -no-links 
+OCAMLBUILD=@OCAMLBUILD@ -use-ocamlfind -no-links 
 
 prefix=@prefix@
 exec_prefix=@exec_prefix@
