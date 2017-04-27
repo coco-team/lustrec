@@ -24,7 +24,7 @@ let print_version fmt =
     (if !Options.mpfr then "MPFR multi-precision" else "(double) floating-point")
 
 let file_to_module_name basename =
-  let baseNAME = String.uppercase basename in
+  let baseNAME = String.uppercase_ascii basename in
   let baseNAME = Str.global_replace (Str.regexp "\\.\\|\\ ") "_" baseNAME in
   baseNAME
 
@@ -165,6 +165,7 @@ let rec pp_c_initialize fmt t =
  *)
 let pp_c_tag fmt t =
  pp_print_string fmt (if t = tag_true then "1" else if t = tag_false then "0" else t)
+
 
 (* Prints a constant value *)
 let rec pp_c_const fmt c =

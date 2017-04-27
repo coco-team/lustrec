@@ -367,10 +367,8 @@ and type_dependent_call env in_main loc const f targs =
     begin
       List.iter2 (fun (a,t) ti ->
 	let t' = type_add_const env (const || Types.get_static_value ti <> None) a t
-	in try_unify ~sub:true ti t' a.expr_loc;
-      ) targs tins;
-(*Format.eprintf "Typing.type_dependent_call END@.";*)
-      touts;
+	in try_unify ~sub:true ti t' a.expr_loc) targs tins;
+      touts
     end
 
 (* type a simple call without dependent types 
@@ -418,7 +416,7 @@ and type_expr env in_main const expr =
     expr.expr_type <- ty;
     ty
   | Expr_access (e1, d) ->
-    type_subtyping_arg env in_main true (expr_of_dimension d) Type_predef.type_int;
+    type_subtyping_arg env in_main false (* not necessary a constant *) (expr_of_dimension d) Type_predef.type_int;
     let ty_elt = new_var () in
     let d = Dimension.mkdim_var () in
     type_subtyping_arg env in_main const e1 (Type_predef.type_array d ty_elt);
@@ -679,19 +677,19 @@ let type_top_consts env clist =
 let rec type_top_decl env decl =
   match decl.top_decl_desc with
   | Node nd -> (
-      try
-	type_node env nd decl.top_decl_loc
-      with Error (loc, err) as exc -> (
-	(*if !Options.global_inline then
-	  Format.eprintf "Type error: failing node@.%a@.@?"
-	    Printers.pp_node nd
-	;*)
-	raise exc)
+    try
+      type_node env nd decl.top_decl_loc
+    with Error (loc, err) as exc -> (
+      if !Options.global_inline then
+	Format.eprintf "Type error: failing node@.%a@.@?"
+	  Printers.pp_node nd
+      ;
+      raise exc)
   )
   | ImportedNode nd ->
-      type_imported_node env nd decl.top_decl_loc
+    type_imported_node env nd decl.top_decl_loc
   | Const c ->
-      type_top_const env c
+    type_top_const env c
   | TypeDef _ -> List.fold_left type_top_decl env (consts_of_enum_type decl)
   | Open _  -> env
 

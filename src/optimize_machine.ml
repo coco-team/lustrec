@@ -58,6 +58,11 @@ let eliminate_dim elim dim =
       with Not_found -> mkdim_ident dim.dim_loc v) 
     dim
 
+
+(* 8th Jan 2016: issues when merging salsa with horn_encoding: The following
+   functions seem unsused. They have to be adapted to the new type for expr
+*)
+
 let unfold_expr_offset m offset expr =
   List.fold_left
     (fun res -> (function | Index i -> mk_val (Access (res, value_of_dimension m i))
@@ -321,7 +326,31 @@ let subst_instr subst instrs instr =
   let instr = eliminate subst instr in
   let v = get_assign_lhs instr in
   let e = get_assign_rhs instr in
-  try
+  (* Difficulties to merge with unstable. Here is the other code:
+
+try
+    let instr' = List.find (fun instr' -> is_assign instr' && get_assign_rhs instr' = e) instrs in
+    match v.value_desc with
+    | LocalVar v ->
+      IMap.add v.var_id (get_assign_lhs instr') subst, instrs
+    | StateVar v ->
+      let lhs' = get_assign_lhs instr' in
+      let typ' = lhs'.value_type in
+      (match lhs'.value_desc with
+      | LocalVar v' ->
+	let instr = eliminate subst (mk_assign (mk_val (StateVar v) typ') (mk_val (LocalVar v') typ')) in
+	subst, instr :: instrs
+      | StateVar v' ->
+	let subst_v' = IMap.add v'.var_id (mk_val (StateVar v) typ') IMap.empty in
+let instrs' = snd (List.fold_right (fun instr (ok, instrs) -> (ok || instr = instr', if ok then instr :: instrs else if instr = instr' then instrs else eliminate subst_v' instr :: instrs)) instrs (false, [])) in
+	IMap.add v'.var_id (mk_val (StateVar v) typ') subst, instr :: instrs'
+      | _           -> assert false)
+    | _          -> assert false
+  with Not_found -> subst, instr :: instrs
+ 
+*)
+
+try
     let instr' = List.find (fun instr' -> is_assign instr' && get_assign_rhs instr' = e) instrs in
     match v.value_desc with
     | LocalVar v ->

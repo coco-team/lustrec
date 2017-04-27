@@ -15,9 +15,9 @@
   open Parser_lustre
   open Utils
 
-  exception Error of Location.t
- 
   let str_buf = Buffer.create 1024
+
+  exception Error of Location.t
 
 (* As advised by Caml documentation. This way a single lexer rule is
    used to handle all the possible keywords. *)

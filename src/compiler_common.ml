@@ -226,16 +226,16 @@ let is_stateful topdecl =
 
 
 let import_dependencies prog =
-  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>.. extracting dependencies@,");
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 0>.. extracting dependencies@ ");
   let dependencies = Corelang.get_dependencies prog in
   let deps =
   List.fold_left
     (fun (compilation_dep, type_env, clock_env) dep ->
       let (local, s) = Corelang.dependency_of_top dep in
       let basename = Modules.name_dependency (local, s) in
-      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@[<v 0>Library %s@," basename);
+      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "  Library %s@ " basename);
       let lusic = Modules.import_dependency dep.top_decl_loc (local, s) in
-      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@]@ ");
+      (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "");*)
       let (lusi_type_env, lusi_clock_env) = get_envs_from_top_decls lusic.Lusic.contents in
       let is_stateful = List.exists is_stateful lusic.Lusic.contents in
       let new_dep = Dep (local, s, lusic.Lusic.contents, is_stateful ) in
@@ -248,4 +248,5 @@ let import_dependencies prog =
     Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
     deps
   end
+
 

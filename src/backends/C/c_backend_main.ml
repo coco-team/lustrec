@@ -165,10 +165,8 @@ let print_main_code fmt basename m =
       print_main_initialize mname main_mem fmt m;
     end;
   print_main_loop mname main_mem fmt m;
-  if Scopes.Plugin.is_active () then
-    begin
-      fprintf fmt "@ %t" Scopes.Plugin.pp 
-    end;    
+
+  Plugins.c_backend_main_loop_body_suffix fmt ();
   fprintf fmt "@]@ }@ @ ";
   if !Options.mpfr then
     begin

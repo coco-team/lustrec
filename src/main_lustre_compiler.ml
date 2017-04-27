@@ -88,10 +88,6 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
   end
 
 
-let functional_backend () = 
-  match !Options.output with
-  | "horn" | "lustre" | "acsl" -> true
-  | _ -> false
 
 (* From prog to prog *)
 let stage1 prog dirname basename =
@@ -120,7 +116,7 @@ let stage1 prog dirname basename =
   in
 
   (* Checking stateless/stateful status *)
-  if Scopes.Plugin.is_active () then
+  if Plugins.check_force_stateful () then
     force_stateful_decls prog
   else
     check_stateless_decls prog;
@@ -254,15 +250,12 @@ let stage2 prog =
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@ ");
   let machine_code = Machine_code.translate_prog prog node_schs in
 
-  Log.report ~level:4 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
-  (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
-    machine_code);
-
-  (* Optimize machine code *)
+   (* Optimize machine code *)
   let machine_code =
-    if !Options.optimization >= 4 && !Options.output <> "horn" then
+    if !Options.optimization >= 4 (* && !Options.output <> "horn" *) then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization: common sub-expression elimination@,");
+	Log.report ~level:1 
+	  (fun fmt -> fprintf fmt ".. machines optimization: sub-expression elimination@,");
 	Optimize_machine.machines_cse machine_code
       end
     else
@@ -270,17 +263,18 @@ let stage2 prog =
   in
   (* Optimize machine code *)
   let machine_code, removed_table = 
-    if !Options.optimization >= 2 && !Options.output <> "horn" then
+    if !Options.optimization >= 2 (*&& !Options.output <> "horn"*) then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization: constants inlining@,");
+	Log.report ~level:1 (fun fmt -> fprintf fmt 
+    ".. machines optimization: const. inlining (partial eval. with const)@,");
 	Optimize_machine.machines_unfold (Corelang.get_consts prog) node_schs machine_code
       end
     else
       machine_code, IMap.empty
   in  
   (* Optimize machine code *)
-  let machine_code = 
-    if !Options.optimization >= 3 && !Options.output <> "horn" then
+  let machine_code =
+    if !Options.optimization >= 3 && not (Corelang.functional_backend ()) then
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization: minimize stack usage by reusing variables@,");
 	let node_schs    = Scheduling.remove_prog_inlined_locals removed_table node_schs in
@@ -418,17 +412,14 @@ let rec compile_source dirname basename extension =
 	
     end;
 
-  let machine_code = 
-    if Scopes.Plugin.is_active () then
-      Scopes.Plugin.process_scopes !Options.main_node prog machine_code
-    else
-      machine_code
-  in
+  let machine_code = Plugins.refine_machine_code prog machine_code in
   
   stage3 prog machine_code dependencies basename;
-  Log.report ~level:1 (fun fmt -> fprintf fmt ".. done @ @]@.");
+  begin
+    Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
     (* We stop the process here *)
-  exit 0
+    exit 0
+  end
 
 let compile dirname basename extension =
   match extension with
@@ -457,13 +448,7 @@ let _ =
   try
     Printexc.record_backtrace true;
 
-    let options = Options.options @ 
-      List.flatten (
-	List.map Options.plugin_opt [
-	  Scopes.Plugin.name, Scopes.Plugin.activate, Scopes.Plugin.options
-	]
-      )
-    in
+    let options = Options.lustrec_options @ (Plugins.options ()) in
     
     Arg.parse options anonymous usage
   with

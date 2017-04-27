@@ -135,6 +135,9 @@ let is_value_internal_fun v =
   | Fun (f, vl) -> is_internal_fun f (List.map (fun v -> v.value_type) vl)
   | _           -> assert false
 
+let is_numeric_operator x =
+  List.mem x arith_funs
+
 let is_homomorphic_fun x =
   List.mem x internal_funs
 

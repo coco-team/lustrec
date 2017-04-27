@@ -517,8 +517,13 @@ let get_var id var_list =
   List.find (fun v -> v.var_id = id) var_list
 
 let get_node_var id node =
-  get_var id (get_node_vars node)
-
+  try
+    get_var id (get_node_vars node)
+  with Not_found -> begin
+    Format.eprintf "Unable to find variable %s in node %s@.@?" id node.node_id;
+    raise Not_found
+  end
+    
 let get_node_eqs =
   let get_eqs stmts =
     List.fold_right
@@ -1042,6 +1047,11 @@ let copy_top top =
 
 let copy_prog top_list =
   List.map copy_top top_list
+
+let functional_backend () = 
+  match !Options.output with
+  | "horn" | "lustre" | "acsl" -> true
+  | _ -> false
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
