@@ -520,7 +520,7 @@ let get_node_var id node =
   try
     get_var id (get_node_vars node)
   with Not_found -> begin
-    Format.eprintf "Unable to find variable %s in node %s@.@?" id node.node_id;
+    (* Format.eprintf "Unable to find variable %s in node %s@.@?" id node.node_id; *)
     raise Not_found
   end
     

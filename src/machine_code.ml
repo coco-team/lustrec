@@ -394,72 +394,72 @@ let reset_instance node args i r c =
                    [control_on_clock node args c (conditional g [MReset i] [MNoReset i])]
 
 let translate_eq node ((m, si, j, d, s) as args) eq =
-  (* Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock; *)
+  (* Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock;  *)
   match eq.eq_lhs, eq.eq_rhs.expr_desc with
   | [x], Expr_arrow (e1, e2)                     ->
-    let var_x = get_node_var x node in
-    let o = new_instance node arrow_top_decl eq.eq_rhs.expr_tag in
-    let c1 = translate_expr node args e1 in
-    let c2 = translate_expr node args e2 in
-    (m,
-     MReset o :: si,
-     Utils.IMap.add o (arrow_top_decl, []) j,
-     d,
-     (control_on_clock node args eq.eq_rhs.expr_clock (MStep ([var_x], o, [c1;c2]))) :: s)
+     let var_x = get_node_var x node in
+     let o = new_instance node arrow_top_decl eq.eq_rhs.expr_tag in
+     let c1 = translate_expr node args e1 in
+     let c2 = translate_expr node args e2 in
+     (m,
+      MReset o :: si,
+      Utils.IMap.add o (arrow_top_decl, []) j,
+      d,
+      (control_on_clock node args eq.eq_rhs.expr_clock (MStep ([var_x], o, [c1;c2]))) :: s)
   | [x], Expr_pre e1 when ISet.mem (get_node_var x node) d     ->
-    let var_x = get_node_var x node in
-    (ISet.add var_x m,
-     si,
-     j,
-     d,
-     control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e1)) :: s)
+     let var_x = get_node_var x node in
+     (ISet.add var_x m,
+      si,
+      j,
+      d,
+      control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e1)) :: s)
   | [x], Expr_fby (e1, e2) when ISet.mem (get_node_var x node) d ->
-    let var_x = get_node_var x node in
-    (ISet.add var_x m,
-     MStateAssign (var_x, translate_expr node args e1) :: si,
-     j,
-     d,
-     control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e2)) :: s)
+     let var_x = get_node_var x node in
+     (ISet.add var_x m,
+      MStateAssign (var_x, translate_expr node args e1) :: si,
+      j,
+      d,
+      control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e2)) :: s)
 
   | p  , Expr_appl (f, arg, r) when not (Basic_library.is_expr_internal_fun eq.eq_rhs) ->
-    let var_p = List.map (fun v -> get_node_var v node) p in
-    let el = expr_list_of_expr arg in
-    let vl = List.map (translate_expr node args) el in
-    let node_f = node_from_name f in
-    let call_f =
-      node_f,
-      NodeDep.filter_static_inputs (node_inputs node_f) el in
-    let o = new_instance node node_f eq.eq_rhs.expr_tag in
-    let env_cks = List.fold_right (fun arg cks -> arg.expr_clock :: cks) el [eq.eq_rhs.expr_clock] in
-    let call_ck = Clock_calculus.compute_root_clock (Clock_predef.ck_tuple env_cks) in
-    (*Clocks.new_var true in
-    Clock_calculus.unify_imported_clock (Some call_ck) eq.eq_rhs.expr_clock eq.eq_rhs.expr_loc;
-    Format.eprintf "call %a: %a: %a@," Printers.pp_expr eq.eq_rhs Clocks.print_ck (Clock_predef.ck_tuple env_cks) Clocks.print_ck call_ck;*)
-    (m,
-     (if Stateless.check_node node_f then si else MReset o :: si),
-     Utils.IMap.add o call_f j,
-     d,
-     (if Stateless.check_node node_f
-      then []
-      else reset_instance node args o r call_ck) @
-       (control_on_clock node args call_ck (MStep (var_p, o, vl))) :: s)
-(*
-   (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
-      are preserved. While they are replaced as if g then x = t else x = e in  C or Java
-      backends. *)
-  | [x], Expr_ite   (c, t, e)
+     let var_p = List.map (fun v -> get_node_var v node) p in
+     let el = expr_list_of_expr arg in
+     let vl = List.map (translate_expr node args) el in
+     let node_f = node_from_name f in
+     let call_f =
+       node_f,
+       NodeDep.filter_static_inputs (node_inputs node_f) el in
+     let o = new_instance node node_f eq.eq_rhs.expr_tag in
+     let env_cks = List.fold_right (fun arg cks -> arg.expr_clock :: cks) el [eq.eq_rhs.expr_clock] in
+     let call_ck = Clock_calculus.compute_root_clock (Clock_predef.ck_tuple env_cks) in
+     (*Clocks.new_var true in
+       Clock_calculus.unify_imported_clock (Some call_ck) eq.eq_rhs.expr_clock eq.eq_rhs.expr_loc;
+       Format.eprintf "call %a: %a: %a@," Printers.pp_expr eq.eq_rhs Clocks.print_ck (Clock_predef.ck_tuple env_cks) Clocks.print_ck call_ck;*)
+     (m,
+      (if Stateless.check_node node_f then si else MReset o :: si),
+      Utils.IMap.add o call_f j,
+      d,
+      (if Stateless.check_node node_f
+       then []
+       else reset_instance node args o r call_ck) @
+	(control_on_clock node args call_ck (MStep (var_p, o, vl))) :: s)
+  (*
+    (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
+    are preserved. While they are replaced as if g then x = t else x = e in  C or Java
+    backends. *)
+    | [x], Expr_ite   (c, t, e)
     when (match !Options.output with | "horn" -> true | "C" | "java" | _ -> false)
-      ->
+    ->
     let var_x = get_node_var x node in
     (m,
-     si,
-     j,
-     d,
-     (control_on_clock node args eq.eq_rhs.expr_clock
-	(MLocalAssign (var_x, translate_expr node args eq.eq_rhs))::s)
+    si,
+    j,
+    d,
+    (control_on_clock node args eq.eq_rhs.expr_clock
+    (MLocalAssign (var_x, translate_expr node args eq.eq_rhs))::s)
     )
 
-*)
+  *)
   | [x], _                                       -> (
     let var_x = get_node_var x node in
     (m, si, j, d,
@@ -471,10 +471,10 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
     )
   )
   | _                                            ->
-    begin
-      Format.eprintf "internal error: Machine_code.translate_eq %a@?" Printers.pp_node_eq eq;
-      assert false
-    end
+     begin
+       Format.eprintf "internal error: Machine_code.translate_eq %a@?" Printers.pp_node_eq eq;
+       assert false
+     end
 
 let find_eq xl eqs =
   let rec aux accu eqs =
