@@ -1,7 +1,8 @@
 define([gitversion], esyscmd([sh -c "git log --oneline | wc -l | tr -d '\n'"]))
-
-AC_INIT([lustrec], [1.4-gitversion], [ploc@garoche.net])
+define([gitbranch], esyscmd([sh -c "git branch | grep \* | cut -d ' ' -f2"]))
+AC_INIT([lustrec], 1.4-gitversion, [ploc@garoche.net])
 AC_SUBST(VERSION_CODENAME, "Xia/Xiang-dev")
+AC_SUBST(GITBRANCH, gitbranch)
 # Next release will be
 #AC_INIT([lustrec], [1.5], [ploc@garoche.net])
 #AC_SUBST(VERSION_CODENAME, "Xia/Shao Kang")
@@ -90,7 +91,27 @@ AC_CHECK_LIB(mpfr, mpfr_add, [mpfr=yes],
 mpfr=no])
 
 
+# Checking availability of path to regression tests
+tests_path="../lustrec-tests/regression_tests"
 
+AC_ARG_WITH([tests-path],
+            [AS_HELP_STRING([--with-tests-path],
+               [provides path to test suite (default is ../lustrec-test if available)])],
+            [tests_path="$withval";
+	     if (test "x$tests_path" = xyes); then
+	       AC_MSG_ERROR(Option --with-tests-path requires a parameter: eg. --with-tests-path=value);
+	     fi],
+            )
+AC_MSG_NOTICE($tests_path)
+AC_CHECK_FILE(${tests_path}/CMakeLists.txt,
+              [
+	      valid_test_path=true	
+	      ],
+	      [
+	      valid_test_path=false
+	        AC_SUBST(PATH_TO_TESTS, $tests_path)	      ])
+AC_SUBST(PATH_TO_TESTS_DEFINED, $valid_test_path)
+AC_SUBST(PATH_TO_TESTS, $tests_path)
 
 # End of config
 
@@ -129,16 +150,21 @@ AC_MSG_NOTICE(include path: $prefix/include)
 AC_MSG_NOTICE(********    Plugins    ********)
 
   if (test "x$gmp" = xyes -a "x$mpfr" = xyes ); then
-      AC_MSG_NOTICE([-mpfr option enable])
+      AC_MSG_NOTICE([MPFR option enabled])
   else 
       AC_MSG_WARN([MPFR option cannot be activated. Requires GMP and MPFR libs])
   fi
 
-  if (test "x$salsa" = xyes -a "x$enable_salsa" = xyes); then
+  if (test "x$salsa" = xyes -a "x$enable_salsa" != xno); then
       AC_MSG_NOTICE([Salsa plugin enabled])
   else 
       AC_MSG_NOTICE([Salsa plugin disabled])
   fi
-
+AC_MSG_NOTICE(****** Regression Tests  ******)
+if (test "x$valid_test_path" = xfalse); then
+  AC_MSG_NOTICE(no valid tests path provided ($tests_path))
+else
+AC_MSG_NOTICE(tests path: $tests_path)
+fi
 AC_MSG_NOTICE(******** Configuration ********)
 AC_MSG_NOTICE(Execute "make; make install" now)

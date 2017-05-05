@@ -36,7 +36,7 @@ dot: doc
 
 clean: clean-lusic
 	@make -C src clean
-	
+
 dist-src-clean: clean
 	@rm -f config.log config.status include/*.lusic include/math.h include/conv.h include/mpfr_lustre.h
 
@@ -72,5 +72,31 @@ install: clean-lusic compile-lusi compile-mpfr-lusi
 	mkdir -p ${datarootdir}
 	install -m 0655 share/FindLustre.cmake ${datarootdir}
 
-.PHONY: all compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean
+test-config: lustrec install
+	if @PATH_TO_TESTS_DEFINED@; then \
+	  mkdir -p test; \
+	  cd test; \
+	  cmake -DLUSTRE_PATH_HINT=${bindir} -DSUBPROJ=@GITBRANCH@ ../@PATH_TO_TESTS@; \
+	fi
+
+test-no-submit: test-config
+	cd test; ctest -M Experimental -T Start -T Update -T Configure -T Build -T Test -R COMPIL_LUSTRE
+
+test-submit: test-config
+	cd test; ctest -M Experimental -T Submit -R COMPIL_LUSTRE
+
+test: test-config
+	cd test; ctest -D Experimental -R COMPIL_LUSTRE
+
+test-full-no-submit: test-config
+	cd test; ctest -M Experimental -T Start -T Update -T Configure -T Build -T Test 
+
+test-full-submit: test-config
+	cd test; ctest -M Experimental -T Submit 
+
+test-full: test-config
+	cd test; ctest -D Experimental 
+
+
+.PHONY: all compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean 
 
