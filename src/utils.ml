@@ -33,7 +33,7 @@ struct (* Node module *)
 end
 
 module IMap = Map.Make(IdentModule)
-
+    
 module ISet = Set.Make(IdentModule)
 
 exception DeSome
@@ -298,6 +298,13 @@ let pp_iset fmt t =
     Format.fprintf fmt "}@."
   end
 
+let pp_imap pp_val fmt m =
+  begin
+    Format.fprintf fmt "@[{@ ";
+    IMap.iter (fun key v -> Format.fprintf fmt "%s -> %a@ " key pp_val v) m;
+    Format.fprintf fmt "}@ @]"
+  end
+    
 let pp_hashtbl t pp_fun beg_str end_str sep_str =
   if (beg_str="\n") then
     print_newline ()
