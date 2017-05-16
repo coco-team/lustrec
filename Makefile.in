@@ -72,7 +72,7 @@ install: clean-lusic compile-lusi compile-mpfr-lusi
 	mkdir -p ${datarootdir}
 	install -m 0655 share/FindLustre.cmake ${datarootdir}
 
-test-config: lustrec install
+test-config: ${bindir}/lustrec
 	if @PATH_TO_TESTS_DEFINED@; then \
 	  mkdir -p test; \
 	  cd test; \
