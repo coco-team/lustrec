@@ -141,40 +141,42 @@ let rec pp_c_const_suffix var_type fmt c =
 
 (* Prints a [value] of type [var_type] indexed by the suffix list [loop_vars] *)
 let rec pp_value_suffix self var_type loop_vars pp_value fmt value =
- (*Format.eprintf "pp_value_suffix: %a %a %a@." Types.print_ty var_type Machine_code.pp_val value pp_suffix loop_vars;*)
- match loop_vars, value.value_desc with
- | (x, LAcc i) :: q, _ when is_const_index i ->
-   let r = ref (Dimension.size_const_dimension (Machine_code.dimension_of_value i)) in
-   pp_value_suffix self var_type ((x, LInt r)::q) pp_value fmt value
- | (_, LInt r) :: q, Cst (Const_array cl) ->
-   let var_type = Types.array_element_type var_type in
-   pp_value_suffix self var_type q pp_value fmt (mk_val (Cst (List.nth cl !r)) Type_predef.type_int)
- | (_, LInt r) :: q, Array vl      ->
-   let var_type = Types.array_element_type var_type in
-   pp_value_suffix self var_type q pp_value fmt (List.nth vl !r)
- | loop_var    :: q, Array vl      ->
-   let var_type = Types.array_element_type var_type in
-   Format.fprintf fmt "(%a[]){%a }%a" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_value_suffix self var_type q pp_value)) vl pp_suffix [loop_var]
- | []              , Array vl      ->
-   let var_type = Types.array_element_type var_type in
-   Format.fprintf fmt "(%a[]){%a }" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_value_suffix self var_type [] pp_value)) vl
- | _           :: q, Power (v, n)  ->
-   pp_value_suffix self var_type q pp_value fmt v
- | _               , Fun (n, vl)   ->
-   Basic_library.pp_c n (pp_value_suffix self var_type loop_vars pp_value) fmt vl
- | _               , Access (v, i) ->
-   let var_type = Type_predef.type_array (Dimension.mkdim_var ()) var_type in
-   pp_value_suffix self var_type ((Dimension.mkdim_var (), LAcc i) :: loop_vars) pp_value fmt v
- | _               , LocalVar v    -> Format.fprintf fmt "%a%a" pp_value v pp_suffix loop_vars
- | _               , StateVar v    ->
-    (* array memory vars are represented by an indirection to a local var with the right type,
-       in order to avoid casting everywhere. *)
-   if Types.is_array_type v.var_type
-   then Format.fprintf fmt "%a%a" pp_value v pp_suffix loop_vars
-   else Format.fprintf fmt "%s->_reg.%a%a" self pp_value v pp_suffix loop_vars
- | _               , Cst cst       -> pp_c_const_suffix var_type fmt cst
- | _               , _             -> (Format.eprintf "internal error: C_backend_src.pp_value_suffix %a %a %a@." Types.print_ty var_type Machine_code.pp_val value pp_suffix loop_vars; assert false)
-
+  (*Format.eprintf "pp_value_suffix: %a %a %a@." Types.print_ty var_type Machine_code.pp_val value pp_suffix loop_vars;*)
+  (
+    match loop_vars, value.value_desc with
+    | (x, LAcc i) :: q, _ when is_const_index i ->
+       let r = ref (Dimension.size_const_dimension (Machine_code.dimension_of_value i)) in
+       pp_value_suffix self var_type ((x, LInt r)::q) pp_value fmt value
+    | (_, LInt r) :: q, Cst (Const_array cl) ->
+       let var_type = Types.array_element_type var_type in
+       pp_value_suffix self var_type q pp_value fmt (mk_val (Cst (List.nth cl !r)) Type_predef.type_int)
+    | (_, LInt r) :: q, Array vl      ->
+       let var_type = Types.array_element_type var_type in
+       pp_value_suffix self var_type q pp_value fmt (List.nth vl !r)
+    | loop_var    :: q, Array vl      ->
+       let var_type = Types.array_element_type var_type in
+       Format.fprintf fmt "(%a[]){%a }%a" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_value_suffix self var_type q pp_value)) vl pp_suffix [loop_var]
+    | []              , Array vl      ->
+       let var_type = Types.array_element_type var_type in
+       Format.fprintf fmt "(%a[]){%a }" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_value_suffix self var_type [] pp_value)) vl
+    | _           :: q, Power (v, n)  ->
+       pp_value_suffix self var_type q pp_value fmt v
+    | _               , Fun (n, vl)   ->
+       Basic_library.pp_c n (pp_value_suffix self var_type loop_vars pp_value) fmt vl
+    | _               , Access (v, i) ->
+       let var_type = Type_predef.type_array (Dimension.mkdim_var ()) var_type in
+       pp_value_suffix self var_type ((Dimension.mkdim_var (), LAcc i) :: loop_vars) pp_value fmt v
+    | _               , LocalVar v    -> Format.fprintf fmt "%a%a" pp_value v pp_suffix loop_vars
+    | _               , StateVar v    ->
+       (* array memory vars are represented by an indirection to a local var with the right type,
+	  in order to avoid casting everywhere. *)
+       if Types.is_array_type v.var_type
+       then Format.fprintf fmt "%a%a" pp_value v pp_suffix loop_vars
+       else Format.fprintf fmt "%s->_reg.%a%a" self pp_value v pp_suffix loop_vars
+    | _               , Cst cst       -> pp_c_const_suffix var_type fmt cst
+    | _               , _             -> (Format.eprintf "internal error: C_backend_src.pp_value_suffix %a %a %a@." Types.print_ty var_type Machine_code.pp_val value pp_suffix loop_vars; assert false)
+  )
+   
 (* Subsumes C_backend_common.pp_c_val to cope with aggressive substitution
    which may yield constant arrays in expressions.
    Type is needed to correctly print constant arrays.

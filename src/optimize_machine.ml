@@ -19,9 +19,9 @@ open Dimension
 
 let pp_elim fmt elim =
   begin
-    Format.fprintf fmt "{ /* elim table: */@.";
-    IMap.iter (fun v expr -> Format.fprintf fmt "%s |-> %a@." v pp_val expr) elim;
-    Format.fprintf fmt "}@.";
+    Format.fprintf fmt "@[{ /* elim table: */@ ";
+    IMap.iter (fun v expr -> Format.fprintf fmt "%s |-> %a@ " v pp_val expr) elim;
+    Format.fprintf fmt "}@ @]";
   end
 
 let rec eliminate elim instr =

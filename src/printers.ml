@@ -71,16 +71,16 @@ and pp_const fmt c =
 let rec pp_expr fmt expr =
   (match expr.expr_annot with 
   | None -> fprintf fmt "%t" 
-  | Some ann -> fprintf fmt "(%a %t)" pp_expr_annot ann)
+  | Some ann -> fprintf fmt "@[(%a %t)@]" pp_expr_annot ann)
     (fun fmt -> 
       match expr.expr_desc with
     | Expr_const c -> pp_const fmt c
-    | Expr_ident id -> Format.fprintf fmt "%s" id
+    | Expr_ident id -> fprintf fmt "%s" id
     | Expr_array a -> fprintf fmt "[%a]" pp_tuple a
     | Expr_access (a, d) -> fprintf fmt "%a[%a]" pp_expr a Dimension.pp_dimension d
     | Expr_power (a, d) -> fprintf fmt "(%a^%a)" pp_expr a Dimension.pp_dimension d
     | Expr_tuple el -> fprintf fmt "(%a)" pp_tuple el
-    | Expr_ite (c, t, e) -> fprintf fmt "(if %a then %a else %a)" pp_expr c pp_expr t pp_expr e
+    | Expr_ite (c, t, e) -> fprintf fmt "@[<hov 1>(if %a then@ @[<hov 2>%a@]@ else@ @[<hov 2>%a@]@])" pp_expr c pp_expr t pp_expr e
     | Expr_arrow (e1, e2) -> fprintf fmt "(%a -> %a)" pp_expr e1 pp_expr e2
     | Expr_fby (e1, e2) -> fprintf fmt "%a fby %a" pp_expr e1 pp_expr e2
     | Expr_pre e -> fprintf fmt "pre %a" pp_expr e
@@ -257,9 +257,9 @@ let pp_typedec fmt ty =
 
 let pp_spec fmt spec =
   fprintf fmt "@[<hov 2>(*@@ ";
-  fprintf_list ~sep:"@;@@ " (fun fmt r -> fprintf fmt "requires %a;" pp_eexpr r) fmt spec.requires;
-  fprintf_list ~sep:"@;@@ " (fun fmt r -> fprintf fmt "ensures %a; " pp_eexpr r) fmt spec.ensures;
-  fprintf_list ~sep:"@;" (fun fmt (name, assumes, ensures, _) -> 
+  fprintf_list ~sep:"@,@@ " (fun fmt r -> fprintf fmt "requires %a;" pp_eexpr r) fmt spec.requires;
+  fprintf_list ~sep:"@,@@ " (fun fmt r -> fprintf fmt "ensures %a; " pp_eexpr r) fmt spec.ensures;
+  fprintf_list ~sep:"@," (fun fmt (name, assumes, ensures, _) -> 
     fprintf fmt "behavior %s:@[@ %a@ %a@]" 
       name
       (fprintf_list ~sep:"@ " (fun fmt r -> fprintf fmt "assumes %a;" pp_eexpr r)) assumes
@@ -281,9 +281,9 @@ let pp_asserts fmt asserts =
   | _ -> ()
     
 let pp_node fmt nd = 
-fprintf fmt "@[<v 0>%a%t%s %s (%a) returns (%a)@.%a%alet@.@[<h 2>   @ @[<v>%a@ %a@ %a@]@ @]@.tel@]@."
+fprintf fmt "@[<v 0>%a%t%s %s (%a) returns (%a)@ %a%alet@[<h 2>   @ @[<v>%a@ %a@ %a@]@]@ tel@]@ "
   (fun fmt s -> match s with Some s -> pp_spec fmt s | _ -> ()) nd.node_spec
-  (fun fmt -> match nd.node_spec with None -> () | Some _ -> Format.fprintf fmt "@.")
+  (fun fmt -> match nd.node_spec with None -> () | Some _ -> Format.fprintf fmt "@ ")
   (if nd.node_dec_stateless then "function" else "node")
   nd.node_id
   pp_node_args nd.node_inputs
@@ -349,10 +349,12 @@ let pp_lusi fmt decl =
   | Node _ -> assert false
 
 let pp_lusi_header fmt basename prog =
-  fprintf fmt "(* Generated Lustre Interface file from %s.lus *)@." basename;
-  fprintf fmt "(* by Lustre-C compiler version %s, %a *)@." Version.number pp_date (Unix.gmtime (Unix.time ()));
-  fprintf fmt "(* Feel free to mask some of the definitions by removing them from this file. *)@.@.";
-  List.iter (fprintf fmt "%a@." pp_lusi) prog    
+  fprintf fmt "@[<v 0>";
+  fprintf fmt "(* Generated Lustre Interface file from %s.lus *)@ " basename;
+  fprintf fmt "(* by Lustre-C compiler version %s, %a *)@ " Version.number pp_date (Unix.gmtime (Unix.time ()));
+  fprintf fmt "(* Feel free to mask some of the definitions by removing them from this file. *)@ @ ";
+  List.iter (fprintf fmt "%a@ " pp_lusi) prog;
+  fprintf fmt "@]"
 
 let pp_offset fmt offset =
   match offset with

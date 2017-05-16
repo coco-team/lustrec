@@ -25,7 +25,7 @@ let create_dest_dir () =
   begin
     if not (Sys.file_exists !Options.dest_dir) then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. creating destination directory@,");
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. creating destination directory@ ");
 	Unix.mkdir !Options.dest_dir (Unix.stat ".").Unix.st_perm
       end;
     if (Unix.stat !Options.dest_dir).Unix.st_kind <> Unix.S_DIR then
@@ -69,7 +69,7 @@ let parse_source source_name =
 
   (* Parsing *)
   Log.report ~level:1 
-    (fun fmt -> fprintf fmt ".. parsing source file %s@," source_name);
+    (fun fmt -> fprintf fmt ".. parsing source file %s@ " source_name);
   try
     let prog = Parse.prog Parser_lustre.prog Lexer_lustre.token lexbuf in
     (*ignore (Modules.load_program ISet.empty prog);*)

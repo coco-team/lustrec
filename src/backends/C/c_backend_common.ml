@@ -474,6 +474,7 @@ let pp_c_var m self pp_var fmt var =
     pp_c_val self pp_var fmt (mk_val (StateVar var) var.var_type)
   else
     pp_c_val self pp_var fmt (mk_val (LocalVar var) var.var_type)
+  
 
 let pp_array_suffix fmt loop_vars =
   Utils.fprintf_list ~sep:"" (fun fmt v -> fprintf fmt "[%s]" v) fmt loop_vars
