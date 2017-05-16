@@ -14,6 +14,8 @@ open Corelang
 open Clocks
 open Causality
 
+let print_statelocaltag = true
+  
 exception NormalizationError
 
 module OrdVarDecl:Map.OrderedType with type t=var_decl =
@@ -24,8 +26,17 @@ module ISet = Set.Make(OrdVarDecl)
 let rec pp_val fmt v =
   match v.value_desc with
     | Cst c         -> Printers.pp_const fmt c 
-    | LocalVar v    -> Format.pp_print_string fmt v.var_id
-    | StateVar v    -> Format.pp_print_string fmt v.var_id
+    | LocalVar v    ->
+       if print_statelocaltag then
+	 Format.fprintf fmt "%s(L)" v.var_id
+       else
+	 Format.pp_print_string fmt v.var_id
+	   
+    | StateVar v    ->
+       if print_statelocaltag then
+	 Format.fprintf fmt "%s(S)" v.var_id
+       else
+	 Format.pp_print_string fmt v.var_id
     | Array vl      -> Format.fprintf fmt "[%a]" (Utils.fprintf_list ~sep:", " pp_val)  vl
     | Access (t, i) -> Format.fprintf fmt "%a[%a]" pp_val t pp_val i
     | Power (v, n)  -> Format.fprintf fmt "(%a^%a)" pp_val v pp_val n
@@ -107,6 +118,10 @@ let pp_machine fmt m =
     (fun fmt -> match m.mspec with | None -> () | Some spec -> Printers.pp_spec fmt spec)
     (Utils.fprintf_list ~sep:"@ " Printers.pp_expr_annot) m.mannot
 
+let pp_machines fmt ml =
+  Format.fprintf fmt "@[<v 0>%a@]" (Utils.fprintf_list ~sep:"@," pp_machine) ml
+
+  
 let rec is_const_value v =
   match v.value_desc with
   | Cst _          -> true
@@ -580,7 +595,7 @@ let translate_decl nd sch =
   assert (ISet.is_empty m0);
   assert (init0 = []);
   assert (Utils.IMap.is_empty j0);
-  let m, init, j, locals, s = translate_eqs nd (m0, init0, j0, locals0, []) (sorted_eqs@assert_instrs) in
+  let m, init, j, locals, s = translate_eqs nd (m0, init0, j0, locals0, []) (assert_instrs@sorted_eqs) in
   let mmap = Utils.IMap.fold (fun i n res -> (i, n)::res) j [] in
   {
     mname = nd;
