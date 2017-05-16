@@ -172,7 +172,7 @@ let _ =
   | Corelang.Error _ (*| Task_set.Error _*)
   | Causality.Error _ -> exit 1
   | Sys_error msg -> (eprintf "Failure: %s@." msg)
-  | exc -> (Utils.track_exception (); raise exc)
+  | exc -> (track_exception (); raise exc)
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

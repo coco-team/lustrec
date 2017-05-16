@@ -181,7 +181,7 @@ let arrow_desc =
 let arrow_top_decl =
   {
     top_decl_desc = Node arrow_desc;
-    top_decl_owner = !Options.include_dir;
+    top_decl_owner = (Options.core_dependency "arrow");
     top_decl_itf = false;
     top_decl_loc = Location.dummy_loc
   }

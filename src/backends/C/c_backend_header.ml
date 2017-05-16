@@ -40,9 +40,9 @@ let print_import_standard fmt =
 	fprintf fmt "#include <mpfr.h>@."
       end;
   if !Options.cpp then
-    fprintf fmt "#include \"%s/arrow.hpp\"@.@." !Options.include_dir
+    fprintf fmt "#include \"%s/arrow.hpp\"@.@." arrow_top_decl.top_decl_owner 
   else
-    fprintf fmt "#include \"%s/arrow.h\"@.@." !Options.include_dir
+    fprintf fmt "#include \"%s/arrow.h\"@.@." arrow_top_decl.top_decl_owner 
 
   end
 

@@ -85,7 +85,7 @@ let print_dep fmt prog =
   List.iter
     (fun dep ->
       let (local, s) = Corelang.dependency_of_top dep in
-      let basename = ((if local then !Options.dest_dir else !Options.include_dir)) ^ s ^ ".smt2" in
+      let basename = (Options.name_dependency (local, s)) ^ ".smt2" in
       Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@[<v 0> Horn Library %s@," basename);
       let horn = load_file basename in
       fprintf fmt "@.%s@." horn;

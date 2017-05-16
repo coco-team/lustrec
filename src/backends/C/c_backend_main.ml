@@ -178,7 +178,7 @@ let print_main_code fmt basename m =
 
 let print_main_header fmt =
   fprintf fmt (if !Options.cpp then "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/io_frontend.hpp\"@." else "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/io_frontend.h\"@.")
-    !Options.include_dir
+    (Options.core_dependency "io_frontend")
 
 let print_main_c main_fmt main_machine basename prog machines _ (*dependencies*) =
   print_main_header main_fmt;

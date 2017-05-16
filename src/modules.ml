@@ -113,11 +113,8 @@ let add_const itf name value =
     | _       -> assert false
   with Not_found -> Hashtbl.add consts_table name value
 
-let name_dependency (local, dep) =
-  ((if local then !Options.dest_dir else !Options.include_dir) ^ "/") ^ dep
-
 let import_dependency_aux loc (local, dep) =
-  let basename = name_dependency (local, dep) in
+  let basename = Options.name_dependency (local, dep) in
   let extension = ".lusic" in 
   try
     let lusic = Lusic.read_lusic basename extension in
@@ -161,7 +158,7 @@ let rec load_header_rec imported header =
     | Const c -> (add_const true c.const_id decl; imported)
     | TypeDef tdef -> (add_type true tdef.tydef_id decl; imported)
     | Open (local, dep) ->
-       let basename = name_dependency (local, dep) in
+       let basename = Options.name_dependency (local, dep) in
        if ISet.mem basename imported then imported else
 	 let lusic = import_dependency_aux decl.top_decl_loc (local, dep)
 	 in load_header_rec (ISet.add basename imported) lusic.Lusic.contents
@@ -186,7 +183,7 @@ let rec load_program_rec imported program =
     | Const c -> (add_const false c.const_id decl; imported)
     | TypeDef tdef -> (add_type false tdef.tydef_id decl; imported)
     | Open (local, dep) ->
-       let basename = name_dependency (local, dep) in
+       let basename = Options.name_dependency (local, dep) in
        if ISet.mem basename imported then imported else
 	 let lusic = import_dependency_aux decl.top_decl_loc (local, dep)
 	 in load_header_rec (ISet.add basename imported) lusic.Lusic.contents

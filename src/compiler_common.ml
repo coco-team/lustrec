@@ -232,7 +232,7 @@ let import_dependencies prog =
   List.fold_left
     (fun (compilation_dep, type_env, clock_env) dep ->
       let (local, s) = Corelang.dependency_of_top dep in
-      let basename = Modules.name_dependency (local, s) in
+      let basename = Options.name_dependency (local, s) in
       Log.report ~level:1 (fun fmt -> Format.fprintf fmt "  Library %s@ " basename);
       let lusic = Modules.import_dependency dep.top_decl_loc (local, s) in
       (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "");*)
@@ -248,5 +248,11 @@ let import_dependencies prog =
     Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
     deps
   end
+
+let track_exception () =
+  if !Options.track_exceptions
+  then (Printexc.print_backtrace stdout; flush stdout)
+  else ()
+
 
 

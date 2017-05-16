@@ -11,18 +11,19 @@
 
 let version = Version.number
 let codename = Version.codename
-let include_dir = ref "."
-let include_path =
-if (!include_dir != ".") then Version.prefix ^ !include_dir
-else Version.include_path
+let include_dirs = ref ["."]
+(* let include_path = *)
+(* if (!include_dir <> ".") then Version.prefix ^ !include_dir *)
+(* else Version.include_path *)
 
 
 
 
 let print_version () =
   Format.printf "Lustrec compiler, version %s (%s)@." version codename;
-  Format.printf "Include directory: %s@." include_path;
-  Format.printf "User selected include directory: %s@." !include_dir
+  Format.printf "Standard lib: %s@." Version.include_path;
+  Format.printf "User provided include directory: @[<h>%a@]@."
+    (Utils.fprintf_list ~sep:"@ " Format.pp_print_string) !include_dirs
 
 let main_node = ref ""
 let static_mem = ref true
@@ -61,6 +62,51 @@ let nb_mutants = ref 1000
 let gen_mcdc = ref false
 let no_mutation_suffix = ref false
 
+let add_include_dir dir =
+  let removed_slash_suffix =
+    let len = String.length dir in
+    if dir.[len-1] = '/' then
+      String.sub dir 0 (len - 1) 
+    else
+      dir
+  in
+  include_dirs := removed_slash_suffix :: !include_dirs
+
+    
+(** Solving the path of required library:
+    If local: look in the folders described in !Options.include_dirs
+    If non local: look first as a local, then in Version.include_path:
+    ie. in Version.include_path::!Options.include_dirs
+    Note that in options.ml, include folder are added as heads. One need to
+    perform a fold_right to respect the order
+*)
+let search_lib_path (local, full_file_name) =
+  let paths = (if local then !include_dirs else Version.include_path::!include_dirs) in
+  let name =
+    List.fold_right (fun dir res ->
+      match res with Some _ -> res
+      | None ->
+	 let path_to_lib = dir ^ "/" ^ full_file_name in 
+	 if Sys.file_exists path_to_lib then
+	   Some dir
+	 else
+	   None
+    )
+      paths
+      None
+  in
+  match name with
+  | None -> Format.eprintf "Unable to find library %s in paths %a@.@?" full_file_name (Utils.fprintf_list ~sep:", " Format.pp_print_string) paths;raise Not_found
+  | Some s -> s
+
+(* Search for path of core libs (without lusic: arrow and io_frontend *)
+let core_dependency lib_name =
+  search_lib_path (false, lib_name ^ ".h")
+    
+let name_dependency (local, dep) =
+  let dir = search_lib_path (false, dep ^ ".lusic") in
+  dir ^ "/" ^ dep
+  
 let set_mpfr prec =
   if prec > 0 then (
     mpfr := true;
@@ -72,7 +118,7 @@ let set_mpfr prec =
 
 let common_options =
   [ "-d", Arg.Set_string dest_dir, "uses the specified \x1b[4mdirectory\x1b[0m as root for generated/imported object and C files <default: .>";
-    "-I", Arg.Set_string include_dir, "sets include \x1b[4mdirectory\x1b[0m";
+    "-I", Arg.String add_include_dir, "sets include \x1b[4mdirectory\x1b[0m";
     "-node", Arg.Set_string main_node, "specifies the \x1b[4mmain\x1b[0m node";
     "-print-types", Arg.Set print_types, "prints node types";
     "-print-clocks", Arg.Set print_clocks, "prints node clocks";

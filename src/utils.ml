@@ -347,12 +347,6 @@ let var_id_cpt = ref 0
 let get_new_id () = incr var_id_cpt;!var_id_cpt
 
 
-let track_exception () =
- if !Options.track_exceptions
- then (Printexc.print_backtrace stdout; flush stdout)
- else ()
-
-
 (* for lexing purposes *)
 
 (* Update line number for location info *)
