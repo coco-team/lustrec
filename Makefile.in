@@ -39,6 +39,7 @@ clean: clean-lusic
 
 dist-src-clean: clean
 	@rm -f config.log config.status include/*.lusic include/math.h include/conv.h include/mpfr_lustre.h
+	@rm -f Makefile ./src/Makefile ./src/pluginList.ml ./src/version.ml ./src/_tags
 
 DIST_ARCHIVE_NAME=lustrec-$(shell $(LOCAL_BINDIR)/lustrec -version | grep version | cut -d, -f 2 | sed -e "s/ version //" -e "s/ (/-/" -e "s/ /-/" -e "s/\//-/" -e "s/)//")-src.tar.gz
 
