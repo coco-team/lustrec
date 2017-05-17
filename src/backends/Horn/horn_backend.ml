@@ -111,7 +111,16 @@ let check_sfunction mannot =
      end
   | _::_ -> false
 
+let preprocess machines =
+  List.fold_right (fun m res ->
+    if List.mem m.mname.node_id registered_keywords then
+      { m with mname  = { m.mname with node_id = protect_kwd m.mname.node_id }}::res
+       else
+	m :: res
+  ) machines []
+     
 let translate fmt basename prog machines=
+  let machines = preprocess machines in
   (* We print typedef *)
   print_dep fmt prog; (*print static library e.g. math*)
   print_type_definitions fmt;

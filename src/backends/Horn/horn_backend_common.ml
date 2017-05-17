@@ -47,6 +47,22 @@ let pp_conj pp fmt l =
 
 
 
+(********************************************************************************************)
+(*                    Workaround to prevent the use of declared keywords as node name       *)
+(********************************************************************************************)
+let registered_keywords = ["implies"]
+
+let protect_kwd s = 
+  if List.mem s registered_keywords then
+    "__" ^ s
+  else
+    s
+
+let node_name n =
+  let name = node_name n in
+  protect_kwd name
+
+
 let concat prefix x = if prefix = "" then x else prefix ^ "." ^ x
 let rename f = (fun v -> {v with var_id = f v.var_id } )
 let rename_machine p = rename (fun n -> concat p n)
