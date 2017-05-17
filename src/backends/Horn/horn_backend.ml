@@ -80,7 +80,7 @@ let print_type_definitions fmt =
 
 let print_dep fmt prog =
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>.. extracting Horn libraries@,");
-  fprintf fmt "; Statically linked libraries@";
+  fprintf fmt "; Statically linked libraries@,";
   let dependencies = Corelang.get_dependencies prog in
   List.iter
     (fun dep ->
