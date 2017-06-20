@@ -15,3 +15,4 @@ function pow (x:real; n: real) returns (y: real) prototype C lib m;
 function sin (x: real) returns (y: real) prototype C lib m;
 function sinh (x: real) returns (y: real) prototype C lib m;
 function sqrt (x: real) returns (y: real) prototype C lib m;
+function tan (x: real) returns (y: real) prototype C lib m;
