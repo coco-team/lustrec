@@ -1,0 +1,22 @@
+"backends": include
+"backends/C": include
+"backends/Horn": include
+"backends/EMF": include
+"plugins/salsa": include
+"plugins/scopes": include
+"plugins/mpfr": include
+<**/.svn>: -traverse
+<**/.svn>: not_hygienic
+
+<**/*.native>: package(ocamlgraph)
+<**/*.native>: use_str
+<**/*.native>: use_unix
+<**/*.native>: package(num)
+
+
+# Required for ocamldoc. Otherwise failed to build
+<*.ml{,i}>: package(ocamlgraph)
+
+# Plugin dependencies
+@SALSA_TAG@
+

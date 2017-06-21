@@ -124,6 +124,7 @@ val eq_replace_rhs_var: (ident -> bool) -> (ident -> ident) -> eq -> eq
 
 (** rename_prog f_node f_var f_const prog *)
 val rename_prog: (ident -> ident) -> (ident -> ident) -> (ident -> ident) -> program -> program
+
 val substitute_expr: var_decl list -> eq list -> expr -> expr
 
 val copy_var_decl: var_decl -> var_decl
@@ -139,6 +140,7 @@ val extend_eexpr: (quantifier_type * var_decl list) list -> eexpr -> eexpr
 val update_expr_annot: ident -> expr -> expr_annot -> expr
 (* val mkpredef_call: Location.t -> ident -> eexpr list -> eexpr*)
 
+val functional_backend: unit -> bool
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

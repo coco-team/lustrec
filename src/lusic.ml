@@ -31,17 +31,17 @@ module Header = C_backend_header.Main (HeaderMod)
 (* extracts a header from a program representing module owner = dirname/basename *)
 let extract_header dirname basename prog =
   let owner = dirname ^ "/" ^ basename in
- List.fold_right
-   (fun decl header ->
-     (*Format.eprintf "Lusic.extract_header: header = %B, owner = %s, decl_owner = %s@." decl.top_decl_itf owner decl.top_decl_owner;*)
-     if decl.top_decl_itf || decl.top_decl_owner <> owner then header else
-    match decl.top_decl_desc with
-    | Node nd        -> { decl with top_decl_desc = ImportedNode (Corelang.get_node_interface nd) } :: header 
-    | ImportedNode _ -> header
-    | Const _
-    | TypeDef _
-    | Open _         -> decl :: header)
-   prog []
+  List.fold_right
+    (fun decl header ->
+      (*Format.eprintf "Lusic.extract_header: header = %B, owner = %s, decl_owner = %s@." decl.top_decl_itf owner decl.top_decl_owner;*)
+      if decl.top_decl_itf || decl.top_decl_owner <> owner then header else
+	match decl.top_decl_desc with
+	| Node nd        -> { decl with top_decl_desc = ImportedNode (Corelang.get_node_interface nd) } :: header 
+	| ImportedNode _ -> header
+	| Const _
+	| TypeDef _
+	| Open _         -> decl :: header)
+    prog []
 
 let check_obsolete lusic basename =
   if lusic.obsolete then raise (Error (Location.dummy_loc, Wrong_number basename))

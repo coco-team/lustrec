@@ -10,6 +10,7 @@
 (********************************************************************)
 
 open Format
+open C_backend_mauve
 (********************************************************************************************)
 (*                         Translation function                                             *)
 (********************************************************************************************)
@@ -38,7 +39,7 @@ let gen_files funs basename prog machines dependencies =
   close_out header_out;
   
   (* Generating Lib C file *)
-  let source_lib_file = destname ^ ".c" in (* Could be changed *)
+  let source_lib_file = (if !Options.cpp then destname ^ ".cpp" else destname ^ ".c") in (* Could be changed *)
   let source_lib_out = open_out source_lib_file in
   let source_lib_fmt = formatter_of_out_channel source_lib_out in
   print_lib_c source_lib_fmt basename prog machines dependencies;
@@ -54,7 +55,7 @@ let gen_files funs basename prog machines dependencies =
       raise (Corelang.Error (Location.dummy_loc, LustreSpec.Main_not_found))
     end
     | Some m -> begin
-      let source_main_file = destname ^ "_main.c" in (* Could be changed *)
+      let source_main_file = (if !Options.cpp then destname ^ "_main.cpp" else destname ^ "_main.c") in (* Could be changed *)
       let source_main_out = open_out source_main_file in
       let source_main_fmt = formatter_of_out_channel source_main_out in
 
@@ -62,6 +63,33 @@ let gen_files funs basename prog machines dependencies =
       print_main_c source_main_fmt m basename prog machines dependencies;
 
       close_out source_main_out;
+    end
+  ));
+
+  (match !Options.mauve with
+  | "" ->  ()
+  | mauve -> (
+    (* looking for the main node *)
+    match Machine_code.get_machine_opt mauve machines with
+    | None -> begin
+      Global.main_node := mauve;
+      Format.eprintf "Code generation error: %a@." Corelang.pp_error LustreSpec.Main_not_found;
+      raise (Corelang.Error (Location.dummy_loc, LustreSpec.Main_not_found))
+    end
+    | Some m -> begin
+      let source_mauve_file = destname ^ "_mauve.hpp" in
+      let source_mauve_out = open_out source_mauve_file in
+      let source_mauve_fmt = formatter_of_out_channel source_mauve_out in
+      (* Header *)
+      print_mauve_header source_mauve_fmt m basename prog machines dependencies;
+      (* Shell *)
+      print_mauve_shell source_mauve_fmt m basename prog machines dependencies;
+      (* Core *)
+      print_mauve_core source_mauve_fmt m basename prog machines dependencies;
+      (* FSM *)
+      print_mauve_fsm source_mauve_fmt m basename prog machines dependencies;
+
+      close_out source_mauve_out;
     end
   ));
 

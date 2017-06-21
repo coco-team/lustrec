@@ -25,7 +25,7 @@ let create_dest_dir () =
   begin
     if not (Sys.file_exists !Options.dest_dir) then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. creating destination directory@,");
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. creating destination directory@ ");
 	Unix.mkdir !Options.dest_dir (Unix.stat ".").Unix.st_perm
       end;
     if (Unix.stat !Options.dest_dir).Unix.st_kind <> Unix.S_DIR then
@@ -69,7 +69,7 @@ let parse_source source_name =
 
   (* Parsing *)
   Log.report ~level:1 
-    (fun fmt -> fprintf fmt ".. parsing source file %s@," source_name);
+    (fun fmt -> fprintf fmt ".. parsing source file %s@ " source_name);
   try
     let prog = Parse.prog Parser_lustre.prog Lexer_lustre.token lexbuf in
     (*ignore (Modules.load_program ISet.empty prog);*)
@@ -226,16 +226,16 @@ let is_stateful topdecl =
 
 
 let import_dependencies prog =
-  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>.. extracting dependencies@,");
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 0>.. extracting dependencies@ ");
   let dependencies = Corelang.get_dependencies prog in
   let deps =
   List.fold_left
     (fun (compilation_dep, type_env, clock_env) dep ->
       let (local, s) = Corelang.dependency_of_top dep in
-      let basename = Modules.name_dependency (local, s) in
-      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@[<v 0>Library %s@," basename);
+      let basename = Options.name_dependency (local, s) in
+      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "  Library %s@ " basename);
       let lusic = Modules.import_dependency dep.top_decl_loc (local, s) in
-      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@]@ ");
+      (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "");*)
       let (lusi_type_env, lusi_clock_env) = get_envs_from_top_decls lusic.Lusic.contents in
       let is_stateful = List.exists is_stateful lusic.Lusic.contents in
       let new_dep = Dep (local, s, lusic.Lusic.contents, is_stateful ) in
@@ -248,4 +248,11 @@ let import_dependencies prog =
     Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
     deps
   end
+
+let track_exception () =
+  if !Options.track_exceptions
+  then (Printexc.print_backtrace stdout; flush stdout)
+  else ()
+
+
 

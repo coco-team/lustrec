@@ -14,6 +14,8 @@ open Corelang
 open Clocks
 open Causality
 
+let print_statelocaltag = true
+  
 exception NormalizationError
 
 module OrdVarDecl:Map.OrderedType with type t=var_decl =
@@ -24,8 +26,17 @@ module ISet = Set.Make(OrdVarDecl)
 let rec pp_val fmt v =
   match v.value_desc with
     | Cst c         -> Printers.pp_const fmt c 
-    | LocalVar v    -> Format.pp_print_string fmt v.var_id
-    | StateVar v    -> Format.pp_print_string fmt v.var_id
+    | LocalVar v    ->
+       if print_statelocaltag then
+	 Format.fprintf fmt "%s(L)" v.var_id
+       else
+	 Format.pp_print_string fmt v.var_id
+	   
+    | StateVar v    ->
+       if print_statelocaltag then
+	 Format.fprintf fmt "%s(S)" v.var_id
+       else
+	 Format.pp_print_string fmt v.var_id
     | Array vl      -> Format.fprintf fmt "[%a]" (Utils.fprintf_list ~sep:", " pp_val)  vl
     | Access (t, i) -> Format.fprintf fmt "%a[%a]" pp_val t pp_val i
     | Power (v, n)  -> Format.fprintf fmt "(%a^%a)" pp_val v pp_val n
@@ -78,6 +89,8 @@ type machine_t = {
   mannot: expr_annot list;
 }
 
+let machine_vars m = m.mstep.step_inputs @ m.mstep.step_locals @ m.mstep.step_outputs @ m.mmemory
+
 let pp_step fmt s =
   Format.fprintf fmt "@[<v>inputs : %a@ outputs: %a@ locals : %a@ checks : %a@ instrs : @[%a@]@ asserts : @[%a@]@]@ "
     (Utils.fprintf_list ~sep:", " Printers.pp_var) s.step_inputs
@@ -105,6 +118,10 @@ let pp_machine fmt m =
     (fun fmt -> match m.mspec with | None -> () | Some spec -> Printers.pp_spec fmt spec)
     (Utils.fprintf_list ~sep:"@ " Printers.pp_expr_annot) m.mannot
 
+let pp_machines fmt ml =
+  Format.fprintf fmt "@[<v 0>%a@]" (Utils.fprintf_list ~sep:"@," pp_machine) ml
+
+  
 let rec is_const_value v =
   match v.value_desc with
   | Cst _          -> true
@@ -164,7 +181,7 @@ let arrow_desc =
 let arrow_top_decl =
   {
     top_decl_desc = Node arrow_desc;
-    top_decl_owner = !Options.include_dir;
+    top_decl_owner = (Options.core_dependency "arrow");
     top_decl_itf = false;
     top_decl_loc = Location.dummy_loc
   }
@@ -353,15 +370,19 @@ let rec translate_expr node ((m, si, j, d, s) as args) expr =
     | Expr_appl (id, e, _) when Basic_library.is_expr_internal_fun expr ->
       let nd = node_from_name id in
       Fun (node_name nd, List.map (translate_expr node args) (expr_list_of_expr e))
-    (*| Expr_ite (g,t,e) -> (
+    | Expr_ite (g,t,e) -> (
       (* special treatment depending on the active backend. For horn backend, ite
 	 are preserved in expression. While they are removed for C or Java
 	 backends. *)
-      match !Options.output with | "horn" -> 
-	Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
+      match !Options.output with
+      | "horn" -> 
+	 Fun ("ite", [translate_expr node args g; translate_expr node args t; translate_expr node args e])
       | "C" | "java" | _ -> 
-	(Printers.pp_expr Format.err_formatter expr; Format.pp_print_flush Format.err_formatter (); raise NormalizationError)
-    )*)
+	 (Format.eprintf "Normalization error for backend %s: %a@."
+	    !Options.output
+	    Printers.pp_expr expr;
+	  raise NormalizationError)
+    )
     | _                   -> raise NormalizationError
   in
   mk_val value_desc expr.expr_type
@@ -388,72 +409,72 @@ let reset_instance node args i r c =
                    [control_on_clock node args c (conditional g [MReset i] [MNoReset i])]
 
 let translate_eq node ((m, si, j, d, s) as args) eq =
-  (* Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock; *)
+  (* Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock;  *)
   match eq.eq_lhs, eq.eq_rhs.expr_desc with
   | [x], Expr_arrow (e1, e2)                     ->
-    let var_x = get_node_var x node in
-    let o = new_instance node arrow_top_decl eq.eq_rhs.expr_tag in
-    let c1 = translate_expr node args e1 in
-    let c2 = translate_expr node args e2 in
-    (m,
-     MReset o :: si,
-     Utils.IMap.add o (arrow_top_decl, []) j,
-     d,
-     (control_on_clock node args eq.eq_rhs.expr_clock (MStep ([var_x], o, [c1;c2]))) :: s)
+     let var_x = get_node_var x node in
+     let o = new_instance node arrow_top_decl eq.eq_rhs.expr_tag in
+     let c1 = translate_expr node args e1 in
+     let c2 = translate_expr node args e2 in
+     (m,
+      MReset o :: si,
+      Utils.IMap.add o (arrow_top_decl, []) j,
+      d,
+      (control_on_clock node args eq.eq_rhs.expr_clock (MStep ([var_x], o, [c1;c2]))) :: s)
   | [x], Expr_pre e1 when ISet.mem (get_node_var x node) d     ->
-    let var_x = get_node_var x node in
-    (ISet.add var_x m,
-     si,
-     j,
-     d,
-     control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e1)) :: s)
+     let var_x = get_node_var x node in
+     (ISet.add var_x m,
+      si,
+      j,
+      d,
+      control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e1)) :: s)
   | [x], Expr_fby (e1, e2) when ISet.mem (get_node_var x node) d ->
-    let var_x = get_node_var x node in
-    (ISet.add var_x m,
-     MStateAssign (var_x, translate_expr node args e1) :: si,
-     j,
-     d,
-     control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e2)) :: s)
+     let var_x = get_node_var x node in
+     (ISet.add var_x m,
+      MStateAssign (var_x, translate_expr node args e1) :: si,
+      j,
+      d,
+      control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e2)) :: s)
 
   | p  , Expr_appl (f, arg, r) when not (Basic_library.is_expr_internal_fun eq.eq_rhs) ->
-    let var_p = List.map (fun v -> get_node_var v node) p in
-    let el = expr_list_of_expr arg in
-    let vl = List.map (translate_expr node args) el in
-    let node_f = node_from_name f in
-    let call_f =
-      node_f,
-      NodeDep.filter_static_inputs (node_inputs node_f) el in
-    let o = new_instance node node_f eq.eq_rhs.expr_tag in
-    let env_cks = List.fold_right (fun arg cks -> arg.expr_clock :: cks) el [eq.eq_rhs.expr_clock] in
-    let call_ck = Clock_calculus.compute_root_clock (Clock_predef.ck_tuple env_cks) in
-    (*Clocks.new_var true in
-    Clock_calculus.unify_imported_clock (Some call_ck) eq.eq_rhs.expr_clock eq.eq_rhs.expr_loc;
-    Format.eprintf "call %a: %a: %a@," Printers.pp_expr eq.eq_rhs Clocks.print_ck (Clock_predef.ck_tuple env_cks) Clocks.print_ck call_ck;*)
-    (m,
-     (if Stateless.check_node node_f then si else MReset o :: si),
-     Utils.IMap.add o call_f j,
-     d,
-     (if Stateless.check_node node_f
-      then []
-      else reset_instance node args o r call_ck) @
-       (control_on_clock node args call_ck (MStep (var_p, o, vl))) :: s)
-(*
-   (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
-      are preserved. While they are replaced as if g then x = t else x = e in  C or Java
-      backends. *)
-  | [x], Expr_ite   (c, t, e)
+     let var_p = List.map (fun v -> get_node_var v node) p in
+     let el = expr_list_of_expr arg in
+     let vl = List.map (translate_expr node args) el in
+     let node_f = node_from_name f in
+     let call_f =
+       node_f,
+       NodeDep.filter_static_inputs (node_inputs node_f) el in
+     let o = new_instance node node_f eq.eq_rhs.expr_tag in
+     let env_cks = List.fold_right (fun arg cks -> arg.expr_clock :: cks) el [eq.eq_rhs.expr_clock] in
+     let call_ck = Clock_calculus.compute_root_clock (Clock_predef.ck_tuple env_cks) in
+     (*Clocks.new_var true in
+       Clock_calculus.unify_imported_clock (Some call_ck) eq.eq_rhs.expr_clock eq.eq_rhs.expr_loc;
+       Format.eprintf "call %a: %a: %a@," Printers.pp_expr eq.eq_rhs Clocks.print_ck (Clock_predef.ck_tuple env_cks) Clocks.print_ck call_ck;*)
+     (m,
+      (if Stateless.check_node node_f then si else MReset o :: si),
+      Utils.IMap.add o call_f j,
+      d,
+      (if Stateless.check_node node_f
+       then []
+       else reset_instance node args o r call_ck) @
+	(control_on_clock node args call_ck (MStep (var_p, o, vl))) :: s)
+  (*
+    (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
+    are preserved. While they are replaced as if g then x = t else x = e in  C or Java
+    backends. *)
+    | [x], Expr_ite   (c, t, e)
     when (match !Options.output with | "horn" -> true | "C" | "java" | _ -> false)
-      ->
+    ->
     let var_x = get_node_var x node in
     (m,
-     si,
-     j,
-     d,
-     (control_on_clock node args eq.eq_rhs.expr_clock
-	(MLocalAssign (var_x, translate_expr node args eq.eq_rhs))::s)
+    si,
+    j,
+    d,
+    (control_on_clock node args eq.eq_rhs.expr_clock
+    (MLocalAssign (var_x, translate_expr node args eq.eq_rhs))::s)
     )
 
-*)
+  *)
   | [x], _                                       -> (
     let var_x = get_node_var x node in
     (m, si, j, d,
@@ -465,10 +486,10 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
     )
   )
   | _                                            ->
-    begin
-      Format.eprintf "internal error: Machine_code.translate_eq %a@?" Printers.pp_node_eq eq;
-      assert false
-    end
+     begin
+       Format.eprintf "internal error: Machine_code.translate_eq %a@?" Printers.pp_node_eq eq;
+       assert false
+     end
 
 let find_eq xl eqs =
   let rec aux accu eqs =
@@ -534,14 +555,47 @@ let translate_decl nd sch =
 
   let sorted_eqs = sort_equations_from_schedule nd sch in
   let constant_eqs = constant_equations nd in
-  
-  let init_args = ISet.empty, [], Utils.IMap.empty, List.fold_right (fun l -> ISet.add l) nd.node_locals ISet.empty, [] in
+
+  (* In case of non functional backend (eg. C), additional local variables have
+     to be declared for each assert *)
+  let new_locals, assert_instrs, nd_node_asserts =
+    let exprl = List.map (fun assert_ -> assert_.assert_expr ) nd.node_asserts in
+    if Corelang.functional_backend () then
+      [], [], exprl  
+    else (* Each assert(e) is associated to a fresh variable v and declared as
+	    v=e; assert (v); *)
+      let _, vars, eql, assertl =
+	List.fold_left (fun (i, vars, eqlist, assertlist) expr ->
+	  let loc = expr.expr_loc in
+	  let var_id = nd.node_id ^ "_assert_" ^ string_of_int i in
+	  let assert_var =
+	    mkvar_decl
+	      loc
+	      ~orig:false (* fresh var *)
+	      (var_id,
+	       mktyp loc Tydec_bool,
+	       mkclock loc Ckdec_any,
+	       false, (* not a constant *)
+	       None (* no default value *)
+	      )
+	  in
+	  assert_var.var_type <- Types.new_ty (Types.Tbool); 
+	  let eq = mkeq loc ([var_id], expr) in
+	  (i+1, assert_var::vars, eq::eqlist, {expr with expr_desc = Expr_ident var_id}::assertlist)
+	) (1, [], [], []) exprl
+      in
+      vars, eql, assertl
+  in
+  let locals_list = nd.node_locals @ new_locals in
+
+  let nd = { nd with node_locals = locals_list } in
+  let init_args = ISet.empty, [], Utils.IMap.empty, List.fold_right (fun l -> ISet.add l) locals_list ISet.empty, [] in
   (* memories, init instructions, node calls, local variables (including memories), step instrs *)
   let m0, init0, j0, locals0, s0 = translate_eqs nd init_args constant_eqs in
   assert (ISet.is_empty m0);
   assert (init0 = []);
   assert (Utils.IMap.is_empty j0);
-  let m, init, j, locals, s = translate_eqs nd (m0, init0, j0, locals0, []) sorted_eqs in
+  let m, init, j, locals, s = translate_eqs nd (m0, init0, j0, locals0, []) (assert_instrs@sorted_eqs) in
   let mmap = Utils.IMap.fold (fun i n res -> (i, n)::res) j [] in
   {
     mname = nd;
@@ -564,10 +618,7 @@ let translate_decl nd sch =
 	| "horn" -> s
 	| "C" | "java" | _ ->*) join_guards_list s
       );
-      step_asserts =
-	let exprl = List.map (fun assert_ -> assert_.assert_expr ) nd.node_asserts in
-	List.map (translate_expr nd init_args) exprl
-	;
+      step_asserts = List.map (translate_expr nd init_args) nd_node_asserts;
     };
     mspec = nd.node_spec;
     mannot = nd.node_annot;

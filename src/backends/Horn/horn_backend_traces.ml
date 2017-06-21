@@ -159,12 +159,13 @@ let traces_file fmt basename prog machines =
           Printers.pp_expr ee)) (memories_old);
 
       let arrow_vars = arrow_vars machines m in
-      let arrow_vars_mid = rename_mid_list arrow_vars and
+      let arrow_vars_curr = rename_current_list arrow_vars and
+          arrow_vars_mid = rename_mid_list arrow_vars and
 	  arrow_vars_next = rename_next_list arrow_vars
       in
       Utils.fprintf_list ~sep:"@ "
       	(fun fmt v -> fprintf fmt "<reset name=\"%a\"/>" pp_var v)
-      	fmt (arrow_vars_mid@arrow_vars_next);
+      	fmt (arrow_vars_curr@arrow_vars_mid@arrow_vars_next);
       fprintf fmt "@]@ </Node>";
      )) (List.rev machines);
   fprintf fmt "</Traces>@."

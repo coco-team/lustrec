@@ -1,7 +1,7 @@
 #ifndef _IO_FRONTEND
 #define _IO_FRONTEND
 
-/* Print a promt ? ************************/
+/* Print a prompt ? ************************/
 extern int ISATTY;
 
 /* Standard Input procedures **************/

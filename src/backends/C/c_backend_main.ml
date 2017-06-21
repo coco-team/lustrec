@@ -165,10 +165,8 @@ let print_main_code fmt basename m =
       print_main_initialize mname main_mem fmt m;
     end;
   print_main_loop mname main_mem fmt m;
-  if Scopes.Plugin.is_active () then
-    begin
-      fprintf fmt "@ %t" Scopes.Plugin.pp 
-    end;    
+
+  Plugins.c_backend_main_loop_body_suffix fmt ();
   fprintf fmt "@]@ }@ @ ";
   if !Options.mpfr then
     begin
@@ -179,8 +177,8 @@ let print_main_code fmt basename m =
   fprintf fmt "@]@ }@."       
 
 let print_main_header fmt =
-  fprintf fmt "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/io_frontend.h\"@."
-    !Options.include_dir
+  fprintf fmt (if !Options.cpp then "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/io_frontend.hpp\"@." else "#include <stdio.h>@.#include <unistd.h>@.#include \"%s/io_frontend.h\"@.")
+    (Options.core_dependency "io_frontend")
 
 let print_main_c main_fmt main_machine basename prog machines _ (*dependencies*) =
   print_main_header main_fmt;

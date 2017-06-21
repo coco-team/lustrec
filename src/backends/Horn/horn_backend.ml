@@ -27,7 +27,6 @@ open Horn_backend_collecting_sem
 (*
 TODO:
 - gerer les traces. Ca merde pour l'instant dans le calcul des memoires sur les arrows
-
 - gerer le reset --- DONE
 - reconstruire les rechable states DONE
 - reintroduire le cex/traces ... DONE
@@ -52,7 +51,7 @@ end
 let load_file f =
   let ic = open_in f in
   let n = in_channel_length ic in
-  let s = String.create n in
+  let s = Bytes.create n in
   really_input ic s 0 n;
   close_in ic;
   (s)
@@ -81,12 +80,12 @@ let print_type_definitions fmt =
 
 let print_dep fmt prog =
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>.. extracting Horn libraries@,");
-  fprintf fmt "; Statically linked libraries@";
+  fprintf fmt "; Statically linked libraries@,";
   let dependencies = Corelang.get_dependencies prog in
   List.iter
     (fun dep ->
       let (local, s) = Corelang.dependency_of_top dep in
-      let basename = ((if local then !Options.dest_dir else !Options.include_dir)) ^ s ^ ".smt2" in
+      let basename = (Options.name_dependency (local, s)) ^ ".smt2" in
       Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@[<v 0> Horn Library %s@," basename);
       let horn = load_file basename in
       fprintf fmt "@.%s@." horn;
@@ -112,7 +111,16 @@ let check_sfunction mannot =
      end
   | _::_ -> false
 
+let preprocess machines =
+  List.fold_right (fun m res ->
+    if List.mem m.mname.node_id registered_keywords then
+      { m with mname  = { m.mname with node_id = protect_kwd m.mname.node_id }}::res
+       else
+	m :: res
+  ) machines []
+     
 let translate fmt basename prog machines=
+  let machines = preprocess machines in
   (* We print typedef *)
   print_dep fmt prog; (*print static library e.g. math*)
   print_type_definitions fmt;

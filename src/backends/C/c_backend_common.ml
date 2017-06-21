@@ -24,7 +24,7 @@ let print_version fmt =
     (if !Options.mpfr then "MPFR multi-precision" else "(double) floating-point")
 
 let file_to_module_name basename =
-  let baseNAME = String.uppercase basename in
+  let baseNAME = String.uppercase_ascii basename in
   let baseNAME = Str.global_replace (Str.regexp "\\.\\|\\ ") "_" baseNAME in
   baseNAME
 
@@ -94,6 +94,7 @@ let pp_global_clear_name fmt id = fprintf fmt "%s_CLEAR" id
 let pp_machine_memtype_name fmt id = fprintf fmt "struct %s_mem" id
 let pp_machine_regtype_name fmt id = fprintf fmt "struct %s_reg" id
 let pp_machine_alloc_name fmt id = fprintf fmt "%s_alloc" id
+let pp_machine_dealloc_name fmt id = fprintf fmt "%s_dealloc" id
 let pp_machine_static_declare_name fmt id = fprintf fmt "%s_DECLARE" id
 let pp_machine_static_link_name fmt id = fprintf fmt "%s_LINK" id
 let pp_machine_static_alloc_name fmt id = fprintf fmt "%s_ALLOC" id
@@ -124,13 +125,16 @@ let is_basic_c_type t =
   | Types.Tbool | Types.Treal | Types.Tint  -> true
   | _                                       -> false
 
-let pp_basic_c_type fmt t =
-  match (Types.repr t).Types.tdesc with
-  | Types.Tbool                    -> fprintf fmt "_Bool"
-  | Types.Treal when !Options.mpfr -> fprintf fmt "%s" Mpfr.mpfr_t
-  | Types.Treal                    -> fprintf fmt "double"
-  | Types.Tint                     -> fprintf fmt "int"
+let pp_c_basic_type_desc t_dsec =
+  match t_dsec with
+  | Types.Tbool when !Options.cpp  -> "bool"
+  | Types.Tbool                    -> "_Bool"
+  | Types.Tint                     -> !Options.int_type
+  | Types.Treal when !Options.mpfr -> Mpfr.mpfr_t
+  | Types.Treal                    -> !Options.real_type
   | _ -> assert false (* Not a basic C type. Do not handle arrays or pointers *)
+
+let pp_basic_c_type fmt t = fprintf fmt "%s" (pp_c_basic_type_desc (Types.repr t).Types.tdesc)
 
 let pp_c_type var fmt t =
   let rec aux t pp_suffix =
@@ -161,6 +165,7 @@ let rec pp_c_initialize fmt t =
  *)
 let pp_c_tag fmt t =
  pp_print_string fmt (if t = tag_true then "1" else if t = tag_false then "0" else t)
+
 
 (* Prints a constant value *)
 let rec pp_c_const fmt c =
@@ -348,6 +353,11 @@ let print_alloc_prototype fmt (name, static) =
     pp_machine_alloc_name name
     (Utils.fprintf_list ~sep:",@ " pp_c_decl_input_var) static
 
+let print_dealloc_prototype fmt name =
+  fprintf fmt "void %a (%a * _alloc)"
+    pp_machine_dealloc_name name
+    pp_machine_memtype_name name
+    
 let print_reset_prototype self fmt (name, static) =
   fprintf fmt "void %a (@[<v>%a%t%a *%s@])"
     pp_machine_reset_name name
@@ -422,8 +432,11 @@ let print_import_alloc_prototype fmt (Dep (_, s, _, stateful)) =
 let print_extern_alloc_prototypes fmt (Dep (_,_, header,_)) =
   List.iter (fun decl -> match decl.top_decl_desc with
   | ImportedNode ind when not ind.nodei_stateless ->
-    let static = List.filter (fun v -> v.var_dec_const) ind.nodei_inputs
-    in fprintf fmt "extern %a;@." print_alloc_prototype (ind.nodei_id, static)
+    let static = List.filter (fun v -> v.var_dec_const) ind.nodei_inputs in
+    begin
+      fprintf fmt "extern %a;@.@." print_alloc_prototype (ind.nodei_id, static);
+      fprintf fmt "extern %a;@.@." print_dealloc_prototype ind.nodei_id;
+    end
   | _                -> ()
   ) header
 
@@ -461,6 +474,7 @@ let pp_c_var m self pp_var fmt var =
     pp_c_val self pp_var fmt (mk_val (StateVar var) var.var_type)
   else
     pp_c_val self pp_var fmt (mk_val (LocalVar var) var.var_type)
+  
 
 let pp_array_suffix fmt loop_vars =
   Utils.fprintf_list ~sep:"" (fun fmt v -> fprintf fmt "[%s]" v) fmt loop_vars

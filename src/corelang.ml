@@ -241,7 +241,7 @@ let is_imported_node td =
 
 (* alias and type definition table *)
 
-let mktop = mktop_decl Location.dummy_loc !Options.include_dir false
+let mktop = mktop_decl Location.dummy_loc !Options.dest_dir false
 
 let top_int_type = mktop (TypeDef {tydef_id = "int"; tydef_desc = Tydec_int})
 let top_bool_type = mktop (TypeDef {tydef_id = "bool"; tydef_desc = Tydec_bool})
@@ -473,8 +473,21 @@ let rec dimension_of_expr expr =
 let sort_handlers hl =
  List.sort (fun (t, _) (t', _) -> compare t t') hl
 
+let num_10 = Num.num_of_int 10
+  
+let rec is_eq_const c1 c2 =
+  match c1, c2 with
+  | Const_real (n1, i1, _), Const_real (n2, i2, _)
+    -> Num.(let n1 = n1 // (num_10 **/ (num_of_int i1)) in
+	    let n2 = n2 // (num_10 **/ (num_of_int i2)) in
+	    eq_num n1 n2)
+  | Const_struct lcl1, Const_struct lcl2
+    -> List.length lcl1 = List.length lcl2
+    && List.for_all2 (fun (l1, c1) (l2, c2) -> l1 = l2 && is_eq_const c1 c2) lcl1 lcl2
+  | _  -> c1 = c2
+
 let rec is_eq_expr e1 e2 = match e1.expr_desc, e2.expr_desc with
-  | Expr_const c1, Expr_const c2 -> c1 = c2
+  | Expr_const c1, Expr_const c2 -> is_eq_const c1 c2
   | Expr_ident i1, Expr_ident i2 -> i1 = i2
   | Expr_array el1, Expr_array el2 
   | Expr_tuple el1, Expr_tuple el2 -> 
@@ -504,8 +517,13 @@ let get_var id var_list =
   List.find (fun v -> v.var_id = id) var_list
 
 let get_node_var id node =
-  get_var id (get_node_vars node)
-
+  try
+    get_var id (get_node_vars node)
+  with Not_found -> begin
+    (* Format.eprintf "Unable to find variable %s in node %s@.@?" id node.node_id; *)
+    raise Not_found
+  end
+    
 let get_node_eqs =
   let get_eqs stmts =
     List.fold_right
@@ -1032,6 +1050,11 @@ let copy_top top =
 
 let copy_prog top_list =
   List.map copy_top top_list
+
+let functional_backend () = 
+  match !Options.output with
+  | "horn" | "lustre" | "acsl" -> true
+  | _ -> false
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

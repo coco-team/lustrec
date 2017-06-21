@@ -39,7 +39,10 @@ let print_import_standard fmt =
       begin
 	fprintf fmt "#include <mpfr.h>@."
       end;
-  fprintf fmt "#include \"%s/arrow.h\"@.@." !Options.include_dir
+  if !Options.cpp then
+    fprintf fmt "#include \"%s/arrow.hpp\"@.@." arrow_top_decl.top_decl_owner 
+  else
+    fprintf fmt "#include \"%s/arrow.h\"@.@." arrow_top_decl.top_decl_owner 
 
   end
 
@@ -177,7 +180,10 @@ let print_machine_decl fmt m =
 	  begin 
             (* Dynamic allocation *)
 	    fprintf fmt "extern %a;@.@."
-	      print_alloc_prototype (m.mname.node_id, m.mstatic)
+	      print_alloc_prototype (m.mname.node_id, m.mstatic);
+
+	    fprintf fmt "extern %a;@.@."
+	      print_dealloc_prototype m.mname.node_id;
 	  end;
 	let self = mk_self m in
 	fprintf fmt "extern %a;@.@."
@@ -219,8 +225,11 @@ let print_machine_alloc_decl fmt m =
       else
 	begin 
           (* Dynamic allocation *)
-	  fprintf fmt "extern %a;@."
-		  print_alloc_prototype (m.mname.node_id, m.mstatic)
+	  fprintf fmt "extern %a;@.@."
+	    print_alloc_prototype (m.mname.node_id, m.mstatic);
+
+	  fprintf fmt "extern %a;@.@."
+	    print_dealloc_prototype m.mname.node_id
 	end
     end
 

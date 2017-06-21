@@ -33,7 +33,7 @@ struct (* Node module *)
 end
 
 module IMap = Map.Make(IdentModule)
-
+    
 module ISet = Set.Make(IdentModule)
 
 exception DeSome
@@ -298,6 +298,13 @@ let pp_iset fmt t =
     Format.fprintf fmt "}@."
   end
 
+let pp_imap pp_val fmt m =
+  begin
+    Format.fprintf fmt "@[{@ ";
+    IMap.iter (fun key v -> Format.fprintf fmt "%s -> %a@ " key pp_val v) m;
+    Format.fprintf fmt "}@ @]"
+  end
+    
 let pp_hashtbl t pp_fun beg_str end_str sep_str =
   if (beg_str="\n") then
     print_newline ()
@@ -326,7 +333,7 @@ let pp_longident lid =
   pp_list lid pp_fun "" "." "."  
 
 let pp_date fmt tm =
-  Format.fprintf fmt "%i/%i/%i, %i:%i:%i"
+  Format.fprintf fmt "%i/%i/%i, %02i:%02i:%02i"
     (tm.Unix.tm_year + 1900)
     tm.Unix.tm_mon
     tm.Unix.tm_mday
@@ -338,12 +345,6 @@ let pp_date fmt tm =
 
 let var_id_cpt = ref 0
 let get_new_id () = incr var_id_cpt;!var_id_cpt
-
-
-let track_exception () =
- if !Options.track_exceptions
- then (Printexc.print_backtrace stdout; flush stdout)
- else ()
 
 
 (* for lexing purposes *)

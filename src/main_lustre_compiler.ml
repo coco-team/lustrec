@@ -50,7 +50,7 @@ let compile_header dirname  basename extension =
       (fun fmt -> fprintf fmt ".. generating compiled header file %sc@," (destname ^ extension));
     Lusic.write_lusic true header destname lusic_ext;
     Lusic.print_lusic_to_h destname lusic_ext;
-    Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.")
+    Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@ ")
   end
 
 (* check whether a source file has a compiled header,
@@ -88,17 +88,12 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
   end
 
 
-let functional_backend () = 
-  match !Options.output with
-  | "horn" | "lustre" | "emf" | "acsl" -> true
-  | _ -> false
 
 (* From prog to prog *)
 let stage1 prog dirname basename =
-  (* Removing automata *) 
+  (* Removing automata *)
   let prog = expand_automata prog in
-
-  Log.report ~level:4 (fun fmt -> fprintf fmt ".. after automata expansion:@.@[<v 2>@ %a@]@," Printers.pp_prog prog);
+  Log.report ~level:4 (fun fmt -> fprintf fmt ".. after automata expansion:@,  @[<v 2>@,%a@]@ " Printers.pp_prog prog);
 
   (* Importing source *)
   let _ = Modules.load_program ISet.empty prog in
@@ -120,7 +115,7 @@ let stage1 prog dirname basename =
   in
 
   (* Checking stateless/stateful status *)
-  if Scopes.Plugin.is_active () then
+  if Plugins.check_force_stateful () then
     force_stateful_decls prog
   else
     check_stateless_decls prog;
@@ -251,36 +246,42 @@ let stage2 prog =
      - introduce fresh local variables for each real pure subexpression
   *)
   (* DFS with modular code generation *)
-  Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@ ");
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,");
   let machine_code = Machine_code.translate_prog prog node_schs in
 
-  Log.report ~level:4 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@,"
-  (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
-    machine_code);
+  Log.report ~level:3 (fun fmt -> fprintf fmt ".. generated machines (unoptimized):@ %a@ "Machine_code.pp_machines machine_code);
 
   (* Optimize machine code *)
   let machine_code =
-    if !Options.optimization >= 4 && !Options.output <> "horn" then
+    if !Options.optimization >= 4 (* && !Options.output <> "horn" *) then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization: common sub-expression elimination@,");
-	Optimize_machine.machines_cse machine_code
+	Log.report ~level:1 
+	  (fun fmt -> fprintf fmt ".. machines optimization: sub-expression elimination@,");
+	let machine_code = Optimize_machine.machines_cse machine_code in
+	Log.report ~level:3 (fun fmt -> fprintf fmt ".. generated machines (sub-expr elim):@ %a@ "Machine_code.pp_machines machine_code);
+	machine_code
       end
     else
       machine_code
   in
   (* Optimize machine code *)
   let machine_code, removed_table = 
-    if !Options.optimization >= 2 && !Options.output <> "horn" then
+    if !Options.optimization >= 2 (*&& !Options.output <> "horn"*) then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization: constants inlining@,");
-	Optimize_machine.machines_unfold (Corelang.get_consts prog) node_schs machine_code
+	Log.report ~level:1 (fun fmt -> fprintf fmt 
+	  ".. machines optimization: const. inlining (partial eval. with const)@,");
+	let machine_code, removed_table = Optimize_machine.machines_unfold (Corelang.get_consts prog) node_schs machine_code in
+	Log.report ~level:3 (fun fmt -> fprintf fmt "\t@[Eliminated constants: @[%a@]@]@ "
+	  (pp_imap Optimize_machine.pp_elim) removed_table);
+	Log.report ~level:3 (fun fmt -> fprintf fmt ".. generated machines (const inlining):@ %a@ "Machine_code.pp_machines machine_code);	
+	machine_code, removed_table
       end
     else
       machine_code, IMap.empty
   in  
   (* Optimize machine code *)
-  let machine_code = 
-    if !Options.optimization >= 3 && !Options.output <> "horn" then
+  let machine_code =
+    if !Options.optimization >= 3 && not (Corelang.functional_backend ()) then
       begin
 	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization: minimize stack usage by reusing variables@,");
 	let node_schs    = Scheduling.remove_prog_inlined_locals removed_table node_schs in
@@ -385,7 +386,7 @@ let stage3 prog machine_code dependencies basename =
 let rec compile_source dirname basename extension =
   let source_name = dirname ^ "/" ^ basename ^ extension in
 
-  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v>");
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 0>");
 
   (* Parsing source *)
   let prog = parse_source source_name in
@@ -397,13 +398,14 @@ let rec compile_source dirname basename extension =
       prog
   in
   let prog, dependencies = 
+    Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>.. Phase 1 : Normalisation@,");
     try 
       stage1 prog dirname basename
     with StopPhase1 prog -> (
       if !Options.lusi then
 	begin
 	  let lusi_ext = extension ^ "i" in
-	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating interface file %s@," (basename ^ lusi_ext));
+	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating interface file %s@ " (basename ^ lusi_ext));
 	  print_lusi prog dirname basename lusi_ext;
 	  Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
 	  exit 0
@@ -412,32 +414,37 @@ let rec compile_source dirname basename extension =
         assert false
     )
   in
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@]@,");
+  Log.report ~level:3 (fun fmt -> fprintf fmt ".. Normalized program:@ %a@ "Printers.pp_prog prog);
+
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>.. Phase 2 : Machines generation@,");
 
   let machine_code = 
     stage2 prog 
   in
+
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
+  Log.report ~level:3 (fun fmt -> fprintf fmt ".. Generated machines:@ %a@ "Machine_code.pp_machines machine_code);
+
   if Scopes.Plugin.show_scopes () then
     begin
       let all_scopes = Scopes.compute_scopes prog !Options.main_node in
       (* Printing scopes *)
       if !Options.verbose_level >= 1 then
 	Format.printf "Possible scopes are:@   ";
-      Format.printf "@[<v>%a@ @]@.@?" Scopes.print_scopes all_scopes;
+      Format.printf "@[<v>%a@ @]@ @?" Scopes.print_scopes all_scopes;
       exit 0
 	
     end;
 
-  let machine_code = 
-    if Scopes.Plugin.is_active () then
-      Scopes.Plugin.process_scopes !Options.main_node prog machine_code
-    else
-      machine_code
-  in
+  let machine_code = Plugins.refine_machine_code prog machine_code in
   
   stage3 prog machine_code dependencies basename;
-  Log.report ~level:1 (fun fmt -> fprintf fmt ".. done @ @]@.");
+  begin
+    Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@.");
     (* We stop the process here *)
-  exit 0
+    exit 0
+  end
 
 let compile dirname basename extension =
   match extension with
@@ -466,13 +473,7 @@ let _ =
   try
     Printexc.record_backtrace true;
 
-    let options = Options.options @ 
-      List.flatten (
-	List.map Options.plugin_opt [
-	  Scopes.Plugin.name, Scopes.Plugin.activate, Scopes.Plugin.options
-	]
-      )
-    in
+    let options = Options.lustrec_options @ (Plugins.options ()) in
     
     Arg.parse options anonymous usage
   with
@@ -481,7 +482,7 @@ let _ =
   | Corelang.Error _ (*| Task_set.Error _*)
   | Causality.Error _ -> exit 1
   | Sys_error msg -> (eprintf "Failure: %s@." msg)
-  | exc -> (Utils.track_exception (); raise exc)
+  | exc -> (track_exception (); raise exc)
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
