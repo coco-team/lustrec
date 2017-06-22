@@ -188,6 +188,13 @@ let get_envs_from_top_decls header =
    (Env.initial, Env.initial)
  *)
 
+let generate_lusic_header destname lusic_ext =	
+  match !Options.output with
+  | "C" -> C_backend_lusic.print_lusic_to_h destname lusic_ext
+  | _ -> ()
+	 
+
+    
 let check_compatibility (prog, computed_types_env, computed_clocks_env) (header, declared_types_env, declared_clocks_env) =
   try
     (* checking defined types are compatible with declared types*)
