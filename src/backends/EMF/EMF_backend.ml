@@ -22,7 +22,7 @@ let pp_expr vars fmt expr =
     | Expr_const c -> Printers.pp_const fmt c
     | Expr_ident id ->
        if List.mem id vars then
-	 Format.fprintf fmt "u(%i)" (get_idx id vars)
+	 Format.fprintf fmt "u%i" (get_idx id vars)
        else
 	 assert false (* impossible to find element id in var list *)
     | Expr_array a -> fprintf fmt "[%a]" pp_tuple a
@@ -115,7 +115,7 @@ let rec pp_val vars fmt v =
   | StateVar v ->
      let id = v.var_id in
      if List.mem id vars then
-       Format.fprintf fmt "u(%i)" (get_idx id vars)
+       Format.fprintf fmt "u%i" (get_idx id vars)
      else
        assert false (* impossible to find element id in var list *)
   | Fun (n, vl) -> pp_fun vars n fmt vl
