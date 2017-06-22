@@ -65,13 +65,15 @@ compile-mpfr-lusi: $(LUSI_MPFR_LIB)
 	@echo Compiling $<
 	@$(LOCAL_BINDIR)/lustrec -verbose 0 -mpfr 1 -d include $<
 
-install: clean-lusic compile-lusi compile-mpfr-lusi
+install-base: clean-lusic
 	mkdir -p ${bindir}
 	install -m 0755 $(LOCAL_BINDIR)/* ${bindir}
 	mkdir -p ${includedir}/lustrec
 	cp include/* ${includedir}/lustrec
 	mkdir -p ${datarootdir}
 	install -m 0655 share/FindLustre.cmake ${datarootdir}
+
+install: install-base compile-lusi compile-mpfr-lusi
 
 test-config: ${bindir}/lustrec
 	if @PATH_TO_TESTS_DEFINED@; then \
