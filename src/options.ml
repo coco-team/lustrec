@@ -53,6 +53,8 @@ let horn_query = ref true
 let cpp       = ref false
 let int_type  = ref "int"
 let real_type = ref "double"
+let print_prec_double = ref 15
+let print_prec_float = ref 10
 
 let sfunction = ref ""
 
@@ -157,6 +159,7 @@ let lustrec_options =
     "-c++" , Arg.Set        cpp      , "c++ backend";
     "-int" , Arg.Set_string int_type , "specifies the integer type (default=\"int\")";
     "-real", Arg.Set_string real_type, "specifies the real type (default=\"double\" without mpfr option)";
+    "-real-print-prec", Arg.Set_int print_prec_double, "specifies the number of digits to be printed for real values (default=15)";
 
     "-mauve", Arg.String (fun node -> mauve := node; cpp := true; static_mem := false), "generates the mauve code";
 ]
