@@ -53,12 +53,8 @@ let print_get_inputs fmt m =
 
 let print_put_outputs fmt m = 
   let po fmt (id, o', o) =
-    match (Types.unclock_type o.var_type).Types.tdesc with
-    | Types.Tint -> fprintf fmt "_put_int(f_out%i, \"%s\", %s)" id o'.var_id o.var_id
-    | Types.Tbool -> fprintf fmt "_put_bool(f_out%i, \"%s\", %s)" id o'.var_id o.var_id
-    | Types.Treal when !Options.mpfr -> fprintf fmt "_put_double(f_out%i, \"%s\", mpfr_get_d(%s, %s))" id o'.var_id o.var_id (Mpfr.mpfr_rnd ())
-    | Types.Treal -> fprintf fmt "_put_double(f_out%i, \"%s\", %s)" id o'.var_id o.var_id
-    | _ -> assert false
+    let suff = string_of_int id in
+    print_put_var fmt suff o'.var_id o.var_type o.var_id
   in
   Utils.List.iteri2 (fun idx v' v -> fprintf fmt "@ %a;" po ((idx+1), v', v)) m.mname.node_outputs m.mstep.step_outputs
 
@@ -158,6 +154,7 @@ let print_main_code fmt basename m =
     else "main_mem" in
   fprintf fmt "@[<v 2>int main (int argc, char *argv[]) {@ ";
   print_main_inout_declaration basename fmt m;
+  Plugins.c_backend_main_loop_body_prefix basename mname fmt ();
   print_main_memory_allocation mname main_mem fmt m;
   if !Options.mpfr then
     begin

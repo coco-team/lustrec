@@ -25,6 +25,11 @@ let refine_machine_code prog machine_code =
   ) machine_code plugins
 
 
+let c_backend_main_loop_body_prefix basename mname fmt () = 
+  List.iter (fun (m: (module PluginType.PluginType)) -> 
+    let module M = (val m : PluginType.PluginType) in
+    M.c_backend_main_loop_body_prefix basename mname fmt ()) plugins
+
 let c_backend_main_loop_body_suffix fmt () = 
   List.iter (fun (m: (module PluginType.PluginType)) -> 
     let module M = (val m : PluginType.PluginType) in
