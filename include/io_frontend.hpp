@@ -80,15 +80,30 @@ void _put_int(FILE* file, char* n, int _V){
   printf("\n");
   fprintf(file, "%d\n", _V);
 }
-void _put_double(FILE* file, char* n, double _V){
+
+void _put_float(FILE* file, char* n, float _V, int PREC){
   if(ISATTY) {
     printf("%s = ", n);
   } else {
     printf("'%s': ", n);
   };
-  printf("'%f' ", _V);
+  printf("'%.*f' ", PREC, _V);
   printf("\n");
-  fprintf(file, "%f\n", _V);
+  fprintf(file, "%.*f\n", PREC, _V);
+  fflush(file);
 }
+
+void _put_double(FILE* file, char* n, double _V, int PREC){
+  if(ISATTY) {
+    printf("%s = ", n);
+  } else {
+    printf("'%s': ", n);
+  };
+  printf("'%.*f' ", PREC, _V);
+  printf("\n");
+  fprintf(file, "%.*f\n", PREC, _V);
+  fflush(file);
+}
+
 
 #endif

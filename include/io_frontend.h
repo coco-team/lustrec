@@ -23,6 +23,9 @@ extern void _put_bool(FILE* file, char* n, _Bool _V);
 extern void _put_int(FILE* file, char* n, int _V);
 
 /*@ assigns \nothing; */
-extern void _put_double(FILE* file, char* n, double _V);
+extern void _put_float(FILE* file, char* n, float _V, int PREC);
+
+/*@ assigns \nothing; */
+extern void _put_double(FILE* file, char* n, double _V, int PREC);
 
 #endif
