@@ -89,6 +89,14 @@ type machine_t = {
   mannot: expr_annot list;
 }
 
+(* merge log: get_node_def was in c0f8 *)
+let get_node_def id m =
+  try
+    let (decl, _) = List.assoc id m.minstances in
+    Corelang.node_of_top decl
+  with Not_found -> raise Not_found
+    
+(* merge log: machine_vars was in 44686 *)
 let machine_vars m = m.mstep.step_inputs @ m.mstep.step_locals @ m.mstep.step_outputs @ m.mmemory
 
 let pp_step fmt s =
@@ -616,7 +624,11 @@ let translate_decl nd sch =
 	   backends. *)
 	(*match !Options.output with
 	| "horn" -> s
-	| "C" | "java" | _ ->*) join_guards_list s
+	  | "C" | "java" | _ ->*)
+	if !Backends.join_guards then
+	  join_guards_list s
+	else
+	  s
       );
       step_asserts = List.map (translate_expr nd init_args) nd_node_asserts;
     };

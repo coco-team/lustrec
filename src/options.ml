@@ -142,18 +142,17 @@ let lustrec_options =
     "-acsl-spec", Arg.Unit (fun () -> spec := "acsl"), "generates an ACSL encoding of the specification. Only meaningful for the C backend <default>";
     "-c-spec", Arg.Unit (fun () -> spec := "c"), "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
     (* "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C"; *)
-    "-horn", Arg.Unit (fun () -> output := "horn"), "generates Horn clauses encoding output instead of C";
-    "-horn-traces", Arg.Unit (fun () -> output := "horn"; traces:=true), "produces traceability file for Horn backend. Enable the horn backend.";
-    "-horn-cex", Arg.Unit (fun () -> output := "horn"; horn_cex:=true), "generates cex enumeration. Enable the horn backend (work in progress)";
-    "-horn-query", Arg.Unit (fun () -> output := "horn"; horn_query:=true), "generates queries in generated Horn file. Enable the horn backend (work in progress)";
-    "-horn-sfunction", Arg.Set_string sfunction, "gets the endpoint predicate of the \x1b[4msfunction\x1b[0m";
+    "-horn", Arg.Unit (fun () -> set_backend "horn"), "generates Horn clauses encoding output instead of C";
+    "-horn-traces", Arg.Unit (fun () -> set_backend "horn"; traces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
+    "-horn-cex", Arg.Unit (fun () -> set_backend "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
+    "-horn-query", Arg.Unit (fun () -> set_backend "horn"; horn_query:=true), "generate queries in generated Horn file. Enable the horn backend (work in progress)";
+    "-horn-sfunction", Arg.Set_string sfunction, "Gets the endpoint predicate of the \x1b[4msfunction\x1b[0m";
     "-print-reuse", Arg.Set print_reuse, "prints variable reuse policy";
     "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";
-   "-emf", Arg.Unit (fun () -> output := "emf"), "generates EMF output, to be used by CocoSim";
+   "-emf", Arg.Unit (fun () -> set_backend "emf"), "generates EMF output, to be used by CocoSim";
    "-inline", Arg.Unit (fun () -> global_inline := true; const_unfold := true), "inlines all node calls (require a main node). Implies constant unfolding";
     "-witnesses", Arg.Set witnesses, "enables production of witnesses during compilation";
     "-O", Arg.Set_int optimization, "changes optimization \x1b[4mlevel\x1b[0m <default: 2>";
-    "-verbose", Arg.Set_int verbose_level, "changes verbose \x1b[4mlevel\x1b[0m <default: 1>";
     
     "-c++" , Arg.Set        cpp      , "c++ backend";
     "-int" , Arg.Set_string int_type , "specifies the integer type (default=\"int\")";
