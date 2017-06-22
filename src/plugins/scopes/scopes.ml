@@ -162,7 +162,7 @@ let inputs = ref []
 
 let option_show_scopes = ref false
 let option_scopes = ref false
-let option_all_scopes = ref true
+let option_all_scopes = ref false
 let option_mem_scopes = ref false
 let option_input_scopes = ref false
 
