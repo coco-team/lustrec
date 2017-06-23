@@ -43,7 +43,7 @@ let rec pp_val fmt v =
     | Fun (n, vl)   -> Format.fprintf fmt "%s (%a)" n (Utils.fprintf_list ~sep:", " pp_val)  vl
 
 let rec pp_instr fmt i =
-  match i with
+  match i.instr_desc with
     | MLocalAssign (i,v) -> Format.fprintf fmt "%s<-l- %a" i.var_id pp_val v
     | MStateAssign (i,v) -> Format.fprintf fmt "%s<-s- %a" i.var_id pp_val v
     | MReset i           -> Format.fprintf fmt "reset %s" i
@@ -149,8 +149,8 @@ let is_output m id =
 let is_memory m id =
   List.exists (fun o -> o.var_id = id.var_id) m.mmemory
 
-let conditional c t e =
-  MBranch(c, [ (tag_true, t); (tag_false, e) ])
+let conditional (* TODO ?(lustre_expr:expr option=None) *) c t e =
+  mkinstr (* TODO ?lustre_expr *) (MBranch(c, [ (tag_true, t); (tag_false, e) ]))
 
 let dummy_var_decl name typ =
   {
@@ -211,7 +211,7 @@ let arrow_machine =
     mmemory = [var_state];
     mcalls = [];
     minstances = [];
-    minit = [MStateAssign(var_state, cst true)];
+    minit = [mkinstr (MStateAssign(var_state, cst true))];
     mstatic = [];
     mconst = [];
     mstep = {
@@ -220,9 +220,11 @@ let arrow_machine =
       step_locals = [];
       step_checks = [];
       step_instrs = [conditional (mk_val (StateVar var_state) Type_predef.type_bool)
-			         [MStateAssign(var_state, cst false);
-                                  MLocalAssign(var_output, mk_val (LocalVar var_input1) t_arg)]
-                                 [MLocalAssign(var_output, mk_val (LocalVar var_input2) t_arg)] ];
+			(List.map mkinstr
+			[MStateAssign(var_state, cst false);
+			 MLocalAssign(var_output, mk_val (LocalVar var_input1) t_arg)])
+                        (List.map mkinstr
+			[MLocalAssign(var_output, mk_val (LocalVar var_input2) t_arg)]) ];
       step_asserts = [];
     };
     mspec = None;
@@ -314,8 +316,12 @@ let rec control_on_clock node ((m, si, j, d, s) as args) ck inst =
  match (Clocks.repr ck).cdesc with
  | Con    (ck1, cr, l) ->
    let id  = Clocks.const_of_carrier cr in
-   control_on_clock node args ck1 (MBranch (translate_ident node args id,
-					    [l, [inst]] ))
+   control_on_clock node args ck1 (mkinstr
+				     (* TODO il faudrait prendre le lustre
+					associé à instr et rajouter print_ck_suffix
+					ck) de clocks.ml *)
+				     (MBranch (translate_ident node args id,
+					       [l, [inst]] )))
  | _                   -> inst
 
 let rec join_branches hl1 hl2 =
@@ -328,12 +334,14 @@ let rec join_branches hl1 hl2 =
    else (t1, List.fold_right join_guards h1 h2) :: join_branches q1 q2
 
 and join_guards inst1 insts2 =
- match inst1, insts2 with
+ match get_instr_desc inst1, List.map get_instr_desc insts2 with
  | _                   , []                               ->
    [inst1]
  | MBranch (x1, hl1), MBranch (x2, hl2) :: q when x1 = x2 ->
-   MBranch (x1, join_branches (sort_handlers hl1) (sort_handlers hl2))
-   :: q
+    mkinstr
+      (* TODO on pourrait uniquement concatener les lustres de inst1 et hd(inst2) *)
+      (MBranch (x1, join_branches (sort_handlers hl1) (sort_handlers hl2)))
+   :: (List.tl insts2)
  | _ -> inst1 :: insts2
 
 let join_guards_list insts =
@@ -403,18 +411,18 @@ let translate_guard node args expr =
 let rec translate_act node ((m, si, j, d, s) as args) (y, expr) =
   match expr.expr_desc with
   | Expr_ite   (c, t, e) -> let g = translate_guard node args c in
-			    conditional g
+			    conditional (* TODO ?lustre_expr:(Some expr) *) g
                               [translate_act node args (y, t)]
                               [translate_act node args (y, e)]
-  | Expr_merge (x, hl)   -> MBranch (translate_ident node args x,
-                                     List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl)
-  | _                    -> MLocalAssign (y, translate_expr node args expr)
+  | Expr_merge (x, hl)   -> mkinstr (* TODO ?lustre_expr:(Some expr) *) (MBranch (translate_ident node args x,
+                                     List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl))
+  | _                    -> mkinstr (* TODO ?lustre_expr:(Some expr) *) (MLocalAssign (y, translate_expr node args expr))
 
 let reset_instance node args i r c =
   match r with
   | None        -> []
   | Some r      -> let g = translate_guard node args r in
-                   [control_on_clock node args c (conditional g [MReset i] [MNoReset i])]
+                   [control_on_clock node args c (conditional g [mkinstr (MReset i)] [mkinstr (MNoReset i)])]
 
 let translate_eq node ((m, si, j, d, s) as args) eq =
   (* Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock;  *)
@@ -425,24 +433,24 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
      let c1 = translate_expr node args e1 in
      let c2 = translate_expr node args e2 in
      (m,
-      MReset o :: si,
+      mkinstr (MReset o) :: si,
       Utils.IMap.add o (arrow_top_decl, []) j,
       d,
-      (control_on_clock node args eq.eq_rhs.expr_clock (MStep ([var_x], o, [c1;c2]))) :: s)
+      (control_on_clock node args eq.eq_rhs.expr_clock (mkinstr (* TODO ?lustre_eq:eq *) (MStep ([var_x], o, [c1;c2])))) :: s)
   | [x], Expr_pre e1 when ISet.mem (get_node_var x node) d     ->
      let var_x = get_node_var x node in
      (ISet.add var_x m,
       si,
       j,
       d,
-      control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e1)) :: s)
+      control_on_clock node args eq.eq_rhs.expr_clock (mkinstr (* TODO ?lustre_eq:(Some eq) *) (MStateAssign (var_x, translate_expr node args e1))) :: s)
   | [x], Expr_fby (e1, e2) when ISet.mem (get_node_var x node) d ->
      let var_x = get_node_var x node in
      (ISet.add var_x m,
-      MStateAssign (var_x, translate_expr node args e1) :: si,
+      mkinstr (* TODO ?lustre_eq:(Some eq) *) (MStateAssign (var_x, translate_expr node args e1)) :: si,
       j,
       d,
-      control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e2)) :: s)
+      control_on_clock node args eq.eq_rhs.expr_clock (mkinstr (* TODO ?lustre_eq:(Some eq) *) (MStateAssign (var_x, translate_expr node args e2))) :: s)
 
   | p  , Expr_appl (f, arg, r) when not (Basic_library.is_expr_internal_fun eq.eq_rhs) ->
      let var_p = List.map (fun v -> get_node_var v node) p in
@@ -459,13 +467,13 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
        Clock_calculus.unify_imported_clock (Some call_ck) eq.eq_rhs.expr_clock eq.eq_rhs.expr_loc;
        Format.eprintf "call %a: %a: %a@," Printers.pp_expr eq.eq_rhs Clocks.print_ck (Clock_predef.ck_tuple env_cks) Clocks.print_ck call_ck;*)
      (m,
-      (if Stateless.check_node node_f then si else MReset o :: si),
+      (if Stateless.check_node node_f then si else mkinstr (MReset o) :: si),
       Utils.IMap.add o call_f j,
       d,
       (if Stateless.check_node node_f
        then []
        else reset_instance node args o r call_ck) @
-	(control_on_clock node args call_ck (MStep (var_p, o, vl))) :: s)
+	(control_on_clock node args call_ck (mkinstr (* TODO ?lustre_eq:(Some eq) *) (MStep (var_p, o, vl)))) :: s)
   (*
     (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
     are preserved. While they are replaced as if g then x = t else x = e in  C or Java
@@ -656,7 +664,12 @@ let get_machine_opt name machines =
 
 let get_const_assign m id =
   try
-    match (List.find (fun instr -> match instr with MLocalAssign (v, _) -> v == id | _ -> false) m.mconst) with
+    match get_instr_desc (List.find
+	     (fun instr -> match get_instr_desc instr with
+	     | MLocalAssign (v, _) -> v == id
+	     | _ -> false)
+	     m.mconst
+    ) with
     | MLocalAssign (_, e) -> e
     | _                   -> assert false
   with Not_found -> assert false

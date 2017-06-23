@@ -236,6 +236,10 @@ and value_t_desc =
   | Power of value_t * value_t
 
 type instr_t =
+  {
+    instr_desc: instr_t_desc;
+  }
+and instr_t_desc =
   | MLocalAssign of var_decl * value_t
   | MStateAssign of var_decl * value_t
   | MReset of ident

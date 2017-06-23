@@ -48,7 +48,7 @@ let rec get_read_vars instrs =
     [] -> Vars.empty
   | i::tl -> (
     let vars_tl = get_read_vars tl in 
-    match i with
+    match Corelang.get_instr_desc i with
     | LT.MLocalAssign(_,e) 
     | LT.MStateAssign(_,e) -> Vars.union (get_expr_real_vars e) vars_tl
     | LT.MStep(_, _, el) -> List.fold_left (fun accu e -> Vars.union (get_expr_real_vars e) accu) vars_tl el
@@ -66,7 +66,7 @@ let rec get_written_vars instrs =
     [] -> Vars.empty
   | i::tl -> (
     let vars_tl = get_written_vars tl in 
-    match i with
+    match Corelang.get_instr_desc i with
     | LT.MLocalAssign(v,_) 
     | LT.MStateAssign(v,_) -> Vars.add v vars_tl 
     | LT.MStep(vdl, _, _) -> List.fold_left (fun accu v -> Vars.add v accu) vars_tl vdl
@@ -224,13 +224,13 @@ let assign_vars nodename constEnv vars_env printed_vars ranges formalEnv vars_to
 	(* Obtaining unfold expression of v in formalEnv *)
 	let v_def = FormalEnv.get_def formalEnv v  in
 	let e, r = optimize_expr nodename constEnv printed_vars vars_env ranges formalEnv v_def in
-	let instr = 
+	let instr_desc = 
 	  if try (get_var vars_env v.LT.var_id).is_local with Not_found -> assert false then
 	    LT.MLocalAssign(v, e)
 	  else
 	    LT.MStateAssign(v, e)
 	in
-	instr::accu_instr, 
+	(Corelang.mkinstr instr_desc)::accu_instr, 
 	(match r with 
 	| None -> ranges 
 	| Some v_r -> RangesInt.add_def ranges v.LT.var_id v_r)
@@ -267,7 +267,7 @@ let rec rewrite_instrs nodename constEnv  vars_env m instrs ranges formalEnv pri
        formalEnv, possibly ranges and vars_to_print *)
      begin
        let hd_instrs, ranges, formalEnv, printed_vars, vars_to_print =
-	 match hd_instr with 
+	 match Corelang.get_instr_desc hd_instr with 
 	 | LT.MLocalAssign(vd,vt) when Types.is_real_type vd.LT.var_type  && not (Vars.mem vd vars_to_print) -> 
 	    (* LocalAssign are injected into formalEnv *)
 	    if debug then Format.eprintf "Registering local assign %a@ " MC.pp_instr hd_instr;
@@ -319,9 +319,9 @@ let rec rewrite_instrs nodename constEnv  vars_env m instrs ranges formalEnv pri
 	      assign_vars printed_vars ranges formalEnv required_vars in
 	    let vt', _ = optimize_expr nodename constEnv (Vars.union required_vars printed_vars) vars_env ranges formalEnv vt in
 	    let new_instr = 
-	      match hd_instr with
-	      | LT.MLocalAssign _ -> LT.MLocalAssign(vd,vt')
-	      | _ -> LT.MStateAssign(vd,vt')
+	      match Corelang.get_instr_desc hd_instr with
+	      | LT.MLocalAssign _ -> Corelang.update_instr_desc hd_instr (LT.MLocalAssign(vd,vt'))
+	      | _ -> Corelang.update_instr_desc hd_instr (LT.MStateAssign(vd,vt'))
 	    in
 	    let written_vars = Vars.add vd required_vars in
 	    prefix_instr@[new_instr],
@@ -382,7 +382,7 @@ let rec rewrite_instrs nodename constEnv  vars_env m instrs ranges formalEnv pri
 									 variables *)
 	      let written_vars = Vars.union required_vars (Vars.of_list vdl) in
 	      let instrs', ranges' = assign_vars (Vars.union written_vars printed_vars) ranges formalEnv required_vars in
-	      instrs' @ [LT.MStep(vdl,id,vtl')], (* New instrs *)
+	      instrs' @ [Corelang.update_instr_desc hd_instr (LT.MStep(vdl,id,vtl'))], (* New instrs *)
 	      RangesInt.add_call ranges' vdl id vtl_ranges,   (* add information bounding each vdl var *) 
 	      formalEnv,
 	      Vars.union written_vars printed_vars,        (* adding vdl to new printed vars *)
@@ -430,7 +430,7 @@ let rec rewrite_instrs nodename constEnv  vars_env m instrs ranges formalEnv pri
 									     
 							   ) branches ([], required_vars, ranges) in
 	    if debug then Format.eprintf "dealing with branches done@ @]@ ";	  
-	    prefix_instr@[LT.MBranch(vt', branches')],
+	    prefix_instr@[Corelang.update_instr_desc hd_instr (LT.MBranch(vt', branches'))],
 	    merged_ranges, (* Only step functions call within branches
 			    may have produced new ranges. We merge this data by
 			    computing the join per variable *)

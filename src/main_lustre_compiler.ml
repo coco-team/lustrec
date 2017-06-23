@@ -389,7 +389,7 @@ let stage3 prog machine_code dependencies basename =
        let source_file = destname ^ ".emf" in (* Could be changed *)
        let source_out = open_out source_file in
        let fmt = formatter_of_out_channel source_out in
-       EMF_backend.translate fmt prog machine_code;
+       EMF_backend.translate fmt basename prog machine_code;
        ()
      end
 

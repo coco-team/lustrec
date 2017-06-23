@@ -181,6 +181,15 @@ let update_expr_annot node_id e annot =
   { e with expr_annot = merge_expr_annot e.expr_annot (Some annot) }
 
 
+let mkinstr (* TODO ?(lustre_expr=None) ?(lustre_eq=None) *) i =
+  {
+    instr_desc = i;
+
+  }
+
+let get_instr_desc i = i.instr_desc
+let update_instr_desc i id = { i with instr_desc = id }
+
 (***********************************************************)
 (* Fast access to nodes, by name *)
 let (node_table : (ident, top_decl) Hashtbl.t) = Hashtbl.create 30

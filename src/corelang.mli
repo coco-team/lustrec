@@ -31,7 +31,11 @@ val mk_new_name: (ident -> bool) -> ident -> ident
 val mk_new_node_name: node_desc -> ident -> ident
 val mktop: top_decl_desc -> top_decl
 
-
+(* constructor for machine types *)
+val mkinstr: (* TODO ?lustre_expr:expr -> ?lustre_eq: eq option -> *) instr_t_desc -> instr_t
+val get_instr_desc: instr_t -> instr_t_desc
+val update_instr_desc: instr_t -> instr_t_desc -> instr_t
+  
 val node_table : (ident, top_decl) Hashtbl.t
 val print_node_table:  Format.formatter -> unit -> unit
 val node_name: top_decl -> ident

@@ -105,7 +105,7 @@ let scope_path main_node_name prog machines all_scopes sl : scope_t =
       let find_var = (fun v -> v.var_id = varid) in
       let instance = 
 	List.find 
-	  (fun i -> match i with 
+	  (fun i -> match get_instr_desc i with 
 	  | MStep(p, o, _) -> List.exists find_var p 
 	  | _ -> false
 	  ) 
@@ -113,7 +113,7 @@ let scope_path main_node_name prog machines all_scopes sl : scope_t =
       in
       try
 	let variable, instance_node, instance_id = 
-	  match instance with 
+	  match get_instr_desc instance with 
 	  | MStep(p, o, _) -> 
 	    (* Format.eprintf "Looking for machine %s@.@?" o; *)
 	    let o_fun, _ = List.assoc o e_machine.mcalls in
@@ -219,7 +219,8 @@ let pp_scopes fmt scopes =
 
 let update_machine machine =
   let stateassign vdecl =
-    MStateAssign (vdecl, mk_val (LocalVar vdecl) vdecl.var_type)
+    mkinstr 
+    (MStateAssign (vdecl, mk_val (LocalVar vdecl) vdecl.var_type))
   in
   let local_decls = machine.mstep.step_inputs
     (* @ machine.mstep.step_outputs   *)
@@ -230,7 +231,7 @@ let update_machine machine =
     mstep = { 
       machine.mstep with 
         step_instrs = machine.mstep.step_instrs
-        @ (MComment "Registering all flows")::(List.map stateassign local_decls)
+        @ (mkinstr (MComment "Registering all flows"))::(List.map stateassign local_decls)
           
     }
   }

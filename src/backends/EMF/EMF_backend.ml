@@ -1,21 +1,46 @@
+(* EMF backend *)
+(* This backup is initially motivated by the need to express Spacer computed
+   invariants as Matlab Simulink executable evidences.
+
+   Therefore the input language is more restricted. We do not expect fancy
+   datastructure, complex function calls, etc.
+
+   In case of error, use -node foo -inline to eliminate function calls that are
+   not seriously handled yet.
+   
+
+   In terms of algorithm, the process was initially based on printing normalized
+   code. We now rely on machine code printing. The old code is preserved for
+   reference.
+*)
+
 open LustreSpec
 open Machine_code
 open Format
 open Utils
 
 exception Unhandled of string
-  
+    
+
+(* Basic printing functions *)
+    
 let pp_var_string fmt v = fprintf fmt "\"%s\"" v
 let pp_var_name fmt v = fprintf fmt "\"%a\"" Printers.pp_var_name v
-
 let pp_node_args = fprintf_list ~sep:", " pp_var_name
 
-(* simple function to extract the element id in the list. Starts from 1. *)
+    
+(* Matlab starting counting from 1.
+   simple function to extract the element id in the list. Starts from 1. *)
 let rec get_idx x l =
   match l with
   | hd::tl -> if hd = x then 1 else 1+(get_idx x tl)
   | [] -> assert false
-     
+
+(**********************************************)
+(* Old stuff: printing normalized code as EMF *)     
+(**********************************************)
+
+(*
 let pp_expr vars fmt expr =
   let rec pp_expr fmt expr =
     match expr.expr_desc with
@@ -107,6 +132,12 @@ let pp_decl fmt decl =
   | Const _
   | Open _
   | TypeDef _ -> eprintf "should not happen in EMF backend"
+*)
+
+
+(**********************************************)
+(*   Printing machine code as EMF             *)
+(**********************************************)
 
 let rec pp_val vars fmt v =
   match v.value_desc with
@@ -142,10 +173,11 @@ and pp_fun vars id fmt vl =
     | "not", [v] -> fprintf fmt "(~%a)" (pp_val vars) v
     | _ -> fprintf fmt "%s (%a)" id  (Utils.fprintf_list ~sep:", " (pp_val vars)) vl 
 
+     
 
      
 let rec pp_instr m vars fmt i =
-  match i with
+  match Corelang.get_instr_desc i with
   | MLocalAssign (var,v) 
   | MStateAssign (var,v) -> fprintf fmt "y = %a" (pp_val vars) v
   | MStep ([var], i, vl)  -> (
@@ -177,8 +209,9 @@ let rec pp_instr m vars fmt i =
 and pp_instrs m vars fmt il =
   fprintf fmt "@[<v 2>%a@]" (Utils.fprintf_list ~sep:"@," (pp_instr m vars)) il
 
+
 let rec get_instr_var i =
-  match i with
+  match Corelang.get_instr_desc i with
   | MLocalAssign (var,_) 
   | MStateAssign (var,_) 
   | MStep ([var], _, _)  -> var 
@@ -194,6 +227,7 @@ and get_instrs_var il =
   | i::_ -> get_instr_var i (* looking for the first instr *)
   | _ -> assert false
 
+  
 let rec  get_val_vars v =
   match v.value_desc with
   | Cst c -> Utils.ISet.empty
@@ -201,9 +235,9 @@ let rec  get_val_vars v =
   | StateVar v -> Utils.ISet.singleton v.var_id
   | Fun (n, vl) -> List.fold_left (fun res v -> Utils.ISet.union (get_val_vars v) res) Utils.ISet.empty vl
   | _ -> assert false (* not available in EMF backend *)
-  
+
 let rec get_instr_vars i =
-  match i with
+  match Corelang.get_instr_desc i with
   | MLocalAssign (_,v)  
   | MStateAssign (_,v) -> get_val_vars v
   | MStep ([_], _, vl)  -> List.fold_left (fun res v -> Utils.ISet.union res (get_val_vars v)) Utils.ISet.empty vl 
@@ -219,7 +253,7 @@ let rec get_instr_vars i =
   | MBranch _ (* EMF backend only accept true/false ite *)
   | MReset _           
   | MNoReset _
-  | MComment _ -> assert false (* not  available for EMF output *)
+  | MComment _ -> failwith "Error in compiling some constructs into EMF. Have you considered -node foo -inline options ?" (* not  available for EMF output *)
 and get_instrs_vars il =
   List.fold_left (fun res i -> Utils.ISet.union res (get_instr_vars i))
     Utils.ISet.empty
@@ -229,11 +263,16 @@ let pp_instr_main m fmt i =
   (* first, we extract the expression and associated variables *)
   let var = get_instr_var i in
   let vars = Utils.ISet.elements (get_instr_vars i) in	
-  fprintf fmt "\"%s\": @[<v 2>{ \"expr\": \"%a\",@ \"vars\": [%a] @]}"
+  fprintf fmt "\"%s\": @[<v 2>{ \"expr\": \"%a\",@ \"vars\": [%a] @ \"original_lustre_expr\": [%t]@]}"
     var.var_id
     (pp_instr m vars) i
     (fprintf_list ~sep:", " pp_var_string) vars
-    
+    (fun fmt -> ()
+      (*xxxx
+      if is expr than print associated lustre eq else empty string
+	xxx todo
+      *)
+    ) 
      
 let pp_machine fmt m =
   try
@@ -250,9 +289,32 @@ let pp_machine fmt m =
     eprintf "%s@ " msg;
     eprintf "node skipped - no output generated@ @]@."
   )
+
+(****************************************************)
+(* Main function: iterates over node and print them *)
+(****************************************************)
+let pp_meta fmt basename =
+  fprintf fmt "\"meta\": @[<v 0>{@ ";
+  Utils.fprintf_list ~sep:",@ "
+    (fun fmt (k, v) -> fprintf fmt "\"%s\": \"%s\"" k v)
+    fmt
+    ["compiler-name", (Filename.basename Sys.executable_name);
+     "compiler-version", Version.number;
+     "command", (String.concat " " (Array.to_list Sys.argv));
+     "source_file", basename
+    ]
+  ;
+  fprintf fmt "@ @]},@ "
     
-let translate fmt prog machines =
+let translate fmt basename prog machines =
   fprintf fmt "@[<v 0>{@ ";
+  pp_meta fmt basename;
+  fprintf fmt "\"nodes\": @[<v 0>{@ ";
   (* fprintf_list ~sep:",@ " pp_decl fmt prog; *)
   fprintf_list ~sep:",@ " pp_machine fmt machines;
+  fprintf fmt "@ @]}";
   fprintf fmt "@ @]}"
+
+(* Local Variables: *)
+(* compile-command: "make -C ../.." *)
+(* End: *)
