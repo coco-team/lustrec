@@ -486,7 +486,7 @@ let _ =
   try
     Printexc.record_backtrace true;
 
-    let options = Options.lustrec_options @ (Plugins.options ()) in
+    let options = Options_management.lustrec_options @ (Plugins.options ()) in
     
     Arg.parse options anonymous usage
   with

@@ -89,7 +89,7 @@ test-submit: test-config
 	cd test; ctest -M Experimental -T Submit -R COMPIL_LUSTRE
 
 test: test-config
-	cd test; ctest -D Experimental -R COMPIL_LUSTRE
+	cd test; ctest -D Experimental -R COMPIL_LUSTRE\|MAKE\|BIN\|DIFF
 
 test-full-no-submit: test-config
 	cd test; ctest -M Experimental -T Start -T Update -T Configure -T Build -T Test 

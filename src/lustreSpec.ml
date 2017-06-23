@@ -237,7 +237,9 @@ and value_t_desc =
 
 type instr_t =
   {
-    instr_desc: instr_t_desc;
+    instr_desc: instr_t_desc; (* main data: the content *)
+    (* lustre_expr: expr option; (* possible representation as a lustre expression *) *)
+    lustre_eq: eq option;     (* possible representation as a lustre flow equation *)
   }
 and instr_t_desc =
   | MLocalAssign of var_decl * value_t

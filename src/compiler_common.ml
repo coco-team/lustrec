@@ -239,7 +239,7 @@ let import_dependencies prog =
   List.fold_left
     (fun (compilation_dep, type_env, clock_env) dep ->
       let (local, s) = Corelang.dependency_of_top dep in
-      let basename = Options.name_dependency (local, s) in
+      let basename = Options_management.name_dependency (local, s) in
       Log.report ~level:1 (fun fmt -> Format.fprintf fmt "  Library %s@ " basename);
       let lusic = Modules.import_dependency dep.top_decl_loc (local, s) in
       (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "");*)

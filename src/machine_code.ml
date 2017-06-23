@@ -43,22 +43,33 @@ let rec pp_val fmt v =
     | Fun (n, vl)   -> Format.fprintf fmt "%s (%a)" n (Utils.fprintf_list ~sep:", " pp_val)  vl
 
 let rec pp_instr fmt i =
-  match i.instr_desc with
+  let _ =
+    match i.instr_desc with
     | MLocalAssign (i,v) -> Format.fprintf fmt "%s<-l- %a" i.var_id pp_val v
     | MStateAssign (i,v) -> Format.fprintf fmt "%s<-s- %a" i.var_id pp_val v
     | MReset i           -> Format.fprintf fmt "reset %s" i
     | MNoReset i         -> Format.fprintf fmt "noreset %s" i
     | MStep (il, i, vl)  ->
-      Format.fprintf fmt "%a = %s (%a)"
-	(Utils.fprintf_list ~sep:", " (fun fmt v -> Format.pp_print_string fmt v.var_id)) il
-	i
-	(Utils.fprintf_list ~sep:", " pp_val) vl
+       Format.fprintf fmt "%a = %s (%a)"
+	 (Utils.fprintf_list ~sep:", " (fun fmt v -> Format.pp_print_string fmt v.var_id)) il
+	 i
+	 (Utils.fprintf_list ~sep:", " pp_val) vl
     | MBranch (g,hl)     ->
-      Format.fprintf fmt "@[<v 2>case(%a) {@,%a@,}@]"
-	pp_val g
-	(Utils.fprintf_list ~sep:"@," pp_branch) hl
+       Format.fprintf fmt "@[<v 2>case(%a) {@,%a@,}@]"
+	 pp_val g
+	 (Utils.fprintf_list ~sep:"@," pp_branch) hl
     | MComment s -> Format.pp_print_string fmt s
-
+       
+  in
+  (* Annotation *)
+  (* let _ = *)
+  (*   match i.lustre_expr with None -> () | Some e -> Format.fprintf fmt " -- original expr: %a" Printers.pp_expr e *)
+  (* in *)
+  let _ = 
+    match i.lustre_eq with None -> () | Some eq -> Format.fprintf fmt " -- original eq: %a" Printers.pp_node_eq eq
+  in
+  ()
+    
 and pp_branch fmt (t, h) =
   Format.fprintf fmt "@[<v 2>%s:@,%a@]" t (Utils.fprintf_list ~sep:"@," pp_instr) h
 
@@ -149,8 +160,8 @@ let is_output m id =
 let is_memory m id =
   List.exists (fun o -> o.var_id = id.var_id) m.mmemory
 
-let conditional (* TODO ?(lustre_expr:expr option=None) *) c t e =
-  mkinstr (* TODO ?lustre_expr *) (MBranch(c, [ (tag_true, t); (tag_false, e) ]))
+let conditional ?lustre_eq c t e =
+  mkinstr ?lustre_eq:lustre_eq  (MBranch(c, [ (tag_true, t); (tag_false, e) ]))
 
 let dummy_var_decl name typ =
   {
@@ -189,7 +200,7 @@ let arrow_desc =
 let arrow_top_decl =
   {
     top_decl_desc = Node arrow_desc;
-    top_decl_owner = (Options.core_dependency "arrow");
+    top_decl_owner = (Options_management.core_dependency "arrow");
     top_decl_itf = false;
     top_decl_loc = Location.dummy_loc
   }
@@ -409,14 +420,15 @@ let translate_guard node args expr =
   | _ -> (Format.eprintf "internal error: translate_guard %s %a@." node.node_id Printers.pp_expr expr;assert false)
 
 let rec translate_act node ((m, si, j, d, s) as args) (y, expr) =
+  let eq = Corelang.mkeq Location.dummy_loc ([y.var_id], expr) in
   match expr.expr_desc with
   | Expr_ite   (c, t, e) -> let g = translate_guard node args c in
-			    conditional (* TODO ?lustre_expr:(Some expr) *) g
+			    conditional ?lustre_eq:(Some (Some eq)) g
                               [translate_act node args (y, t)]
                               [translate_act node args (y, e)]
-  | Expr_merge (x, hl)   -> mkinstr (* TODO ?lustre_expr:(Some expr) *) (MBranch (translate_ident node args x,
+  | Expr_merge (x, hl)   -> mkinstr ?lustre_eq:(Some (Some eq)) (MBranch (translate_ident node args x,
                                      List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl))
-  | _                    -> mkinstr (* TODO ?lustre_expr:(Some expr) *) (MLocalAssign (y, translate_expr node args expr))
+  | _                    -> mkinstr ?lustre_eq:(Some (Some eq))  (MLocalAssign (y, translate_expr node args expr))
 
 let reset_instance node args i r c =
   match r with
@@ -436,21 +448,21 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       mkinstr (MReset o) :: si,
       Utils.IMap.add o (arrow_top_decl, []) j,
       d,
-      (control_on_clock node args eq.eq_rhs.expr_clock (mkinstr (* TODO ?lustre_eq:eq *) (MStep ([var_x], o, [c1;c2])))) :: s)
+      (control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some (Some eq)) (MStep ([var_x], o, [c1;c2])))) :: s)
   | [x], Expr_pre e1 when ISet.mem (get_node_var x node) d     ->
      let var_x = get_node_var x node in
      (ISet.add var_x m,
       si,
       j,
       d,
-      control_on_clock node args eq.eq_rhs.expr_clock (mkinstr (* TODO ?lustre_eq:(Some eq) *) (MStateAssign (var_x, translate_expr node args e1))) :: s)
+      control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some (Some eq)) (MStateAssign (var_x, translate_expr node args e1))) :: s)
   | [x], Expr_fby (e1, e2) when ISet.mem (get_node_var x node) d ->
      let var_x = get_node_var x node in
      (ISet.add var_x m,
-      mkinstr (* TODO ?lustre_eq:(Some eq) *) (MStateAssign (var_x, translate_expr node args e1)) :: si,
+      mkinstr ?lustre_eq:(Some (Some eq)) (MStateAssign (var_x, translate_expr node args e1)) :: si,
       j,
       d,
-      control_on_clock node args eq.eq_rhs.expr_clock (mkinstr (* TODO ?lustre_eq:(Some eq) *) (MStateAssign (var_x, translate_expr node args e2))) :: s)
+      control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some (Some eq)) (MStateAssign (var_x, translate_expr node args e2))) :: s)
 
   | p  , Expr_appl (f, arg, r) when not (Basic_library.is_expr_internal_fun eq.eq_rhs) ->
      let var_p = List.map (fun v -> get_node_var v node) p in
@@ -473,7 +485,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       (if Stateless.check_node node_f
        then []
        else reset_instance node args o r call_ck) @
-	(control_on_clock node args call_ck (mkinstr (* TODO ?lustre_eq:(Some eq) *) (MStep (var_p, o, vl)))) :: s)
+	(control_on_clock node args call_ck (mkinstr ?lustre_eq:(Some (Some eq)) (MStep (var_p, o, vl)))) :: s)
   (*
     (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
     are preserved. While they are replaced as if g then x = t else x = e in  C or Java

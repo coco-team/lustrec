@@ -5,7 +5,7 @@ open PluginList
 
 let options () = 
   List.flatten (
-    List.map Options.plugin_opt (
+    List.map Options_management.plugin_opt (
       List.map (fun m ->
 	let module M = (val m : PluginType.PluginType) in
 	(M.name, M.activate, M.options)

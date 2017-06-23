@@ -161,7 +161,7 @@ let _ =
   try
     Printexc.record_backtrace true;
 
-    let options = Options.lustret_options
+    let options = Options_management.lustret_options
 
     in
     

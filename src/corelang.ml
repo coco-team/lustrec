@@ -181,10 +181,11 @@ let update_expr_annot node_id e annot =
   { e with expr_annot = merge_expr_annot e.expr_annot (Some annot) }
 
 
-let mkinstr (* TODO ?(lustre_expr=None) ?(lustre_eq=None) *) i =
+let mkinstr ?(lustre_expr=None) ?(lustre_eq=None) i =
   {
     instr_desc = i;
-
+    (* lustre_expr = lustre_expr; *)
+    lustre_eq = lustre_eq;
   }
 
 let get_instr_desc i = i.instr_desc

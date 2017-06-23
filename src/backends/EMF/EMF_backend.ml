@@ -174,22 +174,31 @@ and pp_fun vars id fmt vl =
     | _ -> fprintf fmt "%s (%a)" id  (Utils.fprintf_list ~sep:", " (pp_val vars)) vl 
 
      
+(* detect whether the instruction i represents a STEP, ie an arrow with true -> false *)
+let is_step_fun m i =
+  match Corelang.get_instr_desc i with
+  | MStep ([var], i, vl)  -> (
+    let name = (Machine_code.get_node_def i m).node_id in
+    match name, vl with
+    | "_arrow", [v1; v2] -> (
+	match v1.value_desc, v2.value_desc with
+	| Cst c1, Cst c2 ->
+	   if c1 = Corelang.const_of_bool true && c2 = Corelang.const_of_bool false then
+	     true
+	   else
+	     assert false (* only handle true -> false *)
+	| _ -> assert false
+    )
+    | _ -> false
+  )
+  | _ -> false
 
      
 let rec pp_instr m vars fmt i =
   match Corelang.get_instr_desc i with
   | MLocalAssign (var,v) 
   | MStateAssign (var,v) -> fprintf fmt "y = %a" (pp_val vars) v
-  | MStep ([var], i, vl)  -> (
-    let name = (Machine_code.get_node_def i m).node_id in
-    match name, vl with
-      "_arrow", [v1; v2] -> (
-	match v1.value_desc, v2.value_desc with
-	| Cst c1, Cst c2 -> if c1 = Corelang.const_of_bool true && c2 = Corelang.const_of_bool false then fprintf fmt "STEP" else assert false (* only handle true -> false *)
-	| _ -> assert false
-      )
-    | _ -> raise (Unhandled ("call to node " ^ name))
-  )
+  | MStep _ when is_step_fun m i  -> fprintf fmt "STEP" 
   | MBranch (g,[(tag1,case1);(tag2,case2)])     ->
      let then_case, else_case =
        if tag1 = Corelang.tag_true then
@@ -201,7 +210,7 @@ let rec pp_instr m vars fmt i =
        (pp_val vars) g
        (pp_instrs m vars) then_case
        (pp_instrs m vars) else_case
-  | MStep _ (* only single output for function call *)
+  | MStep _ (* no function calls handled yet *)
   | MBranch _ (* EMF backend only accept true/false ite *)
   | MReset _           
   | MNoReset _
@@ -258,21 +267,28 @@ and get_instrs_vars il =
   List.fold_left (fun res i -> Utils.ISet.union res (get_instr_vars i))
     Utils.ISet.empty
     il
+
+
+let pp_original_lustre_expression m fmt i =
+  match Corelang.get_instr_desc i with
+  | MLocalAssign _ | MStateAssign _ 
+  | MBranch _
+    -> ( match i.lustre_eq with None -> () | Some e -> Printers.pp_node_eq fmt e) 
+  | MStep _ when is_step_fun m i -> () (* we print nothing, this is a STEP *)
+  | MStep _ -> (match i.lustre_eq with None -> () | Some eq -> Printers.pp_node_eq fmt eq)
+  | _ -> ()
     
 let pp_instr_main m fmt i =
   (* first, we extract the expression and associated variables *)
   let var = get_instr_var i in
   let vars = Utils.ISet.elements (get_instr_vars i) in	
-  fprintf fmt "\"%s\": @[<v 2>{ \"expr\": \"%a\",@ \"vars\": [%a] @ \"original_lustre_expr\": [%t]@]}"
+  fprintf fmt "\"%s\": @[<v 2>{ \"expr\": \"%a\",@ \"vars\": [%a] @ \"original_lustre_expr\": [%a]@]}"
     var.var_id
     (pp_instr m vars) i
     (fprintf_list ~sep:", " pp_var_string) vars
-    (fun fmt -> ()
-      (*xxxx
-      if is expr than print associated lustre eq else empty string
-	xxx todo
-      *)
-    ) 
+    (pp_original_lustre_expression m) i
+
+    
      
 let pp_machine fmt m =
   try

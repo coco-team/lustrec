@@ -32,7 +32,7 @@ val mk_new_node_name: node_desc -> ident -> ident
 val mktop: top_decl_desc -> top_decl
 
 (* constructor for machine types *)
-val mkinstr: (* TODO ?lustre_expr:expr -> ?lustre_eq: eq option -> *) instr_t_desc -> instr_t
+val mkinstr: ?lustre_expr:expr option -> ?lustre_eq: eq option -> instr_t_desc -> instr_t
 val get_instr_desc: instr_t -> instr_t_desc
 val update_instr_desc: instr_t -> instr_t_desc -> instr_t
   

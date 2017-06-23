@@ -418,7 +418,7 @@ let witness filename main_name orig inlined type_env clock_env =
   let _ = Clock_calculus.clock_prog clock_env new_prog in
 *)
    
-  let witness_file = (Options.get_witness_dir filename) ^ "/" ^ "inliner_witness.lus" in
+  let witness_file = (Options_management.get_witness_dir filename) ^ "/" ^ "inliner_witness.lus" in
   let witness_out = open_out witness_file in
   let witness_fmt = Format.formatter_of_out_channel witness_out in
   begin
