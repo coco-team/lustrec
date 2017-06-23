@@ -423,12 +423,12 @@ let rec translate_act node ((m, si, j, d, s) as args) (y, expr) =
   let eq = Corelang.mkeq Location.dummy_loc ([y.var_id], expr) in
   match expr.expr_desc with
   | Expr_ite   (c, t, e) -> let g = translate_guard node args c in
-			    conditional ?lustre_eq:(Some (Some eq)) g
+			    conditional ?lustre_eq:(Some eq) g
                               [translate_act node args (y, t)]
                               [translate_act node args (y, e)]
-  | Expr_merge (x, hl)   -> mkinstr ?lustre_eq:(Some (Some eq)) (MBranch (translate_ident node args x,
+  | Expr_merge (x, hl)   -> mkinstr ?lustre_eq:(Some eq) (MBranch (translate_ident node args x,
                                      List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl))
-  | _                    -> mkinstr ?lustre_eq:(Some (Some eq))  (MLocalAssign (y, translate_expr node args expr))
+  | _                    -> mkinstr ?lustre_eq:(Some eq)  (MLocalAssign (y, translate_expr node args expr))
 
 let reset_instance node args i r c =
   match r with
@@ -448,21 +448,21 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       mkinstr (MReset o) :: si,
       Utils.IMap.add o (arrow_top_decl, []) j,
       d,
-      (control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some (Some eq)) (MStep ([var_x], o, [c1;c2])))) :: s)
+      (control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some eq) (MStep ([var_x], o, [c1;c2])))) :: s)
   | [x], Expr_pre e1 when ISet.mem (get_node_var x node) d     ->
      let var_x = get_node_var x node in
      (ISet.add var_x m,
       si,
       j,
       d,
-      control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some (Some eq)) (MStateAssign (var_x, translate_expr node args e1))) :: s)
+      control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some eq) (MStateAssign (var_x, translate_expr node args e1))) :: s)
   | [x], Expr_fby (e1, e2) when ISet.mem (get_node_var x node) d ->
      let var_x = get_node_var x node in
      (ISet.add var_x m,
-      mkinstr ?lustre_eq:(Some (Some eq)) (MStateAssign (var_x, translate_expr node args e1)) :: si,
+      mkinstr ?lustre_eq:(Some eq) (MStateAssign (var_x, translate_expr node args e1)) :: si,
       j,
       d,
-      control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some (Some eq)) (MStateAssign (var_x, translate_expr node args e2))) :: s)
+      control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some eq) (MStateAssign (var_x, translate_expr node args e2))) :: s)
 
   | p  , Expr_appl (f, arg, r) when not (Basic_library.is_expr_internal_fun eq.eq_rhs) ->
      let var_p = List.map (fun v -> get_node_var v node) p in
@@ -485,7 +485,7 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       (if Stateless.check_node node_f
        then []
        else reset_instance node args o r call_ck) @
-	(control_on_clock node args call_ck (mkinstr ?lustre_eq:(Some (Some eq)) (MStep (var_p, o, vl)))) :: s)
+	(control_on_clock node args call_ck (mkinstr ?lustre_eq:(Some eq) (MStep (var_p, o, vl)))) :: s)
   (*
     (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
     are preserved. While they are replaced as if g then x = t else x = e in  C or Java
