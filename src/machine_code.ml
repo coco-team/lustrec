@@ -304,11 +304,18 @@ let new_instance =
 (*                       d : local variables             *)
 (*                       s : step instructions           *)
 let translate_ident node (m, si, j, d, s) id =
+  (* Format.eprintf "trnaslating ident: %s@." id; *)
   try (* id is a node var *)
     let var_id = get_node_var id node in
     if ISet.exists (fun v -> v.var_id = id) m
-    then mk_val (StateVar var_id) var_id.var_type
-    else mk_val (LocalVar var_id) var_id.var_type
+    then (
+      (* Format.eprintf "a STATE VAR@."; *)
+      mk_val (StateVar var_id) var_id.var_type
+    )
+    else (
+      (* Format.eprintf "a LOCAL VAR@."; *)
+      mk_val (LocalVar var_id) var_id.var_type
+    )
   with Not_found ->
     try (* id is a constant *)
       let vdecl = (Corelang.var_decl_of_const (const_of_top (Hashtbl.find Corelang.consts_table id))) in
@@ -623,7 +630,7 @@ let translate_decl nd sch =
   assert (ISet.is_empty m0);
   assert (init0 = []);
   assert (Utils.IMap.is_empty j0);
-  let m, init, j, locals, s = translate_eqs nd (m0, init0, j0, locals0, []) (assert_instrs@sorted_eqs) in
+  let m, init, j, locals, s as context_with_asserts = translate_eqs nd (m0, init0, j0, locals0, []) (assert_instrs@sorted_eqs) in
   let mmap = Utils.IMap.fold (fun i n res -> (i, n)::res) j [] in
   {
     mname = nd;
@@ -650,7 +657,7 @@ let translate_decl nd sch =
 	else
 	  s
       );
-      step_asserts = List.map (translate_expr nd init_args) nd_node_asserts;
+      step_asserts = List.map (translate_expr nd context_with_asserts) nd_node_asserts;
     };
     mspec = nd.node_spec;
     mannot = nd.node_annot;
