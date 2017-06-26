@@ -9,6 +9,8 @@ LUSI_MPFR_LIB=include/mpfr_lustre.lusi
 LOCAL_BINDIR=bin
 LOCAL_DOCDIR=doc/manual
 
+DEFAULT_TEST_TARGET=COMPIL_LUS\|MAKE\|BIN\|DIFF
+
 all: lustrec lustret
 
 lustrec:
@@ -83,13 +85,13 @@ test-config: ${bindir}/lustrec
 	fi
 
 test-no-submit: test-config
-	cd test; ctest -M Experimental -T Start -T Update -T Configure -T Build -T Test -R COMPIL_LUSTRE
+	cd test; ctest -M Experimental -T Start -T Update -T Configure -T Build -T Test -R ${DEFAULT_TEST_TARGET}
 
 test-submit: test-config
-	cd test; ctest -M Experimental -T Submit -R COMPIL_LUSTRE
+	cd test; ctest -M Experimental -T Submit -R ${DEFAULT_TEST_TARGET}
 
 test: test-config
-	cd test; ctest -D Experimental -R COMPIL_LUSTRE
+	cd test; ctest -D Experimental -R ${DEFAULT_TEST_TARGET}
 
 test-full-no-submit: test-config
 	cd test; ctest -M Experimental -T Start -T Update -T Configure -T Build -T Test 
