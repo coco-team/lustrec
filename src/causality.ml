@@ -330,7 +330,7 @@ module NodeDep = struct
   let rec filter_static_inputs inputs args =
    match inputs, args with
    | []   , [] -> []
-   | v::vq, a::aq -> if v.var_dec_const then (dimension_of_expr a) :: filter_static_inputs vq aq else filter_static_inputs vq aq
+   | v::vq, a::aq -> if v.var_dec_const && Types.is_dimension_type v.var_type then (dimension_of_expr a) :: filter_static_inputs vq aq else filter_static_inputs vq aq
    | _ -> assert false
 
   let compute_generic_calls prog =

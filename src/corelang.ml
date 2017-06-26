@@ -11,7 +11,7 @@
 
 open Format
 open LustreSpec
-open Dimension
+(*open Dimension*)
 
 
 exception Error of Location.t * error
@@ -441,9 +441,11 @@ let call_of_expr expr =
  | Expr_appl (f, args, r) -> (f, expr_list_of_expr args, r)
  | _                      -> assert false
 
+    
 (* Conversion from dimension expr to standard expr, for the purpose of printing, typing, etc... *)
 let rec expr_of_dimension dim =
- match dim.dim_desc with
+  let open Dimension in
+  match dim.dim_desc with
  | Dbool b        ->
      mkexpr dim.dim_loc (Expr_const (const_of_bool b))
  | Dint i         ->
@@ -460,6 +462,7 @@ let rec expr_of_dimension dim =
 			assert false)
 
 let dimension_of_const loc const =
+  let open Dimension in
  match const with
  | Const_int i                                    -> mkdim_int loc i
  | Const_tag t when t = tag_true || t = tag_false -> mkdim_bool loc (t = tag_true)
@@ -468,6 +471,7 @@ let dimension_of_const loc const =
 (* Conversion from standard expr to dimension expr, for the purpose of injecting static call arguments 
    into dimension expressions *)
 let rec dimension_of_expr expr =
+  let open Dimension in
   match expr.expr_desc with
   | Expr_const c  -> dimension_of_const expr.expr_loc c
   | Expr_ident id -> mkdim_ident expr.expr_loc id
