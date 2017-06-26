@@ -1,8 +1,8 @@
-define([gitversion], esyscmd([sh -c "git log --oneline | wc -l | tr -d '\n'"]))
-define([gitbranch], esyscmd([sh -c "git branch | grep \* | cut -d ' ' -f2"]))
+#define([gitversion], esyscmd([sh -c "git log --oneline | wc -l | tr -d '\n'"]))
+#define([gitbranch], esyscmd([sh -c "git branch | grep \* | cut -d ' ' -f2"]))
 AC_INIT([lustrec], 1.4, [ploc@garoche.net])
 AC_SUBST(VERSION_CODENAME, "Xia/Xiang")
-AC_SUBST(GITBRANCH, gitbranch)
+#AC_SUBST(GITBRANCH, gitbranch)
 # Next release will be
 #AC_INIT([lustrec], [1.5], [ploc@garoche.net])
 #AC_SUBST(VERSION_CODENAME, "Xia/Shao Kang")
