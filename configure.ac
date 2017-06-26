@@ -6,7 +6,7 @@ AC_SUBST(GITBRANCH, gitbranch)
 # Next release will be
 #AC_INIT([lustrec], [1.5], [ploc@garoche.net])
 #AC_SUBST(VERSION_CODENAME, "Xia/Shao Kang")
-
+AC_MSG_NOTICE(Git branch: ${GITBRANCH})
 AC_CONFIG_SRCDIR([src/main_lustre_compiler.ml])
 AC_CONFIG_SRCDIR([src/main_lustre_testgen.ml])
 
