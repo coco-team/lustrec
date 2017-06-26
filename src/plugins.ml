@@ -5,7 +5,7 @@ open PluginList
 
 let options () = 
   List.flatten (
-    List.map Options.plugin_opt (
+    List.map Options_management.plugin_opt (
       List.map (fun m ->
 	let module M = (val m : PluginType.PluginType) in
 	(M.name, M.activate, M.options)
@@ -24,6 +24,11 @@ let refine_machine_code prog machine_code =
     M.refine_machine_code prog accu
   ) machine_code plugins
 
+
+let c_backend_main_loop_body_prefix basename mname fmt () = 
+  List.iter (fun (m: (module PluginType.PluginType)) -> 
+    let module M = (val m : PluginType.PluginType) in
+    M.c_backend_main_loop_body_prefix basename mname fmt ()) plugins
 
 let c_backend_main_loop_body_suffix fmt () = 
   List.iter (fun (m: (module PluginType.PluginType)) -> 

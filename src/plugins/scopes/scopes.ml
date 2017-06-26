@@ -105,7 +105,7 @@ let scope_path main_node_name prog machines all_scopes sl : scope_t =
       let find_var = (fun v -> v.var_id = varid) in
       let instance = 
 	List.find 
-	  (fun i -> match i with 
+	  (fun i -> match get_instr_desc i with 
 	  | MStep(p, o, _) -> List.exists find_var p 
 	  | _ -> false
 	  ) 
@@ -113,7 +113,7 @@ let scope_path main_node_name prog machines all_scopes sl : scope_t =
       in
       try
 	let variable, instance_node, instance_id = 
-	  match instance with 
+	  match get_instr_desc instance with 
 	  | MStep(p, o, _) -> 
 	    (* Format.eprintf "Looking for machine %s@.@?" o; *)
 	    let o_fun, _ = List.assoc o e_machine.mcalls in
@@ -162,19 +162,21 @@ let inputs = ref []
 
 let option_show_scopes = ref false
 let option_scopes = ref false
-let option_all_scopes = ref true
+let option_all_scopes = ref false
 let option_mem_scopes = ref false
 let option_input_scopes = ref false
 
 let scopes_map : (LustreSpec.ident list  * scope_t) list ref  = ref []
 
 let register_scopes s = 
+  option_scopes := true;
   option_all_scopes:=false; 
   let scope_list = Str.split (Str.regexp ", *") s in
   let scope_list = List.map (fun scope -> Str.split (Str.regexp "\\.") scope) scope_list in
   scopes_def := scope_list
 
 let register_inputs s = 
+  option_scopes := true;
   let input_list = Str.split (Str.regexp "[;]") s in
   let input_list = List.map (fun s -> match Str.split (Str.regexp "=") s with | [v;e] -> v, e | _ -> raise (Invalid_argument ("Input list error: " ^ s))) input_list in
   let input_list = List.map (fun (v, e) -> v, Str.split (Str.regexp "[;]") e) input_list in
@@ -185,12 +187,12 @@ let register_inputs s =
    iterer sur path pour construire la suite des xx_mem._reg.yy_mem._reg......flow
 par ex main_mem->n8->n9->_reg.flow
 *)
-let pp_scopes fmt scopes = 
+let extract_scopes_defs scopes =
   let rec scope_path (path, flow) accu = 
     match path with 
-      | [] -> accu ^ "_reg." ^ flow.var_id, flow.var_type
-      | (_, _, Some instance_id)::tl -> scope_path (tl, flow) ( accu ^ instance_id ^ "->" ) 
-      | _ -> assert false
+    | [] -> accu ^ "_reg." ^ flow.var_id, flow.var_type
+    | (_, _, Some instance_id)::tl -> scope_path (tl, flow) ( accu ^ instance_id ^ "->" ) 
+    | _ -> assert false
   in
   let scopes_vars = 
     List.map 
@@ -198,19 +200,27 @@ let pp_scopes fmt scopes =
 	String.concat "." sl, scope_path scope "main_mem.") 
       scopes 
   in
-  List.iter (fun (id, (var, typ)) -> 
-    match (Types.repr typ).Types.tdesc with
-      | Types.Tint -> Format.fprintf fmt "_put_int(\"%s\", %s);@ " id var
-      | Types.Tbool -> Format.fprintf fmt "_put_bool(\"%s\", %s);@ " id var
-      | Types.Treal when !Options.mpfr ->
-	 Format.fprintf fmt "_put_double(\"%s\", mpfr_get_d(%s, %s));@ " id var (Mpfr.mpfr_rnd ())
-      | Types.Treal -> Format.fprintf fmt "_put_double(\"%s\", %s);@ " id var
-      | _ -> Format.eprintf "Impossible to print the _put_xx for type %a@.@?" Types.print_ty typ; assert false
+  scopes_vars
+
+let pp_scopes_files basename mname fmt scopes =
+  let scopes_vars = extract_scopes_defs scopes in
+  List.iteri (fun idx _ (* (id, (var, typ)) *) ->
+    Format.fprintf fmt "FILE *f_out_scopes_%i;@ " (idx+1); (* we start from 1: in1, in2, ... *)
+    Format.fprintf fmt "f_out_scopes_%i = fopen(\"%s_%s_simu.scope%i\", \"w\");@ " (idx+1) basename mname (idx+1);
+  ) scopes_vars
+
+  
+let pp_scopes fmt scopes = 
+  let scopes_vars = extract_scopes_defs scopes in
+  List.iteri (fun idx (id, (var, typ)) ->
+    Format.fprintf fmt "@ %t;" 
+      (fun fmt -> C_backend_common.print_put_var fmt ("_scopes_" ^ string_of_int (idx+1)) var typ var)
   ) scopes_vars
 
 let update_machine machine =
   let stateassign vdecl =
-    MStateAssign (vdecl, mk_val (LocalVar vdecl) vdecl.var_type)
+    mkinstr 
+    (MStateAssign (vdecl, mk_val (LocalVar vdecl) vdecl.var_type))
   in
   let local_decls = machine.mstep.step_inputs
     (* @ machine.mstep.step_outputs   *)
@@ -221,7 +231,7 @@ let update_machine machine =
     mstep = { 
       machine.mstep with 
         step_instrs = machine.mstep.step_instrs
-        @ (MComment "Registering all flows")::(List.map stateassign local_decls)
+        @ (mkinstr (MComment "Registering all flows"))::(List.map stateassign local_decls)
           
     }
   }
@@ -235,7 +245,7 @@ module Plugin : (
 struct
   let name = "scopes"
   let is_active () = 
-    !option_scopes
+    !option_scopes || !option_show_scopes || !option_all_scopes || !option_mem_scopes || !option_input_scopes
       
   let show_scopes () = 
     !option_show_scopes && (
@@ -315,9 +325,9 @@ struct
     let machines = List.map update_machine machines in
      machines
 
-  let pp fmt = pp_scopes fmt !scopes_map
+  (* let pp fmt = pp_scopes fmt !scopes_map *)
 
-  let check_force_stateful () = !option_scopes
+  let check_force_stateful () = is_active()
 
   let refine_machine_code prog machine_code =
     if show_scopes () then
@@ -339,9 +349,16 @@ struct
   let c_backend_main_loop_body_suffix fmt () =
     if is_active () then
       begin
-	Format.fprintf fmt "@ %t" pp 
-      end;    
- 
+	Format.fprintf fmt "@ %a" pp_scopes !scopes_map 
+      end  
+
+  let c_backend_main_loop_body_prefix basename mname fmt () =
+    if is_active () then
+      begin
+	Format.fprintf fmt "@ %a" (pp_scopes_files basename mname) !scopes_map 
+      end  
+
+
 end
     
 (* Local Variables: *)

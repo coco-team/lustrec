@@ -236,6 +236,12 @@ and value_t_desc =
   | Power of value_t * value_t
 
 type instr_t =
+  {
+    instr_desc: instr_t_desc; (* main data: the content *)
+    (* lustre_expr: expr option; (* possible representation as a lustre expression *) *)
+    lustre_eq: eq option;     (* possible representation as a lustre flow equation *)
+  }
+and instr_t_desc =
   | MLocalAssign of var_decl * value_t
   | MStateAssign of var_decl * value_t
   | MReset of ident

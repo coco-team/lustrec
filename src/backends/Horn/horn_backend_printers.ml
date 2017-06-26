@@ -288,7 +288,7 @@ let pp_instance_call machines reset_instances m fmt i inputs outputs =
     
 (* Print the instruction and update the set of reset instances *)
 let rec pp_machine_instr machines reset_instances (m: machine_t) fmt instr : ident list =
-  match instr with
+  match get_instr_desc instr with
   | MComment _ -> reset_instances
   | MNoReset i -> (* we assign middle_mem with mem_m. And declare i as reset *)
     pp_no_reset machines m fmt i;

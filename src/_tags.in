@@ -1,5 +1,7 @@
+"backends": include
 "backends/C": include
 "backends/Horn": include
+"backends/EMF": include
 "plugins/salsa": include
 "plugins/scopes": include
 "plugins/mpfr": include

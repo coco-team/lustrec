@@ -26,21 +26,23 @@ let pp_elim fmt elim =
 
 let rec eliminate elim instr =
   let e_expr = eliminate_expr elim in
-  match instr with
+  match get_instr_desc instr with
   | MComment _         -> instr
-  | MLocalAssign (i,v) -> MLocalAssign (i, e_expr v)
-  | MStateAssign (i,v) -> MStateAssign (i, e_expr v)
+  | MLocalAssign (i,v) -> update_instr_desc instr (MLocalAssign (i, e_expr v))
+  | MStateAssign (i,v) -> update_instr_desc instr (MStateAssign (i, e_expr v))
   | MReset i           -> instr
   | MNoReset i         -> instr
-  | MStep (il, i, vl)  -> MStep(il, i, List.map e_expr vl)
+  | MStep (il, i, vl)  -> update_instr_desc instr (MStep(il, i, List.map e_expr vl))
   | MBranch (g,hl)     -> 
-    MBranch
-      (e_expr g, 
-       (List.map 
-	  (fun (l, il) -> l, List.map (eliminate elim) il) 
-	  hl
-       )
-      )
+     update_instr_desc instr (
+       MBranch
+	 (e_expr g, 
+	  (List.map 
+	     (fun (l, il) -> l, List.map (eliminate elim) il) 
+	     hl
+	  )
+	 )
+     )
     
 and eliminate_expr elim expr =
   match expr.value_desc with
@@ -106,14 +108,16 @@ let simplify_expr_offset m expr =
   in simplify [] expr
 
 let rec simplify_instr_offset m instr =
-  match instr with
-  | MLocalAssign (v, expr) -> MLocalAssign (v, simplify_expr_offset m expr)
-  | MStateAssign (v, expr) -> MStateAssign (v, simplify_expr_offset m expr)
+  match get_instr_desc instr with
+  | MLocalAssign (v, expr) -> update_instr_desc instr (MLocalAssign (v, simplify_expr_offset m expr))
+  | MStateAssign (v, expr) -> update_instr_desc instr (MStateAssign (v, simplify_expr_offset m expr))
   | MReset id              -> instr
   | MNoReset id            -> instr
-  | MStep (outputs, id, inputs) -> MStep (outputs, id, List.map (simplify_expr_offset m) inputs)
+  | MStep (outputs, id, inputs) -> update_instr_desc instr (MStep (outputs, id, List.map (simplify_expr_offset m) inputs))
   | MBranch (cond, brl)
-    -> MBranch(simplify_expr_offset m cond, List.map (fun (l, il) -> l, simplify_instrs_offset m il) brl)
+    -> update_instr_desc instr (
+      MBranch(simplify_expr_offset m cond, List.map (fun (l, il) -> l, simplify_instrs_offset m il) brl)
+    )
   | MComment _             -> instr
 
 and simplify_instrs_offset m instrs =
@@ -197,10 +201,10 @@ let rec instrs_unfold fanin elim instrs =
 
 and instr_unfold fanin instrs elim instr =
 (*  Format.eprintf "SHOULD WE STORE THE EXPRESSION IN INSTR %a TO ELIMINATE IT@." pp_instr instr;*)
-  match instr with
+  match get_instr_desc instr with
   (* Simple cases*)
   | MStep([v], id, vl) when Basic_library.is_value_internal_fun (mk_val (Fun (id, vl)) v.var_type)
-    -> instr_unfold fanin instrs elim (MLocalAssign (v, mk_val (Fun (id, vl)) v.var_type))
+    -> instr_unfold fanin instrs elim (update_instr_desc instr (MLocalAssign (v, mk_val (Fun (id, vl)) v.var_type)))
   | MLocalAssign(v, expr) when unfoldable_assign fanin v expr
     -> (IMap.add v.var_id expr elim, instrs)
   | MBranch(g, hl) when false
@@ -209,7 +213,7 @@ and instr_unfold fanin instrs elim instr =
 	 List.fold_right
 	   (fun (h, (e, l)) (elim, branches) -> (merge_elim elim e, (h, l)::branches))
 	   elim_branches (elim, [])
-       in elim, (MBranch (g, branches) :: instrs)
+       in elim, ((update_instr_desc instr (MBranch (g, branches))) :: instrs)
   | _
     -> (elim, instr :: instrs)
     (* default case, we keep the instruction and do not modify elim *)
@@ -259,7 +263,7 @@ let instr_of_const top_const =
   let const = const_of_top top_const in
   let vdecl = mkvar_decl Location.dummy_loc (const.const_id, mktyp Location.dummy_loc Tydec_any, mkclock Location.dummy_loc Ckdec_any, true, None) in
   let vdecl = { vdecl with var_type = const.const_type }
-  in MLocalAssign (vdecl, mk_val (Cst const.const_value) vdecl.var_type)
+  in mkinstr (MLocalAssign (vdecl, mk_val (Cst const.const_value) vdecl.var_type))
 
 let machines_unfold consts node_schs machines =
   List.fold_right (fun m (machines, removed) ->
@@ -272,19 +276,19 @@ let machines_unfold consts node_schs machines =
     ([], IMap.empty)
 
 let get_assign_lhs instr =
-  match instr with
+  match get_instr_desc instr with
   | MLocalAssign(v, e) -> mk_val (LocalVar v) e.value_type
   | MStateAssign(v, e) -> mk_val (StateVar v) e.value_type
   | _                  -> assert false
 
 let get_assign_rhs instr =
-  match instr with
+  match get_instr_desc instr with
   | MLocalAssign(_, e)
   | MStateAssign(_, e) -> e
   | _                  -> assert false
 
 let is_assign instr =
-  match instr with
+  match get_instr_desc instr with
   | MLocalAssign _
   | MStateAssign _ -> true
   | _              -> false
@@ -296,7 +300,7 @@ let mk_assign v e =
  | _          -> assert false
 
 let rec assigns_instr instr assign =
-  match instr with  
+  match get_instr_desc instr with  
   | MLocalAssign (i,_)
   | MStateAssign (i,_) -> ISet.add i assign
   | MStep (ol, _, _)   -> List.fold_right ISet.add ol assign
@@ -359,7 +363,7 @@ try
        let lhs = get_assign_lhs instr' in
       (match lhs.value_desc with
       | LocalVar v' ->
-        let instr = eliminate subst (mk_assign v lhs) in
+        let instr = eliminate subst (update_instr_desc instr (mk_assign v lhs)) in
 	subst, instr :: instrs
       | StateVar stv' ->
 	let subst_v' = IMap.add stv'.var_id v IMap.empty in
@@ -377,10 +381,10 @@ try
    - [instr] : current instruction, normalized by [subst]
 *)
 let rec instr_cse (subst, instrs) instr =
-  match instr with
+  match get_instr_desc instr with
   (* Simple cases*)
   | MStep([v], id, vl) when Basic_library.is_internal_fun id (List.map (fun v -> v.value_type) vl)
-      -> instr_cse (subst, instrs) (MLocalAssign (v, mk_val (Fun (id, vl)) v.var_type))
+      -> instr_cse (subst, instrs) (update_instr_desc instr (MLocalAssign (v, mk_val (Fun (id, vl)) v.var_type)))
   | MLocalAssign(v, expr) when is_unfoldable_expr 2 expr
       -> (IMap.add v.var_id expr subst, instr :: instrs)
   | _ when is_assign instr
@@ -421,7 +425,7 @@ let machines_cse machines =
 
 (* checks whether an [instr] is skip and can be removed from program *)
 let rec instr_is_skip instr =
-  match instr with
+  match get_instr_desc instr with
   | MLocalAssign (i, { value_desc = (LocalVar v) ; _}) when i = v -> true
   | MStateAssign (i, { value_desc = StateVar v; _}) when i = v -> true
   | MBranch (g, hl) -> List.for_all (fun (_, il) -> instrs_are_skip il) hl
@@ -433,10 +437,10 @@ let instr_cons instr cont =
  if instr_is_skip instr then cont else instr::cont
 
 let rec instr_remove_skip instr cont =
-  match instr with
+  match get_instr_desc instr with
   | MLocalAssign (i, { value_desc = LocalVar v; _ }) when i = v -> cont
   | MStateAssign (i, { value_desc = StateVar v; _ }) when i = v -> cont
-  | MBranch (g, hl) -> MBranch (g, List.map (fun (h, il) -> (h, instrs_remove_skip il [])) hl) :: cont
+  | MBranch (g, hl) -> update_instr_desc instr (MBranch (g, List.map (fun (h, il) -> (h, instrs_remove_skip il [])) hl)) :: cont
   | _               -> instr::cont
 
 and instrs_remove_skip instrs cont =
@@ -453,14 +457,14 @@ let rec value_replace_var fvar value =
   | Power (v, n) -> { value with value_desc = Power(value_replace_var fvar v, n)}
 
 let rec instr_replace_var fvar instr cont =
-  match instr with
+  match get_instr_desc instr with
   | MComment _          -> instr_cons instr cont
-  | MLocalAssign (i, v) -> instr_cons (MLocalAssign (fvar i, value_replace_var fvar v)) cont
-  | MStateAssign (i, v) -> instr_cons (MStateAssign (i, value_replace_var fvar v)) cont
+  | MLocalAssign (i, v) -> instr_cons (update_instr_desc instr (MLocalAssign (fvar i, value_replace_var fvar v))) cont
+  | MStateAssign (i, v) -> instr_cons (update_instr_desc instr (MStateAssign (i, value_replace_var fvar v))) cont
   | MReset i            -> instr_cons instr cont
   | MNoReset i          -> instr_cons instr cont
-  | MStep (il, i, vl)   -> instr_cons (MStep (List.map fvar il, i, List.map (value_replace_var fvar) vl)) cont
-  | MBranch (g, hl)     -> instr_cons (MBranch (value_replace_var fvar g, List.map (fun (h, il) -> (h, instrs_replace_var fvar il [])) hl)) cont
+  | MStep (il, i, vl)   -> instr_cons (update_instr_desc instr (MStep (List.map fvar il, i, List.map (value_replace_var fvar) vl))) cont
+  | MBranch (g, hl)     -> instr_cons (update_instr_desc instr (MBranch (value_replace_var fvar g, List.map (fun (h, il) -> (h, instrs_replace_var fvar il [])) hl))) cont
 
 and instrs_replace_var fvar instrs cont =
   List.fold_right (instr_replace_var fvar) instrs cont
@@ -504,7 +508,7 @@ let machines_reuse_variables prog reuse_tables =
     ) prog
 
 let rec instr_assign res instr =
-  match instr with
+  match get_instr_desc instr with
   | MLocalAssign (i, _) -> Disjunction.CISet.add i res
   | MStateAssign (i, _) -> Disjunction.CISet.add i res
   | MBranch (g, hl)     -> List.fold_left (fun res (h, b) -> instrs_assign res b) res hl
@@ -515,7 +519,7 @@ and instrs_assign res instrs =
   List.fold_left instr_assign res instrs
 
 let rec instr_constant_assign var instr =
-  match instr with
+  match get_instr_desc instr with
   | MLocalAssign (i, { value_desc = Cst (Const_tag _); _ })
   | MStateAssign (i, { value_desc = Cst (Const_tag _); _ }) -> i = var
   | MBranch (g, hl)                     -> List.for_all (fun (h, b) -> instrs_constant_assign var b) hl
@@ -525,10 +529,10 @@ and instrs_constant_assign var instrs =
   List.fold_left (fun res i -> if Disjunction.CISet.mem var (instr_assign Disjunction.CISet.empty i) then instr_constant_assign var i else res) false instrs
 
 let rec instr_reduce branches instr1 cont =
-  match instr1 with
+  match get_instr_desc instr1 with
   | MLocalAssign (_, { value_desc = Cst (Const_tag c); _}) -> instr1 :: (List.assoc c branches @ cont)
   | MStateAssign (_, { value_desc = Cst (Const_tag c); _}) -> instr1 :: (List.assoc c branches @ cont)
-  | MBranch (g, hl)                     -> MBranch (g, List.map (fun (h, b) -> (h, instrs_reduce branches b [])) hl) :: cont
+  | MBranch (g, hl)                     -> (update_instr_desc instr1 (MBranch (g, List.map (fun (h, b) -> (h, instrs_reduce branches b [])) hl))) :: cont
   | _                                   -> instr1 :: cont
 
 and instrs_reduce branches instrs cont =
@@ -538,17 +542,18 @@ and instrs_reduce branches instrs cont =
  | i1::i2::q -> i1 :: instrs_reduce branches (i2::q) cont
 
 let rec instrs_fusion instrs =
-  match instrs with
-  | []
-  | [_]                                                               ->
+  match instrs, List.map get_instr_desc instrs with
+  | [], []
+  | [_], [_]                                                               ->
     instrs
-  | i1::(MBranch ({ value_desc = LocalVar v; _}, hl))::q when instr_constant_assign v i1 ->
+  | i1::i2::q, i1_desc::(MBranch ({ value_desc = LocalVar v; _}, hl))::q_desc when instr_constant_assign v i1 ->
     instr_reduce (List.map (fun (h, b) -> h, instrs_fusion b) hl) i1 (instrs_fusion q)
-  | i1::(MBranch ({ value_desc = StateVar v; _}, hl))::q when instr_constant_assign v i1 ->
+  | i1::i2::q, i1_desc::(MBranch ({ value_desc = StateVar v; _}, hl))::q_desc when instr_constant_assign v i1 ->
     instr_reduce (List.map (fun (h, b) -> h, instrs_fusion b) hl) i1 (instrs_fusion q) 
-  | i1::i2::q                                                         ->
+  | i1::i2::q, _                                                         ->
     i1 :: instrs_fusion (i2::q)
-
+  | _ -> assert false (* Other cases should not happen since both lists are of same size *)
+     
 let step_fusion step =
   { step with
     step_instrs = instrs_fusion step.step_instrs;

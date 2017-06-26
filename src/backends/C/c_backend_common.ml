@@ -647,6 +647,17 @@ let pp_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list
     aux [] fmt (List.hd inputs).value_type
   end
 
+
+(*** Common functions for main ***)
+
+let print_put_var fmt file_suffix name var_type var_id =
+  match (Types.unclock_type var_type).Types.tdesc with
+  | Types.Tint -> fprintf fmt "_put_int(f_out%s, \"%s\", %s)" file_suffix name var_id
+  | Types.Tbool -> fprintf fmt "_put_bool(f_out%s, \"%s\", %s)" file_suffix name var_id
+  | Types.Treal when !Options.mpfr -> fprintf fmt "_put_double(f_out%s, \"%s\", mpfr_get_d(%s, %s), %i)" file_suffix name var_id (Mpfr.mpfr_rnd ()) !Options.print_prec_double
+  | Types.Treal -> fprintf fmt "_put_double(f_out%s, \"%s\", %s, %i)" file_suffix name var_id !Options.print_prec_double
+  | _ -> Format.eprintf "Impossible to print the _put_xx for type %a@.@?" Types.print_ty var_type; assert false
+
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)
 (* End: *)

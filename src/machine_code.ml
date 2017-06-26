@@ -43,22 +43,33 @@ let rec pp_val fmt v =
     | Fun (n, vl)   -> Format.fprintf fmt "%s (%a)" n (Utils.fprintf_list ~sep:", " pp_val)  vl
 
 let rec pp_instr fmt i =
-  match i with
+  let _ =
+    match i.instr_desc with
     | MLocalAssign (i,v) -> Format.fprintf fmt "%s<-l- %a" i.var_id pp_val v
     | MStateAssign (i,v) -> Format.fprintf fmt "%s<-s- %a" i.var_id pp_val v
     | MReset i           -> Format.fprintf fmt "reset %s" i
     | MNoReset i         -> Format.fprintf fmt "noreset %s" i
     | MStep (il, i, vl)  ->
-      Format.fprintf fmt "%a = %s (%a)"
-	(Utils.fprintf_list ~sep:", " (fun fmt v -> Format.pp_print_string fmt v.var_id)) il
-	i
-	(Utils.fprintf_list ~sep:", " pp_val) vl
+       Format.fprintf fmt "%a = %s (%a)"
+	 (Utils.fprintf_list ~sep:", " (fun fmt v -> Format.pp_print_string fmt v.var_id)) il
+	 i
+	 (Utils.fprintf_list ~sep:", " pp_val) vl
     | MBranch (g,hl)     ->
-      Format.fprintf fmt "@[<v 2>case(%a) {@,%a@,}@]"
-	pp_val g
-	(Utils.fprintf_list ~sep:"@," pp_branch) hl
+       Format.fprintf fmt "@[<v 2>case(%a) {@,%a@,}@]"
+	 pp_val g
+	 (Utils.fprintf_list ~sep:"@," pp_branch) hl
     | MComment s -> Format.pp_print_string fmt s
-
+       
+  in
+  (* Annotation *)
+  (* let _ = *)
+  (*   match i.lustre_expr with None -> () | Some e -> Format.fprintf fmt " -- original expr: %a" Printers.pp_expr e *)
+  (* in *)
+  let _ = 
+    match i.lustre_eq with None -> () | Some eq -> Format.fprintf fmt " -- original eq: %a" Printers.pp_node_eq eq
+  in
+  ()
+    
 and pp_branch fmt (t, h) =
   Format.fprintf fmt "@[<v 2>%s:@,%a@]" t (Utils.fprintf_list ~sep:"@," pp_instr) h
 
@@ -89,6 +100,14 @@ type machine_t = {
   mannot: expr_annot list;
 }
 
+(* merge log: get_node_def was in c0f8 *)
+let get_node_def id m =
+  try
+    let (decl, _) = List.assoc id m.minstances in
+    Corelang.node_of_top decl
+  with Not_found -> raise Not_found
+    
+(* merge log: machine_vars was in 44686 *)
 let machine_vars m = m.mstep.step_inputs @ m.mstep.step_locals @ m.mstep.step_outputs @ m.mmemory
 
 let pp_step fmt s =
@@ -141,8 +160,8 @@ let is_output m id =
 let is_memory m id =
   List.exists (fun o -> o.var_id = id.var_id) m.mmemory
 
-let conditional c t e =
-  MBranch(c, [ (tag_true, t); (tag_false, e) ])
+let conditional ?lustre_eq c t e =
+  mkinstr ?lustre_eq:lustre_eq  (MBranch(c, [ (tag_true, t); (tag_false, e) ]))
 
 let dummy_var_decl name typ =
   {
@@ -181,7 +200,7 @@ let arrow_desc =
 let arrow_top_decl =
   {
     top_decl_desc = Node arrow_desc;
-    top_decl_owner = (Options.core_dependency "arrow");
+    top_decl_owner = (Options_management.core_dependency "arrow");
     top_decl_itf = false;
     top_decl_loc = Location.dummy_loc
   }
@@ -203,7 +222,7 @@ let arrow_machine =
     mmemory = [var_state];
     mcalls = [];
     minstances = [];
-    minit = [MStateAssign(var_state, cst true)];
+    minit = [mkinstr (MStateAssign(var_state, cst true))];
     mstatic = [];
     mconst = [];
     mstep = {
@@ -212,9 +231,11 @@ let arrow_machine =
       step_locals = [];
       step_checks = [];
       step_instrs = [conditional (mk_val (StateVar var_state) Type_predef.type_bool)
-			         [MStateAssign(var_state, cst false);
-                                  MLocalAssign(var_output, mk_val (LocalVar var_input1) t_arg)]
-                                 [MLocalAssign(var_output, mk_val (LocalVar var_input2) t_arg)] ];
+			(List.map mkinstr
+			[MStateAssign(var_state, cst false);
+			 MLocalAssign(var_output, mk_val (LocalVar var_input1) t_arg)])
+                        (List.map mkinstr
+			[MLocalAssign(var_output, mk_val (LocalVar var_input2) t_arg)]) ];
       step_asserts = [];
     };
     mspec = None;
@@ -283,11 +304,18 @@ let new_instance =
 (*                       d : local variables             *)
 (*                       s : step instructions           *)
 let translate_ident node (m, si, j, d, s) id =
+  (* Format.eprintf "trnaslating ident: %s@." id; *)
   try (* id is a node var *)
     let var_id = get_node_var id node in
     if ISet.exists (fun v -> v.var_id = id) m
-    then mk_val (StateVar var_id) var_id.var_type
-    else mk_val (LocalVar var_id) var_id.var_type
+    then (
+      (* Format.eprintf "a STATE VAR@."; *)
+      mk_val (StateVar var_id) var_id.var_type
+    )
+    else (
+      (* Format.eprintf "a LOCAL VAR@."; *)
+      mk_val (LocalVar var_id) var_id.var_type
+    )
   with Not_found ->
     try (* id is a constant *)
       let vdecl = (Corelang.var_decl_of_const (const_of_top (Hashtbl.find Corelang.consts_table id))) in
@@ -306,8 +334,12 @@ let rec control_on_clock node ((m, si, j, d, s) as args) ck inst =
  match (Clocks.repr ck).cdesc with
  | Con    (ck1, cr, l) ->
    let id  = Clocks.const_of_carrier cr in
-   control_on_clock node args ck1 (MBranch (translate_ident node args id,
-					    [l, [inst]] ))
+   control_on_clock node args ck1 (mkinstr
+				     (* TODO il faudrait prendre le lustre
+					associé à instr et rajouter print_ck_suffix
+					ck) de clocks.ml *)
+				     (MBranch (translate_ident node args id,
+					       [l, [inst]] )))
  | _                   -> inst
 
 let rec join_branches hl1 hl2 =
@@ -320,12 +352,14 @@ let rec join_branches hl1 hl2 =
    else (t1, List.fold_right join_guards h1 h2) :: join_branches q1 q2
 
 and join_guards inst1 insts2 =
- match inst1, insts2 with
+ match get_instr_desc inst1, List.map get_instr_desc insts2 with
  | _                   , []                               ->
    [inst1]
  | MBranch (x1, hl1), MBranch (x2, hl2) :: q when x1 = x2 ->
-   MBranch (x1, join_branches (sort_handlers hl1) (sort_handlers hl2))
-   :: q
+    mkinstr
+      (* TODO on pourrait uniquement concatener les lustres de inst1 et hd(inst2) *)
+      (MBranch (x1, join_branches (sort_handlers hl1) (sort_handlers hl2)))
+   :: (List.tl insts2)
  | _ -> inst1 :: insts2
 
 let join_guards_list insts =
@@ -393,20 +427,21 @@ let translate_guard node args expr =
   | _ -> (Format.eprintf "internal error: translate_guard %s %a@." node.node_id Printers.pp_expr expr;assert false)
 
 let rec translate_act node ((m, si, j, d, s) as args) (y, expr) =
+  let eq = Corelang.mkeq Location.dummy_loc ([y.var_id], expr) in
   match expr.expr_desc with
   | Expr_ite   (c, t, e) -> let g = translate_guard node args c in
-			    conditional g
+			    conditional ?lustre_eq:(Some eq) g
                               [translate_act node args (y, t)]
                               [translate_act node args (y, e)]
-  | Expr_merge (x, hl)   -> MBranch (translate_ident node args x,
-                                     List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl)
-  | _                    -> MLocalAssign (y, translate_expr node args expr)
+  | Expr_merge (x, hl)   -> mkinstr ?lustre_eq:(Some eq) (MBranch (translate_ident node args x,
+                                     List.map (fun (t,  h) -> t, [translate_act node args (y, h)]) hl))
+  | _                    -> mkinstr ?lustre_eq:(Some eq)  (MLocalAssign (y, translate_expr node args expr))
 
 let reset_instance node args i r c =
   match r with
   | None        -> []
   | Some r      -> let g = translate_guard node args r in
-                   [control_on_clock node args c (conditional g [MReset i] [MNoReset i])]
+                   [control_on_clock node args c (conditional g [mkinstr (MReset i)] [mkinstr (MNoReset i)])]
 
 let translate_eq node ((m, si, j, d, s) as args) eq =
   (* Format.eprintf "translate_eq %a with clock %a@." Printers.pp_node_eq eq Clocks.print_ck eq.eq_rhs.expr_clock;  *)
@@ -417,24 +452,24 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
      let c1 = translate_expr node args e1 in
      let c2 = translate_expr node args e2 in
      (m,
-      MReset o :: si,
+      mkinstr (MReset o) :: si,
       Utils.IMap.add o (arrow_top_decl, []) j,
       d,
-      (control_on_clock node args eq.eq_rhs.expr_clock (MStep ([var_x], o, [c1;c2]))) :: s)
+      (control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some eq) (MStep ([var_x], o, [c1;c2])))) :: s)
   | [x], Expr_pre e1 when ISet.mem (get_node_var x node) d     ->
      let var_x = get_node_var x node in
      (ISet.add var_x m,
       si,
       j,
       d,
-      control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e1)) :: s)
+      control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some eq) (MStateAssign (var_x, translate_expr node args e1))) :: s)
   | [x], Expr_fby (e1, e2) when ISet.mem (get_node_var x node) d ->
      let var_x = get_node_var x node in
      (ISet.add var_x m,
-      MStateAssign (var_x, translate_expr node args e1) :: si,
+      mkinstr ?lustre_eq:(Some eq) (MStateAssign (var_x, translate_expr node args e1)) :: si,
       j,
       d,
-      control_on_clock node args eq.eq_rhs.expr_clock (MStateAssign (var_x, translate_expr node args e2)) :: s)
+      control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some eq) (MStateAssign (var_x, translate_expr node args e2))) :: s)
 
   | p  , Expr_appl (f, arg, r) when not (Basic_library.is_expr_internal_fun eq.eq_rhs) ->
      let var_p = List.map (fun v -> get_node_var v node) p in
@@ -451,13 +486,13 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
        Clock_calculus.unify_imported_clock (Some call_ck) eq.eq_rhs.expr_clock eq.eq_rhs.expr_loc;
        Format.eprintf "call %a: %a: %a@," Printers.pp_expr eq.eq_rhs Clocks.print_ck (Clock_predef.ck_tuple env_cks) Clocks.print_ck call_ck;*)
      (m,
-      (if Stateless.check_node node_f then si else MReset o :: si),
+      (if Stateless.check_node node_f then si else mkinstr (MReset o) :: si),
       Utils.IMap.add o call_f j,
       d,
       (if Stateless.check_node node_f
        then []
        else reset_instance node args o r call_ck) @
-	(control_on_clock node args call_ck (MStep (var_p, o, vl))) :: s)
+	(control_on_clock node args call_ck (mkinstr ?lustre_eq:(Some eq) (MStep (var_p, o, vl)))) :: s)
   (*
     (* special treatment depending on the active backend. For horn backend, x = ite (g,t,e)
     are preserved. While they are replaced as if g then x = t else x = e in  C or Java
@@ -595,7 +630,7 @@ let translate_decl nd sch =
   assert (ISet.is_empty m0);
   assert (init0 = []);
   assert (Utils.IMap.is_empty j0);
-  let m, init, j, locals, s = translate_eqs nd (m0, init0, j0, locals0, []) (assert_instrs@sorted_eqs) in
+  let m, init, j, locals, s as context_with_asserts = translate_eqs nd (m0, init0, j0, locals0, []) (assert_instrs@sorted_eqs) in
   let mmap = Utils.IMap.fold (fun i n res -> (i, n)::res) j [] in
   {
     mname = nd;
@@ -616,9 +651,13 @@ let translate_decl nd sch =
 	   backends. *)
 	(*match !Options.output with
 	| "horn" -> s
-	| "C" | "java" | _ ->*) join_guards_list s
+	  | "C" | "java" | _ ->*)
+	if !Backends.join_guards then
+	  join_guards_list s
+	else
+	  s
       );
-      step_asserts = List.map (translate_expr nd init_args) nd_node_asserts;
+      step_asserts = List.map (translate_expr nd context_with_asserts) nd_node_asserts;
     };
     mspec = nd.node_spec;
     mannot = nd.node_annot;
@@ -644,7 +683,12 @@ let get_machine_opt name machines =
 
 let get_const_assign m id =
   try
-    match (List.find (fun instr -> match instr with MLocalAssign (v, _) -> v == id | _ -> false) m.mconst) with
+    match get_instr_desc (List.find
+	     (fun instr -> match get_instr_desc instr with
+	     | MLocalAssign (v, _) -> v == id
+	     | _ -> false)
+	     m.mconst
+    ) with
     | MLocalAssign (_, e) -> e
     | _                   -> assert false
   with Not_found -> assert false

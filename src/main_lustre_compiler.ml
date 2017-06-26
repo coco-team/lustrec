@@ -49,7 +49,7 @@ let compile_header dirname  basename extension =
     Log.report ~level:1
       (fun fmt -> fprintf fmt ".. generating compiled header file %sc@," (destname ^ extension));
     Lusic.write_lusic true header destname lusic_ext;
-    Lusic.print_lusic_to_h destname lusic_ext;
+    generate_lusic_header destname lusic_ext;
     Log.report ~level:1 (fun fmt -> fprintf fmt ".. done !@ @]@ ")
   end
 
@@ -89,6 +89,11 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
 
 
 
+let dynamic_checks () =
+  match !Options.output, !Options.spec with
+  | "C", "C" -> true
+  | _ -> false
+     
 (* From prog to prog *)
 let stage1 prog dirname basename =
   (* Removing automata *)
@@ -196,6 +201,14 @@ let stage1 prog dirname basename =
     Corelang.Node nd -> Format.eprintf "%s calls %a" id
     Causality.NodeDep.pp_generic_calls nd | _ -> ()) Corelang.node_table;*)
 
+  (* If some backend involving dynamic checks are active, then node annotations become runtime checks *)
+  let prog =
+    if dynamic_checks () then
+      Spec.enforce_spec_prog prog
+    else
+      prog
+  in
+  
   (* Normalization phase *)
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. normalization@,");
   (* Special treatment of arrows in lustre backend. We want to keep them *)
@@ -370,6 +383,15 @@ let stage3 prog machine_code dependencies basename =
        (*	Lustre_backend.translate fmt basename normalized_prog machine_code *)
        ()
      end
+  | "emf" ->
+     begin
+       let destname = !Options.dest_dir ^ "/" ^ basename in
+       let source_file = destname ^ ".emf" in (* Could be changed *)
+       let source_out = open_out source_file in
+       let fmt = formatter_of_out_channel source_out in
+       EMF_backend.translate fmt basename prog machine_code;
+       ()
+     end
 
   | _ -> assert false
 
@@ -464,7 +486,7 @@ let _ =
   try
     Printexc.record_backtrace true;
 
-    let options = Options.lustrec_options @ (Plugins.options ()) in
+    let options = Options_management.lustrec_options @ (Plugins.options ()) in
     
     Arg.parse options anonymous usage
   with

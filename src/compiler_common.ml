@@ -188,6 +188,13 @@ let get_envs_from_top_decls header =
    (Env.initial, Env.initial)
  *)
 
+let generate_lusic_header destname lusic_ext =	
+  match !Options.output with
+  | "C" -> C_backend_lusic.print_lusic_to_h destname lusic_ext
+  | _ -> ()
+	 
+
+    
 let check_compatibility (prog, computed_types_env, computed_clocks_env) (header, declared_types_env, declared_clocks_env) =
   try
     (* checking defined types are compatible with declared types*)
@@ -232,7 +239,7 @@ let import_dependencies prog =
   List.fold_left
     (fun (compilation_dep, type_env, clock_env) dep ->
       let (local, s) = Corelang.dependency_of_top dep in
-      let basename = Options.name_dependency (local, s) in
+      let basename = Options_management.name_dependency (local, s) in
       Log.report ~level:1 (fun fmt -> Format.fprintf fmt "  Library %s@ " basename);
       let lusic = Modules.import_dependency dep.top_decl_loc (local, s) in
       (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "");*)

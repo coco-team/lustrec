@@ -327,7 +327,7 @@ let rec pp_conditional dependencies (m: machine_t) self fmt c tl el =
     (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) el
 
 and pp_machine_instr dependencies (m: machine_t) self fmt instr =
-  match instr with 
+  match get_instr_desc instr with 
   | MNoReset _ -> ()
   | MReset i ->
     pp_machine_reset m self fmt i
@@ -341,7 +341,7 @@ and pp_machine_instr dependencies (m: machine_t) self fmt instr =
       i.var_type (mk_val (StateVar i) i.var_type) v
   | MStep ([i0], i, vl) when Basic_library.is_value_internal_fun (mk_val (Fun (i, vl)) i0.var_type)  ->
     pp_machine_instr dependencies m self fmt 
-      (MLocalAssign (i0, mk_val (Fun (i, vl)) i0.var_type))
+      (update_instr_desc instr (MLocalAssign (i0, mk_val (Fun (i, vl)) i0.var_type)))
   | MStep ([i0], i, vl) when has_c_prototype i dependencies -> 
     fprintf fmt "%a = %s(%a);" 
       (pp_c_val self (pp_c_var_read m)) (mk_val (LocalVar i0) i0.var_type)
@@ -437,7 +437,7 @@ let print_dealloc_code fmt m =
     (Utils.fprintf_list ~sep:"" print_dealloc_instance) m.minstances
 
 let print_stateless_init_code dependencies fmt m self =
-  let minit = List.map (function MReset i -> i | _ -> assert false) m.minit in
+  let minit = List.map (fun i -> match get_instr_desc i with MReset i -> i | _ -> assert false) m.minit in
   let array_mems = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
   fprintf fmt "@[<v 2>%a {@,%a%t%a%t%a%treturn;@]@,}@.@."
     (print_init_prototype self) (m.mname.node_id, m.mstatic)
@@ -452,7 +452,7 @@ let print_stateless_init_code dependencies fmt m self =
     (Utils.pp_newline_if_non_empty m.minit)
 
 let print_stateless_clear_code dependencies fmt m self =
-  let minit = List.map (function MReset i -> i | _ -> assert false) m.minit in
+  let minit = List.map (fun i -> match get_instr_desc i with MReset i -> i | _ -> assert false) m.minit in
   let array_mems = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
   fprintf fmt "@[<v 2>%a {@,%a%t%a%t%a%treturn;@]@,}@.@."
     (print_clear_prototype self) (m.mname.node_id, m.mstatic)
@@ -522,7 +522,7 @@ let print_reset_code dependencies fmt m self =
     (Utils.pp_newline_if_non_empty m.minit)
 
 let print_init_code dependencies fmt m self =
-  let minit = List.map (function MReset i -> i | _ -> assert false) m.minit in
+  let minit = List.map (fun i -> match get_instr_desc i with MReset i -> i | _ -> assert false) m.minit in
   let array_mems = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
   fprintf fmt "@[<v 2>%a {@,%a%t%a%t%a%treturn;@]@,}@.@."
     (print_init_prototype self) (m.mname.node_id, m.mstatic)
@@ -537,7 +537,7 @@ let print_init_code dependencies fmt m self =
     (Utils.pp_newline_if_non_empty m.minit)
 
 let print_clear_code dependencies fmt m self =
-  let minit = List.map (function MReset i -> i | _ -> assert false) m.minit in
+  let minit = List.map (fun i -> match get_instr_desc i with MReset i -> i | _ -> assert false) m.minit in
   let array_mems = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
   fprintf fmt "@[<v 2>%a {@,%a%t%a%t%a%treturn;@]@,}@.@."
     (print_clear_prototype self) (m.mname.node_id, m.mstatic)
