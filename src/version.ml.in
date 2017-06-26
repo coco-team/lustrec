@@ -1,5 +1,5 @@
 
-let number = "@PACKAGE_VERSION@-@GITBRANCH@"
+let number = "@PACKAGE_VERSION@"
 
 let codename ="@VERSION_CODENAME@"
 
