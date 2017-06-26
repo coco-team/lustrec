@@ -991,10 +991,10 @@ let get_expr_vars e =
   let rec get_expr_vars vars e =
     get_expr_desc_vars vars e.expr_desc
   and get_expr_desc_vars vars expr_desc =
-    Format.eprintf "get_expr_desc_vars expr=%a@." Printers.pp_expr (mkexpr Location.dummy_loc expr_desc);
+    (*Format.eprintf "get_expr_desc_vars expr=%a@." Printers.pp_expr (mkexpr Location.dummy_loc expr_desc);*)
   match expr_desc with
   | Expr_const _ -> vars
-  | Expr_ident x -> Format.eprintf "%s is an ident!@." x; Utils.ISet.add x vars
+  | Expr_ident x -> Utils.ISet.add x vars
   | Expr_tuple el
   | Expr_array el -> List.fold_left get_expr_vars vars el
   | Expr_pre e1 -> get_expr_vars vars e1
