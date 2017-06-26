@@ -201,8 +201,9 @@ let add_eq_dependencies mems inputs node_vars eq (g, g') =
       else
 	let x = if ISet.mem x inputs then mk_read_var x else x in
 	(add_edges lhs [x] g, g')
-    else (add_edges lhs [mk_read_var x] g, g') (* x is a global constant, treated as a read var *) in
-(* Add dependencies from [lhs] to rhs clock [ck]. *)
+    else (add_edges lhs [mk_read_var x] g, g') (* x is a global constant, treated as a read var *)
+  in
+  (* Add dependencies from [lhs] to rhs clock [ck]. *)
   let rec add_clock lhs_is_mem lhs ck g =
     (*Format.eprintf "add_clock %a@." Clocks.print_ck ck;*)
     match (Clocks.repr ck).Clocks.cdesc with
@@ -244,7 +245,14 @@ let add_eq_dependencies mems inputs node_vars eq (g, g') =
   in
   let g =
     List.fold_left
-      (fun g lhs -> if ISet.mem lhs mems then add_vertices [lhs; mk_read_var lhs] g else add_vertices [lhs] g) g eq.eq_lhs in
+      (fun g lhs ->
+	if ISet.mem lhs mems then
+	  add_vertices [lhs; mk_read_var lhs] g
+	else
+	  add_vertices [lhs] g
+      )
+      g eq.eq_lhs
+  in
   add_dep false eq.eq_lhs eq.eq_rhs (g, g')
   
 
@@ -254,58 +262,72 @@ let dependence_graph mems inputs node_vars n =
   let g = new_graph (), new_graph () in
   (* Basic dependencies *)
   let g = List.fold_right (add_eq_dependencies mems inputs node_vars) (get_node_eqs n) g in
+  (* TODO Xavier: un essai ci dessous. Ca n'a pas l'air de résoudre le pb. Il
+     faut imposer que les outputs dépendent des asserts pour identifier que les
+     fcn calls des asserts sont évalués avant le noeuds *)
+
+  (* (\* In order to introduce dependencies between assert expressions and the node, *)
+  (*    we build an artificial dependency between node output and each assert *)
+  (*    expr. While these are not valid equations, they should properly propage in *)
+  (*    function add_eq_dependencies *\) *)
+  (* let g = *)
+  (*   let output_vars_as_lhs = ISet.elements (node_output_variables n) in *)
+  (*   List.fold_left (fun g ae -> *)
+  (*     let fake_eq = mkeq Location.dummy_loc (output_vars_as_lhs, ae.assert_expr) in *)
+  (*   add_eq_dependencies mems inputs node_vars fake_eq g *)
+  (* ) g n.node_asserts in  *)
   g
 
-end
+   end
 
-module NodeDep = struct
+   module NodeDep = struct
 
-  module ExprModule =
-  struct
-    type t = expr
-    let compare = compare
-    let hash n = Hashtbl.hash n
-    let equal n1 n2 = n1 = n2
-  end
+   module ExprModule =
+   struct
+   type t = expr
+   let compare = compare
+   let hash n = Hashtbl.hash n
+   let equal n1 n2 = n1 = n2
+   end
 
-  module ESet = Set.Make(ExprModule)
+   module ESet = Set.Make(ExprModule)
 
-  let rec get_expr_calls prednode expr = 
-    match expr.expr_desc with
-      | Expr_const _ 
-      | Expr_ident _ -> ESet.empty
-      | Expr_access (e, _)
-      | Expr_power (e, _) -> get_expr_calls prednode e
-      | Expr_array t
-      | Expr_tuple t -> List.fold_right (fun x set -> ESet.union (get_expr_calls prednode x) set) t ESet.empty
-      | Expr_merge (_,hl) -> List.fold_right (fun (_,h) set -> ESet.union (get_expr_calls prednode h) set) hl ESet.empty
-      | Expr_fby (e1,e2)
-      | Expr_arrow (e1,e2) -> ESet.union (get_expr_calls prednode e1) (get_expr_calls prednode e2)
-      | Expr_ite   (c, t, e) -> ESet.union (get_expr_calls prednode c) (ESet.union (get_expr_calls prednode t) (get_expr_calls prednode e))
-      | Expr_pre e 
-      | Expr_when (e,_,_) -> get_expr_calls prednode e
-      | Expr_appl (id,e, _) ->
-	if not (Basic_library.is_expr_internal_fun expr) && prednode id
-	then ESet.add expr (get_expr_calls prednode e)
-	else (get_expr_calls prednode e)
+   let rec get_expr_calls prednode expr = 
+   match expr.expr_desc with
+   | Expr_const _ 
+   | Expr_ident _ -> ESet.empty
+   | Expr_access (e, _)
+   | Expr_power (e, _) -> get_expr_calls prednode e
+   | Expr_array t
+   | Expr_tuple t -> List.fold_right (fun x set -> ESet.union (get_expr_calls prednode x) set) t ESet.empty
+   | Expr_merge (_,hl) -> List.fold_right (fun (_,h) set -> ESet.union (get_expr_calls prednode h) set) hl ESet.empty
+   | Expr_fby (e1,e2)
+   | Expr_arrow (e1,e2) -> ESet.union (get_expr_calls prednode e1) (get_expr_calls prednode e2)
+   | Expr_ite   (c, t, e) -> ESet.union (get_expr_calls prednode c) (ESet.union (get_expr_calls prednode t) (get_expr_calls prednode e))
+   | Expr_pre e 
+   | Expr_when (e,_,_) -> get_expr_calls prednode e
+   | Expr_appl (id,e, _) ->
+   if not (Basic_library.is_expr_internal_fun expr) && prednode id
+   then ESet.add expr (get_expr_calls prednode e)
+   else (get_expr_calls prednode e)
 
-  let get_callee expr =
-    match expr.expr_desc with
-    | Expr_appl (id, args, _) -> Some (id, expr_list_of_expr args)
-    | _ -> None
+   let get_callee expr =
+   match expr.expr_desc with
+   | Expr_appl (id, args, _) -> Some (id, expr_list_of_expr args)
+   | _ -> None
 
-  let get_calls prednode eqs =
-    let deps =
-      List.fold_left 
-	(fun accu eq -> ESet.union accu (get_expr_calls prednode eq.eq_rhs))
-	ESet.empty
-	eqs in
-    ESet.elements deps
+   let get_calls prednode eqs =
+   let deps =
+   List.fold_left 
+   (fun accu eq -> ESet.union accu (get_expr_calls prednode eq.eq_rhs))
+   ESet.empty
+   eqs in
+   ESet.elements deps
 
-  let dependence_graph prog =
-  let g = new_graph () in
-  let g = List.fold_right 
-    (fun td accu -> (* for each node we add its dependencies *)
+   let dependence_graph prog =
+   let g = new_graph () in
+   let g = List.fold_right 
+   (fun td accu -> (* for each node we add its dependencies *)
       match td.top_decl_desc with 
 	| Node nd ->
 	  (*Format.eprintf "Computing deps of node %s@.@?" nd.node_id; *)
