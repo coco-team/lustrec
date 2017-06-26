@@ -370,7 +370,7 @@ let normalize_node node =
       let assert_expr = assert_.assert_expr in
       let (defs, vars'), expr = 
 	normalize_expr 
-	  ~alias:false 
+	  ~alias:true (* forcing introduction of new equations for fcn calls *) 
 	  node 
 	  [] (* empty offset for arrays *)
 	  ([], vars) (* defvar only contains vars *)
