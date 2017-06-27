@@ -592,6 +592,101 @@ let get_sf_info() =
          end
 
         end
+
+
+(**************** XML printing functions *************)
+
+	  let rec pp_xml_expr fmt expr =
+  (match expr.expr_annot with 
+  | None -> fprintf fmt "%t" 
+  | Some ann -> fprintf fmt "@[(%a %t)@]" pp_xml_expr_annot ann)
+    (fun fmt -> 
+      match expr.expr_desc with
+    | Expr_const c -> Printers.pp_const fmt c
+    | Expr_ident id -> fprintf fmt "%s" id
+    | Expr_array a -> fprintf fmt "[%a]" pp_xml_tuple a
+    | Expr_access (a, d) -> fprintf fmt "%a[%a]" pp_xml_expr a Dimension.pp_dimension d
+    | Expr_power (a, d) -> fprintf fmt "(%a^%a)" pp_xml_expr a Dimension.pp_dimension d
+    | Expr_tuple el -> fprintf fmt "(%a)" pp_xml_tuple el
+    | Expr_ite (c, t, e) -> fprintf fmt "@[<hov 1>(if %a then@ @[<hov 2>%a@]@ else@ @[<hov 2>%a@]@])" pp_xml_expr c pp_xml_expr t pp_xml_expr e
+    | Expr_arrow (e1, e2) -> fprintf fmt "(%a -> %a)" pp_xml_expr e1 pp_xml_expr e2
+    | Expr_fby (e1, e2) -> fprintf fmt "%a fby %a" pp_xml_expr e1 pp_xml_expr e2
+    | Expr_pre e -> fprintf fmt "pre %a" pp_xml_expr e
+    | Expr_when (e, id, l) -> fprintf fmt "%a when %s(%s)" pp_xml_expr e l id
+    | Expr_merge (id, hl) -> 
+      fprintf fmt "merge %s %a" id pp_xml_handlers hl
+    | Expr_appl (id, e, r) -> pp_xml_app fmt id e r
+    )
+and pp_xml_tuple fmt el =
+ Utils.fprintf_list ~sep:"," pp_xml_expr fmt el
+
+and pp_xml_handler fmt (t, h) =
+ fprintf fmt "(%s -> %a)" t pp_xml_expr h
+
+and pp_xml_handlers fmt hl =
+ Utils.fprintf_list ~sep:" " pp_xml_handler fmt hl
+
+and pp_xml_app fmt id e r =
+  match r with
+  | None -> pp_xml_call fmt id e
+  | Some c -> fprintf fmt "%t every (%a)" (fun fmt -> pp_xml_call fmt id e) pp_xml_expr c 
+
+and pp_xml_call fmt id e =
+  match id, e.expr_desc with
+  | "+", Expr_tuple([e1;e2]) -> fprintf fmt "(%a + %a)" pp_xml_expr e1 pp_xml_expr e2
+  | "uminus", _ -> fprintf fmt "(- %a)" pp_xml_expr e
+  | "-", Expr_tuple([e1;e2]) -> fprintf fmt "(%a - %a)" pp_xml_expr e1 pp_xml_expr e2
+  | "*", Expr_tuple([e1;e2]) -> fprintf fmt "(%a * %a)" pp_xml_expr e1 pp_xml_expr e2
+  | "/", Expr_tuple([e1;e2]) -> fprintf fmt "(%a / %a)" pp_xml_expr e1 pp_xml_expr e2
+  | "mod", Expr_tuple([e1;e2]) -> fprintf fmt "(%a mod %a)" pp_xml_expr e1 pp_xml_expr e2
+  | "&&", Expr_tuple([e1;e2]) -> fprintf fmt "(%a and %a)" pp_xml_expr e1 pp_xml_expr e2
+  | "||", Expr_tuple([e1;e2]) -> fprintf fmt "(%a or %a)" pp_xml_expr e1 pp_xml_expr e2
+  | "xor", Expr_tuple([e1;e2]) -> fprintf fmt "(%a xor %a)" pp_xml_expr e1 pp_xml_expr e2
+  | "impl", Expr_tuple([e1;e2]) -> fprintf fmt "(%a => %a)" pp_xml_expr e1 pp_xml_expr e2
+  | "<", Expr_tuple([e1;e2]) -> fprintf fmt "(%a &lt; %a)" pp_xml_expr e1 pp_xml_expr e2
+  | "<=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a &lt;= %a)" pp_xml_expr e1 pp_xml_expr e2
+  | ">", Expr_tuple([e1;e2]) -> fprintf fmt "(%a &gt; %a)" pp_xml_expr e1 pp_xml_expr e2
+  | ">=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a &gt;= %a)" pp_xml_expr e1 pp_xml_expr e2
+  | "!=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a != %a)" pp_xml_expr e1 pp_xml_expr e2
+  | "=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a = %a)" pp_xml_expr e1 pp_xml_expr e2
+  | "not", _ -> fprintf fmt "(not %a)" pp_xml_expr e
+  | _, Expr_tuple _ -> fprintf fmt "%s %a" id pp_xml_expr e
+  | _ -> fprintf fmt "%s (%a)" id pp_xml_expr e
+
+and pp_xml_eexpr fmt e =
+  fprintf fmt "%a%t %a"
+    (Utils.fprintf_list ~sep:"; " Printers.pp_quantifiers) e.eexpr_quantifiers
+    (fun fmt -> match e.eexpr_quantifiers with [] -> () | _ -> fprintf fmt ";")
+    pp_xml_expr e.eexpr_qfexpr
+
+and  pp_xml_sf_value fmt e =
+   fprintf fmt "%a"
+     (* (Utils.fprintf_list ~sep:"; " pp_xml_quantifiers) e.eexpr_quantifiers *)
+     (* (fun fmt -> match e.eexpr_quantifiers *)
+     (*             with [] -> () *)
+     (*                | _ -> fprintf fmt ";") *)
+     pp_xml_expr e.eexpr_qfexpr
+
+and pp_xml_s_function fmt expr_ann =
+  let pp_xml_annot fmt (kwds, ee) =
+    Format.fprintf fmt " %t : %a"
+                   (fun fmt -> match kwds with
+                               | [] -> assert false
+                               | [x] -> Format.pp_print_string fmt x
+                               | _ -> Format.fprintf fmt "%a" (Utils.fprintf_list ~sep:"/" Format.pp_print_string) kwds)
+                   pp_xml_sf_value ee
+  in
+  Utils.fprintf_list ~sep:"@ " pp_xml_annot fmt expr_ann.annots
+
+and pp_xml_expr_annot fmt expr_ann =
+  let pp_xml_annot fmt (kwds, ee) =
+    Format.fprintf fmt "(*! %t: %a; *)"
+      (fun fmt -> match kwds with | [] -> assert false | [x] -> Format.pp_print_string fmt x | _ -> Format.fprintf fmt "/%a/" (Utils.fprintf_list ~sep:"/" Format.pp_print_string) kwds)
+      pp_xml_eexpr ee
+  in
+  Utils.fprintf_list ~sep:"@ " pp_xml_annot fmt expr_ann.annots
+
+
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)
 (* End: *)
