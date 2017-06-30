@@ -139,6 +139,9 @@ let pp_decl fmt decl =
 (*   Printing machine code as EMF             *)
 (**********************************************)
 
+(* Print machine code values as matlab expressions. Variable identifiers are
+   replaced by uX where X is the index of the variables in the list vars of input
+   variables. *)
 let rec pp_val vars fmt v =
   match v.value_desc with
   | Cst c -> Printers.pp_const fmt c
@@ -152,7 +155,7 @@ let rec pp_val vars fmt v =
   | Fun (n, vl) -> pp_fun vars n fmt vl
   | _ -> assert false (* not available in EMF backend *)
 and pp_fun vars id fmt vl =
-  eprintf "print %s with %i args@.@?" id (List.length vl);
+  (* eprintf "print %s with %i args@.@?" id (List.length vl);*)
   match id, vl with
     | "+", [v1;v2] -> fprintf fmt "(%a + %a)" (pp_val vars) v1 (pp_val vars) v2
     | "uminus", [v] -> fprintf fmt "(- %a)" (pp_val vars) v
@@ -174,11 +177,11 @@ and pp_fun vars id fmt vl =
     | _ -> fprintf fmt "%s (%a)" id  (Utils.fprintf_list ~sep:", " (pp_val vars)) vl 
 
      
-(* detect whether the instruction i represents a STEP, ie an arrow with true -> false *)
-let is_step_fun m i =
+(* detect whether the instruction i represents an ARROW, ie an arrow with true -> false *)
+let is_arrow_fun m i =
   match Corelang.get_instr_desc i with
   | MStep ([var], i, vl)  -> (
-    let name = (Machine_code.get_node_def i m).node_id in
+    let name = try (Machine_code.get_node_def i m).node_id with Not_found -> Format.eprintf "Impossible to find node %s@.@?" i; raise Not_found in
     match name, vl with
     | "_arrow", [v1; v2] -> (
 	match v1.value_desc, v2.value_desc with
@@ -193,13 +196,17 @@ let is_step_fun m i =
   )
   | _ -> false
 
-     
-let rec pp_instr m vars fmt i =
+(* pp_basic_instr prints regular instruction. These do not contain MStep which
+   should have been already filtered out. Another restriction which is supposed
+   to be enforced is that branching statement contain a single instruction (in
+   practice it has to be an assign) *)
+let rec pp_basic_instr m vars fmt i =
   match Corelang.get_instr_desc i with
   | MLocalAssign (var,v) 
   | MStateAssign (var,v) -> fprintf fmt "y = %a" (pp_val vars) v
-  | MStep _ when is_step_fun m i  -> fprintf fmt "STEP" 
-  | MBranch (g,[(tag1,case1);(tag2,case2)])     ->
+  | MBranch (g,[(tag1,[case1]);(tag2,[case2])])     ->
+     (* Thanks to normalization with join_guards = false, branches shall contain
+	a single expression *)
      let then_case, else_case =
        if tag1 = Corelang.tag_true then
 	 case1, case2
@@ -208,15 +215,21 @@ let rec pp_instr m vars fmt i =
      in
      fprintf fmt "if %a; %a; else %a; end"
        (pp_val vars) g
-       (pp_instrs m vars) then_case
-       (pp_instrs m vars) else_case
-  | MStep _ (* no function calls handled yet *)
+       (pp_basic_instr m vars) then_case
+       (pp_basic_instr m vars) else_case
   | MBranch _ (* EMF backend only accept true/false ite *)
+    -> Format.eprintf "unhandled branch in EMF@.@?"; assert false
   | MReset _           
+    -> Format.eprintf "unhandled reset in EMF@.@?"; assert false
   | MNoReset _
-  | MComment _ -> assert false (* not  available for EMF output *)
-and pp_instrs m vars fmt il =
-  fprintf fmt "@[<v 2>%a@]" (Utils.fprintf_list ~sep:"@," (pp_instr m vars)) il
+    -> Format.eprintf "unhandled noreset in EMF@.@?"; assert false
+  | MStep _ (* function calls already handled, including STEP *)
+    -> Format.eprintf "unhandled function call in EMF (should have been filtered out before)@.@?";
+      assert false
+  | MComment _ 
+    -> Format.eprintf "unhandled comment in EMF@.@?"; assert false
+      (* not  available for EMF output *)
+
 
 
 let rec get_instr_var i =
@@ -249,24 +262,23 @@ let rec get_instr_vars i =
   match Corelang.get_instr_desc i with
   | MLocalAssign (_,v)  
   | MStateAssign (_,v) -> get_val_vars v
-  | MStep ([_], _, vl)  -> List.fold_left (fun res v -> Utils.ISet.union res (get_val_vars v)) Utils.ISet.empty vl 
-  | MBranch (c,[(_,case1);(_,case2)])     ->
+  | MStep (_, _, vl)  -> List.fold_left (fun res v -> Utils.ISet.union res (get_val_vars v)) Utils.ISet.empty vl 
+  | MBranch (c,[(_,[case1]);(_,[case2])])     ->
      Utils.ISet.union
        (get_val_vars c)
        (
 	 Utils.ISet.union
-	   (get_instrs_vars case1)
-	   (get_instrs_vars case2)
+	   (get_instr_vars case1)
+	   (get_instr_vars case2)
        )
-  | MStep _ (* only single output for function call *)
   | MBranch _ (* EMF backend only accept true/false ite *)
   | MReset _           
   | MNoReset _
   | MComment _ -> failwith "Error in compiling some constructs into EMF. Have you considered -node foo -inline options ?" (* not  available for EMF output *)
-and get_instrs_vars il =
-  List.fold_left (fun res i -> Utils.ISet.union res (get_instr_vars i))
-    Utils.ISet.empty
-    il
+(* and get_instrs_vars il = *)
+(*   List.fold_left (fun res i -> Utils.ISet.union res (get_instr_vars i)) *)
+(*     Utils.ISet.empty *)
+(*     il *)
 
 
 let pp_original_lustre_expression m fmt i =
@@ -274,20 +286,38 @@ let pp_original_lustre_expression m fmt i =
   | MLocalAssign _ | MStateAssign _ 
   | MBranch _
     -> ( match i.lustre_eq with None -> () | Some e -> Printers.pp_node_eq fmt e) 
-  | MStep _ when is_step_fun m i -> () (* we print nothing, this is a STEP *)
+  | MStep _ when is_arrow_fun m i -> () (* we print nothing, this is a STEP *)
   | MStep _ -> (match i.lustre_eq with None -> () | Some eq -> Printers.pp_node_eq fmt eq)
   | _ -> ()
     
-let pp_instr_main m fmt i =
-  (* first, we extract the expression and associated variables *)
-  let var = get_instr_var i in
-  let vars = Utils.ISet.elements (get_instr_vars i) in	
-  fprintf fmt "\"%s\": @[<v 2>{ \"expr\": \"%a\",@ \"vars\": [%a] @ \"original_lustre_expr\": [%a]@]}"
-    var.var_id
-    (pp_instr m vars) i
-    (fprintf_list ~sep:", " pp_var_string) vars
-    (pp_original_lustre_expression m) i
-
+let pp_emf_instrs m fmt i =
+  (* Either it is a Step function non arrow, then we have a dedicated treatment,
+     or it has to be a single variable assigment *)
+  let arguments_vars = Utils.ISet.elements (get_instr_vars i) in	
+  
+  match Corelang.get_instr_desc i with
+    (* Regular node call either a statuful node or a functional one *)
+    MStep (outputs, f, inputs) when not (is_arrow_fun m i) -> (
+      fprintf fmt "\"__functioncall\": @[<v 2>{ \"node\": \"%s\",@ \"inputs\": [%a],@ \"vars\": [%a]@ \"outputs\": [%a],@ \"original_lustre_expr\": [%a]@]}"
+	((Machine_code.get_node_def f m).node_id) (* Node name *)
+        (Utils.fprintf_list ~sep:", " (fun fmt _val -> fprintf fmt "\"%a\"" (pp_val arguments_vars) _val)) inputs                  (* inputs *)
+	(fprintf_list ~sep:", " pp_var_string) arguments_vars
+	(fprintf_list ~sep:", " (fun fmt v -> pp_var_string fmt v.var_id)) outputs  (* outputs *)
+	(pp_original_lustre_expression m) i         (* original lustre expr *)
+    )
+  | _ ->
+     (* Other expressions, including "pre" *)
+     ( 
+    (* first, we extract the expression and associated variables *)
+    let var = get_instr_var i in
+    fprintf fmt "\"%s\": @[<v 2>{ \"expr\": \"%a\",@ \"vars\": [%a] @ \"original_lustre_expr\": [%a]@]}"
+      var.var_id
+      (fun fmt i -> match Corelang.get_instr_desc i with
+      | MStep _ -> fprintf fmt "STEP"
+      | _ -> pp_basic_instr m arguments_vars fmt i) i
+      (fprintf_list ~sep:", " pp_var_string) arguments_vars
+      (pp_original_lustre_expression m) i
+  )
     
      
 let pp_machine fmt m =
@@ -297,7 +327,7 @@ let pp_machine fmt m =
       pp_node_args m.mstep.step_inputs
       pp_node_args m.mstep.step_outputs;
     fprintf fmt "\"exprs\": {@[<v 1> %a@]@ }"
-      (fprintf_list ~sep:",@ " (pp_instr_main m)) m.mstep.step_instrs;
+      (fprintf_list ~sep:",@ " (pp_emf_instrs m)) m.mstep.step_instrs;
     fprintf fmt "@]@ }"
   with Unhandled msg -> (
     eprintf "[Error] @[<v 0>EMF backend@ Issues while translating node %s@ "
@@ -326,7 +356,8 @@ let translate fmt basename prog machines =
   fprintf fmt "@[<v 0>{@ ";
   pp_meta fmt basename;
   fprintf fmt "\"nodes\": @[<v 0>{@ ";
-  (* fprintf_list ~sep:",@ " pp_decl fmt prog; *)
+  (* Previous alternative: mapping normalized lustre to EMF: 
+     fprintf_list ~sep:",@ " pp_decl fmt prog; *)
   fprintf_list ~sep:",@ " pp_machine fmt machines;
   fprintf fmt "@ @]}";
   fprintf fmt "@ @]}"

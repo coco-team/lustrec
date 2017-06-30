@@ -101,11 +101,18 @@ type machine_t = {
 }
 
 (* merge log: get_node_def was in c0f8 *)
+(* Returns the node/machine associated to id in m calls *)
 let get_node_def id m =
   try
-    let (decl, _) = List.assoc id m.minstances in
+    let (decl, _) = List.assoc id m.mcalls in
     Corelang.node_of_top decl
-  with Not_found -> raise Not_found
+  with Not_found -> (
+    Format.eprintf "Unable to find node %s in list [%a]@.@?"
+      id
+      (Utils.fprintf_list ~sep:", " (fun fmt (n,_) -> Format.fprintf fmt "%s" n)) m.mcalls
+      ; assert false;
+    raise Not_found
+  )
     
 (* merge log: machine_vars was in 44686 *)
 let machine_vars m = m.mstep.step_inputs @ m.mstep.step_locals @ m.mstep.step_outputs @ m.mmemory
