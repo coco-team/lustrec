@@ -14,6 +14,26 @@ open LustreSpec
 open Corelang
 open Format
 
+(** Normalisation iters through the AST of expressions and bind fresh definition
+    when some criteria are met. This creation of fresh definition is performed by
+    the function mk_expr_alias_opt when the alias argument is on.
+
+    Initial expressions, ie expressions attached a variable in an equation
+    definition are not aliased. This non-alias feature is propagated in the
+    expression AST for array access and power construct, tuple, and some special
+    cases of arrows.
+
+    Two global variables may impact the normalization process:
+    - unfold_arrow_active
+    - force_alias_ite: when set, bind a fresh alias for then and else
+      definitions.
+*)
+
+(* Two global variables *)
+let unfold_arrow_active = ref true
+let force_alias_ite = ref false
+
+  
 let expr_true loc ck =
 { expr_tag = Utils.new_tag ();
   expr_desc = Expr_const (Const_tag tag_true);
@@ -53,7 +73,6 @@ let unfold_arrow expr =
     { expr with expr_desc = Expr_ite (expr_once loc ck, e1, e2) }
  | _                   -> assert false
 
-let unfold_arrow_active = ref true
 let cpt_fresh = ref 0
 
 (* Generate a new local [node] variable *)
@@ -294,8 +313,15 @@ and normalize_cond_expr ?(alias=true) node offsets defvars expr =
   | Expr_merge (c, hl) ->
     let defvars, norm_hl = normalize_branches node offsets defvars hl in
     defvars, mk_norm_expr offsets expr (Expr_merge (c, norm_hl))
-  | _ -> normalize_expr ~alias:alias node offsets defvars expr
-
+  | _ when !force_alias_ite ->
+     (* Forcing alias creation for then/else expressions *)
+     let defvars, norm_expr =
+       normalize_expr ~alias:alias node offsets defvars expr
+     in
+     mk_expr_alias_opt true node defvars norm_expr
+  | _ -> (* default case without the force_alias_ite option *)
+     normalize_expr ~alias:alias node offsets defvars expr
+     
 and normalize_guard node defvars expr =
   let defvars, norm_expr = normalize_expr node [] defvars expr in
   mk_expr_alias_opt true node defvars norm_expr
@@ -434,9 +460,30 @@ let normalize_decl decl =
     decl'
   | Open _ | ImportedNode _ | Const _ | TypeDef _ -> decl
 
-let normalize_prog decls =
-  List.map normalize_decl decls
+let normalize_prog ?(backend="C") decls =
+  let old_unfold_arrow_active = !unfold_arrow_active in
+  let old_force_alias_ite = !force_alias_ite in
+  
+  (* Backend specific configurations for normalization *)
+  let _ =
+    match backend with
+    | "lustre" ->
+    (* Special treatment of arrows in lustre backend. We want to keep them *)
+       unfold_arrow_active := false;
+    | "emf" -> (* Forcing ite normalization *)
+       force_alias_ite := true;
+    | _ -> () (* No fancy options for other backends *)
+  in
 
-(* Local Variables: *)
+  (* Main algorithm: iterates over nodes *)
+  let res = List.map normalize_decl decls in
+  
+  (* Restoring previous settings *)
+  unfold_arrow_active := old_unfold_arrow_active;
+  force_alias_ite := old_force_alias_ite;
+
+  res
+  
+  (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

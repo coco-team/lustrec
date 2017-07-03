@@ -211,10 +211,7 @@ let stage1 prog dirname basename =
   
   (* Normalization phase *)
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. normalization@,");
-  (* Special treatment of arrows in lustre backend. We want to keep them *)
-  if !Options.output = "lustre" then
-    Normalization.unfold_arrow_active := false;
-  let prog = Normalization.normalize_prog prog in
+  let prog = Normalization.normalize_prog ~backend:!Options.output prog in
   Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
 
   let prog =
