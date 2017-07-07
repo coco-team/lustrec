@@ -32,6 +32,7 @@ open Format
 (* Two global variables *)
 let unfold_arrow_active = ref true
 let force_alias_ite = ref false
+let force_alias_internal_fun = ref false
 
   
 let expr_true loc ck =
@@ -224,7 +225,8 @@ let rec normalize_expr ?(alias=true) node offsets defvars expr =
 	(expr_list_of_expr args)
     in
     defvars, mk_norm_expr offsets expr (Expr_appl (id, expr_of_expr_list args.expr_loc norm_args, None))
-  | Expr_appl (id, args, None) when Basic_library.is_expr_internal_fun expr ->
+  | Expr_appl (id, args, None) when Basic_library.is_expr_internal_fun expr
+                                    && not !force_alias_internal_fun ->
     let defvars, norm_args = normalize_expr ~alias:true node offsets defvars args in
     defvars, mk_norm_expr offsets expr (Expr_appl (id, norm_args, None))
   | Expr_appl (id, args, r) ->
@@ -235,7 +237,9 @@ let rec normalize_expr ?(alias=true) node offsets defvars expr =
       let defvars, norm_expr = normalize_expr node [] defvars norm_expr in
       normalize_expr ~alias:alias node offsets defvars norm_expr
     else
-      mk_expr_alias_opt (alias && not (Basic_library.is_expr_internal_fun expr)) node defvars norm_expr
+      mk_expr_alias_opt (alias && (!force_alias_internal_fun
+				   || not (Basic_library.is_expr_internal_fun expr)))
+	node defvars norm_expr
   | Expr_arrow (e1,e2) when !unfold_arrow_active && not (is_expr_once expr) ->
     (* Here we differ from Colaco paper: arrows are pushed to the top *)
     normalize_expr ~alias:alias node offsets defvars (unfold_arrow expr)
@@ -463,6 +467,7 @@ let normalize_decl decl =
 let normalize_prog ?(backend="C") decls =
   let old_unfold_arrow_active = !unfold_arrow_active in
   let old_force_alias_ite = !force_alias_ite in
+  let old_force_alias_internal_fun = !force_alias_internal_fun in
   
   (* Backend specific configurations for normalization *)
   let _ =
@@ -470,8 +475,11 @@ let normalize_prog ?(backend="C") decls =
     | "lustre" ->
     (* Special treatment of arrows in lustre backend. We want to keep them *)
        unfold_arrow_active := false;
-    | "emf" -> (* Forcing ite normalization *)
-       force_alias_ite := true;
+    | "emf" -> (
+       (* Forcing ite normalization *)
+      force_alias_ite := true;
+      force_alias_internal_fun := true;
+    )
     | _ -> () (* No fancy options for other backends *)
   in
 
@@ -481,7 +489,7 @@ let normalize_prog ?(backend="C") decls =
   (* Restoring previous settings *)
   unfold_arrow_active := old_unfold_arrow_active;
   force_alias_ite := old_force_alias_ite;
-
+  force_alias_internal_fun := old_force_alias_internal_fun;
   res
   
   (* Local Variables: *)
