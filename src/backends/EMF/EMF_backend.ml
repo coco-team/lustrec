@@ -25,9 +25,22 @@ exception Unhandled of string
 (* Basic printing functions *)
     
 let pp_var_string fmt v = fprintf fmt "\"%s\"" v
-let pp_var_name fmt v = fprintf fmt "\"%a\"" Printers.pp_var_name v
-let pp_node_args = fprintf_list ~sep:", " pp_var_name
+(*let pp_var_name fmt v = fprintf fmt "\"%a\"" Printers.pp_var_name v*)
+(*let pp_node_args = fprintf_list ~sep:", " pp_var_name*)
 
+let pp_emf_var_decl fmt v =
+  fprintf fmt "@[{\"name\": \"%a\", type:\"%a\"}@]"
+    Printers.pp_var_name v
+    Printers.pp_var_type v
+    
+let pp_emf_vars_decl fmt vl =
+  fprintf fmt "@[";
+  fprintf_list ~sep:",@ " pp_emf_var_decl fmt vl;
+  fprintf fmt "@]"
+  
+let reset_name id =
+  "reset_" ^ id
+  
     
 (* Matlab starting counting from 1.
    simple function to extract the element id in the list. Starts from 1. *)
@@ -136,7 +149,7 @@ let pp_decl fmt decl =
 
 
 (**********************************************)
-(*   Printing machine code as EMF             *)
+(*   Utility functions: arrow and lustre expr *)
 (**********************************************)
 
 (* detect whether the instruction i represents an ARROW, ie an arrow with true
@@ -168,7 +181,26 @@ let pp_original_lustre_expression m fmt i =
   | MStep _ -> (match i.lustre_eq with None -> () | Some eq -> Printers.pp_node_eq fmt eq)
   | _ -> ()
 
+let rec get_instr_lhs i =
+  match Corelang.get_instr_desc i with
+  | MLocalAssign (var,_) 
+  | MStateAssign (var,_) -> [var.var_id]
+  | MStep (vars, _, _)  ->  List.map (fun v -> v.var_id) vars
+  | MBranch (_,(_,case1)::_)     ->
+     get_instrs_lhs case1 (* assuming all cases define the same variables *)
+  | MBranch _ -> assert false (* branch instruction should admit at least one case *)
+  | MReset ni           
+  | MNoReset ni -> [reset_name ni]
+  | MComment _ -> assert false (* not  available for EMF output *)
+and get_instrs_lhs il =
+  List.fold_left (fun accu i -> (get_instr_lhs i) @ accu ) [] il
+     
+(**********************************************)
+(*   Printing machine code as EMF             *)
+(**********************************************)
 
+(*******************
+     
 (* Print machine code values as matlab expressions. Variable identifiers are
    replaced by uX where X is the index of the variables in the list vars of input
    variables. *)
@@ -377,7 +409,134 @@ let rec pp_emf_instr m fmt i =
 	 (fprintf_list ~sep:", " pp_var_string) arguments_vars
 	 (pp_original_lustre_expression m) i
      )
+
+*********************)
+     
+let pp_emf_cst_or_var fmt v =
+  match v.value_desc with
+  | Cst c ->
+     fprintf fmt "{@[\"type\": \"constant\",@ \"value\": \"%a\"@ @]}"
+       Printers.pp_const c
+  | LocalVar v
+  | StateVar v ->
+     fprintf fmt "{@[\"type\": \"variable\",@ \"value\": \"%a\"@ @]}"
+       Printers.pp_var_name v
+  | _ -> assert false (* Invalid argument *)
+
+     
+let branch_cpt = ref 0
+let get_instr_id fmt i =
+  match Corelang.get_instr_desc i with
+  | MLocalAssign(lhs,_) | MStateAssign (lhs, _) -> Printers.pp_var_name fmt lhs
+  | MReset i | MNoReset i -> fprintf fmt "%s" (reset_name i)
+  | MBranch (g, _) -> incr branch_cpt; fprintf fmt "branch_%i" !branch_cpt
+  | MStep (_, id, _) -> fprintf fmt "%s" id
+  | _ -> () (* No name *)
+
+let pp_emf_cst_or_var_list =
+  fprintf_list ~sep:",@ " pp_emf_cst_or_var
     
+let rec pp_emf_instr2 m fmt i =
+  (* let arguments_vars = Utils.ISet.elements (get_instr_rhs_vars i) in	   *)
+  let pp_content fmt i =
+    match Corelang.get_instr_desc i with
+    | MLocalAssign(lhs, expr)
+    -> (
+      (match expr.value_desc with
+      | Fun (fun_id, vl) -> (
+	(* Thanks to normalization, vl shall only contain constant or
+	   local/state vars but not calls to other functions *)
+	fprintf fmt "\"kind\": \"operator\",@ ";
+	fprintf fmt "\"lhs\": \"%a\",@ " Printers.pp_var_name lhs;
+	fprintf fmt "\"name\": \"%s\",@ \"args\": [@[%a@]]}"
+	  fun_id
+	  pp_emf_cst_or_var_list vl
+      )	 
+      | Array _ | Access _ | Power _ -> assert false (* No array expression allowed yet *)
+      | Cst _ 
+      | LocalVar _
+      | StateVar _ -> (
+	fprintf fmt "\"kind\": \"local_assign\",@ \"lhs\": \"%a\",@ \"rhs\": %a"
+	  Printers.pp_var_name lhs
+	  pp_emf_cst_or_var expr
+      ))    )
+
+  | MStateAssign(lhs, expr) (* a Pre construct Shall only be defined by a
+			       variable or a constant, no function anymore! *)
+    -> (
+      fprintf fmt "\"kind\": \"pre\",@ \"lhs\": \"%a\",@ \"rhs\": %a"
+	Printers.pp_var_name lhs
+	pp_emf_cst_or_var expr
+    )
+     
+  | MReset id           
+    -> (
+      fprintf fmt "\"kind\": \"reset\",@ \"lhs\": \"%s\",@ \"rhs\": \"true\""
+	(reset_name id)
+    )
+  | MNoReset id           
+    -> (
+      fprintf fmt "\"kind\": \"reset\",@ \"lhs\": \"%s\",@ \"rhs\": \"false\""
+	(reset_name id)
+    )
+    
+  | MBranch (g, hl) -> (
+    let outputs = match hl with
+      | (_,instr_tag1)::_ -> (* all branches are supposed to define the same flows *)
+	 get_instrs_lhs instr_tag1
+      | _ -> assert false (* should not happen: a branch with no branch ?? *)
+    in
+    fprintf fmt "\"kind\": \"branch\",@ ";
+    fprintf fmt "\"guard\": %a,@ " pp_emf_cst_or_var g; (* it has to be a variable or a constant *)
+    fprintf fmt "\"output\": [%a],@ " (fprintf_list ~sep:", " pp_var_string) outputs;
+    fprintf fmt "\"branches\": [@[<v 0>%a@]]@ "
+      (fprintf_list ~sep:",@ "
+	 (fun fmt (tag, instrs_tag) ->
+	   fprintf fmt "\"%s\": [@[<v 0>" tag;
+	   fprintf_list ~sep:",@ " (pp_emf_instr2 m) fmt instrs_tag;
+	       (* TODO xx ajouter les outputs dans le Mbranch et les inputs de chaque
+	    action bloc dans chaque branch 
+	    (fprintf_list ~sep:", " pp_var_string) arguments_vars *)
+	       
+	       fprintf fmt "@]]"
+
+	 )
+      )
+      hl
+  )
+
+  | MStep ([var], f, _) when is_arrow_fun m i -> (* Arrow case *) (
+    fprintf fmt "\"kind\": \"arrow\",@ \"name\": \"%s\",@ \"lhs\": \"%a\",@ \"rhs\": \"%s\""
+      f
+      Printers.pp_var_name var
+      (reset_name f)
+  )
+
+  | MStep (outputs, f, inputs) -> (
+    let node_f = Machine_code.get_node_def f m in
+    let is_stateful = List.mem_assoc f m.minstances in 
+    fprintf fmt "\"kind\": \"%s\",@ \"name\": \"%s\",@ \"id\": \"%s\",@ "
+      (if is_stateful then "statefulcall" else "statelesscall")
+      (node_f.node_id) 
+      f;
+    fprintf fmt "\"lhs\": [%a],@ \"args\": [@[%a@]],@ "
+      (fprintf_list ~sep:",@ " (fun fmt v -> fprintf fmt "\"%a\"" Printers.pp_var_name v)) outputs
+      pp_emf_cst_or_var_list inputs;
+    if is_stateful then fprintf fmt "\"reset\": \"%s\"" (reset_name f)   
+  )
+
+  | MComment _ 
+    -> Format.eprintf "unhandled comment in EMF@.@?"; assert false
+  (* not  available for EMF output *)
+
+  in
+  fprintf fmt "@[{ \"%a\": { " get_instr_id i;
+  fprintf fmt "@[<v 0>%a,@ " pp_content i;
+  fprintf fmt "\"original_lustre_expr\": [@[<v 0>\"%a\"@]]@]" (pp_original_lustre_expression m) i; 
+  fprintf fmt "}@]"
+
+       
+       
 (* A (normalized) node becomes a JSON struct
    node foo (in1, in2: int) returns (out1, out2: int);
    var x : int;
@@ -392,9 +551,9 @@ let rec pp_emf_instr m fmt i =
    is reset as well as all calls to stateful node it contains. 
 
    will produce the following JSON struct:
-   "foo": {inputs:  [{name: "in1", type: "int"}, 
+   "foo": {"kind":  "stateful",
+           inputs:  [{name: "in1", type: "int"}, 
                      {name: "in2", type: "int"}, 
-                     {name: "__reset", type: "reset"}
                     ],
            outputs: [{name: "out1", type: "int"}, {name: "out2", type: "int"}],
            locals:  [{name: "x", type: "int"}],
@@ -409,16 +568,24 @@ let rec pp_emf_instr m fmt i =
                     ]
            }
 
-Basically we have three different definitions
-1. classical assign of a variable to another one:
-   { def_out1: { lhs: "out1", rhs: "x" } },
+Basically we have the following different definitions
+1. local assign of a variable to another one:
+   { def_out1: { kind: "local_assign", lhs: "out1", rhs: "x" } },
+
+2. pre construct over a variable (this is a state assign):
+   { def_pre_x: { kind: "pre", lhs: "pre_x", rhs: "x" } },
+
+3. arrow constructs, while there is not specific input, it could be reset 
+   by a specific signal. We register it as a fresh rhs var:
+   { def_arrow: { kind: "arrow", name: "ni4", lhs: "is_init", rhs: "reset_ni4"}}
+
 2. call to a stateless function, typically an operator
-   { def_x: { lhs: ["x"], 
-     rhs: {type: "statelesscall", name: "bar", args: [in1, in2]} 
+   { def_x: { kind: "statelesscall", lhs: ["x"], 
+              name: "bar", rhs: [in1, in2]} 
    }
   or in the operator version 
-   { def_x: { lhs: ["x"], 
-     rhs: {type: "operator", name: "+", args: [in1, in2]} 
+   { def_x: { kind: "operator", lhs: ["x"], 
+              name: "+", rhs: [in1, in2]} 
    }
 
   In Simulink this should introduce a subsystem in the first case or a 
@@ -426,11 +593,9 @@ Basically we have three different definitions
 
 3. call to a stateful node. It is similar to the stateless above, 
    with the addition of the reset argument
-    { def_x: { lhs: ["x"], 
-               rhs: {type: "statefulcall", name: "bar", 
-                     args: [in1, in2], reset: [ni4_reset] } 
-             }
-    }
+    { def_x: { kind: "statefulcall", lhs: ["x"], 
+               name: "bar", rhs: [in1, in2], reset: [ni4_reset] } 
+      }
   
   In lustrec compilation phases, a unique id is associated to this specific
   instance of stateful node "bar", here ni4. 
@@ -450,16 +615,24 @@ Basically we have three different definitions
                  }
    }
 
-  In Simulink, this should become one IF block to produce enable ports "var_guard == tag1", "var_guard == tag2", .... as well as one action block per branch: each of these action block shall  
+  In Simulink, this should become one IF block to produce enable ports 
+  "var_guard == tag1", "var_guard == tag2", .... as well as one action 
+  block per branch: each of these action block shall  
 *)     
 let pp_machine fmt m =
   try
-    fprintf fmt "@[<v 2>\"%s\": {@ \"inputs\": [%a],@ \"outputs\": [%a],@ "
-      m.mname.node_id
-      pp_node_args m.mstep.step_inputs
-      pp_node_args m.mstep.step_outputs;
-    fprintf fmt "\"exprs\": {@[<v 1> %a@]@ }"
-      (fprintf_list ~sep:",@ " (pp_emf_instr m)) m.mstep.step_instrs;
+    fprintf fmt "@[<v 2>\"%s\": {@ "
+      m.mname.node_id;
+    fprintf fmt "\"kind\": %t,@ \"inputs\": [%a],@ \"outputs\": [%a],@ \"locals\": [%a],@ "
+      (fun fmt -> if not ( snd (get_stateless_status m) )
+	then fprintf fmt "\"stateful\""
+	else fprintf fmt "\"stateless\"")
+      pp_emf_vars_decl m.mstep.step_inputs
+      pp_emf_vars_decl m.mstep.step_outputs
+      pp_emf_vars_decl m.mstep.step_locals
+    ;
+    fprintf fmt "\"instrs\": [@[<v 0> %a@]@ ]"
+      (fprintf_list ~sep:",@ " (pp_emf_instr2 m)) m.mstep.step_instrs;
     fprintf fmt "@]@ }"
   with Unhandled msg -> (
     eprintf "[Error] @[<v 0>EMF backend@ Issues while translating node %s@ "
