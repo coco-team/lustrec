@@ -4,7 +4,7 @@ let join_guards = ref true
 let setup s =
   match s with
   | "emf" ->
-     join_guards := false; (* guards should not be joined, in order to have only
+     join_guards := true; (* guards should not be joined, in order to have only
 			      if c then x = e1 else x = e2 to ease
 			      reconstruction of flows. *)
     Options.optimization := 0; (* Optimization=0 prevents expression
