@@ -181,6 +181,7 @@ let pp_original_lustre_expression m fmt i =
   | MStep _ -> (match i.lustre_eq with None -> () | Some eq -> Printers.pp_node_eq fmt eq)
   | _ -> ()
 
+     (*
 let rec get_instr_lhs i =
   match Corelang.get_instr_desc i with
   | MLocalAssign (var,_) 
@@ -194,7 +195,7 @@ let rec get_instr_lhs i =
   | MComment _ -> assert false (* not  available for EMF output *)
 and get_instrs_lhs il =
   List.fold_left (fun accu i -> (get_instr_lhs i) @ accu ) [] il
-     
+  *)     
 (**********************************************)
 (*   Printing machine code as EMF             *)
 (**********************************************)
@@ -433,6 +434,25 @@ let get_instr_id fmt i =
   | MStep (_, id, _) -> fprintf fmt "%s" id
   | _ -> () (* No name *)
 
+let rec branch_block_defined_vars il =
+  List.fold_left
+    (fun accu i -> ISet.union accu (branch_instr_defined_vars i)) ISet.empty il
+and branch_instr_defined_vars i =
+  match Corelang.get_instr_desc i with
+  | MLocalAssign (var,_) 
+  | MStateAssign (var,_) -> ISet.singleton var.var_id
+  | MStep (vars, _, _)  ->  ISet.of_list (List.map (fun v -> v.var_id) vars)
+  | MBranch (_,(_,hd_il)::tl)     -> (* We focus on variables defined in all branches *)
+     List.fold_left
+       (fun res (_, il) -> ISet.inter res (branch_block_defined_vars il))
+       (branch_block_defined_vars hd_il)
+       tl
+  | MBranch _ -> assert false (* branch instruction should admit at least one case *)
+  | MReset ni           
+  | MNoReset ni -> ISet.singleton (reset_name ni)
+  | MComment _ -> assert false (* not  available for EMF output *)
+     
+  
 let pp_emf_cst_or_var_list =
   fprintf_list ~sep:",@ " pp_emf_cst_or_var
     
@@ -481,14 +501,10 @@ let rec pp_emf_instr2 m fmt i =
     )
     
   | MBranch (g, hl) -> (
-    let outputs = match hl with
-      | (_,instr_tag1)::_ -> (* all branches are supposed to define the same flows *)
-	 get_instrs_lhs instr_tag1
-      | _ -> assert false (* should not happen: a branch with no branch ?? *)
-    in
+    let outputs = ISet.elements (branch_instr_defined_vars i) in
     fprintf fmt "\"kind\": \"branch\",@ ";
     fprintf fmt "\"guard\": %a,@ " pp_emf_cst_or_var g; (* it has to be a variable or a constant *)
-    fprintf fmt "\"output\": [%a],@ " (fprintf_list ~sep:", " pp_var_string) outputs;
+    fprintf fmt "\"outputs\": [%a],@ " (fprintf_list ~sep:", " pp_var_string) outputs;
     fprintf fmt "\"branches\": [@[<v 0>%a@]]@ "
       (fprintf_list ~sep:",@ "
 	 (fun fmt (tag, instrs_tag) ->
