@@ -109,7 +109,7 @@ let const_of_top top_decl =
 let node_of_top top_decl =
   match top_decl.top_decl_desc with
   | Node nd -> nd
-  | _ -> assert false
+  | _ -> raise Not_found
 
 let imported_node_of_top top_decl =
   match top_decl.top_decl_desc with

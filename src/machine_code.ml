@@ -106,11 +106,11 @@ let get_node_def id m =
   try
     let (decl, _) = List.assoc id m.mcalls in
     Corelang.node_of_top decl
-  with Not_found -> (
-    Format.eprintf "Unable to find node %s in list [%a]@.@?"
-      id
-      (Utils.fprintf_list ~sep:", " (fun fmt (n,_) -> Format.fprintf fmt "%s" n)) m.mcalls
-    ;
+  with Not_found -> ( 
+    (* Format.eprintf "Unable to find node %s in list [%a]@.@?" *)
+    (*   id *)
+    (*   (Utils.fprintf_list ~sep:", " (fun fmt (n,_) -> Format.fprintf fmt "%s" n)) m.mcalls *)
+    (* ; *)
     raise Not_found
   )
     
