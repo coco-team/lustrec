@@ -246,6 +246,7 @@ let rec pp_emf_instr m fmt i =
 	 (fun fmt (tag, instrs_tag) ->
 	   let (*branch_outputs*) _, branch_inputs = branch_block_vars instrs_tag in    	   
 	   fprintf fmt "@[<v 2>\"%s\": {@ " tag;
+	   fprintf fmt "\"guard_value\": \"%a\",@ " pp_tag_id tag; 
 	   fprintf fmt "\"inputs\": [%a],@ " pp_emf_vars_decl (VSet.elements branch_inputs); 
 	   fprintf fmt "@[<v 2>\"instrs\": {@ ";
 	   fprintf_list ~sep:",@ " (pp_emf_instr m) fmt instrs_tag;

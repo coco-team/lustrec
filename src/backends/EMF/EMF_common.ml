@@ -51,7 +51,14 @@ let pp_emf_vars_decl fmt vl =
 let reset_name id =
   "reset_" ^ id
   
-    
+let pp_tag_id fmt t =
+  let typ = (Corelang.typedef_of_top (Hashtbl.find Corelang.tag_table t)) in
+  if typ.tydef_id = "bool" then
+    pp_print_string fmt t
+  else
+    let const_list = match typ.tydef_desc with Tydec_enum tl -> tl | _ -> assert false in
+    fprintf fmt "%i" (get_idx t const_list)
+     
 let pp_emf_cst_or_var fmt v =
   match v.value_desc with
   | Cst ((Const_tag t) as c)->
@@ -60,9 +67,8 @@ let pp_emf_cst_or_var fmt v =
        fprintf fmt "{@[\"type\": \"constant\",@ \"value\": \"%a\"@ @]}"
 	 Printers.pp_const c
      else (
-       let const_list = match typ.tydef_desc with Tydec_enum tl -> tl | _ -> assert false in
-       fprintf fmt "{@[\"type\": \"constant\",@ \"value\": \"%i\",@ " 
-	 (get_idx t const_list);
+       fprintf fmt "{@[\"type\": \"constant\",@ \"value\": \"%a\",@ " 
+	 pp_tag_id t;
        fprintf fmt "\"origin_type\": \"%s\",@ \"origin_value\": \"%s\"@ "
 	 typ.tydef_id t;
        fprintf fmt "@]}"
