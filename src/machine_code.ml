@@ -21,7 +21,7 @@ exception NormalizationError
 module OrdVarDecl:Map.OrderedType with type t=var_decl =
   struct type t = var_decl;; let compare = compare end
 
-module ISet = Set.Make(OrdVarDecl)
+module VSet = Set.Make(OrdVarDecl)
 
 let rec pp_val fmt v =
   match v.value_desc with
@@ -110,7 +110,7 @@ let get_node_def id m =
     Format.eprintf "Unable to find node %s in list [%a]@.@?"
       id
       (Utils.fprintf_list ~sep:", " (fun fmt (n,_) -> Format.fprintf fmt "%s" n)) m.mcalls
-      ; assert false;
+    ;
     raise Not_found
   )
     
@@ -314,7 +314,7 @@ let translate_ident node (m, si, j, d, s) id =
   (* Format.eprintf "trnaslating ident: %s@." id; *)
   try (* id is a node var *)
     let var_id = get_node_var id node in
-    if ISet.exists (fun v -> v.var_id = id) m
+    if VSet.exists (fun v -> v.var_id = id) m
     then (
       (* Format.eprintf "a STATE VAR@."; *)
       mk_val (StateVar var_id) var_id.var_type
@@ -463,16 +463,16 @@ let translate_eq node ((m, si, j, d, s) as args) eq =
       Utils.IMap.add o (arrow_top_decl, []) j,
       d,
       (control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some eq) (MStep ([var_x], o, [c1;c2])))) :: s)
-  | [x], Expr_pre e1 when ISet.mem (get_node_var x node) d     ->
+  | [x], Expr_pre e1 when VSet.mem (get_node_var x node) d     ->
      let var_x = get_node_var x node in
-     (ISet.add var_x m,
+     (VSet.add var_x m,
       si,
       j,
       d,
       control_on_clock node args eq.eq_rhs.expr_clock (mkinstr ?lustre_eq:(Some eq) (MStateAssign (var_x, translate_expr node args e1))) :: s)
-  | [x], Expr_fby (e1, e2) when ISet.mem (get_node_var x node) d ->
+  | [x], Expr_fby (e1, e2) when VSet.mem (get_node_var x node) d ->
      let var_x = get_node_var x node in
-     (ISet.add var_x m,
+     (VSet.add var_x m,
       mkinstr ?lustre_eq:(Some eq) (MStateAssign (var_x, translate_expr node args e1)) :: si,
       j,
       d,
@@ -631,17 +631,17 @@ let translate_decl nd sch =
   let locals_list = nd.node_locals @ new_locals in
 
   let nd = { nd with node_locals = locals_list } in
-  let init_args = ISet.empty, [], Utils.IMap.empty, List.fold_right (fun l -> ISet.add l) locals_list ISet.empty, [] in
+  let init_args = VSet.empty, [], Utils.IMap.empty, List.fold_right (fun l -> VSet.add l) locals_list VSet.empty, [] in
   (* memories, init instructions, node calls, local variables (including memories), step instrs *)
   let m0, init0, j0, locals0, s0 = translate_eqs nd init_args constant_eqs in
-  assert (ISet.is_empty m0);
+  assert (VSet.is_empty m0);
   assert (init0 = []);
   assert (Utils.IMap.is_empty j0);
   let m, init, j, locals, s as context_with_asserts = translate_eqs nd (m0, init0, j0, locals0, []) (assert_instrs@sorted_eqs) in
   let mmap = Utils.IMap.fold (fun i n res -> (i, n)::res) j [] in
   {
     mname = nd;
-    mmemory = ISet.elements m;
+    mmemory = VSet.elements m;
     mcalls = mmap;
     minstances = List.filter (fun (_, (n,_)) -> not (Stateless.check_node n)) mmap;
     minit = init;
@@ -650,7 +650,7 @@ let translate_decl nd sch =
     mstep = {
       step_inputs = nd.node_inputs;
       step_outputs = nd.node_outputs;
-      step_locals = ISet.elements (ISet.diff locals m);
+      step_locals = VSet.elements (VSet.diff locals m);
       step_checks = List.map (fun d -> d.Dimension.dim_loc, translate_expr nd init_args (expr_of_dimension d)) nd.node_checks;
       step_instrs = (
 	(* special treatment depending on the active backend. For horn backend,

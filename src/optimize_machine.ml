@@ -302,8 +302,8 @@ let mk_assign v e =
 let rec assigns_instr instr assign =
   match get_instr_desc instr with  
   | MLocalAssign (i,_)
-  | MStateAssign (i,_) -> ISet.add i assign
-  | MStep (ol, _, _)   -> List.fold_right ISet.add ol assign
+  | MStateAssign (i,_) -> VSet.add i assign
+  | MStep (ol, _, _)   -> List.fold_right VSet.add ol assign
   | MBranch (_,hl)     -> List.fold_right (fun (_, il) -> assigns_instrs il) hl assign
   | _                  -> assign
 
@@ -404,14 +404,14 @@ let rec instrs_cse subst instrs =
 let machine_cse subst machine =
   (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "machine_cse %a@." pp_elim subst);*)
   let subst, instrs = instrs_cse subst machine.mstep.step_instrs in
-  let assigned = assigns_instrs instrs ISet.empty
+  let assigned = assigns_instrs instrs VSet.empty
   in
   {
     machine with
-      mmemory = List.filter (fun vdecl -> ISet.mem vdecl assigned) machine.mmemory;
+      mmemory = List.filter (fun vdecl -> VSet.mem vdecl assigned) machine.mmemory;
       mstep = { 
 	machine.mstep with 
-	  step_locals = List.filter (fun vdecl -> ISet.mem vdecl assigned) machine.mstep.step_locals;
+	  step_locals = List.filter (fun vdecl -> VSet.mem vdecl assigned) machine.mstep.step_locals;
 	  step_instrs = instrs
       }
   }
