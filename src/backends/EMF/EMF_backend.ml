@@ -29,7 +29,7 @@ let pp_var_string fmt v = fprintf fmt "\"%s\"" v
 (*let pp_node_args = fprintf_list ~sep:", " pp_var_name*)
 
 let pp_emf_var_decl fmt v =
-  fprintf fmt "@[{\"name\": \"%a\", type:\"%a\"}@]"
+  fprintf fmt "@[{\"name\": \"%a\", \"type\":\"%a\"}@]"
     Printers.pp_var_name v
     Printers.pp_var_type v
     
@@ -448,7 +448,7 @@ let rec pp_emf_instr2 m fmt i =
 	   local/state vars but not calls to other functions *)
 	fprintf fmt "\"kind\": \"operator\",@ ";
 	fprintf fmt "\"lhs\": \"%a\",@ " Printers.pp_var_name lhs;
-	fprintf fmt "\"name\": \"%s\",@ \"args\": [@[%a@]]}"
+	fprintf fmt "\"name\": \"%s\",@ \"args\": [@[%a@]]"
 	  fun_id
 	  pp_emf_cst_or_var_list vl
       )	 
@@ -489,16 +489,16 @@ let rec pp_emf_instr2 m fmt i =
     fprintf fmt "\"kind\": \"branch\",@ ";
     fprintf fmt "\"guard\": %a,@ " pp_emf_cst_or_var g; (* it has to be a variable or a constant *)
     fprintf fmt "\"output\": [%a],@ " (fprintf_list ~sep:", " pp_var_string) outputs;
-    fprintf fmt "\"branches\": [@[<v 0>%a@]]@ "
+    fprintf fmt "\"branches\": {@[<v 0>%a@]}@ "
       (fprintf_list ~sep:",@ "
 	 (fun fmt (tag, instrs_tag) ->
-	   fprintf fmt "\"%s\": [@[<v 0>" tag;
+	   fprintf fmt "\"%s\": {@[<v 0>" tag;
 	   fprintf_list ~sep:",@ " (pp_emf_instr2 m) fmt instrs_tag;
 	       (* TODO xx ajouter les outputs dans le Mbranch et les inputs de chaque
 	    action bloc dans chaque branch 
 	    (fprintf_list ~sep:", " pp_var_string) arguments_vars *)
 	       
-	       fprintf fmt "@]]"
+	       fprintf fmt "@]}"
 
 	 )
       )
@@ -519,10 +519,10 @@ let rec pp_emf_instr2 m fmt i =
       (if is_stateful then "statefulcall" else "statelesscall")
       (node_f.node_id) 
       f;
-    fprintf fmt "\"lhs\": [%a],@ \"args\": [@[%a@]],@ "
+    fprintf fmt "\"lhs\": [%a],@ \"args\": [@[%a@]]@ "
       (fprintf_list ~sep:",@ " (fun fmt v -> fprintf fmt "\"%a\"" Printers.pp_var_name v)) outputs
       pp_emf_cst_or_var_list inputs;
-    if is_stateful then fprintf fmt "\"reset\": \"%s\"" (reset_name f)   
+    if is_stateful then fprintf fmt ",@ \"reset\": \"%s\"" (reset_name f)   
   )
 
   | MComment _ 
@@ -530,7 +530,7 @@ let rec pp_emf_instr2 m fmt i =
   (* not  available for EMF output *)
 
   in
-  fprintf fmt "@[{ \"%a\": { " get_instr_id i;
+  fprintf fmt "@[ \"%a\": { " get_instr_id i;
   fprintf fmt "@[<v 0>%a,@ " pp_content i;
   fprintf fmt "\"original_lustre_expr\": [@[<v 0>\"%a\"@]]@]" (pp_original_lustre_expression m) i; 
   fprintf fmt "}@]"
@@ -557,36 +557,36 @@ let rec pp_emf_instr2 m fmt i =
                     ],
            outputs: [{name: "out1", type: "int"}, {name: "out2", type: "int"}],
            locals:  [{name: "x", type: "int"}],
-           instrs:  [
-                    { def_x: { lhs: ["x"], 
+           instrs:  {
+                    def_x: { lhs: ["x"], 
                                rhs: {type: "statefulcall", name: "bar", 
                                      args: [in1, in2], reset: [ni4_reset] } 
                              }
+                    
+                    def_out1: { lhs: "out1", rhs: "x" } ,
+                    def_out2: { lhs: "out2", rhs: "in2"}
                     }
-                    { def_out1: { lhs: "out1", rhs: "x" } },
-                    { def_out2: { lhs: "out2", rhs: "in2" }}
-                    ]
            }
 
 Basically we have the following different definitions
 1. local assign of a variable to another one:
-   { def_out1: { kind: "local_assign", lhs: "out1", rhs: "x" } },
+   def_out1: { kind: "local_assign", lhs: "out1", rhs: "x" },
 
 2. pre construct over a variable (this is a state assign):
-   { def_pre_x: { kind: "pre", lhs: "pre_x", rhs: "x" } },
+   def_pre_x: { kind: "pre", lhs: "pre_x", rhs: "x" },
 
 3. arrow constructs, while there is not specific input, it could be reset 
    by a specific signal. We register it as a fresh rhs var:
-   { def_arrow: { kind: "arrow", name: "ni4", lhs: "is_init", rhs: "reset_ni4"}}
+   def_arrow: { kind: "arrow", name: "ni4", lhs: "is_init", rhs: "reset_ni4"}
 
 2. call to a stateless function, typically an operator
-   { def_x: { kind: "statelesscall", lhs: ["x"], 
+    def_x: { kind: "statelesscall", lhs: ["x"], 
               name: "bar", rhs: [in1, in2]} 
-   }
+   
   or in the operator version 
-   { def_x: { kind: "operator", lhs: ["x"], 
+   def_x: { kind: "operator", lhs: ["x"], 
               name: "+", rhs: [in1, in2]} 
-   }
+   
 
   In Simulink this should introduce a subsystem in the first case or a 
   regular block in the second with card(lhs) outputs and card{args} inputs.
@@ -608,12 +608,12 @@ Basically we have the following different definitions
   the instructions.
 
 4. branching construct: (guard expr, (tag, instr list) list)
-   { "merge_XX": { type: "branch", guard: "var_guard", 
+    "merge_XX": { type: "branch", guard: "var_guard", 
                    inputs:   ["varx", "vary"],
                    outputs:  ["vark", "varz"],
-                   branches: ["tag1": [liste_of_definitions (1-4)], ...] 
+                   branches: {"tag1": {liste_of_definitions (1-4)}, ...}
                  }
-   }
+   
 
   In Simulink, this should become one IF block to produce enable ports 
   "var_guard == tag1", "var_guard == tag2", .... as well as one action 
@@ -631,7 +631,7 @@ let pp_machine fmt m =
       pp_emf_vars_decl m.mstep.step_outputs
       pp_emf_vars_decl m.mstep.step_locals
     ;
-    fprintf fmt "\"instrs\": [@[<v 0> %a@]@ ]"
+    fprintf fmt "\"instrs\": {@[<v 0> %a@]@ }"
       (fprintf_list ~sep:",@ " (pp_emf_instr2 m)) m.mstep.step_instrs;
     fprintf fmt "@]@ }"
   with Unhandled msg -> (
@@ -663,7 +663,7 @@ let translate fmt basename prog machines =
   fprintf fmt "\"nodes\": @[<v 0>{@ ";
   (* Previous alternative: mapping normalized lustre to EMF: 
      fprintf_list ~sep:",@ " pp_decl fmt prog; *)
-  fprintf_list ~sep:",@ " pp_machine fmt machines;
+  fprintf_list ~sep:",@ " pp_machine fmt (List.rev machines);
   fprintf fmt "@ @]}";
   fprintf fmt "@ @]}"
 
