@@ -329,6 +329,7 @@ let pp_meta fmt basename =
   fprintf fmt "@ @]},@ "
     
 let translate fmt basename prog machines =
+  (* record_types prog; *)
   fprintf fmt "@[<v 0>{@ ";
   pp_meta fmt basename;
   fprintf fmt "\"nodes\": @[<v 0>{@ ";
