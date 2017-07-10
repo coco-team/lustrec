@@ -424,7 +424,13 @@ let pp_emf_cst_or_var fmt v =
        Printers.pp_var_name v
   | _ -> assert false (* Invalid argument *)
 
-     
+let rec get_expr_vars v =
+  match v.value_desc with
+  | Cst c -> VSet.empty
+  | LocalVar v | StateVar v -> VSet.singleton v
+  | Fun (_, args) -> List.fold_left (fun accu v -> VSet.union accu (get_expr_vars v)) VSet.empty args
+  | _ -> assert false (* Invalid argument *)
+
 let branch_cpt = ref 0
 let get_instr_id fmt i =
   match Corelang.get_instr_desc i with
@@ -434,22 +440,37 @@ let get_instr_id fmt i =
   | MStep (_, id, _) -> fprintf fmt "%s" id
   | _ -> () (* No name *)
 
-let rec branch_block_defined_vars il =
+let rec branch_block_vars il =
   List.fold_left
-    (fun accu i -> ISet.union accu (branch_instr_defined_vars i)) ISet.empty il
-and branch_instr_defined_vars i =
+    (fun (accu_def, accu_read) i ->
+      let defined_vars, read_vars = branch_instr_vars i in
+      ISet.union accu_def defined_vars, VSet.union accu_read read_vars)
+    (ISet.empty, VSet.empty) il
+and branch_instr_vars i =
   match Corelang.get_instr_desc i with
-  | MLocalAssign (var,_) 
-  | MStateAssign (var,_) -> ISet.singleton var.var_id
-  | MStep (vars, _, _)  ->  ISet.of_list (List.map (fun v -> v.var_id) vars)
-  | MBranch (_,(_,hd_il)::tl)     -> (* We focus on variables defined in all branches *)
-     List.fold_left
-       (fun res (_, il) -> ISet.inter res (branch_block_defined_vars il))
-       (branch_block_defined_vars hd_il)
-       tl
+  | MLocalAssign (var,expr) 
+  | MStateAssign (var,expr) -> ISet.singleton var.var_id, get_expr_vars expr
+  | MStep (vars, _, args)  ->
+     ISet.of_list (List.map (fun v -> v.var_id) vars),
+    List.fold_left (fun accu v -> VSet.union accu (get_expr_vars v)) VSet.empty args
+  | MBranch (g,(_,hd_il)::tl)     -> (* We focus on variables defined in all branches *)
+     let read_guard = get_expr_vars g in
+     let def_vars_hd, read_vars_hd = branch_block_vars hd_il in
+     let def_vars, read_vars =
+       List.fold_left
+	 (fun (def_vars, read_vars) (_, il) ->
+	 (* We accumulate reads but intersect writes *)
+	   let writes_il, reads_il = branch_block_vars il in
+	   ISet.inter def_vars writes_il,
+	 VSet.union read_vars reads_il
+	 )
+	 (def_vars_hd, read_vars_hd)
+	 tl
+     in
+     def_vars, VSet.union read_guard read_vars
   | MBranch _ -> assert false (* branch instruction should admit at least one case *)
   | MReset ni           
-  | MNoReset ni -> ISet.singleton (reset_name ni)
+  | MNoReset ni -> ISet.singleton (reset_name ni), VSet.empty
   | MComment _ -> assert false (* not  available for EMF output *)
      
   
@@ -501,25 +522,32 @@ let rec pp_emf_instr2 m fmt i =
     )
     
   | MBranch (g, hl) -> (
-    let outputs = ISet.elements (branch_instr_defined_vars i) in
+    let outputs, inputs = branch_instr_vars i in
     fprintf fmt "\"kind\": \"branch\",@ ";
     fprintf fmt "\"guard\": %a,@ " pp_emf_cst_or_var g; (* it has to be a variable or a constant *)
-    fprintf fmt "\"outputs\": [%a],@ " (fprintf_list ~sep:", " pp_var_string) outputs;
-    fprintf fmt "\"branches\": {@[<v 0>%a@]}@ "
+    fprintf fmt "\"outputs\": [%a],@ " (fprintf_list ~sep:", " pp_var_string) (ISet.elements outputs);
+    fprintf fmt "\"inputs\": [%a],@ " pp_emf_vars_decl
+      (* (let guard_inputs = get_expr_vars g in
+	  VSet.elements (VSet.diff inputs guard_inputs)) -- previous version to
+	 removed guard's variable from inputs *)
+      (VSet.elements inputs)
+    ;
+    fprintf fmt "@[<v 2>\"branches\": {@ %a@]}@ "
       (fprintf_list ~sep:",@ "
 	 (fun fmt (tag, instrs_tag) ->
-	   fprintf fmt "\"%s\": {@[<v 0>" tag;
+	   let (*branch_outputs*) _, branch_inputs = branch_block_vars instrs_tag in
+    	   
+	   fprintf fmt "@[<v 2>\"%s\": {@ " tag;
+	   fprintf fmt "\"inputs\": [%a],@ " pp_emf_vars_decl (VSet.elements branch_inputs); 
+	   fprintf fmt "@[<v 2>\"instrs\": {@ ";
 	   fprintf_list ~sep:",@ " (pp_emf_instr2 m) fmt instrs_tag;
-	       (* TODO xx ajouter les outputs dans le Mbranch et les inputs de chaque
-	    action bloc dans chaque branch 
-	    (fprintf_list ~sep:", " pp_var_string) arguments_vars *)
-	       
-	       fprintf fmt "@]}"
+	   fprintf fmt "@]}@ ";
+	   fprintf fmt "@]}"
 
 	 )
       )
       hl
-  )
+   )
 
   | MStep ([var], f, _) when is_arrow_fun m i -> (* Arrow case *) (
     fprintf fmt "\"kind\": \"arrow\",@ \"name\": \"%s\",@ \"lhs\": \"%a\",@ \"rhs\": \"%s\""
@@ -535,10 +563,10 @@ let rec pp_emf_instr2 m fmt i =
       (if is_stateful then "statefulcall" else "statelesscall")
       (node_f.node_id) 
       f;
-    fprintf fmt "\"lhs\": [%a],@ \"args\": [@[%a@]]@ "
+    fprintf fmt "\"lhs\": [@[%a@]],@ \"args\": [@[%a@]]"
       (fprintf_list ~sep:",@ " (fun fmt v -> fprintf fmt "\"%a\"" Printers.pp_var_name v)) outputs
       pp_emf_cst_or_var_list inputs;
-    if is_stateful then fprintf fmt ",@ \"reset\": \"%s\"" (reset_name f)   
+    if is_stateful then fprintf fmt ",@ \"reset\": \"%s\"" (reset_name f) else fprintf fmt "@ "
   )
 
   | MComment _ 
@@ -546,9 +574,9 @@ let rec pp_emf_instr2 m fmt i =
   (* not  available for EMF output *)
 
   in
-  fprintf fmt "@[ \"%a\": { " get_instr_id i;
-  fprintf fmt "@[<v 0>%a,@ " pp_content i;
-  fprintf fmt "\"original_lustre_expr\": [@[<v 0>\"%a\"@]]@]" (pp_original_lustre_expression m) i; 
+  fprintf fmt "@[ @[<v 2>\"%a\": {@ " get_instr_id i;
+  fprintf fmt "%a@ " pp_content i;
+  (* fprintf fmt "@[<v 2>\"original_lustre_expr\": [@ \"%a\"@]]@]" (pp_original_lustre_expression m) i;  *)
   fprintf fmt "}@]"
 
        

@@ -45,7 +45,7 @@ and print_dec_ty fmt cty =
   | Tydec_array (d, cty') -> fprintf fmt "%a^%a" print_dec_ty cty' Dimension.pp_dimension d
 
 let pp_var_name fmt id = fprintf fmt "%s" id.var_id
-let pp_var_type fmt id = Types.print_ty fmt id.var_type
+let pp_var_type fmt id = Types.print_node_ty fmt id.var_type
   
 let pp_eq_lhs = fprintf_list ~sep:", " pp_print_string
 
