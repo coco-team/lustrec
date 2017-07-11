@@ -154,35 +154,41 @@ let get_instr_id fmt i =
 
 let rec branch_block_vars il =
   List.fold_left
-    (fun (accu_def, accu_read) i ->
-      let defined_vars, read_vars = branch_instr_vars i in
-      ISet.union accu_def defined_vars, VSet.union accu_read read_vars)
-    (ISet.empty, VSet.empty) il
+    (fun (accu_all_def, accu_def, accu_read) i ->
+      let all_defined_vars, common_def_vars, read_vars = branch_instr_vars i in
+      ISet.union accu_all_def all_defined_vars,
+      ISet.union accu_def common_def_vars,
+      VSet.union accu_read read_vars)
+    (ISet.empty, ISet.empty, VSet.empty) il
 and branch_instr_vars i =
   match Corelang.get_instr_desc i with
   | MLocalAssign (var,expr) 
-  | MStateAssign (var,expr) -> ISet.singleton var.var_id, get_expr_vars expr
+  | MStateAssign (var,expr) -> ISet.singleton var.var_id, ISet.singleton var.var_id, get_expr_vars expr
   | MStep (vars, _, args)  ->
-     ISet.of_list (List.map (fun v -> v.var_id) vars),
-    List.fold_left (fun accu v -> VSet.union accu (get_expr_vars v)) VSet.empty args
+     let lhs = ISet.of_list (List.map (fun v -> v.var_id) vars) in
+     lhs, lhs,
+     List.fold_left (fun accu v -> VSet.union accu (get_expr_vars v)) VSet.empty args
   | MBranch (g,(_,hd_il)::tl)     -> (* We focus on variables defined in all branches *)
      let read_guard = get_expr_vars g in
-     let def_vars_hd, read_vars_hd = branch_block_vars hd_il in
-     let def_vars, read_vars =
+     let all_def_vars_hd, def_vars_hd, read_vars_hd = branch_block_vars hd_il in
+     let all_def_vars, def_vars, read_vars =
        List.fold_left
-	 (fun (def_vars, read_vars) (_, il) ->
+	 (fun (all_def_vars, def_vars, read_vars) (_, il) ->
 	 (* We accumulate reads but intersect writes *)
-	   let writes_il, reads_il = branch_block_vars il in
+	   let all_writes_il, writes_il, reads_il = branch_block_vars il in
+	   ISet.union all_def_vars all_writes_il,
 	   ISet.inter def_vars writes_il,
-	 VSet.union read_vars reads_il
+	   VSet.union read_vars reads_il
 	 )
-	 (def_vars_hd, read_vars_hd)
+	 (all_def_vars_hd, def_vars_hd, read_vars_hd)
 	 tl
      in
-     def_vars, VSet.union read_guard read_vars
+     all_def_vars, def_vars, VSet.union read_guard read_vars
   | MBranch _ -> assert false (* branch instruction should admit at least one case *)
   | MReset ni           
-  | MNoReset ni -> ISet.singleton (reset_name ni), VSet.empty
+  | MNoReset ni ->
+     let write = ISet.singleton (reset_name ni) in
+     write, write, VSet.empty
   | MComment _ -> assert false (* not  available for EMF output *)
      
   
@@ -231,7 +237,21 @@ let rec pp_emf_instr m fmt i =
     )
     
   | MBranch (g, hl) -> (
-    let outputs, inputs = branch_instr_vars i in
+    let all_outputs, outputs, inputs = branch_instr_vars i in
+    Format.eprintf "Mbranch %a@.vars: all_out: %a, out:%a, in:%a@.@."
+      Machine_code.pp_instr i
+      (fprintf_list ~sep:", " pp_var_string) (ISet.elements all_outputs)
+      (fprintf_list ~sep:", " pp_var_string) (ISet.elements outputs)
+      pp_emf_vars_decl
+      (VSet.elements inputs)
+
+    ;
+    let inputs = VSet.filter (fun v -> not (ISet.mem v.var_id all_outputs)) inputs in
+    Format.eprintf "Filtering in: %a@.@."
+      pp_emf_vars_decl
+      (VSet.elements inputs)
+
+      ;
     fprintf fmt "\"kind\": \"branch\",@ ";
     fprintf fmt "\"guard\": %a,@ " pp_emf_cst_or_var g; (* it has to be a variable or a constant *)
     fprintf fmt "\"outputs\": [%a],@ " (fprintf_list ~sep:", " pp_var_string) (ISet.elements outputs);
@@ -244,7 +264,8 @@ let rec pp_emf_instr m fmt i =
     fprintf fmt "@[<v 2>\"branches\": {@ %a@]}@ "
       (fprintf_list ~sep:",@ "
 	 (fun fmt (tag, instrs_tag) ->
-	   let (*branch_outputs*) _, branch_inputs = branch_block_vars instrs_tag in    	   
+	   let branch_all_lhs, _, branch_inputs = branch_block_vars instrs_tag in
+	   let branch_inputs = VSet.filter (fun v -> not (ISet.mem v.var_id branch_all_lhs)) branch_inputs in
 	   fprintf fmt "@[<v 2>\"%s\": {@ " tag;
 	   fprintf fmt "\"guard_value\": \"%a\",@ " pp_tag_id tag; 
 	   fprintf fmt "\"inputs\": [%a],@ " pp_emf_vars_decl (VSet.elements branch_inputs); 
