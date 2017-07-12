@@ -80,7 +80,7 @@ let pp_emf_cst_or_var fmt v =
   | StateVar v ->
      fprintf fmt "{@[\"type\": \"variable\",@ \"value\": \"%a\"@ @]}"
        Printers.pp_var_name v
-  | _ -> assert false (* Invalid argument *)
+  | _ -> Format.eprintf "Not of cst or var: %a@." Machine_code.pp_val v ; assert false (* Invalid argument *)
 
 
 let pp_emf_cst_or_var_list =

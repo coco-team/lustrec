@@ -191,8 +191,25 @@ and branch_instr_vars i =
      write, write, VSet.empty
   | MComment _ -> assert false (* not  available for EMF output *)
      
-  
-      
+(* A kind of super join_guards: all MBranch are postponed and sorted by
+   guards so they can be easier merged *)
+let merge_branches instrs =
+  let instrs, branches =
+    List.fold_right (fun i (il, branches) ->
+      match Corelang.get_instr_desc i with
+	MBranch _ -> il, i::branches
+      | _ -> i::il, branches
+    ) instrs ([],[])
+  in
+  let sorting_branches b1 b2 =
+    match Corelang.get_instr_desc b1, Corelang.get_instr_desc b2 with
+    | MBranch(g1, hl1), MBranch(g2, hl) ->
+       compare g1 g2
+    | _ -> assert false
+  in
+  let sorted_branches = List.sort sorting_branches branches in
+  instrs @ (join_guards_list sorted_branches)
+    
 let rec pp_emf_instr m fmt i =
   let pp_content fmt i =
     match Corelang.get_instr_desc i with
@@ -270,7 +287,7 @@ let rec pp_emf_instr m fmt i =
 	   fprintf fmt "\"guard_value\": \"%a\",@ " pp_tag_id tag; 
 	   fprintf fmt "\"inputs\": [%a],@ " pp_emf_vars_decl (VSet.elements branch_inputs); 
 	   fprintf fmt "@[<v 2>\"instrs\": {@ ";
-	   fprintf_list ~sep:",@ " (pp_emf_instr m) fmt instrs_tag;
+	   (pp_emf_instrs m) fmt instrs_tag;
 	   fprintf fmt "@]}@ ";
 	   fprintf fmt "@]}"
 
@@ -310,9 +327,10 @@ let rec pp_emf_instr m fmt i =
   fprintf fmt "@[ @[<v 2>\"%a\": {@ " get_instr_id i;
   fprintf fmt "%a@ " pp_content i;
   fprintf fmt "}@]"
-
+and pp_emf_instrs m fmt instrs = fprintf_list ~sep:",@ " (pp_emf_instr m) fmt instrs
        
 let pp_machine fmt m =
+  let instrs = merge_branches m.mstep.step_instrs in
   try
     fprintf fmt "@[<v 2>\"%s\": {@ "
       m.mname.node_id;
@@ -325,7 +343,7 @@ let pp_machine fmt m =
       pp_emf_vars_decl m.mstep.step_locals
     ;
     fprintf fmt "\"instrs\": {@[<v 0> %a@]@ }"
-      (fprintf_list ~sep:",@ " (pp_emf_instr m)) m.mstep.step_instrs;
+      (pp_emf_instrs m) instrs;
     fprintf fmt "@]@ }"
   with Unhandled msg -> (
     eprintf "[Error] @[<v 0>EMF backend@ Issues while translating node %s@ "
@@ -351,7 +369,7 @@ let pp_meta fmt basename =
   fprintf fmt "@ @]},@ "
     
 let translate fmt basename prog machines =
-  (* record_types prog; *)
+   (* record_types prog; *)
   fprintf fmt "@[<v 0>{@ ";
   pp_meta fmt basename;
   fprintf fmt "\"nodes\": @[<v 0>{@ ";
