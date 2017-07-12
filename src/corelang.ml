@@ -1065,11 +1065,6 @@ let copy_top top =
 let copy_prog top_list =
   List.map copy_top top_list
 
-let functional_backend () = 
-  match !Options.output with
-  | "horn" | "lustre" | "acsl" -> true
-  | _ -> false
-
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

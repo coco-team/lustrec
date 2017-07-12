@@ -602,7 +602,7 @@ let translate_decl nd sch =
      to be declared for each assert *)
   let new_locals, assert_instrs, nd_node_asserts =
     let exprl = List.map (fun assert_ -> assert_.assert_expr ) nd.node_asserts in
-    if Corelang.functional_backend () then
+    if Backends.is_functional () then
       [], [], exprl  
     else (* Each assert(e) is associated to a fresh variable v and declared as
 	    v=e; assert (v); *)

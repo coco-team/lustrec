@@ -262,74 +262,7 @@ let stage2 prog =
   Log.report ~level:3 (fun fmt -> fprintf fmt ".. generated machines (unoptimized):@ %a@ "Machine_code.pp_machines machine_code);
 
   (* Optimize machine code *)
-  let machine_code =
-    if !Options.optimization >= 4 (* && !Options.output <> "horn" *) then
-      begin
-	Log.report ~level:1 
-	  (fun fmt -> fprintf fmt ".. machines optimization: sub-expression elimination@,");
-	let machine_code = Optimize_machine.machines_cse machine_code in
-	Log.report ~level:3 (fun fmt -> fprintf fmt ".. generated machines (sub-expr elim):@ %a@ "Machine_code.pp_machines machine_code);
-	machine_code
-      end
-    else
-      machine_code
-  in
-  (* Optimize machine code *)
-  let machine_code, removed_table = 
-    if !Options.optimization >= 2 (*&& !Options.output <> "horn"*) then
-      begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt 
-	  ".. machines optimization: const. inlining (partial eval. with const)@,");
-	let machine_code, removed_table = Optimize_machine.machines_unfold (Corelang.get_consts prog) node_schs machine_code in
-	Log.report ~level:3 (fun fmt -> fprintf fmt "\t@[Eliminated constants: @[%a@]@]@ "
-	  (pp_imap Optimize_machine.pp_elim) removed_table);
-	Log.report ~level:3 (fun fmt -> fprintf fmt ".. generated machines (const inlining):@ %a@ "Machine_code.pp_machines machine_code);	
-	machine_code, removed_table
-      end
-    else
-      machine_code, IMap.empty
-  in  
-  (* Optimize machine code *)
-  let machine_code =
-    if !Options.optimization >= 3 && not (Corelang.functional_backend ()) then
-      begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines optimization: minimize stack usage by reusing variables@,");
-	let node_schs    = Scheduling.remove_prog_inlined_locals removed_table node_schs in
-	let reuse_tables = Scheduling.compute_prog_reuse_table node_schs in
-	Optimize_machine.machines_fusion (Optimize_machine.machines_reuse_variables machine_code reuse_tables)
-      end
-    else
-      machine_code
-  in
-  
-  (* Salsa optimize machine code *)
-  (*
-  let machine_code = 
-    if !Options.salsa_enabled then
-      begin
-	check_main ();
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. salsa machines optimization: optimizing floating-point accuracy with Salsa@,");
-	(* Selecting float constants for Salsa *)
-	let constEnv = List.fold_left (
-	  fun accu c_topdecl ->
-	    match c_topdecl.top_decl_desc with
-	    | Const c when Types.is_real_type c.const_type  ->
-	      (c.const_id, c.const_value) :: accu
-	    | _ -> accu
-	) [] (Corelang.get_consts prog) 
-	in
-	List.map 
-	  (Machine_salsa_opt.machine_t2machine_t_optimized_by_salsa constEnv) 
-	  machine_code 
-      end
-    else
-      machine_code
-  in
-  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@ "
-    (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
-    machine_code);
-  *)
-  machine_code
+  Optimize_machine.optimize prog node_schs machine_code
 
 
 (* printing code *)

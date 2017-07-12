@@ -144,7 +144,6 @@ val extend_eexpr: (quantifier_type * var_decl list) list -> eexpr -> eexpr
 val update_expr_annot: ident -> expr -> expr_annot -> expr
 (* val mkpredef_call: Location.t -> ident -> eexpr list -> eexpr*)
 
-val functional_backend: unit -> bool
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)
