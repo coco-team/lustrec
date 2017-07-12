@@ -3,14 +3,10 @@ let join_guards = ref true
 
 let setup () =
   match !Options.output with
-  (* | "emf" -> *)
-  (*    join_guards := true; (\* guards should not be joined, in order to have only *)
-  (* 			      if c then x = e1 else x = e2 to ease *)
-  (* 			      reconstruction of flows. *\) *)
-  (*   Options.optimization := 0; (\* Optimization=0 prevents expression *)
-  (* 				  elimination. This simplifies largely the *)
-  (* 				  association of lustre expression to *)
-  (* 				  instructions *\) *)
+  | "emf" ->
+     (* In case of a default "int" type, substitute it with the legal int32 value *)
+     if !Options.int_type = "int" then
+       Options.int_type := "int32"
   | _ -> ()
 
 let is_functional () = 
@@ -18,7 +14,7 @@ let is_functional () =
   | "horn" | "lustre" | "acsl" | "emf" -> true
   | _ -> false
 
-  
+
 (* Local Variables: *)
 (* compile-command: "make -k -C .." *)
 (* End: *)
