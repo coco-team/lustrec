@@ -41,34 +41,57 @@ let collecting_semantics machines fmt node machine =
       main_output_dummy
   in
 
-  (* Special case when the main node is stateless *)
-  let reset_name, step_name =
-    if is_stateless machine then
-      pp_machine_stateless_name, pp_machine_stateless_name
-    else
-      pp_machine_reset_name, pp_machine_step_name
-  in
-
   fprintf fmt "(declare-rel MAIN (%a))@."
     (Utils.fprintf_list ~sep:" " pp_type)
     (List.map (fun v -> v.var_type) main_memory_next);
 
-  fprintf fmt "; Initial set: Reset(c,m) + One Step(m,x) @.";
-  fprintf fmt "(declare-rel INIT_STATE ())@.";
-  fprintf fmt "(rule INIT_STATE)@.";
-  fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>";
-  fprintf fmt "INIT_STATE@ ";
-  fprintf fmt "(@[<v 0>%a %a@])@ "
-    reset_name node
-    (Utils.fprintf_list ~sep:" " (pp_horn_var machine)) (reset_vars machines machine);
-  fprintf fmt "(@[<v 0>%a %a@])"
-    step_name node
-    (Utils.fprintf_list ~sep:" " (pp_horn_var machine)) (step_vars_m_x machines machine);
-    
-  fprintf fmt "@]@ )@ ";
-  fprintf fmt "(MAIN %a)@]@.))@.@."
-    (Utils.fprintf_list ~sep:" " (pp_horn_var machine)) main_memory_next ;
+  
+  (* Init case *)
+  let _ = 
+    (* Special case when the main node is stateless *)
+    if is_stateless machine then (
+      let step_name = pp_machine_stateless_name in
+      fprintf fmt "; Initial set: One Step(m,x)  -- Stateless node! @.";
+      fprintf fmt "(declare-rel INIT_STATE ())@.";
+      fprintf fmt "(rule INIT_STATE)@.";
+      fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>";
+      fprintf fmt "INIT_STATE@ ";
+      fprintf fmt "(@[<v 0>%a %a@])"
+	step_name node
+	(Utils.fprintf_list ~sep:" " (pp_horn_var machine)) (step_vars_m_x machines machine);    
+      fprintf fmt "@]@ )@ ";
+      fprintf fmt "(MAIN %a)@]@.))@.@."
+	(Utils.fprintf_list ~sep:" " (pp_horn_var machine)) main_memory_next ;
+    )
+    else (
+      let reset_name, step_name =
+	pp_machine_reset_name, pp_machine_step_name
+      in
+      fprintf fmt "; Initial set: Reset(c,m) + One Step(m,x) @.";
+      fprintf fmt "(declare-rel INIT_STATE ())@.";
+      fprintf fmt "(rule INIT_STATE)@.";
+      fprintf fmt "@[<v 2>(rule (=> @ (and @[<v 0>";
+      fprintf fmt "INIT_STATE@ ";
+      fprintf fmt "(@[<v 0>%a %a@])@ "
+	reset_name node
+	(Utils.fprintf_list ~sep:" " (pp_horn_var machine)) (reset_vars machines machine);
+      fprintf fmt "(@[<v 0>%a %a@])"
+	step_name node
+	(Utils.fprintf_list ~sep:" " (pp_horn_var machine)) (step_vars_m_x machines machine);
+      
+      fprintf fmt "@]@ )@ ";
+      fprintf fmt "(MAIN %a)@]@.))@.@."
+	(Utils.fprintf_list ~sep:" " (pp_horn_var machine)) main_memory_next ;
+    )
+  in
 
+  let step_name = 
+    if is_stateless machine then 
+      pp_machine_stateless_name
+    else
+      pp_machine_step_name
+  in
+  
   fprintf fmt "; Inductive def@.";
   (Utils.fprintf_list ~sep:" " (fun fmt v -> fprintf fmt "%a@." pp_decl_var v)) fmt main_output_dummy;
   fprintf fmt

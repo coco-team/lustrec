@@ -36,7 +36,7 @@ let pp_horn_var m fmt id =
 (* Used to print boolean constants *)
 let pp_horn_tag fmt t =
   pp_print_string fmt (if t = tag_true then "true" else if t = tag_false then "false" else t)
-
+    
 (* Prints a constant value *)
 let rec pp_horn_const fmt c =
   match c with
@@ -276,8 +276,8 @@ let pp_instance_call machines reset_instances m fmt i inputs outputs =
     end
   with Not_found -> ( (* stateless node instance *)
     let (n,_) = List.assoc i m.mcalls in
-    fprintf fmt "(%s @[<v 0>%a%t%a)@]"
-      (node_name n)
+    fprintf fmt "(%a @[<v 0>%a%t%a)@]"
+      pp_machine_stateless_name (node_name n)
       (Utils.fprintf_list ~sep:"@ " (pp_horn_val self (pp_horn_var m)))
       inputs
       (Utils.pp_final_char_if_non_empty "@ " inputs)
@@ -327,14 +327,14 @@ let rec pp_machine_instr machines reset_instances (m: machine_t) fmt instr : ide
     let self = m.mname.node_id in
     let pp_branch fmt (tag, instrs) =
       fprintf fmt 
-	"@[<v 3>(or (not (= %a %s))@ " 
+	"@[<v 3>(or (not (= %a %a))@ " 
 	(*"@[<v 3>(=> (= %a %s)@ "*)  (* Issues with some versions of Z3. It
 					  seems that => within Horn predicate
 					  may cause trouble. I have hard time
 					  producing a MWE, so I'll just keep the
 					  fix here as (not a) or b *)
 	(pp_horn_val self (pp_horn_var m)) g
-	tag;
+	pp_horn_tag tag;
       let _ (* rs *) = pp_machine_instrs machines reset_instances m fmt instrs in 
       fprintf fmt "@])";
       () (* rs *)

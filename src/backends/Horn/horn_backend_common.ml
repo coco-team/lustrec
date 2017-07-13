@@ -16,7 +16,7 @@ open Machine_code
 
 let pp_machine_reset_name fmt id = fprintf fmt "%s_reset" id
 let pp_machine_step_name fmt id = fprintf fmt "%s_step" id
-let pp_machine_stateless_name fmt id = fprintf fmt "%s" id
+let pp_machine_stateless_name fmt id = fprintf fmt "%s_fun" id
 
 let rec pp_type fmt t =
   match (Types.repr t).Types.tdesc with
