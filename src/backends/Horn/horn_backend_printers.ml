@@ -430,12 +430,32 @@ let print_machine machines fmt m =
 	    (Utils.fprintf_list ~sep:" " pp_type)
 	    (List.map (fun v -> v.var_type) (inout_vars machines m));
 
-	  (* Rule for single predicate *)
-	  fprintf fmt "@[<v 2>(rule (=> @ ";
-	  ignore (pp_machine_instrs machines ([] (* No reset info for stateless nodes *) )  m fmt m.mstep.step_instrs);
-	  fprintf fmt "@ (%a %a)@]@.))@.@."
-	    pp_machine_stateless_name m.mname.node_id
-	    (Utils.fprintf_list ~sep:" " (pp_horn_var m)) (inout_vars machines m);
+          match m.mstep.step_asserts with
+	  | [] ->
+	     begin
+
+	       (* Rule for single predicate *)
+	       fprintf fmt "; Stateless step rule @.";
+	       fprintf fmt "@[<v 2>(rule (=> @ ";
+	       ignore (pp_machine_instrs machines ([] (* No reset info for stateless nodes *) )  m fmt m.mstep.step_instrs);
+	       fprintf fmt "@ (%a @[<v 0>%a)@]@]@.))@.@."
+		 pp_machine_stateless_name m.mname.node_id
+		 (Utils.fprintf_list ~sep:" " (pp_horn_var m)) (inout_vars machines m);
+	     end
+	  | assertsl ->
+	     begin
+	       let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id (pp_horn_var m) in
+	       
+	       fprintf fmt "; Stateless step rule with Assertions @.";
+	       (*Rule for step*)
+	       fprintf fmt "@[<v 2>(rule (=> @ (and @ ";
+	       ignore (pp_machine_instrs machines [] m fmt m.mstep.step_instrs);
+	       fprintf fmt "@. %a)@ (%a @[<v 0>%a)@]@]@.))@.@." (pp_conj pp_val) assertsl
+		 pp_machine_stateless_name m.mname.node_id
+		 (Utils.fprintf_list ~sep:" " (pp_horn_var m)) (step_vars machines m);
+	  
+	     end
+	       
 	end
       else
 	begin
@@ -460,30 +480,30 @@ let print_machine machines fmt m =
 
           match m.mstep.step_asserts with
 	  | [] ->
-	    begin
-
-	      (* Rule for step*)
-	      fprintf fmt "@[<v 2>(rule (=> @ ";
-	      ignore (pp_machine_instrs machines [] m fmt m.mstep.step_instrs);
-	      fprintf fmt "@ (%a @[<v 0>%a)@]@]@.))@.@."
-		pp_machine_step_name m.mname.node_id
-		(Utils.fprintf_list ~sep:"@ " (pp_horn_var m)) (step_vars machines m);
-	    end
+	     begin
+	       fprintf fmt "; Step rule @.";
+	       (* Rule for step*)
+	       fprintf fmt "@[<v 2>(rule (=> @ ";
+	       ignore (pp_machine_instrs machines [] m fmt m.mstep.step_instrs);
+	       fprintf fmt "@ (%a @[<v 0>%a)@]@]@.))@.@."
+		 pp_machine_step_name m.mname.node_id
+		 (Utils.fprintf_list ~sep:"@ " (pp_horn_var m)) (step_vars machines m);
+	     end
 	  | assertsl -> 
-	    begin
-	      let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id (pp_horn_var m) in
-	      (* print_string pp_val; *)
-	      fprintf fmt "; with Assertions @.";
-	      
-	      (*Rule for step*)
-	      fprintf fmt "@[<v 2>(rule (=> @ (and @ ";
-	      ignore (pp_machine_instrs machines [] m fmt m.mstep.step_instrs);
-	      fprintf fmt "@. %a)(%a @[<v 0>%a)@]@]@.))@.@." (pp_conj pp_val) assertsl
-		pp_machine_step_name m.mname.node_id
-		(Utils.fprintf_list ~sep:" " (pp_horn_var m)) (step_vars machines m);
-	    end
-	      
-	      
+	     begin
+	       let pp_val = pp_horn_val ~is_lhs:true m.mname.node_id (pp_horn_var m) in
+	       (* print_string pp_val; *)
+	       fprintf fmt "; Step rule with Assertions @.";
+	       
+	       (*Rule for step*)
+	       fprintf fmt "@[<v 2>(rule (=> @ (and @ ";
+	       ignore (pp_machine_instrs machines [] m fmt m.mstep.step_instrs);
+	       fprintf fmt "@. %a)@ (%a @[<v 0>%a)@]@]@.))@.@." (pp_conj pp_val) assertsl
+		 pp_machine_step_name m.mname.node_id
+		 (Utils.fprintf_list ~sep:" " (pp_horn_var m)) (step_vars machines m);
+	     end
+	       
+	       
 	end
     end
 
