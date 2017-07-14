@@ -13,7 +13,7 @@ let pp_call fmt m f outputs inputs =
   if Corelang.is_imported_node decl then
     let inode = Corelang.imported_node_of_top decl in
     match inode.nodei_id, Filename.basename decl.top_decl_owner with
-    | name, (("math" | "conv") as lib) -> (
+    | name, (("lustrec_math" | "simulink_math_fcn" | "conv") as lib) -> (
       fprintf fmt "\"kind\": \"functioncall\",@ \"name\": \"%s\",@ \"library\": \"%s\",@ "
         name lib;
       fprintf fmt "\"lhs\": [@[%a@]],@ \"args\": [@[%a@]]"

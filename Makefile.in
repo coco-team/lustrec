@@ -4,7 +4,7 @@ bindir=@bindir@
 datarootdir = ${prefix}/share
 includedir = ${prefix}/include
 
-LUSI_LIBS=include/math.lusi include/conv.lusi
+LUSI_LIBS=include/lustrec_math.lusi include/simulink_math_fcn.lusi include/conv.lusi
 LUSI_MPFR_LIB=include/mpfr_lustre.lusi
 LOCAL_BINDIR=bin
 LOCAL_DOCDIR=doc/manual
@@ -40,7 +40,7 @@ clean: clean-lusic
 	@make -C src clean
 
 dist-src-clean: clean
-	@rm -f config.log config.status include/*.lusic include/math.h include/conv.h include/mpfr_lustre.h
+	@rm -f config.log config.status include/*.lusic include/lustrec_math.h include/simulink_math_fcn.h include/conv.h include/mpfr_lustre.h
 	@rm -f Makefile ./src/Makefile ./src/pluginList.ml ./src/version.ml ./src/_tags
 
 DIST_ARCHIVE_NAME=lustrec-$(shell $(LOCAL_BINDIR)/lustrec -version | grep version | cut -d, -f 2 | sed -e "s/ version //" -e "s/ (/-/" -e "s/ /-/" -e "s/\//-/" -e "s/)//")-src.tar.gz
