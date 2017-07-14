@@ -222,7 +222,7 @@ let rec pp_emf_instr m fmt i =
 	(* Thanks to normalization, vl shall only contain constant or
 	   local/state vars but not calls to other functions *)
 	fprintf fmt "\"kind\": \"operator\",@ ";
-	fprintf fmt "\"lhs\": \"%a\",@ " Printers.pp_var_name lhs;
+	fprintf fmt "\"lhs\": \"%a\",@ " pp_var_name lhs;
 	fprintf fmt "\"name\": \"%s\",@ \"args\": [@[%a@]]"
 	  fun_id
 	  pp_emf_cst_or_var_list vl
@@ -232,7 +232,7 @@ let rec pp_emf_instr m fmt i =
       | LocalVar _
       | StateVar _ -> (
 	fprintf fmt "\"kind\": \"local_assign\",@ \"lhs\": \"%a\",@ \"rhs\": %a"
-	  Printers.pp_var_name lhs
+	  pp_var_name lhs
 	  pp_emf_cst_or_var expr
       ))    )
 
@@ -240,7 +240,7 @@ let rec pp_emf_instr m fmt i =
 			       variable or a constant, no function anymore! *)
     -> (
       fprintf fmt "\"kind\": \"pre\",@ \"lhs\": \"%a\",@ \"rhs\": %a"
-	Printers.pp_var_name lhs
+	pp_var_name lhs
 	pp_emf_cst_or_var expr
     )
      
@@ -313,7 +313,7 @@ let rec pp_emf_instr m fmt i =
       print_protect (fun fmt -> pp_print_string fmt (node_f.node_id)) 
       f;
     fprintf fmt "\"lhs\": [@[%a@]],@ \"args\": [@[%a@]]"
-      (fprintf_list ~sep:",@ " (fun fmt v -> fprintf fmt "\"%a\"" Printers.pp_var_name v)) outputs
+      (fprintf_list ~sep:",@ " (fun fmt v -> fprintf fmt "\"%a\"" pp_var_name v)) outputs
       pp_emf_cst_or_var_list inputs;
     if is_stateful then fprintf fmt ",@ \"reset\": \"%s\"" (reset_name f) else fprintf fmt "@ "
   )
