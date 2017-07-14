@@ -334,8 +334,8 @@ and pp_emf_instrs m fmt instrs = fprintf_list ~sep:",@ " (pp_emf_instr m) fmt in
 let pp_machine fmt m =
   let instrs = merge_branches m.mstep.step_instrs in
   try
-    fprintf fmt "@[<v 2>\"%s\": {@ "
-      m.mname.node_id;
+    fprintf fmt "@[<v 2>\"%a\": {@ "
+       print_protect (fun fmt -> pp_print_string fmt m.mname.node_id);
     fprintf fmt "\"kind\": %t,@ \"inputs\": [%a],@ \"outputs\": [%a],@ \"locals\": [%a],@ "
       (fun fmt -> if not ( snd (get_stateless_status m) )
 	then fprintf fmt "\"stateful\""
