@@ -33,9 +33,23 @@ let record_types prog =
 *)
     
 (* Basic printing functions *)
+
+(* If string length of f is longer than 50 chars, we select the 20 first and
+   last and put a hash in the middle *)
+let print_protect fmt f =
+  fprintf str_formatter "%t" f;
+  let s = flush_str_formatter () in
+  let l = String.length s in
+  if l > 50 then
+    let prefix = String.sub s 0 20 and
+	suffix = String.sub s (l-20) 20 in
+    let hash = Hashtbl.hash s in
+    fprintf fmt "%s_%i_%s" prefix hash suffix
+  else
+    fprintf fmt "%s" s
     
 let pp_var_string fmt v = fprintf fmt "\"%s\"" v
-(*let pp_var_name fmt v = fprintf fmt "\"%a\"" Printers.pp_var_name v*)
+let pp_var_name fmt v = print_protect fmt (fun fmt -> Printers.pp_var_name fmt v) 
 (*let pp_node_args = fprintf_list ~sep:", " pp_var_name*)
 
 (********* Printing types ***********)
@@ -126,7 +140,7 @@ let pp_var_type fmt v =
     
 let pp_emf_var_decl fmt v =
   fprintf fmt "@[{\"name\": \"%a\", \"datatype\":\"%a\"}@]"
-    Printers.pp_var_name v
+    pp_var_name v
     pp_var_type v
     
 let pp_emf_vars_decl fmt vl =

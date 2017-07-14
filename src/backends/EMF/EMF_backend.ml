@@ -146,10 +146,12 @@ let is_arrow_fun m i =
 let branch_cpt = ref 0
 let get_instr_id fmt i =
   match Corelang.get_instr_desc i with
-  | MLocalAssign(lhs,_) | MStateAssign (lhs, _) -> Printers.pp_var_name fmt lhs
+  | MLocalAssign(lhs,_) | MStateAssign (lhs, _) -> pp_var_name fmt lhs
   | MReset i | MNoReset i -> fprintf fmt "%s" (reset_name i)
   | MBranch (g, _) -> incr branch_cpt; fprintf fmt "branch_%i" !branch_cpt
-  | MStep (outs, id, _) -> fprintf fmt "%a_%s" (fprintf_list ~sep:"_" Printers.pp_var_name) outs id
+  | MStep (outs, id, _) ->
+     print_protect fmt 
+       (fun fmt -> fprintf fmt "%a_%s" (fprintf_list ~sep:"_" pp_var_name) outs id)
   | _ -> () (* No name *)
 
 let rec branch_block_vars il =
@@ -299,16 +301,16 @@ let rec pp_emf_instr m fmt i =
   | MStep ([var], f, _) when is_arrow_fun m i -> (* Arrow case *) (
     fprintf fmt "\"kind\": \"arrow\",@ \"name\": \"%s\",@ \"lhs\": \"%a\",@ \"rhs\": \"%s\""
       f
-      Printers.pp_var_name var
+      pp_var_name var
       (reset_name f)
   )
 
   | MStep (outputs, f, inputs) when not (is_imported_node f m) -> (
     let node_f = Machine_code.get_node_def f m in
     let is_stateful = List.mem_assoc f m.minstances in 
-    fprintf fmt "\"kind\": \"%s\",@ \"name\": \"%s\",@ \"id\": \"%s\",@ "
+    fprintf fmt "\"kind\": \"%s\",@ \"name\": \"%a\",@ \"id\": \"%s\",@ "
       (if is_stateful then "statefulcall" else "statelesscall")
-      (node_f.node_id) 
+      print_protect (fun fmt -> pp_print_string fmt (node_f.node_id)) 
       f;
     fprintf fmt "\"lhs\": [@[%a@]],@ \"args\": [@[%a@]]"
       (fprintf_list ~sep:",@ " (fun fmt v -> fprintf fmt "\"%a\"" Printers.pp_var_name v)) outputs
