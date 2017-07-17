@@ -255,9 +255,6 @@ let rec pp_emf_instr m fmt i =
 	(reset_name id)
     )
     
-  | MBranch (_, [_, single_branch]) -> (
-    pp_emf_instrs m fmt single_branch (* Single branch hack treated as regular instrs *)
-  )
   | MBranch (g, hl) -> (
     let all_outputs, outputs, inputs = branch_instr_vars i in
     Format.eprintf "Mbranch %a@.vars: all_out: %a, out:%a, in:%a@.@."
@@ -329,9 +326,15 @@ let rec pp_emf_instr m fmt i =
   (* not  available for EMF output *)
 
   in
-  fprintf fmt "@[ @[<v 2>\"%a\": {@ " get_instr_id i;
-  fprintf fmt "%a@ " pp_content i;
-  fprintf fmt "}@]"
+  match Corelang.get_instr_desc i with
+  | MBranch (_, [_, single_branch]) -> (
+    pp_emf_instrs m fmt single_branch (* Single branch hack treated as regular instrs *)
+  )
+  | _ -> (
+    fprintf fmt "@[ @[<v 2>\"%a\": {@ " get_instr_id i;
+    fprintf fmt "%a@ " pp_content i;
+    fprintf fmt "}@]"
+  )
 and pp_emf_instrs m fmt instrs = fprintf_list ~sep:",@ " (pp_emf_instr m) fmt instrs
        
 let pp_machine fmt m =
