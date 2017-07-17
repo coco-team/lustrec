@@ -255,6 +255,9 @@ let rec pp_emf_instr m fmt i =
 	(reset_name id)
     )
     
+  | MBranch (_, [_, single_branch]) -> (
+    pp_emf_instrs m fmt single_branch (* Single branch hack treated as regular instrs *)
+  )
   | MBranch (g, hl) -> (
     let all_outputs, outputs, inputs = branch_instr_vars i in
     Format.eprintf "Mbranch %a@.vars: all_out: %a, out:%a, in:%a@.@."
@@ -332,7 +335,7 @@ let rec pp_emf_instr m fmt i =
 and pp_emf_instrs m fmt instrs = fprintf_list ~sep:",@ " (pp_emf_instr m) fmt instrs
        
 let pp_machine fmt m =
-  let instrs = (* merge_branches *) m.mstep.step_instrs in
+  let instrs = (*merge_branches*) m.mstep.step_instrs in
   try
     fprintf fmt "@[<v 2>\"%a\": {@ "
        print_protect (fun fmt -> pp_print_string fmt m.mname.node_id);
