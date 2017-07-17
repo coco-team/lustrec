@@ -332,7 +332,7 @@ let rec pp_emf_instr m fmt i =
 and pp_emf_instrs m fmt instrs = fprintf_list ~sep:",@ " (pp_emf_instr m) fmt instrs
        
 let pp_machine fmt m =
-  let instrs = merge_branches m.mstep.step_instrs in
+  let instrs = (* merge_branches *) m.mstep.step_instrs in
   try
     fprintf fmt "@[<v 2>\"%a\": {@ "
        print_protect (fun fmt -> pp_print_string fmt m.mname.node_id);
