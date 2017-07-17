@@ -17,8 +17,8 @@ open Corelang
 let check_main () =
   if !Options.main_node = "" then
     begin
-      eprintf "Code generation error: %a@." pp_error No_main_specified;
-      raise (Error (Location.dummy_loc, No_main_specified))
+      eprintf "Code generation error: %a@." Error.pp_error_msg Error.No_main_specified;
+      raise (Error (Location.dummy_loc, Error.No_main_specified))
     end
 
 let create_dest_dir () =
@@ -55,7 +55,7 @@ let parse_header own filename =
       raise exc
     | Corelang.Error (loc, err) as exc -> (
       eprintf "Parsing error: %a%a@."
-	Corelang.pp_error err
+	Error.pp_error_msg err
 	Location.pp_loc loc;
       raise exc
     )
@@ -81,7 +81,7 @@ let parse_source source_name =
     raise exc
   | Corelang.Error (loc, err) as exc ->
     eprintf "Parsing error: %a%a@."
-      Corelang.pp_error err
+      Error.pp_error_msg err
       Location.pp_loc loc;
     raise exc
 
@@ -91,7 +91,7 @@ let expand_automata decls =
     Automata.expand_decls decls
   with (Corelang.Error (loc, err)) as exc ->
     eprintf "Automata error: %a%a@."
-      Corelang.pp_error err
+      Error.pp_error_msg err
       Location.pp_loc loc;
     raise exc
 
@@ -128,7 +128,7 @@ let type_decls env decls =
 	raise exc
     end 
   in
-  if !Options.print_types then
+  if !Options.print_types || !Options.verbose_level > 2 then
     Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>  %a@]@ " Corelang.pp_prog_type decls);
   new_env
       
@@ -143,7 +143,7 @@ let clock_decls env decls =
 	raise exc
     end
   in
-  if !Options.print_clocks then
+  if !Options.print_clocks  || !Options.verbose_level > 2 then
     Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>  %a@]@ " Corelang.pp_prog_clock decls);
   new_env
 
@@ -233,14 +233,14 @@ let is_stateful topdecl =
 
 
 let import_dependencies prog =
-  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 0>.. extracting dependencies@ ");
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 4>.. extracting dependencies");
   let dependencies = Corelang.get_dependencies prog in
   let deps =
   List.fold_left
     (fun (compilation_dep, type_env, clock_env) dep ->
       let (local, s) = Corelang.dependency_of_top dep in
       let basename = Options_management.name_dependency (local, s) in
-      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "  Library %s@ " basename);
+      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@ Library %s" basename);
       let lusic = Modules.import_dependency dep.top_decl_loc (local, s) in
       (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "");*)
       let (lusi_type_env, lusi_clock_env) = get_envs_from_top_decls lusic.Lusic.contents in

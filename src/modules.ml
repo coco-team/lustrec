@@ -15,12 +15,12 @@ open Corelang
 
 let add_symbol loc msg hashtbl name value =
  if Hashtbl.mem hashtbl name
- then raise (Error (loc, Already_bound_symbol msg))
+ then raise (Error (loc, Error.Already_bound_symbol msg))
  else Hashtbl.add hashtbl name value
 
 let check_symbol loc msg hashtbl name =
  if not (Hashtbl.mem hashtbl name)
- then raise (Error (loc, Unbound_symbol msg))
+ then raise (Error (loc, Error.Unbound_symbol msg))
  else ()
 
 let add_imported_node name value =
@@ -33,7 +33,7 @@ let add_imported_node name value =
     let itf = value.top_decl_itf in
     match value'.top_decl_desc, value.top_decl_desc with
     | Node _        , ImportedNode _  when owner = owner' && itf' && (not itf) -> Hashtbl.add node_table name value
-    | ImportedNode _, ImportedNode _            -> raise (Error (value.top_decl_loc, Already_bound_symbol ("node " ^ name)))
+    | ImportedNode _, ImportedNode _            -> raise (Error (value.top_decl_loc, Error.Already_bound_symbol ("node " ^ name)))
     | _                                         -> assert false
   with
     Not_found                                   -> Hashtbl.add node_table name value
@@ -48,7 +48,7 @@ let add_node name value =
     let itf = value.top_decl_itf in
     match value'.top_decl_desc, value.top_decl_desc with
     | ImportedNode _, Node _          when owner = owner' && itf' && (not itf) -> ()
-    | Node _        , Node _                    -> raise (Error (value.top_decl_loc, Already_bound_symbol ("node " ^ name)))
+    | Node _        , Node _                    -> raise (Error (value.top_decl_loc, Error.Already_bound_symbol ("node " ^ name)))
     | _                                         -> assert false
   with
     Not_found                                   -> Hashtbl.add node_table name value
@@ -56,12 +56,12 @@ let add_node name value =
 
 let add_tag loc name typ =
   if Hashtbl.mem tag_table name then
-    raise (Error (loc, Already_bound_symbol ("enum tag " ^ name)))
+    raise (Error (loc, Error.Already_bound_symbol ("enum tag " ^ name)))
   else Hashtbl.add tag_table name typ
 
 let add_field loc name typ =
   if Hashtbl.mem field_table name then
-    raise (Error (loc, Already_bound_symbol ("struct field " ^ name)))
+    raise (Error (loc, Error.Already_bound_symbol ("struct field " ^ name)))
   else Hashtbl.add field_table name typ
 
 let import_typedef name tydef =
@@ -75,7 +75,7 @@ let import_typedef name tydef =
     | Tydec_clock ty      -> import ty
     | Tydec_const c       ->
        if not (Hashtbl.mem type_table (Tydec_const c))
-       then raise (Error (loc, Unbound_symbol ("type " ^ c)))
+       then raise (Error (loc, Error.Unbound_symbol ("type " ^ c)))
        else ()
     | Tydec_array (c, ty) -> import ty
     | _                   -> ()
@@ -91,13 +91,13 @@ let add_type itf name value =
     let itf = value.top_decl_itf in
     match value'.top_decl_desc, value.top_decl_desc with
     | TypeDef ty', TypeDef ty when coretype_equal ty'.tydef_desc ty.tydef_desc && owner' = owner && itf' && (not itf) -> ()
-    | TypeDef ty', TypeDef ty -> raise (Error (value.top_decl_loc, Already_bound_symbol ("type " ^ name)))
+    | TypeDef ty', TypeDef ty -> raise (Error (value.top_decl_loc, Error.Already_bound_symbol ("type " ^ name)))
     | _       -> assert false
   with Not_found -> (import_typedef name value; Hashtbl.add type_table (Tydec_const name) value)
 
 let check_type loc name =
  if not (Hashtbl.mem type_table (Tydec_const name))
- then raise (Error (loc, Unbound_symbol ("type " ^ name)))
+ then raise (Error (loc, Error.Unbound_symbol ("type " ^ name)))
  else ()
 
 let add_const itf name value =
@@ -109,7 +109,7 @@ let add_const itf name value =
     let itf = value.top_decl_itf in
     match value'.top_decl_desc, value.top_decl_desc with
     | Const c', Const c when c.const_value = c'.const_value && owner' = owner && itf' && (not itf) -> ()
-    | Const c', Const c -> raise (Error (value.top_decl_loc, Already_bound_symbol ("const " ^ name)))
+    | Const c', Const c -> raise (Error (value.top_decl_loc, Error.Already_bound_symbol ("const " ^ name)))
     | _       -> assert false
   with Not_found -> Hashtbl.add consts_table name value
 
@@ -124,7 +124,7 @@ let import_dependency_aux loc (local, dep) =
   | Sys_error msg ->
     begin
       (*Format.eprintf "Error: %s@." msg;*)
-      raise (Error (loc, Unknown_library basename))
+      raise (Error (loc, Error.Unknown_library basename))
     end
   | Corelang.Error (_, msg) -> raise (Corelang.Error (loc, msg))
 
@@ -134,7 +134,7 @@ let import_dependency loc (local, dep) =
   with
   | Corelang.Error (_, err) as exc -> (
     Format.eprintf "Import error: %a%a@."
-      Corelang.pp_error err
+      Error.pp_error_msg err
       Location.pp_loc loc;
     raise exc
   )
@@ -145,7 +145,7 @@ let check_dependency lusic basename =
   with
   | Corelang.Error (loc, err) as exc -> (
     Format.eprintf "Import error: %a%a@."
-      Corelang.pp_error err
+      Error.pp_error_msg err
       Location.pp_loc loc;
     raise exc
   )
@@ -170,7 +170,7 @@ let load_header imported header =
   with
     Corelang.Error (loc, err) as exc -> (
       Format.eprintf "Import error: %a%a@."
-	Corelang.pp_error err
+	Error.pp_error_msg err
 	Location.pp_loc loc;
       raise exc
     );;
@@ -195,7 +195,7 @@ let load_program imported program =
   with
     Corelang.Error (loc, err) as exc -> (
       Format.eprintf "Import error: %a%a@."
-	Corelang.pp_error err
+	Error.pp_error_msg err
 	Location.pp_loc loc;
       raise exc
     );;

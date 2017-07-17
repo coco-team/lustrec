@@ -251,15 +251,6 @@ and instr_t_desc =
   | MComment of string
 
 
-type error =
-    Main_not_found
-  | Main_wrong_kind
-  | No_main_specified
-  | Unbound_symbol of ident
-  | Already_bound_symbol of ident
-  | Unknown_library of ident
-  | Wrong_number of ident
-
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

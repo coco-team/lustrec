@@ -14,7 +14,7 @@ open LustreSpec
 (*open Dimension*)
 
 
-exception Error of Location.t * error
+exception Error of Location.t * Error.error_kind
 
 module VDeclModule =
 struct (* Node module *)
@@ -823,32 +823,6 @@ let pp_decl_clock fmt cdecl =
 let pp_prog_clock fmt prog =
   Utils.fprintf_list ~sep:"" pp_decl_clock fmt prog
 
-let pp_error fmt = function
-    Main_not_found ->
-      fprintf fmt "Could not find the definition of main node %s.@."
-	!Global.main_node
-  | Main_wrong_kind ->
-    fprintf fmt
-      "Node %s does not correspond to a valid main node definition.@." 
-      !Global.main_node 
-  | No_main_specified ->
-    fprintf fmt "No main node specified (use -node option)@."
-  | Unbound_symbol sym ->
-    fprintf fmt
-      "%s is undefined.@."
-      sym
-  | Already_bound_symbol sym -> 
-    fprintf fmt
-      "%s is already defined.@."
-      sym
-  | Unknown_library sym ->
-    fprintf fmt
-      "impossible to load library %s.lusic.@.Please compile the corresponding interface or source file.@."
-      sym
-  | Wrong_number sym ->
-    fprintf fmt
-      "library %s.lusic has a different version number and may crash compiler.@.Please recompile the corresponding interface or source file.@."
-      sym
 
 (* filling node table with internal functions *)
 let vdecls_of_typ_ck cpt ty =
@@ -1064,6 +1038,28 @@ let copy_top top =
 
 let copy_prog top_list =
   List.map copy_top top_list
+
+
+let rec expr_contains_expr expr_tag expr  =
+  let search = expr_contains_expr expr_tag in
+  expr.expr_tag = expr_tag ||
+      (
+	match expr.expr_desc with
+	| Expr_const _ -> false
+	| Expr_array el -> List.exists search el
+	| Expr_access (e1, _) 
+	| Expr_power (e1, _) -> search e1
+	| Expr_tuple el -> List.exists search el
+	| Expr_ite (c, t, e) -> List.exists search [c;t;e]
+	| Expr_arrow (e1, e2)
+	| Expr_fby (e1, e2) -> List.exists search [e1; e2]
+	| Expr_pre e' 
+	| Expr_when (e', _, _) -> search e'
+	| Expr_merge (_, hl) -> List.exists (fun (_, h) -> search h) hl
+	| Expr_appl (_, e', None) -> search e' 
+	| Expr_appl (_, e', Some e'') -> List.exists search [e'; e''] 
+	| Expr_ident _ -> false
+      )
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
