@@ -383,7 +383,7 @@ let translate fmt basename prog machines =
   (* Previous alternative: mapping normalized lustre to EMF: 
      fprintf_list ~sep:",@ " pp_decl fmt prog; *)
   fprintf_list ~sep:",@ " pp_machine fmt (List.rev machines);
-  fprintf fmt "@]@ }";
+  fprintf fmt "}@]@ }";
   fprintf fmt "@]@ }"
 
 (* Local Variables: *)
