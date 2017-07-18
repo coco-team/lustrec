@@ -187,7 +187,7 @@ let pp_emf_cst_or_var fmt v =
   | LocalVar v
   | StateVar v -> (
     fprintf fmt "{@[\"type\": \"variable\",@ \"value\": \"%a\",@ "
-      Printers.pp_var_name v;
+      pp_var_name v;
     fprintf fmt "\"datatype\": \"%a\"@ " pp_var_type v;
     fprintf fmt "@]}"
   )
