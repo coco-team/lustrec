@@ -34,15 +34,15 @@ let record_types prog =
     
 (* Basic printing functions *)
 
-(* If string length of f is longer than 50 chars, we select the 20 first and
+(* If string length of f is longer than 50 chars, we select the 10 first and
    last and put a hash in the middle *)
 let print_protect fmt f =
   fprintf str_formatter "%t" f;
   let s = flush_str_formatter () in
   let l = String.length s in
-  if l > 50 then
-    let prefix = String.sub s 0 20 and
-	suffix = String.sub s (l-20) 20 in
+  if l > 30 then
+    let prefix = String.sub s 0 10 and
+	suffix = String.sub s (l-10) 10 in
     let hash = Hashtbl.hash s in
     fprintf fmt "%s_%i_%s" prefix hash suffix
   else
