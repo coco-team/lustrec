@@ -280,7 +280,7 @@ let rec pp_emf_instr m fmt i =
 	 remove guard's variable from inputs *)
       (VSet.elements inputs)
     ;
-    fprintf fmt "@[<v 2>\"branches\": {@ %a@]}@ "
+    fprintf fmt "@[<v 2>\"branches\": {@ @[<v 0>%a@]@]@ }"
       (fprintf_list ~sep:",@ "
 	 (fun fmt (tag, instrs_tag) ->
 	   let branch_all_lhs, _, branch_inputs = branch_block_vars instrs_tag in
@@ -290,9 +290,8 @@ let rec pp_emf_instr m fmt i =
 	   fprintf fmt "\"inputs\": [%a],@ " pp_emf_vars_decl (VSet.elements branch_inputs); 
 	   fprintf fmt "@[<v 2>\"instrs\": {@ ";
 	   (pp_emf_instrs m) fmt instrs_tag;
-	   fprintf fmt "@]}@ ";
-	   fprintf fmt "@]}"
-
+	   fprintf fmt "@]@ }";
+	   fprintf fmt "@]@ }"
 	 )
       )
       hl
@@ -332,8 +331,8 @@ let rec pp_emf_instr m fmt i =
   )
   | _ -> (
     fprintf fmt "@[ @[<v 2>\"%a\": {@ " get_instr_id i;
-    fprintf fmt "%a@ " pp_content i;
-    fprintf fmt "}@]"
+    fprintf fmt "%a" pp_content i;
+    fprintf fmt "@]@]@ }"
   )
 and pp_emf_instrs m fmt instrs = fprintf_list ~sep:",@ " (pp_emf_instr m) fmt instrs
        
@@ -384,8 +383,8 @@ let translate fmt basename prog machines =
   (* Previous alternative: mapping normalized lustre to EMF: 
      fprintf_list ~sep:",@ " pp_decl fmt prog; *)
   fprintf_list ~sep:",@ " pp_machine fmt (List.rev machines);
-  fprintf fmt "@ @]}";
-  fprintf fmt "@ @]}"
+  fprintf fmt "@]@ }";
+  fprintf fmt "@]@ }"
 
 (* Local Variables: *)
 (* compile-command: "make -C ../.." *)
