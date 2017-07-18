@@ -34,21 +34,33 @@ let record_types prog =
     
 (* Basic printing functions *)
 
-(* If string length of f is longer than 50 chars, we select the 20 first and
+let hash_map = Hashtbl.create 13
+  
+(* If string length of f is longer than 50 chars, we select the 10 first and
    last and put a hash in the middle *)
 let print_protect fmt f =
   fprintf str_formatter "%t" f;
   let s = flush_str_formatter () in
   let l = String.length s in
-  if l > 50 then
-    let prefix = String.sub s 0 20 and
-	suffix = String.sub s (l-20) 20 in
-    let hash = Hashtbl.hash s in
-    fprintf fmt "%s_%i_%s" prefix hash suffix
+  if l > 30 then
+    let _ = Format.eprintf "Looking for variable %s in hash @[<v 0>%t@]@."
+      s
+      (fun fmt -> Hashtbl.iter (fun s new_s -> fprintf fmt "%s -> %s@ " s new_s) hash_map)
+    in
+    if Hashtbl.mem hash_map s then
+    fprintf fmt "%s" (Hashtbl.find hash_map s)
+    else
+      let prefix = String.sub s 0 10 and
+	  suffix = String.sub s (l-10) 10 in
+      let hash = Hashtbl.hash s in
+      fprintf str_formatter "%s_%i_%s" prefix hash suffix;
+      let new_s = flush_str_formatter () in
+      Hashtbl.add hash_map s new_s;
+      fprintf fmt "%s" new_s
   else
     fprintf fmt "%s" s
     
-let pp_var_string fmt v = fprintf fmt "\"%s\"" v
+let pp_var_string fmt v = print_protect fmt (fun fmt -> fprintf fmt "%s" v) 
 let pp_var_name fmt v = print_protect fmt (fun fmt -> Printers.pp_var_name fmt v) 
 (*let pp_node_args = fprintf_list ~sep:", " pp_var_name*)
 
@@ -187,7 +199,7 @@ let pp_emf_cst_or_var fmt v =
   | LocalVar v
   | StateVar v -> (
     fprintf fmt "{@[\"type\": \"variable\",@ \"value\": \"%a\",@ "
-      Printers.pp_var_name v;
+      pp_var_name v;
     fprintf fmt "\"datatype\": \"%a\"@ " pp_var_type v;
     fprintf fmt "@]}"
   )

@@ -222,7 +222,7 @@ let rec pp_emf_instr m fmt i =
 	(* Thanks to normalization, vl shall only contain constant or
 	   local/state vars but not calls to other functions *)
 	fprintf fmt "\"kind\": \"operator\",@ ";
-	fprintf fmt "\"lhs\": \"%a\",@ " Printers.pp_var_name lhs;
+	fprintf fmt "\"lhs\": \"%a\",@ " pp_var_name lhs;
 	fprintf fmt "\"name\": \"%s\",@ \"args\": [@[%a@]]"
 	  fun_id
 	  pp_emf_cst_or_var_list vl
@@ -232,7 +232,7 @@ let rec pp_emf_instr m fmt i =
       | LocalVar _
       | StateVar _ -> (
 	fprintf fmt "\"kind\": \"local_assign\",@ \"lhs\": \"%a\",@ \"rhs\": %a"
-	  Printers.pp_var_name lhs
+	  pp_var_name lhs
 	  pp_emf_cst_or_var expr
       ))    )
 
@@ -240,7 +240,7 @@ let rec pp_emf_instr m fmt i =
 			       variable or a constant, no function anymore! *)
     -> (
       fprintf fmt "\"kind\": \"pre\",@ \"lhs\": \"%a\",@ \"rhs\": %a"
-	Printers.pp_var_name lhs
+	pp_var_name lhs
 	pp_emf_cst_or_var expr
     )
      
@@ -280,7 +280,7 @@ let rec pp_emf_instr m fmt i =
 	 remove guard's variable from inputs *)
       (VSet.elements inputs)
     ;
-    fprintf fmt "@[<v 2>\"branches\": {@ %a@]}@ "
+    fprintf fmt "@[<v 2>\"branches\": {@ @[<v 0>%a@]@]@ }"
       (fprintf_list ~sep:",@ "
 	 (fun fmt (tag, instrs_tag) ->
 	   let branch_all_lhs, _, branch_inputs = branch_block_vars instrs_tag in
@@ -290,9 +290,8 @@ let rec pp_emf_instr m fmt i =
 	   fprintf fmt "\"inputs\": [%a],@ " pp_emf_vars_decl (VSet.elements branch_inputs); 
 	   fprintf fmt "@[<v 2>\"instrs\": {@ ";
 	   (pp_emf_instrs m) fmt instrs_tag;
-	   fprintf fmt "@]}@ ";
-	   fprintf fmt "@]}"
-
+	   fprintf fmt "@]@ }";
+	   fprintf fmt "@]@ }"
 	 )
       )
       hl
@@ -313,7 +312,7 @@ let rec pp_emf_instr m fmt i =
       print_protect (fun fmt -> pp_print_string fmt (node_f.node_id)) 
       f;
     fprintf fmt "\"lhs\": [@[%a@]],@ \"args\": [@[%a@]]"
-      (fprintf_list ~sep:",@ " (fun fmt v -> fprintf fmt "\"%a\"" Printers.pp_var_name v)) outputs
+      (fprintf_list ~sep:",@ " (fun fmt v -> fprintf fmt "\"%a\"" pp_var_name v)) outputs
       pp_emf_cst_or_var_list inputs;
     if is_stateful then fprintf fmt ",@ \"reset\": \"%s\"" (reset_name f) else fprintf fmt "@ "
   )
@@ -326,16 +325,22 @@ let rec pp_emf_instr m fmt i =
   (* not  available for EMF output *)
 
   in
-  fprintf fmt "@[ @[<v 2>\"%a\": {@ " get_instr_id i;
-  fprintf fmt "%a@ " pp_content i;
-  fprintf fmt "}@]"
+  match Corelang.get_instr_desc i with
+  | MBranch (_, [_, single_branch]) -> (
+    pp_emf_instrs m fmt single_branch (* Single branch hack treated as regular instrs *)
+  )
+  | _ -> (
+    fprintf fmt "@[ @[<v 2>\"%a\": {@ " get_instr_id i;
+    fprintf fmt "%a" pp_content i;
+    fprintf fmt "@]@]@ }"
+  )
 and pp_emf_instrs m fmt instrs = fprintf_list ~sep:",@ " (pp_emf_instr m) fmt instrs
        
 let pp_machine fmt m =
-  let instrs = merge_branches m.mstep.step_instrs in
+  let instrs = (*merge_branches*) m.mstep.step_instrs in
   try
-    fprintf fmt "@[<v 2>\"%s\": {@ "
-      m.mname.node_id;
+    fprintf fmt "@[<v 2>\"%a\": {@ "
+       print_protect (fun fmt -> pp_print_string fmt m.mname.node_id);
     fprintf fmt "\"kind\": %t,@ \"inputs\": [%a],@ \"outputs\": [%a],@ \"locals\": [%a],@ "
       (fun fmt -> if not ( snd (get_stateless_status m) )
 	then fprintf fmt "\"stateful\""
@@ -378,8 +383,8 @@ let translate fmt basename prog machines =
   (* Previous alternative: mapping normalized lustre to EMF: 
      fprintf_list ~sep:",@ " pp_decl fmt prog; *)
   fprintf_list ~sep:",@ " pp_machine fmt (List.rev machines);
-  fprintf fmt "@ @]}";
-  fprintf fmt "@ @]}"
+  fprintf fmt "@]@ }";
+  fprintf fmt "@]@ }"
 
 (* Local Variables: *)
 (* compile-command: "make -C ../.." *)
