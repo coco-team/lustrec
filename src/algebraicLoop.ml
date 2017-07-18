@@ -2,15 +2,14 @@
 each node is mapped to its own cycles
 each cycle is tentatively solved by inlining one of its component
 
-When done, a report is generated
+When done, a report is generated.
 
 - for each initial AL, the cycle is presented
    - either it is solvable and we provide the set of inlines that solves it
    - or it is not and we write the AL as unsolvable by inlining
 
    If the option solve_al is activated, the resulting partially inlined prog is
-   propagated fur future processing
-   Otherwise the program stops
+   propagated fur future processing Otherwise the compilation stops
 *)
 open LustreSpec
 open Corelang
@@ -18,11 +17,19 @@ open Utils
 open Format
 
 (* An single algebraic loop is defined (partition, node calls, inlined, status)
-   ie the list of variables in the loop, ident list
-      the possible functions identifier to inline, and whether they have been inlined yet (ident * tag * bool) list
-   and a status whether the inlining is enough  bool
+   ie 
+
+   1. the list of variables in the loop, ident list
+   
+   2.the possible functions identifier to inline, and whether they have been
+   inlined yet (ident * tag * bool) list and 
+
+   3. a status whether the inlining is enough bool
 *)
-type algebraic_loop = (ident list * (ident * expr * bool) list * bool) 
+
+type call = ident * expr * eq (* fun id, expression, and containing equation *)
+  
+type algebraic_loop = ident list * (call * bool) list * bool
   
 exception Error of (node_desc * (algebraic_loop list)) list
 
@@ -33,7 +40,7 @@ struct
 
   (* We iter over calls in node defs. If the call defined on of the variable in
      the cycle, we store it for future possible inline. *)
-  let resolve node partition =
+  let resolve node partition : call list =
     let partition = ISet.of_list partition in
     (* Preprocessing calls: associate to each of them the eq.lhs associated *)
     let eqs = get_node_eqs node in
@@ -47,10 +54,10 @@ struct
 	  | Expr_appl(fun_id, _, _) -> fun_id
 	  | _ -> assert false
 	in
-	eq, expr, fun_name
+	fun_name, expr, eq
     ) calls_expr in
     List.fold_left (
-      fun accu ((eq, _, _) as call) ->
+      fun accu ((_, _, eq) as call) ->
 	let shared_vars = ISet.inter (ISet.of_list eq.eq_lhs) partition in
 	if not (ISet.is_empty shared_vars) then
 	  (* We have a match: keep the eq and the expr to inline *)
@@ -69,9 +76,12 @@ let pp_resolution fmt resolution =
     Format.fprintf fmt "inlining: %a" Printers.pp_node_eq eq
   ) fmt resolution
   
-let al_is_solved al = true
-
-(********************)
+let al_is_solved (_, (vars, calls, status)) = status
+  
+(**********************************************************************)
+(* Functions to access or toggle the local inlining feature of a call *)
+(* expression                                                         *)
+(**********************************************************************)
 
 let inline_annotation loc =
   Inliner.keyword,
