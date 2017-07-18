@@ -60,7 +60,7 @@ let print_protect fmt f =
   else
     fprintf fmt "%s" s
     
-let pp_var_string fmt v = print_protect fmt (fun fmt -> fprintf fmt "%s" v) 
+let pp_var_string fmt v =fprintf fmt "\"%t\"" (fun fmt -> print_protect fmt (fun fmt -> fprintf fmt "%s" v)) 
 let pp_var_name fmt v = print_protect fmt (fun fmt -> Printers.pp_var_name fmt v) 
 (*let pp_node_args = fprintf_list ~sep:", " pp_var_name*)
 
