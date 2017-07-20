@@ -178,7 +178,8 @@ let update_expr_annot node_id e annot =
   List.iter (fun (key, _) -> 
     Annotations.add_expr_ann node_id e.expr_tag key
   ) annot.annots;
-  { e with expr_annot = merge_expr_annot e.expr_annot (Some annot) }
+  e.expr_annot <- merge_expr_annot e.expr_annot (Some annot);
+  e
 
 
 let mkinstr ?lustre_expr ?lustre_eq i =

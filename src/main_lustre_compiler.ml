@@ -116,7 +116,7 @@ let stage1 prog dirname basename =
       Inliner.global_inline basename prog type_env clock_env
     else (* if !Option.has_local_inline *)
       [],
-      Inliner.local_inline basename prog type_env clock_env
+      Inliner.local_inline prog (* type_env clock_env *)
   in
 
   (* Checking stateless/stateful status *)
@@ -241,7 +241,7 @@ let stage1 prog dirname basename =
 let stage2 prog =    
   (* Computation of node equation scheduling. It also breaks dependency cycles
      and warns about unused input or memory variables *)
-  Log.report ~level:1 (fun fmt -> fprintf fmt ".. scheduling@,");
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. @[<v 2>scheduling@ ");
   let prog, node_schs =
     try 
       Scheduling.schedule_prog prog
@@ -254,7 +254,7 @@ let stage2 prog =
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_fanin_table node_schs);
   Log.report ~level:5 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_dep_graph node_schs);
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
-
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
 
   (* TODO Salsa optimize prog: 
      - emits warning for programs with pre inside expressions

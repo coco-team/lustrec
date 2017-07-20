@@ -14,7 +14,6 @@ When done, a report is generated.
 open LustreSpec
 open Corelang
 open Utils
-open Format
 
 (* An single algebraic loop is defined (partition, node calls, inlined, status)
    ie 
@@ -30,8 +29,9 @@ open Format
 type call = ident * expr * eq (* fun id, expression, and containing equation *)
   
 type algebraic_loop = ident list * (call * bool) list * bool
-  
-exception Error of (node_desc * (algebraic_loop list)) list
+type report = (node_desc * algebraic_loop list) list
+exception Error of report
+
 
 (* Module that extract from the DataCycle the set of node that could be inlined
    to solve the problem. *)
@@ -76,7 +76,7 @@ let pp_resolution fmt resolution =
     Format.fprintf fmt "inlining: %a" Printers.pp_node_eq eq
   ) fmt resolution
   
-let al_is_solved (_, (vars, calls, status)) = status
+let al_is_solved (_, als) = List.for_all (fun (vars, calls, status) -> status) als
   
 (**********************************************************************)
 (* Functions to access or toggle the local inlining feature of a call *)
@@ -89,124 +89,181 @@ let inline_annotation loc =
     (Corelang.mkexpr loc
        (Expr_const (Const_tag tag_true) ))
 
-let is_expr_inlined expr =
+let is_inlining_annot (key, status) =
+key = Inliner.keyword && (
+  match status.eexpr_qfexpr.expr_desc with
+  | Expr_const (Const_tag tag) when tag = tag_true ->
+     true
+  | Expr_const (Const_tag tag) when tag = tag_false ->
+     false
+  | _ -> assert false (* expecting true or false value *)	 
+)
+  
+let is_expr_inlined nd expr =
   match expr.expr_annot with
     None -> false
-  | Some anns -> if List.mem_assoc Inliner.keyword anns.annots then
-      let status = List.assoc Inliner.keyword anns.annots in
-      match status.eexpr_qfexpr.expr_desc with
-      | Expr_const (Const_tag tag) when tag = tag_true ->
-	 true
-      | Expr_const (Const_tag tag) when tag = tag_false ->
-	 false
-      | _ -> assert false (* expecting true or false value *)	 
-    else false
-      
-(* Inline the provided expression *)
-let inline_expr expr =
-  let ann = inline_annotation expr.expr_loc in
-    match expr.expr_annot with
-    | None -> expr.expr_annot = Some {annots = [ann]; annot_loc = expr.expr_loc} 
-    | Some anns -> expr.expr_annot = Some {anns with annots = ann::anns.annots}
-  
-(* Inline the call tagged tag in expr: should not be used anymore, thanks to a direct call to inline_expr *)
-let rec inline_call tag expr =
-  if expr.expr_tag = tag then
-    inline_expr expr
-  else
-    let _in = inline_call tag in
-    let _ins = List.exists _in
-    in
-    match expr.expr_desc with
-    | Expr_const _
-    | Expr_ident _ -> false
-    | Expr_tuple el -> _ins el
-    | Expr_ite (g,t,e) -> _ins [g;t;e]
-    | Expr_arrow (e1, e2) 
-    | Expr_fby (e1, e2) -> _ins [e1; e2]
-    | Expr_array el -> _ins el
-    | Expr_access (e, _)
-    | Expr_power (e, _)
-    | Expr_pre e
-    | Expr_when (e, _, _) -> _in e
-    | Expr_merge (_, hl) -> _ins (List.map snd hl)
-    | Expr_appl (_, arg, Some r) -> _ins [arg; r]
-    | Expr_appl (_, arg, None) -> _in arg
+  | Some anns -> (
+     (* Sanity check: expr should have the annotation AND the annotation should be declared *)
+     let local_ann = List.exists is_inlining_annot anns.annots in
+     let all_expr_inlined = Hashtbl.find_all Annotations.expr_annotations Inliner.keyword in
+     let registered =
+       List.exists
+	 (fun (nd_id, expr_tag) -> nd_id = nd.node_id && expr_tag = expr.expr_tag)
+	 all_expr_inlined
+     in
+     match local_ann, registered with
+     | true, true -> true (* Everythin' all righ' ! *)
+     | false, false -> false (* idem *)
+     | _ -> assert false 
+  )
 
+let pp_calls nd fmt calls = Format.fprintf fmt "@[<v 0>%a@]"
+  (fprintf_list ~sep:"@ " (fun fmt (funid,expr, _) -> Format.fprintf fmt "%s: %i (inlined:%b)"
+    funid
+    expr.expr_tag
+    (is_expr_inlined nd expr)
+   ))
+  calls
+
+(* Inline the provided expression *)
+let inline_expr node expr =
+  (* Format.eprintf "inlining %a@ @?" Printers.pp_expr expr; *)
+  let ann = inline_annotation expr.expr_loc in
+  let ann = {annots = [ann]; annot_loc = expr.expr_loc} in
+  let res = update_expr_annot node.node_id expr ann in
+  (* assert (is_expr_inlined node res); *)
+  (* Format.eprintf "Is expression inlined? %b@." (is_expr_inlined node res); *)
+  res
+
+(* Perform the steps of stage1/stage2 to revalidate the schedulability of the program *)
+let fast_stages_processing prog =
+  Log.report ~level:3
+    (fun fmt -> Format.fprintf fmt "@[<v 2>Fast revalidation: normalization + schedulability@ ");
+  Options.verbose_level := !Options.verbose_level - 2;
+
+  (* Mini stage 1 *)
+  (* Extracting dependencies *)
+  let dependencies, type_env, clock_env = Compiler_common.import_dependencies prog in
+  (* Local inlining *)
+  let prog = Inliner.local_inline prog (* type_env clock_env *) in
+  (* Checking stateless/stateful status *)
+  if Plugins.check_force_stateful () then
+    Compiler_common.force_stateful_decls prog
+  else
+    Compiler_common.check_stateless_decls prog;
+  (* Typing *)
+  let _ (*computed_types_env*) = Compiler_common.type_decls type_env prog in
+  (* Clock calculus *)
+  let _ (*computed_clocks_env*) = Compiler_common.clock_decls clock_env prog in
+  (* Normalization *)
+  let prog = Normalization.normalize_prog ~backend:!Options.output prog in
+  (* Mini stage 2 : Scheduling *)
+  let res = Scheduling.schedule_prog prog in
+  Options.verbose_level := !Options.verbose_level + 2;
+
+  Log.report ~level:3
+    (fun fmt -> Format.fprintf fmt "@]@ ");
+  res
 
 (**********************)
 (* Returns a modified node, if possible, and an algebraic_loop report *)
-let rec solving_node nd existing_al partitions =
+let rec solving_node max_inlines prog nd existing_al partitions =
+  (* let pp_calls = pp_calls nd in *)
   (* For each partition, we identify the original one *)
-  let rerun, al = List.fold_left (fun (rerun, al) part ->
+  let rerun, max_inlines, al = List.fold_left (fun (rerun, inlines, al) part ->
     let part_vars = ISet.of_list part in 
+    (* Useful functions to filter list of elements *)
     let match_al (vars, calls, status) =
-      not (ISet.is_empty (ISet.inter (ISet.of_list vars) part_vars))  in
+      not (ISet.is_empty (ISet.inter (ISet.of_list vars) part_vars)) in
+    (* Identifying previous alarms that could be associated to current conflict *)
     let matched, non_matched = List.partition match_al existing_al in
-    match matched, non_matched with
-    | [], _ -> ((* A new conflict partition *)
-      let calls = CycleResolution.resolve nd part in
-      (* Filter out already inlined calls *)
-      let already_inlined, possible_resolution =
-	List.partition (fun (_, expr, _) -> is_expr_inlined expr) calls in
-      (* Inlining the first uninlined call *)
-      match possible_resolution with
-      | (eq, expr, fun_id)::_ -> ((* One could inline expr *)
-	(* Forcing the expr to be inlined *)
-	let _ = inline_expr expr in
-	true, (* we have to rerun to see if the inlined expression solves the issue *)
-	(
-	  part,
-	  List.map (fun (eq, expr2, fcn_name) ->  fcn_name, expr2, (expr2.expr_tag = expr.expr_tag)) calls,
-	  false (* Status is nok, LA is unsolved yet *)
-	    
-	)::non_matched
-      )	 
-      | [] -> (* No more calls to inline: algebraic loop is not solvable *)
-	 rerun, (* we don't force rerun since the current node is not solvable *)
-	(
-	  part, (* initial list of troublesome variables *)
-	  List.map (fun (eq, expr, fcn_name) ->  fcn_name, expr, false) calls,
-	  false (* Status is nok, LA is unsolved *)
-	)::non_matched 
+    let previous_calls =
+      match matched with
+      | [] -> []
+      | [_ (*vars*), calls, _ (*status*)] -> List.map fst calls (* we just keep the calls *)
+      | _ -> (* variable should not belong to two different algrebraic loops. At least I
+		hope so! *)
+	 assert false
+    in
+    let match_previous (eq, expr, fun_id) =
+      List.exists
+	(fun (_, expr', _) -> expr'.expr_tag = expr.expr_tag)
+	previous_calls
+    in
+    (* let match_inlined (_, expr, _) = is_expr_inlined nd expr in *)
+    
+    (* let previous_inlined, previous_no_inlined = List.partition match_inlined previous_calls in *)
+    (* Format.eprintf "Previous calls: @[<v 0>inlined: {%a}@ no inlined: {%a}@ @]@ " *)
+    (*   pp_calls previous_inlined *)
+    (*   pp_calls previous_no_inlined *)
+
+    (* ; *)
+    
+    let current_calls = CycleResolution.resolve nd part in
+    (* Format.eprintf "Current calls: %a" pp_calls current_calls; *)
+    (* Filter out calls from current_calls that were not already in previous calls *)
+    let current_calls = List.filter (fun c -> not (match_previous c)) current_calls
+    in
+    (* Format.eprintf "Current new calls (no old ones): %a" pp_calls current_calls; *)
+    let calls = previous_calls @ current_calls in
+    (* Format.eprintf "All calls (previous + new): %a" pp_calls calls; *)
+    
+    (* Filter out already inlined calls: actually they should not appear
+       ... since they were inlined. We keep it for safety. *)
+    let _ (* already_inlined *), possible_resolution =
+      List.partition (fun (_, expr, _) -> is_expr_inlined nd expr) calls in
+    (* Inlining the first uninlined call *)
+    match possible_resolution with
+    | (fun_id, expr, eq)::_ -> ((* One could inline expr *)
+      Log.report ~level:2 (fun fmt-> Format.fprintf fmt "inlining call to %s@ " fun_id); 
+      (* Forcing the expr to be inlined *)
+      let _ = inline_expr nd expr in
+      (* Format.eprintf "Making sure that the inline list evolved: inlined = {%a}" *)
+      (* 	pp_calls  *)
+      (* ; *)
+      true, (* we have to rerun to see if the inlined expression solves the issue *)
+      max_inlines - 1,
+      (
+	part,
+	List.map (fun ((eq, expr2, fcn_name) as call)->  call, (expr2.expr_tag = expr.expr_tag)) calls,
+	true (* TODO was false. Should be put it true and expect a final
+		scheduling to change it to false in case of failure ? *) (*
+									   Status is nok, LA is unsolved yet *)
 	  
-    )
-    | [vars, calls, status], _ ->
-       assert false (* Existing partitions were already addressed:
-		       on peut regarder si la partition courante concerne xxx
-		       else (* New cycle ??? *)
-		       
-		       
-
-
-		       Que faut il faire?
-
-		       dans un premiertemps on peut ramasser les contraintes et s'arreter là.
-		       pas d'appel recursif donc on a toujours des nouvelles partitions
-		       on calcule les apples, on les associe à faux (on a pas inliné encore)
-		       et le statue global est à faux (on a rien resolu)
-
-		       comment resoud-on ?
-		       on ne doit se focaliser que sur les partitions courantes. C'est elle qui sont en conflit
-		       pour chaque, on pick un call et on l'inlinee
-		       apres on appel stage1/stage2 pour faire le scheudling du node
-
-
-		    *)
-
-	 
-  ) (false, existing_al) partitions
+      )::non_matched
+    )	 
+    | [] -> (* No more calls to inline: algebraic loop is not solvable *)
+       rerun, (* we don't force rerun since the current node is not solvable *)
+      max_inlines,
+      (
+	part, (* initial list of troublesogme variables *)
+	List.map (fun ((eq, expr, fcn_name) as call) ->  call, false) calls,
+	false (* Status is nok, LA is unsolved *)
+      )::non_matched 
+	
+  ) (false, max_inlines, existing_al) partitions
   in
   (* if partition an already identified al ? *)
   (* if ISet.of_list partition *)
-
-  (* if rerun then *)
-  (*   assert false (\* the missing part, redo stage 1, ... with the updated inline flags *\) *)
-  (* ; *)
-  (* TODO xxx il faut ici ajouter le inline sur le 1er appel,
-     puis reafaire le stage1 et scheduling du noeud *)
-  Some(nd, al)
-
+  if rerun && max_inlines > 0 then
+    (* At least one partition could be improved: we try to inline the calls and reschedule the node. *)
+    try
+      Log.report ~level:2 (fun fmt -> Format.fprintf fmt "rescheduling node with new inlined call@ ");
+      let _ = fast_stages_processing prog in
+      (* If everything went up to here, the problem is solved! All associated
+	 alarms are mapped to valid status. *)
+      let al = List.map (fun (v,c,_) -> v,c,true) al in
+      Log.report ~level:2 (fun fmt -> Format.fprintf fmt "AL solved@ ");
+      Some(nd, al), max_inlines
+    with Causality.Error (Causality.DataCycle partitions2) -> (
+      Log.report ~level:3 (fun fmt -> Format.fprintf fmt "AL not solved yet. Further processing.@ ");
+      solving_node max_inlines prog nd al partitions2
+    )
+  else ((* No rerun, we return the current node and computed alarms *)
+    Log.report ~level:3 (fun fmt -> Format.fprintf fmt "AL not solved yet. Stopping.@ ");
+    Some(nd, al), max_inlines
+  )
+      
 (** This function takes a prog and returns (prog', status, alarms)
     where prog' is a modified prog with some locally inlined calls
     status is true is the final prog' is schedulable, ie no algebraic loop
@@ -214,42 +271,51 @@ let rec solving_node nd existing_al partitions =
     Alarms contain the list of inlining performed or advised for each node. 
     This could be provided as a feedback to the user.
 *)
-let clean_al prog =
+let clean_al prog : program * bool * report =
+  let max_inlines = !Options.al_nb_max in
 (* We iterate over each node *)
-  let prog, al_list =
+  let _, prog, al_list =
     List.fold_right (
-      fun top (prog_accu, al_list) ->
+      fun top (max_inlines, prog_accu, al_list) ->
 	match top.top_decl_desc with
 	| Node nd -> (
-	  let error =
+	  let error, max_inlines =
 	    try (* without exception the node is schedulable; nothing to declare *)
 	      let _ = Scheduling.schedule_node nd in
-	      None
-	    with Causality.Error (Causality.DataCycle partitions) -> solving_node nd [] partitions
+	      None, max_inlines
+	    with Causality.Error (Causality.DataCycle partitions) -> (
+	      Log.report ~level:2 (fun fmt -> Format.fprintf fmt "@[<v 2>AL in node %s@ " nd.node_id);
+	      let error, max_inlines = solving_node max_inlines prog nd [] partitions in
+	      Log.report ~level:2 (fun fmt -> Format.fprintf fmt "@ @]");
+	      error, max_inlines
+	    )
 	  in
 	  match error with
-	  | None -> top::prog_accu, al_list (* keep it as is *)
+	  | None -> max_inlines, top::prog_accu, al_list (* keep it as is *)
 	  | Some (nd, al) ->
 	     (* returning the updated node, possible solved, as well as the
 		generated alarms *)
-	     {top with top_decl_desc = Node nd}::prog_accu, (nd, al)::al_list 
+	     max_inlines,
+	     {top with top_decl_desc = Node nd}::prog_accu,
+	    (nd, al)::al_list 
 	)	   
-	| _ -> top::prog_accu, al_list
-    ) prog ([], []) 
+	| _ -> max_inlines, top::prog_accu, al_list
+    ) prog (max_inlines, [], []) 
   in
   prog, List.for_all al_is_solved al_list, al_list
 
 
 (* (ident list * (ident * expr* bool) list * bool) *)
-let pp_al fmt (partition, calls, status) =
+let pp_al nd fmt (partition, calls, status) =
+  let open Format in
   fprintf fmt "@[<v 0>";
   fprintf fmt "variables in the alg. loop: @[<hov 0>%a@]@ "
     (fprintf_list ~sep:",@ " pp_print_string) partition;
   fprintf fmt "@ involved node calls: @[<v 0>%a@]@ "
     (fprintf_list ~sep:",@ "
-       (fun fmt (funid, expr, status) ->
+       (fun fmt ((funid, expr, eq), status) ->
 	 fprintf fmt "%s" funid;
-	 if status && is_expr_inlined expr then fprintf fmt " (inlining it solves the alg. loop)";
+	 if status && is_expr_inlined nd expr then fprintf fmt " (inlining it solves the alg. loop)";
        )
     ) calls;
   fprintf fmt "@]"
@@ -265,26 +331,54 @@ let pp_al fmt (partition, calls, status) =
     
     
 let pp_report fmt report =
-  fprintf fmt "@.Algebraic loops in nodes@.";
+  let open Format in
   fprintf_list ~sep:"@."
     (fun fmt (nd, als) ->
       let top = Corelang.node_from_name (nd.node_id) in
-      Error.pp_error top.top_decl_loc
+      let pp =
+	if not !Options.solve_al || List.exists (fun (_,_,valid) -> not valid) als then
+	  Error.pp_error (* at least one failure: erroneous node *)
+	else
+	  Error.pp_warning (* solvable cases: warning only *)
+      in
+      pp top.top_decl_loc
 	(fun fmt -> 
-	  fprintf fmt "node %s: {@[<v 0>%a@]}"
+	  fprintf fmt "algebraic loop in node %s: {@[<v 0>%a@]}"
 	    nd.node_id
-	    (fprintf_list ~sep:"@ " pp_al) als
+	    (fprintf_list ~sep:"@ " (pp_al nd)) als
 	)
     ) fmt report;
   fprintf fmt "@."
     
 
-let analyze prog =
+
+let analyze cpt prog =
+  Log.report ~level:1 (fun fmt ->
+    Format.fprintf fmt "@[<v 2>Algebraic loop detected: ";
+    if !Options.solve_al then Format.fprintf fmt "solving mode actived";
+    Format.fprintf fmt "@ ";    
+  );
   let prog, status_ok, report = clean_al prog in
-  if !Options.solve_al && status_ok then
-    Scheduling.schedule_prog prog
-  else (
-    (* TODO create a report *)
-    Format.eprintf "%a" pp_report report;
-    raise (Corelang.Error (Location.dummy_loc, Error.AlgebraicLoop))
-  )
+  
+  let res =
+    if cpt > 0 && !Options.solve_al && status_ok then (
+      try
+	fast_stages_processing prog
+      with _ -> assert false (* Should not happen since the error has been
+				catched already *)
+    )
+    else (
+      (* We stop with unresolved AL *)(* TODO create a report *)
+      (* Printing the report on stderr *)
+      Format.eprintf "%a" pp_report report;
+      raise (Corelang.Error (Location.dummy_loc, Error.AlgebraicLoop))
+    )
+  in
+  (* Printing the report on stderr *)
+  Format.eprintf "%a" pp_report report;
+  res
+    
+let analyze prog =
+  analyze !Options.al_nb_max prog
+    
+    

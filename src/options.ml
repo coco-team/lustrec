@@ -53,7 +53,8 @@ let gen_mcdc = ref false
 let no_mutation_suffix = ref false
 
 let solve_al = ref false
-
+let al_nb_max = ref 15
+  
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

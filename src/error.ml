@@ -50,10 +50,9 @@ let return_code kind =
       "library %s.lusic has a different version number and may crash compiler.@.Please recompile the corresponding interface or source file.@."
       sym
 
-let pp_warning loc warning_code pp_msg =
-  Format.eprintf "%a@.Warning %i: %t@."
+let pp_warning loc pp_msg =
+  Format.eprintf "%a@.Warning: %t@."
     Location.pp_loc loc
-    warning_code
     pp_msg
 
 let pp_error loc pp_msg =

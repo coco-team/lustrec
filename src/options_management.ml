@@ -81,6 +81,8 @@ let common_options =
     "-node", Arg.Set_string main_node, "specifies the \x1b[4mmain\x1b[0m node";
     "-print-types", Arg.Set print_types, "prints node types";
     "-print-clocks", Arg.Set print_clocks, "prints node clocks";
+    "-algebraic-loop-solve", Arg.Set solve_al, "try to solve algebraic loops"; 
+    "-algebraic-loop-max", Arg.Set_int al_nb_max, "try to solve \x1b[4mnb\x1b[0m number of algebraic loops  <default: 15>"; 
     "-verbose", Arg.Set_int verbose_level, "changes verbose \x1b[4mlevel\x1b[0m <default: 1>";
     "-version", Arg.Unit print_version, " displays the version";
   ]
