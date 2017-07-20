@@ -42,9 +42,9 @@ let print_get_inputs fmt m =
       begin
 	Global.main_node := !Options.main_node;
 	Format.eprintf "Code generation error: %a%a@."
-	  pp_error Main_wrong_kind
+	  Error.pp_error_msg Error.Main_wrong_kind
 	  Location.pp_loc v'.var_loc;
-	raise (Error (v'.var_loc, Main_wrong_kind))
+	raise (Error (v'.var_loc, Error.Main_wrong_kind))
       end
   in
   List.iteri2 (fun idx v' v ->

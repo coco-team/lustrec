@@ -45,7 +45,7 @@ let stage1 prog dirname basename =
       Inliner.global_inline basename prog type_env clock_env
     else (* if !Option.has_local_inline *)
       [],
-      Inliner.local_inline basename prog type_env clock_env
+      Inliner.local_inline prog (* type_env clock_env *)
   in
 
   check_stateless_decls prog;

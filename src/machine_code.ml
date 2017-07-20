@@ -156,7 +156,7 @@ let rec is_const_value v =
 
 (* Returns the declared stateless status and the computed one. *)
 let get_stateless_status m =
- (m.mname.node_dec_stateless, Utils.desome m.mname.node_stateless)
+ (m.mname.node_dec_stateless, try Utils.desome m.mname.node_stateless with _ -> failwith ("stateless status of machine " ^ m.mname.node_id ^ " not computed"))
 
 let is_input m id =
   List.exists (fun o -> o.var_id = id.var_id) m.mstep.step_inputs

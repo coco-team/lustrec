@@ -229,7 +229,8 @@ let rec inline_expr ?(selection_on_annotation=false) expr locals node nodes =
 						    as arguments nodes *)
       (not selection_on_annotation || is_inline_expr expr) (* and if selection on annotation is activated, 
 							      it is explicitely inlined here *)
-    then 
+    then (
+      (* Format.eprintf "Inlining call to %s in expression %a@." id Printers.pp_expr expr; *)
       (* The node should be inlined *)
       (* let _ =     Format.eprintf "Inlining call to %s@." id in *)
       let called = try List.find (check_node_name id) nodes 
@@ -239,6 +240,7 @@ let rec inline_expr ?(selection_on_annotation=false) expr locals node nodes =
       let expr, locals', eqs'', asserts'', annots'' = 
 	inline_call called' expr.expr_loc expr.expr_tag args' reset locals' node in
       expr, locals', eqs'@eqs'', asserts'@asserts'', annots'@annots''
+    )
     else 
       (* let _ =     Format.eprintf "Not inlining call to %s@." id in *)
       { expr with expr_desc = Expr_appl(id, args', reset)}, 
@@ -458,22 +460,57 @@ let global_inline basename prog type_env clock_env =
 *)
   res
 
-let local_inline basename prog type_env clock_env =
+let pp_inline_calls fmt prog =
   let local_anns = Annotations.get_expr_annotations keyword in
-  if local_anns != [] then (
-    let nodes_with_anns = List.fold_left (fun accu (k, _) -> ISet.add k accu) ISet.empty local_anns in
-    ISet.iter (fun node_id -> Format.eprintf "Node %s has local expression annotations@." node_id) nodes_with_anns;
-    List.fold_right (fun top accu -> 
-      ( match top.top_decl_desc with
-      | Node nd when ISet.mem nd.node_id nodes_with_anns ->
-	{ top with top_decl_desc = Node (inline_node ~selection_on_annotation:true nd prog) }
-      | _ -> top
-      )::accu) prog []
-    
-)
- else
+  let nodes_with_anns = List.fold_left (fun accu (k, _) -> ISet.add k accu) ISet.empty local_anns in
+  Format.fprintf fmt "@[<v 0>Inlined expresssions in node (by tags):@ %a@]"
+    (fprintf_list ~sep:""
+       (fun fmt top ->
+	 match top.top_decl_desc with
+	 | Node nd when ISet.mem nd.node_id nodes_with_anns ->
+	    Format.fprintf fmt "%s: {@[<v 0>%a}@]@ "
+	      nd.node_id
+	      (fprintf_list ~sep:"@ " (fun fmt tag -> Format.fprintf fmt "%i" tag))
+	      (List.fold_left
+		 (fun accu (id, tag) -> if id = nd.node_id then tag::accu else accu)
+		 []
+		 local_anns
+	      )	      
+	 (* | Node nd -> Format.fprintf fmt "%s: no inline annotations" nd.node_id *)
+	 | _ -> ()
+     ))
+    prog
+  
+  
+let local_inline prog (* type_env clock_env *) =
+  Log.report ~level:2 (fun fmt -> Format.fprintf fmt ".. @[<v 2>Inlining@,");
+  let local_anns = Annotations.get_expr_annotations keyword in
+  let prog = 
+    if local_anns != [] then (
+      let nodes_with_anns = List.fold_left (fun accu (k, _) -> ISet.add k accu) ISet.empty local_anns in
+      ISet.iter (fun node_id -> Log.report ~level:2 (fun fmt -> Format.fprintf fmt "Node %s has local expression annotations@ " node_id))
+	nodes_with_anns;
+      List.fold_right (fun top accu -> 
+	( match top.top_decl_desc with
+	| Node nd when ISet.mem nd.node_id nodes_with_anns ->
+	   Log.report ~level:2 (fun fmt -> Format.fprintf fmt "[local inline] Processing node %s@ " nd.node_id);
+	  let inlined_node = inline_node ~selection_on_annotation:true nd prog in
+	  (* Format.eprintf "Before inline@.%a@.After:@.%a@." *)
+	  (*   Printers.pp_node nd *)
+	  (*   Printers.pp_node inlined_node; *)
+	  { top with top_decl_desc = Node inlined_node }
+	    
+	| _ -> top
+	)::accu) prog []
+	
+    )
+    else (
+      Log.report ~level:2 (fun fmt -> Format.fprintf fmt "No local inline information!@ ");
+      prog
+    )
+  in
+  Log.report ~level:2 (fun fmt -> Format.fprintf fmt "@]@,");
   prog
-
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

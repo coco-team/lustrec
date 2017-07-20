@@ -18,10 +18,11 @@ open Utils
 open LustreSpec
 open Corelang
 open Graph
-open Format
 
+
+type identified_call = eq * tag
 type error =
-  | DataCycle of ident list
+  | DataCycle of ident list list (* multiple failed partitions at once *) 
   | NodeCycle of ident list
 
 exception Error of error
@@ -97,14 +98,14 @@ module ExprDep = struct
    but used to compute useless inputs/mems.
    a mem read var represents a mem at the beginning of a cycle  *)
   let mk_read_var id =
-    sprintf "#%s" id
+    Format.sprintf "#%s" id
 
 (* instance vars represent node instance calls,
    they are not part of the program/schedule,
    but used to simplify causality analysis
 *)
   let mk_instance_var id =
-    incr instance_var_cpt; sprintf "!%s_%d" id !instance_var_cpt
+    incr instance_var_cpt; Format.sprintf "!%s_%d" id !instance_var_cpt
 
   let is_read_var v = v.[0] = '#'
 
@@ -215,7 +216,7 @@ module ExprDep = struct
     (* Add mashup dependencies for a user-defined node instance [lhs] = [f]([e]) *)
     (* i.e every input is connected to every output, through a ghost var *)
       let mashup_appl_dependencies f e g =
-	let f_var = mk_instance_var (sprintf "%s_%d" f eq.eq_loc.Location.loc_start.Lexing.pos_lnum) in
+	let f_var = mk_instance_var (Format.sprintf "%s_%d" f eq.eq_loc.Location.loc_start.Lexing.pos_lnum) in
 	List.fold_right (fun rhs -> add_dep lhs_is_mem (adjust_tuple f_var rhs) rhs)
 	  (expr_list_of_expr e) (add_var lhs_is_mem lhs f_var g) 
       in
@@ -384,6 +385,7 @@ module NodeDep = struct
 
 end
 
+
 module CycleDetection = struct
 
   (* ---- Look for cycles in a dependency graph *)
@@ -420,11 +422,12 @@ module CycleDetection = struct
      [Cycle partition] if the succession of dependencies [partition] forms a cycle *)
   let check_cycles g =
     let scc_l = Cycles.scc_list g in
-    List.iter (fun partition ->
-      if wrong_partition g partition then
-	raise (Error (DataCycle partition))
-      else ()
-    ) scc_l
+    let algebraic_loops = List.filter (wrong_partition g) scc_l in
+    if List.length algebraic_loops > 0 then
+      raise (Error (DataCycle algebraic_loops))
+	(* We extract a hint to resolve the cycle: for each variable in the cycle
+	   which is defined by a call, we return the name of the node call and
+	   its specific id *)
 
   (* Creates the sub-graph of [g] restricted to vertices and edges in partition *)
   let copy_partition g partition =
@@ -562,6 +565,7 @@ struct
     end
 end
 
+  
 let pp_dep_graph fmt g =
   begin
     Format.fprintf fmt "{ /* graph */@.";
@@ -571,13 +575,19 @@ let pp_dep_graph fmt g =
 
 let pp_error fmt err =
   match err with
-  | DataCycle trace ->
-     fprintf fmt "@.Causality error, cyclic data dependencies: %a@."
-       (fprintf_list ~sep:", " pp_print_string) trace
   | NodeCycle trace ->
-     fprintf fmt "@.Causality error, cyclic node calls: %a@."
-       (fprintf_list ~sep:", " pp_print_string) trace
-
+     Format.fprintf fmt "Causality error, cyclic node calls:@   @[<v 0>%a@]@ "
+       (fprintf_list ~sep:",@ " Format.pp_print_string) trace
+  | DataCycle traces -> (
+     Format.fprintf fmt "Causality error, cyclic data dependencies:@   @[<v 0>%a@]@ "
+       (fprintf_list ~sep:";@ "
+       (fun fmt trace ->
+	 Format.fprintf fmt "@[<v 0>{%a}@]"
+	   (fprintf_list ~sep:",@ " Format.pp_print_string)
+	   trace
+       )) traces
+  )
+     
 (* Merges elements of graph [g2] into graph [g1] *)
 let merge_with g1 g2 =
   begin
@@ -605,15 +615,19 @@ let global_dependency node =
   let (g_non_mems, g_mems) = ExprDep.dependence_graph mems inputs node_vars node in
   (*Format.eprintf "g_non_mems: %a" pp_dep_graph g_non_mems;
     Format.eprintf "g_mems: %a" pp_dep_graph g_mems;*)
-  CycleDetection.check_cycles g_non_mems;
-  let (vdecls', eqs', g_mems') = CycleDetection.break_cycles node mems g_mems in
-  (*Format.eprintf "g_mems': %a" pp_dep_graph g_mems';*)
-  begin
-    merge_with g_non_mems g_mems';
-    add_external_dependency outputs mems g_non_mems;
-    { node with node_stmts = List.map (fun eq -> Eq eq) eqs'; node_locals = vdecls'@node.node_locals }, 
-    g_non_mems
-  end
+  try
+    CycleDetection.check_cycles g_non_mems;
+    let (vdecls', eqs', g_mems') = CycleDetection.break_cycles node mems g_mems in
+    (*Format.eprintf "g_mems': %a" pp_dep_graph g_mems';*)
+    begin
+      merge_with g_non_mems g_mems';
+      add_external_dependency outputs mems g_non_mems;
+      { node with node_stmts = List.map (fun eq -> Eq eq) eqs'; node_locals = vdecls'@node.node_locals }, 
+      g_non_mems
+    end
+  with Error (DataCycle _ as exc) -> (
+      raise (Error (exc))
+  )
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

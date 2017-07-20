@@ -1,5 +1,5 @@
-/_build/
-/main_lustre_compiler.native
+*~
+/src/_build/
 /setup.data
 /setup.log
 /src/version.ml

@@ -130,34 +130,26 @@ let filter_original n vl =
 
 let schedule_node n =
   (* let node_vars = get_node_vars n in *)
-  try
-    let eq_equiv = ExprDep.node_eq_equiv n in
-    let eq_equiv v1 v2 =
-      try
-	Hashtbl.find eq_equiv v1 = Hashtbl.find eq_equiv v2
-      with Not_found -> false in
+  let eq_equiv = ExprDep.node_eq_equiv n in
+  let eq_equiv v1 v2 =
+    try
+      Hashtbl.find eq_equiv v1 = Hashtbl.find eq_equiv v2
+    with Not_found -> false in
 
-    let n', g = global_dependency n in
-    
-    (* TODO X: extend the graph with inputs (adapt the causality analysis to deal with inputs
+  let n', g = global_dependency n in
+  
+  (* TODO X: extend the graph with inputs (adapt the causality analysis to deal with inputs
      compute: coi predecessors of outputs
      warning (no modification) when memories are non used (do not impact output) or when inputs are not used (do not impact output)
-       DONE !
-     *)
+     DONE !
+  *)
 
-    let gg = IdentDepGraph.copy g in
-    let sort = topological_sort eq_equiv g in
-    let unused = Liveness.compute_unused_variables n gg in
-    let fanin = Liveness.compute_fanin n gg in
-    { node = n'; schedule = sort; unused_vars = unused; fanin_table = fanin; dep_graph = gg; }
+  let gg = IdentDepGraph.copy g in
+  let sort = topological_sort eq_equiv g in
+  let unused = Liveness.compute_unused_variables n gg in
+  let fanin = Liveness.compute_fanin n gg in
+  { node = n'; schedule = sort; unused_vars = unused; fanin_table = fanin; dep_graph = gg; }
 
-  with (Causality.Error err) as exc ->
-    match err with
-    | DataCycle vl ->
-       let _ (*vl*) = filter_original n vl in
-       Causality.pp_error Format.err_formatter err;
-       raise exc
-    | _ -> raise exc
 
 let compute_node_reuse_table report =
   let disjoint = Disjunction.clock_disjoint_map (get_node_vars report.node) in

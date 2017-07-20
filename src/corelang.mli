@@ -12,8 +12,9 @@
 
 open LustreSpec
 
-exception Error of Location.t * error
-
+exception Error of Location.t * Error.error_kind
+module VSet: Set.S
+  
 val dummy_type_dec: type_dec
 val dummy_clock_dec: clock_dec
 
@@ -84,7 +85,7 @@ val sort_handlers : (label * 'a) list -> (label * 'a) list
 
 val is_eq_expr: expr -> expr -> bool
 
-val pp_error :  Format.formatter -> error -> unit
+(* val pp_error :  Format.formatter -> error -> unit *)
 
 (* Caution, returns an untyped, unclocked, etc, expression *)
 val is_tuple_expr : expr -> bool
@@ -144,6 +145,7 @@ val extend_eexpr: (quantifier_type * var_decl list) list -> eexpr -> eexpr
 val update_expr_annot: ident -> expr -> expr_annot -> expr
 (* val mkpredef_call: Location.t -> ident -> eexpr list -> eexpr*)
 
+val expr_contains_expr: tag -> expr -> bool
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

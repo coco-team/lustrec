@@ -44,7 +44,7 @@ let extract_header dirname basename prog =
     prog []
 
 let check_obsolete lusic basename =
-  if lusic.obsolete then raise (Error (Location.dummy_loc, Wrong_number basename))
+  if lusic.obsolete then raise (Error (Location.dummy_loc, Error.Wrong_number basename))
 
 (* encode and write a header in a file *)
 let write_lusic lusi (header : top_decl list) basename extension =

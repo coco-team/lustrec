@@ -116,7 +116,7 @@ let stage1 prog dirname basename =
       Inliner.global_inline basename prog type_env clock_env
     else (* if !Option.has_local_inline *)
       [],
-      Inliner.local_inline basename prog type_env clock_env
+      Inliner.local_inline prog (* type_env clock_env *)
   in
 
   (* Checking stateless/stateful status *)
@@ -241,14 +241,20 @@ let stage1 prog dirname basename =
 let stage2 prog =    
   (* Computation of node equation scheduling. It also breaks dependency cycles
      and warns about unused input or memory variables *)
-  Log.report ~level:1 (fun fmt -> fprintf fmt ".. scheduling@,");
-  let prog, node_schs = Scheduling.schedule_prog prog in
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. @[<v 2>scheduling@ ");
+  let prog, node_schs =
+    try 
+      Scheduling.schedule_prog prog
+    with Causality.Error _ -> (* Error is not kept. It is recomputed in a more
+				 systemtic way in AlgebraicLoop module *)
+      AlgebraicLoop.analyze prog
+  in
   Log.report ~level:1 (fun fmt -> fprintf fmt "%a"              Scheduling.pp_warning_unused node_schs);
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_schedule node_schs);
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_fanin_table node_schs);
   Log.report ~level:5 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_dep_graph node_schs);
   Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
-
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
 
   (* TODO Salsa optimize prog: 
      - emits warning for programs with pre inside expressions
@@ -421,11 +427,11 @@ let _ =
     Arg.parse options anonymous usage
   with
   | Parse.Error _
-  | Types.Error (_,_) | Clocks.Error (_,_)
-  | Corelang.Error _ (*| Task_set.Error _*)
-  | Causality.Error _ -> exit 1
+  | Types.Error (_,_) | Clocks.Error (_,_) -> exit 1
+  | Corelang.Error (_ (* loc *), kind) (*| Task_set.Error _*) -> exit (Error.return_code kind)
+  (* | Causality.Error _  -> exit (Error.return_code Error.AlgebraicLoop) *)
   | Sys_error msg -> (eprintf "Failure: %s@." msg)
-  | exc -> (track_exception (); raise exc)
+  | exc -> (track_exception (); raise exc) 
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

@@ -15,8 +15,8 @@ let include_dirs = ref ["."]
 
 let main_node = ref ""
 let static_mem = ref true
-let print_types = ref true
-let print_clocks = ref true
+let print_types = ref false
+let print_clocks = ref false
 let delay_calculus = ref true
 let track_exceptions = ref true
 let ansi = ref false
@@ -52,8 +52,9 @@ let nb_mutants = ref 1000
 let gen_mcdc = ref false
 let no_mutation_suffix = ref false
 
-
-
+let solve_al = ref false
+let al_nb_max = ref 15
+  
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)
