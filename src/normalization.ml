@@ -191,132 +191,139 @@ let rec normalize_list alias node offsets norm_element defvars elist =
       (defvars, norm_t :: qlist)
     ) elist (defvars, [])
 
-let rec normalize_expr ?(alias=true) node offsets defvars expr =
+let rec normalize_expr ?(alias=true) ?(alias_basic=false) node offsets defvars expr =
   (*Format.eprintf "normalize %B %a:%a [%a]@." alias Printers.pp_expr expr Types.print_ty expr.expr_type (Utils.fprintf_list ~sep:"," Dimension.pp_dimension) offsets;*)
   match expr.expr_desc with
   | Expr_const _
   | Expr_ident _ -> defvars, unfold_offsets expr offsets
   | Expr_array elist ->
-    let defvars, norm_elist = normalize_list alias node offsets (fun _ -> normalize_array_expr ~alias:true) defvars elist in
-    let norm_expr = mk_norm_expr offsets expr (Expr_array norm_elist) in
-    mk_expr_alias_opt alias node defvars norm_expr
+     let defvars, norm_elist = normalize_list alias node offsets (fun _ -> normalize_array_expr ~alias:true) defvars elist in
+     let norm_expr = mk_norm_expr offsets expr (Expr_array norm_elist) in
+     mk_expr_alias_opt alias node defvars norm_expr
   | Expr_power (e1, d) when offsets = [] ->
-    let defvars, norm_e1 = normalize_expr node offsets defvars e1 in
-    let norm_expr = mk_norm_expr offsets expr (Expr_power (norm_e1, d)) in
-    mk_expr_alias_opt alias node defvars norm_expr
+     let defvars, norm_e1 = normalize_expr node offsets defvars e1 in
+     let norm_expr = mk_norm_expr offsets expr (Expr_power (norm_e1, d)) in
+     mk_expr_alias_opt alias node defvars norm_expr
   | Expr_power (e1, d) ->
-    normalize_expr ~alias:alias node (List.tl offsets) defvars e1
+     normalize_expr ~alias:alias node (List.tl offsets) defvars e1
   | Expr_access (e1, d) ->
-    normalize_expr ~alias:alias node (d::offsets) defvars e1
+     normalize_expr ~alias:alias node (d::offsets) defvars e1
   | Expr_tuple elist ->
-    let defvars, norm_elist =
-      normalize_list alias node offsets (fun alias -> normalize_expr ~alias:alias) defvars elist in
-    defvars, mk_norm_expr offsets expr (Expr_tuple norm_elist)
+     let defvars, norm_elist =
+       normalize_list alias node offsets (fun alias -> normalize_expr ~alias:alias ~alias_basic:false) defvars elist in
+     defvars, mk_norm_expr offsets expr (Expr_tuple norm_elist)
   | Expr_appl (id, args, None)
       when Basic_library.is_homomorphic_fun id 
 	&& Types.is_array_type expr.expr_type ->
-    let defvars, norm_args =
-      normalize_list
-	alias
-	node
-	offsets
-	(fun _ -> normalize_array_expr ~alias:true)
-	defvars
-	(expr_list_of_expr args)
-    in
-    defvars, mk_norm_expr offsets expr (Expr_appl (id, expr_of_expr_list args.expr_loc norm_args, None))
+     let defvars, norm_args =
+       normalize_list
+	 alias
+	 node
+	 offsets
+	 (fun _ -> normalize_array_expr ~alias:true)
+	 defvars
+	 (expr_list_of_expr args)
+     in
+     defvars, mk_norm_expr offsets expr (Expr_appl (id, expr_of_expr_list args.expr_loc norm_args, None))
   | Expr_appl (id, args, None) when Basic_library.is_expr_internal_fun expr
-                                    && not !force_alias_internal_fun ->
-    let defvars, norm_args = normalize_expr ~alias:true node offsets defvars args in
-    defvars, mk_norm_expr offsets expr (Expr_appl (id, norm_args, None))
+      && not (!force_alias_internal_fun || alias_basic) ->
+     let defvars, norm_args = normalize_expr ~alias:true node offsets defvars args in
+     defvars, mk_norm_expr offsets expr (Expr_appl (id, norm_args, None))
   | Expr_appl (id, args, r) ->
-    let defvars, norm_args = normalize_expr node [] defvars args in
-    let norm_expr = mk_norm_expr [] expr (Expr_appl (id, norm_args, r)) in
-    if offsets <> []
-    then
-      let defvars, norm_expr = normalize_expr node [] defvars norm_expr in
-      normalize_expr ~alias:alias node offsets defvars norm_expr
-    else
-      mk_expr_alias_opt (alias && (!force_alias_internal_fun
-				   || not (Basic_library.is_expr_internal_fun expr)))
-	node defvars norm_expr
+     let defvars, r =
+       match r with
+       | None -> defvars, None
+       | Some r ->
+	  let defvars, norm_r = normalize_expr ~alias_basic:true node [] defvars r in
+	  defvars, Some norm_r
+     in
+     let defvars, norm_args = normalize_expr node [] defvars args in
+     let norm_expr = mk_norm_expr [] expr (Expr_appl (id, norm_args, r)) in
+     if offsets <> []
+     then
+       let defvars, norm_expr = normalize_expr node [] defvars norm_expr in
+       normalize_expr ~alias:alias node offsets defvars norm_expr
+     else
+       mk_expr_alias_opt (alias && (!force_alias_internal_fun || alias_basic
+				    || not (Basic_library.is_expr_internal_fun expr)))
+	 node defvars norm_expr
   | Expr_arrow (e1,e2) when !unfold_arrow_active && not (is_expr_once expr) ->
-    (* Here we differ from Colaco paper: arrows are pushed to the top *)
-    normalize_expr ~alias:alias node offsets defvars (unfold_arrow expr)
+     (* Here we differ from Colaco paper: arrows are pushed to the top *)
+     normalize_expr ~alias:alias node offsets defvars (unfold_arrow expr)
   | Expr_arrow (e1,e2) ->
-    let defvars, norm_e1 = normalize_expr node offsets defvars e1 in
-    let defvars, norm_e2 = normalize_expr node offsets defvars e2 in
-    let norm_expr = mk_norm_expr offsets expr (Expr_arrow (norm_e1, norm_e2)) in
-    mk_expr_alias_opt alias node defvars norm_expr
+     let defvars, norm_e1 = normalize_expr node offsets defvars e1 in
+     let defvars, norm_e2 = normalize_expr node offsets defvars e2 in
+     let norm_expr = mk_norm_expr offsets expr (Expr_arrow (norm_e1, norm_e2)) in
+     mk_expr_alias_opt alias node defvars norm_expr
   | Expr_pre e ->
-    let defvars, norm_e = normalize_expr node offsets defvars e in
-    let norm_expr = mk_norm_expr offsets expr (Expr_pre norm_e) in
-    mk_expr_alias_opt alias node defvars norm_expr
+     let defvars, norm_e = normalize_expr node offsets defvars e in
+     let norm_expr = mk_norm_expr offsets expr (Expr_pre norm_e) in
+     mk_expr_alias_opt alias node defvars norm_expr
   | Expr_fby (e1, e2) ->
-    let defvars, norm_e1 = normalize_expr node offsets defvars e1 in
-    let defvars, norm_e2 = normalize_expr node offsets defvars e2 in
-    let norm_expr = mk_norm_expr offsets expr (Expr_fby (norm_e1, norm_e2)) in
-    mk_expr_alias_opt alias node defvars norm_expr
+     let defvars, norm_e1 = normalize_expr node offsets defvars e1 in
+     let defvars, norm_e2 = normalize_expr node offsets defvars e2 in
+     let norm_expr = mk_norm_expr offsets expr (Expr_fby (norm_e1, norm_e2)) in
+     mk_expr_alias_opt alias node defvars norm_expr
   | Expr_when (e, c, l) ->
-    let defvars, norm_e = normalize_expr node offsets defvars e in
-    defvars, mk_norm_expr offsets expr (Expr_when (norm_e, c, l))
+     let defvars, norm_e = normalize_expr node offsets defvars e in
+     defvars, mk_norm_expr offsets expr (Expr_when (norm_e, c, l))
   | Expr_ite (c, t, e) ->
-    let defvars, norm_c = normalize_guard node defvars c in
-    let defvars, norm_t = normalize_cond_expr  node offsets defvars t in
-    let defvars, norm_e = normalize_cond_expr  node offsets defvars e in
-    let norm_expr = mk_norm_expr offsets expr (Expr_ite (norm_c, norm_t, norm_e)) in
-    mk_expr_alias_opt alias node defvars norm_expr
+     let defvars, norm_c = normalize_guard node defvars c in
+     let defvars, norm_t = normalize_cond_expr  node offsets defvars t in
+     let defvars, norm_e = normalize_cond_expr  node offsets defvars e in
+     let norm_expr = mk_norm_expr offsets expr (Expr_ite (norm_c, norm_t, norm_e)) in
+     mk_expr_alias_opt alias node defvars norm_expr
   | Expr_merge (c, hl) ->
-    let defvars, norm_hl = normalize_branches node offsets defvars hl in
-    let norm_expr = mk_norm_expr offsets expr (Expr_merge (c, norm_hl)) in
-    mk_expr_alias_opt alias node defvars norm_expr
+     let defvars, norm_hl = normalize_branches node offsets defvars hl in
+     let norm_expr = mk_norm_expr offsets expr (Expr_merge (c, norm_hl)) in
+     mk_expr_alias_opt alias node defvars norm_expr
 
 (* Creates a conditional with a merge construct, which is more lazy *)
 (*
-let norm_conditional_as_merge alias node norm_expr offsets defvars expr =
- match expr.expr_desc with
- | Expr_ite (c, t, e) ->
-   let defvars, norm_t = norm_expr (alias node offsets defvars t in
- | _ -> assert false
+  let norm_conditional_as_merge alias node norm_expr offsets defvars expr =
+  match expr.expr_desc with
+  | Expr_ite (c, t, e) ->
+  let defvars, norm_t = norm_expr (alias node offsets defvars t in
+  | _ -> assert false
 *)
 and normalize_branches node offsets defvars hl =
- List.fold_right
-   (fun (t, h) (defvars, norm_q) ->
-     let (defvars, norm_h) = normalize_cond_expr node offsets defvars h in
-     defvars, (t, norm_h) :: norm_q
-   )
-   hl (defvars, [])
+  List.fold_right
+    (fun (t, h) (defvars, norm_q) ->
+      let (defvars, norm_h) = normalize_cond_expr node offsets defvars h in
+      defvars, (t, norm_h) :: norm_q
+    )
+    hl (defvars, [])
 
 and normalize_array_expr ?(alias=true) node offsets defvars expr =
   (*Format.eprintf "normalize_array %B %a [%a]@." alias Printers.pp_expr expr (Utils.fprintf_list ~sep:"," Dimension.pp_dimension) offsets;*)
   match expr.expr_desc with
   | Expr_power (e1, d) when offsets = [] ->
-    let defvars, norm_e1 = normalize_expr node offsets defvars e1 in
-    defvars, mk_norm_expr offsets expr (Expr_power (norm_e1, d))
+     let defvars, norm_e1 = normalize_expr node offsets defvars e1 in
+     defvars, mk_norm_expr offsets expr (Expr_power (norm_e1, d))
   | Expr_power (e1, d) ->
-    normalize_array_expr ~alias:alias node (List.tl offsets) defvars e1
+     normalize_array_expr ~alias:alias node (List.tl offsets) defvars e1
   | Expr_access (e1, d) -> normalize_array_expr ~alias:alias node (d::offsets) defvars e1
   | Expr_array elist when offsets = [] ->
-    let defvars, norm_elist = normalize_list alias node offsets (fun _ -> normalize_array_expr ~alias:true) defvars elist in
-    defvars, mk_norm_expr offsets expr (Expr_array norm_elist)
+     let defvars, norm_elist = normalize_list alias node offsets (fun _ -> normalize_array_expr ~alias:true) defvars elist in
+     defvars, mk_norm_expr offsets expr (Expr_array norm_elist)
   | Expr_appl (id, args, None) when Basic_library.is_expr_internal_fun expr ->
-    let defvars, norm_args = normalize_list alias node offsets (fun _ -> normalize_array_expr ~alias:true) defvars (expr_list_of_expr args) in
-    defvars, mk_norm_expr offsets expr (Expr_appl (id, expr_of_expr_list args.expr_loc norm_args, None))
+     let defvars, norm_args = normalize_list alias node offsets (fun _ -> normalize_array_expr ~alias:true) defvars (expr_list_of_expr args) in
+     defvars, mk_norm_expr offsets expr (Expr_appl (id, expr_of_expr_list args.expr_loc norm_args, None))
   |  _ -> normalize_expr ~alias:alias node offsets defvars expr
 
 and normalize_cond_expr ?(alias=true) node offsets defvars expr =
   (*Format.eprintf "normalize_cond %B %a [%a]@." alias Printers.pp_expr expr (Utils.fprintf_list ~sep:"," Dimension.pp_dimension) offsets;*)
   match expr.expr_desc with
   | Expr_access (e1, d) ->
-    normalize_cond_expr ~alias:alias node (d::offsets) defvars e1
+     normalize_cond_expr ~alias:alias node (d::offsets) defvars e1
   | Expr_ite (c, t, e) ->
-    let defvars, norm_c = normalize_guard node defvars c in
-    let defvars, norm_t = normalize_cond_expr node offsets defvars t in
-    let defvars, norm_e = normalize_cond_expr node offsets defvars e in
-    defvars, mk_norm_expr offsets expr (Expr_ite (norm_c, norm_t, norm_e))
+     let defvars, norm_c = normalize_guard node defvars c in
+     let defvars, norm_t = normalize_cond_expr node offsets defvars t in
+     let defvars, norm_e = normalize_cond_expr node offsets defvars e in
+     defvars, mk_norm_expr offsets expr (Expr_ite (norm_c, norm_t, norm_e))
   | Expr_merge (c, hl) ->
-    let defvars, norm_hl = normalize_branches node offsets defvars hl in
-    defvars, mk_norm_expr offsets expr (Expr_merge (c, norm_hl))
+     let defvars, norm_hl = normalize_branches node offsets defvars hl in
+     defvars, mk_norm_expr offsets expr (Expr_merge (c, norm_hl))
   | _ when !force_alias_ite ->
      (* Forcing alias creation for then/else expressions *)
      let defvars, norm_expr =
@@ -325,9 +332,9 @@ and normalize_cond_expr ?(alias=true) node offsets defvars expr =
      mk_expr_alias_opt true node defvars norm_expr
   | _ -> (* default case without the force_alias_ite option *)
      normalize_expr ~alias:alias node offsets defvars expr
-     
+       
 and normalize_guard node defvars expr =
-  let defvars, norm_expr = normalize_expr node [] defvars expr in
+  let defvars, norm_expr = normalize_expr ~alias_basic:true node [] defvars expr in
   mk_expr_alias_opt true node defvars norm_expr
 
 (* outputs cannot be memories as well. If so, introduce new local variable.
