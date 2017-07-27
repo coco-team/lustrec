@@ -73,33 +73,44 @@ To be solved (later) with
 
 *)
 
-let print_makefile basename nodename (dependencies:  dep_t list) fmt =
-  fprintf fmt "GCC=gcc -O0@.";
-  fprintf fmt "LUSTREC=%s@." Sys.executable_name;
-  fprintf fmt "LUSTREC_BASE=%s@." (Filename.dirname (Filename.dirname Sys.executable_name));
-  fprintf fmt "INC=${LUSTREC_BASE}/include/lustrec@.";
-  fprintf fmt "@.";
+  let print_makefile basename nodename (dependencies:  dep_t list) fmt =
+    let binname =
+      let s = basename ^ "_" ^ nodename in
+      if String.length s > 100 (* seems that GCC fails from 144 characters and
+				  on: File name too long collect2 ld error. *)
+      then
+	if String.length nodename > 100 then
+	  basename ^ "_run" (* shorter version *)
+	else
+	  nodename ^ "run"
+      else
+	s
+    in
+    fprintf fmt "BINNAME?=%s@." binname;
+    fprintf fmt "GCC=gcc -O0@.";
+    fprintf fmt "LUSTREC=%s@." Sys.executable_name;
+    fprintf fmt "LUSTREC_BASE=%s@." (Filename.dirname (Filename.dirname Sys.executable_name));
+    fprintf fmt "INC=${LUSTREC_BASE}/include/lustrec@.";
+    fprintf fmt "@.";
 
-  (* Main binary *)
-  fprintf fmt "%s_%s: %s.c %s_main.c@." basename "run"(*nodename*) basename basename;
-  fprintf fmt "\t${GCC} -I${INC} -I. -c %s.c@." basename;  
-  fprintf fmt "\t${GCC} -I${INC} -I. -c %s_main.c@." basename;   
-  fprintf_dependencies fmt dependencies;    
-  fprintf fmt "\t${GCC} -o %s_%s io_frontend.o %a %s.o %s_main.o %a@." basename "run"(*nodename *)
-    (Utils.fprintf_list ~sep:" " (fun fmt (Dep (_, s, _, _)) -> Format.fprintf fmt "%s.o" s)) 
-    (compiled_dependencies dependencies)
-    basename (* library .o *)
-    basename (* main function . o *) 
-    (Utils.fprintf_list ~sep:" " (fun fmt lib -> fprintf fmt "-l%s" lib)) (lib_dependencies dependencies)
+    (* Main binary *)
+    fprintf fmt "%s_%s: %s.c %s_main.c@." basename "run"(*nodename*) basename basename;
+    fprintf fmt "\t${GCC} -I${INC} -I. -c %s.c@." basename;  
+    fprintf fmt "\t${GCC} -I${INC} -I. -c %s_main.c@." basename;   
+    fprintf_dependencies fmt dependencies;    
+    fprintf fmt "\t${GCC} -o ${BINNAME} io_frontend.o %a %s.o %s_main.o %a@." 
+      (Utils.fprintf_list ~sep:" " (fun fmt (Dep (_, s, _, _)) -> Format.fprintf fmt "%s.o" s)) 
+      (compiled_dependencies dependencies)
+      basename (* library .o *)
+      basename (* main function . o *) 
+      (Utils.fprintf_list ~sep:" " (fun fmt lib -> fprintf fmt "-l%s" lib)) (lib_dependencies dependencies)
     ;
- fprintf fmt "@.";
- fprintf fmt "clean:@.";
- fprintf fmt "\t\\rm -f *.o %s_%s@." basename "run"(*nodename*);
- fprintf fmt "@.";
- fprintf fmt ".PHONY: %s_%s@." basename "run" (*nodename*);
- fprintf fmt "@.";
- Mod.other_targets fmt basename nodename dependencies;
- fprintf fmt "@.";
+    fprintf fmt "@.";
+    fprintf fmt "clean:@.";
+    fprintf fmt "\t\\rm -f *.o ${BINNAME}@.";
+    fprintf fmt "@.";
+    Mod.other_targets fmt basename nodename dependencies;
+    fprintf fmt "@.";
 
 end
 
