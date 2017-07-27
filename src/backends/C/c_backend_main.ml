@@ -60,6 +60,8 @@ let print_put_outputs fmt m =
 
 let print_main_inout_declaration basename fmt m =
   let mname = m.mname.node_id in
+  (* TODO: find a proper way to shorthen long names. This causes segfault in the binary when trying to fprintf in them *)
+  let mname = if String.length mname > 50 then string_of_int (Hashtbl.hash mname) else mname in
   fprintf fmt "/* Declaration of inputs/outputs variables */@ ";
   List.iteri 
     (fun idx v ->

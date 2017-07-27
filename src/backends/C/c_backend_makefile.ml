@@ -61,6 +61,17 @@ end: MODIFIERS_MKF)
 module Main = functor (Mod: MODIFIERS_MKF) -> 
 struct
 
+(* TODO: BEWARE OF THE BUG !!  in case of very long nodename or maybe even
+   basename, the string basename_nodename exceed a limit length for files on linux
+   and prevent gcc to generate the binary of that name.
+
+To be solved (later) with
+- either the default name if it short
+- a shorter version if it is long (md5?)
+- a provided name given when calling the makefile so the user can control the 
+  expected name of the binary
+
+*)
 
 let print_makefile basename nodename (dependencies:  dep_t list) fmt =
   fprintf fmt "GCC=gcc -O0@.";
@@ -70,11 +81,11 @@ let print_makefile basename nodename (dependencies:  dep_t list) fmt =
   fprintf fmt "@.";
 
   (* Main binary *)
-  fprintf fmt "%s_%s: %s.c %s_main.c@." basename nodename basename basename;
+  fprintf fmt "%s_%s: %s.c %s_main.c@." basename "run"(*nodename*) basename basename;
   fprintf fmt "\t${GCC} -I${INC} -I. -c %s.c@." basename;  
   fprintf fmt "\t${GCC} -I${INC} -I. -c %s_main.c@." basename;   
   fprintf_dependencies fmt dependencies;    
-  fprintf fmt "\t${GCC} -o %s_%s io_frontend.o %a %s.o %s_main.o %a@." basename nodename 
+  fprintf fmt "\t${GCC} -o %s_%s io_frontend.o %a %s.o %s_main.o %a@." basename "run"(*nodename *)
     (Utils.fprintf_list ~sep:" " (fun fmt (Dep (_, s, _, _)) -> Format.fprintf fmt "%s.o" s)) 
     (compiled_dependencies dependencies)
     basename (* library .o *)
@@ -83,9 +94,9 @@ let print_makefile basename nodename (dependencies:  dep_t list) fmt =
     ;
  fprintf fmt "@.";
  fprintf fmt "clean:@.";
- fprintf fmt "\t\\rm -f *.o %s_%s@." basename nodename;
+ fprintf fmt "\t\\rm -f *.o %s_%s@." basename "run"(*nodename*);
  fprintf fmt "@.";
- fprintf fmt ".PHONY: %s_%s@." basename nodename;
+ fprintf fmt ".PHONY: %s_%s@." basename "run" (*nodename*);
  fprintf fmt "@.";
  Mod.other_targets fmt basename nodename dependencies;
  fprintf fmt "@.";
