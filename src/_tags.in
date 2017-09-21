@@ -5,6 +5,11 @@
 "plugins/salsa": include
 "plugins/scopes": include
 "plugins/mpfr": include
+"tools/stateflow": include
+"tools/stateflow/common": include
+"tools/stateflow/semantics": include
+"tools/stateflow/models": include
+
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic
 

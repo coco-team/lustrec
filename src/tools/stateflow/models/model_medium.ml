@@ -1,8 +1,9 @@
 open Datatype
 open SF
 
-let name = "simple"
+let name = "medium"
 
+let condition x = condition (Corelang.mkexpr Location.dummy_loc (LustreSpec.Expr_const (Corelang.const_of_bool true)))
  
 let model : prog_t =
     let state_main = "main" in
@@ -21,6 +22,14 @@ let model : prog_t =
       condition_act = action "condact_tA";
       transition_act = action "transact_tA";
       dest = DPath [state_main;state_a];
+    }
+    in
+    let tJ = {
+      event = no_event;
+      condition = condition "cond_tJ";
+      condition_act = action "condact_tJ";
+      transition_act = action "transact_tJ";
+      dest = DJunction "jmid";
     }
     in
     let tB = {
@@ -43,7 +52,7 @@ let model : prog_t =
 
     let def_a = {
       state_actions = actions_a;
-      outer_trans = [tB];
+      outer_trans = [tJ];
       inner_trans = [];
       internal_composition = Or ([tA1], [state_a1])
     }
@@ -73,8 +82,9 @@ let model : prog_t =
 	       State([state_main;state_a;state_a1], def_a1);
 	       State([state_main;state_b], def_b);
 	       State([state_main], def_main);
+	       Junction("jmid", [tB]);
 	      ]
     in
-    (state_main, src)
+    (state_main, src, [])
 
 let traces : trace_t list = [[None; None]]

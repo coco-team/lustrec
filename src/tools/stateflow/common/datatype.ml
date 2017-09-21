@@ -38,7 +38,7 @@ type src_components_t =
   | State of path_t * state_def_t
   | Junction of junction_name_t * transitions_t
 
-type prog_t = state_name_t * src_components_t list
+type prog_t = state_name_t * src_components_t list * LustreSpec.var_decl list 
   
 type trace_t = event_t list
     
@@ -64,10 +64,18 @@ struct
   let no_state_action    = {entry_act = no_action; during_act = no_action; exit_act = no_action; }
   let state_action a b c = {entry_act = a; during_act = b; exit_act = c; }
 
-  let states (_, defs) =
-    List.fold_left (fun res c -> match c with State (p, _) -> ActiveStates.Vars.add p res | Junction _ -> res) ActiveStates.Vars.empty defs
+  let states (_, defs, _) =
+    List.fold_left
+      (fun res c ->
+	match c with
+	| State (p, _) -> ActiveStates.Vars.add p res
+	| Junction _ -> res
+      )
+      ActiveStates.Vars.empty defs
 
   let init_env model = ActiveStates.Env.from_set (states model) false
+
+  let global_vars (_, _, env) = env
     
   (* Printers *)
       

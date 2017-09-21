@@ -8,9 +8,11 @@ struct
   
 module Prog =
 struct
-  let init = fst M.model
-  let defs = snd M.model
-  let vars = SF.states M.model
+  let init, defs, state_vars = 
+    let (init, defs, globals) = M.model in
+    let state_vars = SF.states M.model in
+    init, defs, state_vars
+    
 (*let _ = Format.printf "Model definitions@.%a@.####" Simulink.pp_src defs; () *)
 end
 
@@ -41,18 +43,10 @@ let compute modular  =
 let code_gen fmt modular  =
   let module Eval = (val (eval modular)) in
   let principal, components =  Eval.eval_prog, Eval.eval_components in
-  Format.fprintf fmt "%a@." T.pp_principal principal;
-
-  List.iter
-    (fun (c, tr) -> Format.fprintf fmt "@.%a@." (fun fmt -> T.pp_component fmt Ecall c) tr)
-    (components Ecall);
-  List.iter
-    (fun (c, tr) -> Format.fprintf fmt "@.%a@." (fun fmt -> T.pp_component fmt Dcall c) tr)
-    (components Dcall);
-  List.iter
-    (fun (c, tr) -> Format.fprintf fmt "@.%a@." (fun fmt -> T.pp_component fmt Xcall c) tr)
-    (components Xcall);
-
-  ()
-
+  [
+    List.map (fun (c, tr) -> T.mkcomponent Ecall c tr) (components Ecall);
+    List.map (fun (c, tr) -> T.mkcomponent Dcall c tr) (components Dcall);
+    List.map (fun (c, tr) -> T.mkcomponent Xcall c tr) (components Xcall);
+    T.mkprincipal principal;
+  ]
 end

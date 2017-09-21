@@ -21,6 +21,10 @@ lustret:
 	@echo Compiling binary lustret
 	@make -C src lustret
 
+lustresf:
+	@echo Compiling binary lustresf
+	@make -C src lustresf
+
 configure: configure.ac
 	@echo configure.ac has changed relaunching autoconf
 	@autoconf

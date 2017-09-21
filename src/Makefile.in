@@ -24,6 +24,12 @@ lustret:
 	@mkdir -p $(LOCAL_BINDIR)
 	@mv _build/main_lustre_testgen.native $(LOCAL_BINDIR)/lustret
 
+lustresf:
+	@echo Compiling binary lustret
+	@$(OCAMLBUILD) tools/stateflow/sf_sem.native
+	@mkdir -p $(LOCAL_BINDIR)
+	@mv _build/tools/stateflow/sf_sem.native $(LOCAL_BINDIR)/lustresf
+
 doc:
 	@echo Generating doc
 	@$(OCAMLBUILD) lustrec.docdir/index.html

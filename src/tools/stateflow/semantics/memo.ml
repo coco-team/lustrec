@@ -1,4 +1,5 @@
-
+open Basetypes
+  
 type ('a, 'b) t = Memo : ('a, 'b) Hashtbl.t -> ('a, 'b) t;;
 
 let create () = Memo (Hashtbl.create 97);;
@@ -16,12 +17,12 @@ let fold (Memo hashf) f e =
 let apply (Memo hashf) f =
   fun x ->
     try
-      Log.log ~debug:false (fun fmt -> Format.fprintf fmt "lookup 1@.");
+      Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "lookup 1@.");
       Hashtbl.find hashf x
     with Not_found ->
       let res = f x in
       begin
-	Log.log ~debug:false (fun fmt -> Format.fprintf fmt "hashing 1@.");
+	Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "hashing 1@.");
 	Hashtbl.add hashf x res;
 	res
       end;;
@@ -29,12 +30,12 @@ let apply (Memo hashf) f =
 let apply2 (Memo hashf) f =
   fun x y ->
     try
-      Log.log ~debug:false (fun fmt -> Format.fprintf fmt "lookup 2@.");
+      Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "lookup 2@.");
       Hashtbl.find hashf (x, y)
     with Not_found ->
       let res = f x y in
       begin
-	Log.log ~debug:false (fun fmt -> Format.fprintf fmt "hashing 2@.");
+	Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "hashing 2@.");
 	Hashtbl.add hashf (x, y) res;
 	res
       end;;
@@ -42,12 +43,12 @@ let apply2 (Memo hashf) f =
 let apply3 (Memo hashf) f =
   fun x y z ->
     try
-      Log.log ~debug:false (fun fmt -> Format.fprintf fmt "lookup 3@.");
+      Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "lookup 3@.");
       Hashtbl.find hashf (x, y, z)
     with Not_found ->
       let res = f x y z in
       begin
-	Log.log ~debug:false (fun fmt -> Format.fprintf fmt "hashing 3@.");
+	Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "hashing 3@.");
 	Hashtbl.add hashf (x, y, z) res;
 	res
       end;;

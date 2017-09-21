@@ -92,13 +92,13 @@ struct
     module Theta = Thetaify (Kenv)
 
     let eval_dest dest wrapper success fail =
-      Log.log (fun fmt -> Format.fprintf fmt "@[<v 2>D[[%a]]@ " SF.pp_dest dest);
+      Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "@[<v 2>D[[%a]]@ " SF.pp_dest dest);
       match dest with
       | DPath p -> wrapper p (success p)
       | DJunction j -> Theta.theta J j wrapper success fail
 
     let eval_tau trans wrapper success fail =
-      Log.log (fun fmt -> Format.fprintf fmt "@[<v 2>tau[[%a]]@ " SF.pp_trans trans);
+      Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "@[<v 2>tau[[%a]]@ " SF.pp_trans trans);
       let success' p =
 	Transformer.(success p >> eval_act (module Theta) trans.transition_act)
       in
@@ -108,7 +108,7 @@ struct
 		     fail.local)
 
     let rec eval_T tl wrapper success fail =
-      Log.log ~debug:false (fun fmt -> Format.fprintf fmt "@[<v 2>T[[%a]]@ " SF.pp_transitions tl);
+      Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "@[<v 2>T[[%a]]@ " SF.pp_transitions tl);
       match tl with
       | [] -> fail.global
       | t::[] ->  eval_tau t wrapper success fail
@@ -122,7 +122,7 @@ struct
       | t::q -> [t], q
 
     let rec eval_open_path mode p p1 p2 success_p2 =
-      Log.log ~debug:false (fun fmt -> Format.fprintf fmt "@[<v 2>open_path_rec[[mode %a, prefix %a, src %a, dst %a]]@ " pp_mode mode pp_path p pp_path p1 pp_path p2);
+      Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "@[<v 2>open_path_rec[[mode %a, prefix %a, src %a, dst %a]]@ " pp_mode mode pp_path p pp_path p1 pp_path p2);
       match frontier p1, frontier p2 with
       | ([x], ps), ([y], pd) when x = y -> eval_open_path mode (p@[x]) ps pd success_p2
       | (x  , _ ), (y  , pd)            ->
@@ -137,7 +137,7 @@ struct
       fun tag prefix comp ->
 	match tag with
 	| E -> Transformer.(
-	  Log.log ~debug:false (fun fmt -> Format.fprintf fmt "@[<v 2>C_%a[[%a, %a]]@ " pp_tag tag pp_path prefix SF.pp_comp comp);
+	  Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "@[<v 2>C_%a[[%a, %a]]@ " pp_tag tag pp_path prefix SF.pp_comp comp);
 	  match comp with
 	  | Or (_T, [])   -> null
 	  | Or ([], [s0]) -> eval_open_path Enter prefix [] [s0] null
@@ -164,14 +164,14 @@ struct
       fun tag p p_def ->
 	match tag with
 	| E -> fun path frontier -> Transformer.(
-	  Log.log ~debug:false (fun fmt -> Format.fprintf fmt "@[<v 2>S_%a[[node %a, dest %a, frontier %a]]@ " pp_tag tag pp_path p pp_path path pp_frontier frontier);
+	  Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "@[<v 2>S_%a[[node %a, dest %a, frontier %a]]@ " pp_tag tag pp_path p pp_path path pp_frontier frontier);
 	  ((frontier = Loose) >? (eval_act (module Theta) p_def.state_actions.entry_act >> eval_act (module Theta) (open_path p))) >> 
 	  match path with
 	  | []         -> eval_C E p p_def.internal_composition
 	  | s::path_tl -> Theta.theta E (p@[s]) path_tl Loose
 	)
 	| D -> Transformer.(
-	  Log.log ~debug:false (fun fmt -> Format.fprintf fmt "@[<v 2>S_%a[[node %a]]@ " pp_tag tag pp_path p);
+	  Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "@[<v 2>S_%a[[node %a]]@ " pp_tag tag pp_path p);
 	  let wrapper_i = eval_open_path Inner [] p in
 	  let wrapper_o = eval_open_path Outer [] p in
 	  let success p_d = null in
@@ -186,7 +186,7 @@ struct
 	  eval_T p_def.outer_trans wrapper_o success fail_o
 	)
 	| X -> fun frontier -> Transformer.(
-	  Log.log ~debug:false (fun fmt -> Format.fprintf fmt "@[<v 2>S_%a[[node %a, frontier %a]]@ " pp_tag tag pp_path p pp_frontier frontier);
+	  Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "@[<v 2>S_%a[[node %a, frontier %a]]@ " pp_tag tag pp_path p pp_frontier frontier);
 	  eval_C X p p_def.internal_composition >>
 	  ((frontier = Loose) >? (eval_act (module Theta) p_def.state_actions.exit_act >> eval_act (module Theta) (close_path p)))
 	)

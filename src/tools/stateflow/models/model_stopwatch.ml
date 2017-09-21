@@ -4,6 +4,7 @@ open SF
 
 let verbose = false
 let actionv x = if verbose then action x else no_action
+let condition x = condition (Corelang.mkexpr Location.dummy_loc (LustreSpec.Expr_const (Corelang.const_of_bool true)))
     
 let name = "stopwatch"
   
@@ -239,7 +240,25 @@ let model =
     Junction("j3", []);
   ]
   in
-  (smain, src)
+  let globals =
+    let int_typ = Corelang.mktyp Location.dummy_loc LustreSpec.Tydec_int in
+    List.map (fun k ->
+      Corelang.mkvar_decl
+	Location.dummy_loc
+	(k, (* name *)
+	 int_typ, (* type *)
+	 Corelang.dummy_clock_dec, (* clock *)
+	 false, (* not a constant *)
+	 None (* no default value *)
+	)
+    )
+      ["cent";
+       "sec";
+       "min";
+       "cont"
+      ]
+  in
+  (smain, src, globals)
 
 let traces : trace_t list =
   [

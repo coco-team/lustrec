@@ -1,20 +1,24 @@
 
+let sf_level = 2
+  
 (* Basic datatype for model elements: state and junction name, events ... *)
 type state_name_t    = string
 type junction_name_t = string
 type path_t = state_name_t list
 type event_base_t = string
 type event_t      = event_base_t option
-type base_action_t = string
-type base_condition_t = string
+
+(* Connected to lustrec types *)
+type base_action_t = { defs : LustreSpec.eq list; ident : string }
+type base_condition_t = LustreSpec.expr
   
 (* P(r)etty printers *)
 let pp_state_name = Format.pp_print_string
 let pp_junction_name = Format.pp_print_string
 let pp_path fmt p = Utils.fprintf_list ~sep:"." pp_state_name fmt p
 let pp_event fmt e = match e with None -> Format.fprintf fmt "none" | Some s -> Format.fprintf fmt "%s" s
-let pp_base_act = Format.pp_print_string
-let pp_base_cond = Format.pp_print_string
+let pp_base_act fmt a = Utils.fprintf_list ~sep:",@ " Printers.pp_node_eq fmt a.defs
+let pp_base_cond = Printers.pp_expr
   
 (* Action and Condition types and functions. *)
 
