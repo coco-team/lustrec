@@ -28,28 +28,39 @@ let pp_as_c_macro pp_fun fmt v =
     pp_set_formatter_out_functions fmt formatter_out_funs;
   end
 
-let rec print_dec_struct_ty_field fmt (label, cty) =
-  fprintf fmt "%a : %a" pp_print_string label print_dec_ty cty
-and print_dec_ty fmt cty =
-  match (*get_repr_type*) cty with
-  | Tydec_any -> fprintf fmt "Any"
+let rec pp_var_struct_type_field fmt (label, tdesc) =
+  fprintf fmt "%a : %a;" pp_print_string label pp_var_type_dec_desc tdesc
+and pp_var_type_dec_desc fmt tdesc =
+  match tdesc with 
+  | Tydec_any -> fprintf fmt "<any>"
   | Tydec_int -> fprintf fmt "int"
   | Tydec_real -> fprintf fmt "real"
+  (* | Tydec_float -> fprintf fmt "float" *)
   | Tydec_bool -> fprintf fmt "bool"
-  | Tydec_clock cty' -> fprintf fmt "%a clock" print_dec_ty cty'
-  | Tydec_const c -> fprintf fmt "%s" c
-  | Tydec_enum taglist -> fprintf fmt "enum {%a }"
-      (Utils.fprintf_list ~sep:", " pp_print_string) taglist
-  | Tydec_struct fieldlist -> fprintf fmt "struct {%a }"
-      (Utils.fprintf_list ~sep:"; " print_dec_struct_ty_field) fieldlist
-  | Tydec_array (d, cty') -> fprintf fmt "%a^%a" print_dec_ty cty' Dimension.pp_dimension d
+  | Tydec_clock t -> fprintf fmt "%a clock" pp_var_type_dec_desc t
+  | Tydec_const t -> fprintf fmt "%s" t
+  | Tydec_enum id_list -> fprintf fmt "enum {%a }" (fprintf_list ~sep:", " pp_print_string) id_list
+  | Tydec_struct f_list -> fprintf fmt "struct {%a }" (fprintf_list ~sep:" " pp_var_struct_type_field) f_list
+  | Tydec_array (s, t) -> fprintf fmt "%a^%a" pp_var_type_dec_desc t Dimension.pp_dimension s
+
+let pp_var_type_dec fmt ty =
+  pp_var_type_dec_desc fmt ty.ty_dec_desc
 
 let pp_var_name fmt id = fprintf fmt "%s" id.var_id
-let pp_var_type fmt id = Types.print_node_ty fmt id.var_type
+let pp_var_type fmt id =
+  if !Options.print_dec_types then
+    pp_var_type_dec fmt id.var_dec_type
+  else
+    Types.print_node_ty fmt id.var_type
+let pp_var_clock fmt id = Clocks.print_ck_suffix fmt id.var_clock
   
 let pp_eq_lhs = fprintf_list ~sep:", " pp_print_string
 
-let pp_var fmt id = fprintf fmt "%s%s: %a" (if id.var_dec_const then "const " else "") id.var_id Types.print_ty id.var_type
+let pp_var fmt id =
+  fprintf fmt "%s%s: %a"
+    (if id.var_dec_const then "const " else "")
+    id.var_id
+    pp_var_type id
 
 let pp_quantifiers fmt (q, vars) =
   match q with
@@ -176,7 +187,11 @@ let pp_node_var fmt id = fprintf fmt "%s%s: %a(%a)%a" (if id.var_dec_const then 
 *)
 let pp_node_var fmt id =
   begin
-    fprintf fmt "%s%s: %a%a" (if id.var_dec_const then "const " else "") id.var_id Types.print_node_ty id.var_type Clocks.print_ck_suffix id.var_clock;
+    fprintf fmt "%s%s: %a%a"
+      (if id.var_dec_const then "const " else "")
+      id.var_id
+      pp_var_type id
+      pp_var_clock id;
     match id.var_dec_value with
     | None -> () 
     | Some v -> fprintf fmt " = %a" pp_expr v
@@ -234,24 +249,6 @@ and pp_node_aut fmt aut =
     (Utils.fprintf_list ~sep:"@ " pp_handler) aut.aut_handlers
 
 and pp_node_eqs fmt eqs = fprintf_list ~sep:"@ " pp_node_eq fmt eqs
-
-let rec pp_var_struct_type_field fmt (label, tdesc) =
-  fprintf fmt "%a : %a;" pp_print_string label pp_var_type_dec_desc tdesc
-and pp_var_type_dec_desc fmt tdesc =
-  match tdesc with 
-  | Tydec_any -> fprintf fmt "<any>"
-  | Tydec_int -> fprintf fmt "int"
-  | Tydec_real -> fprintf fmt "real"
-  (* | Tydec_float -> fprintf fmt "float" *)
-  | Tydec_bool -> fprintf fmt "bool"
-  | Tydec_clock t -> fprintf fmt "%a clock" pp_var_type_dec_desc t
-  | Tydec_const t -> fprintf fmt "%s" t
-  | Tydec_enum id_list -> fprintf fmt "enum {%a }" (fprintf_list ~sep:", " pp_print_string) id_list
-  | Tydec_struct f_list -> fprintf fmt "struct {%a }" (fprintf_list ~sep:" " pp_var_struct_type_field) f_list
-  | Tydec_array (s, t) -> fprintf fmt "%a^%a" pp_var_type_dec_desc t Dimension.pp_dimension s
-
-let pp_var_type_dec fmt ty =
-  pp_var_type_dec_desc fmt ty.ty_dec_desc
 
 let pp_typedef fmt ty =
   fprintf fmt "type %s = %a;@ " ty.tydef_id pp_var_type_dec_desc ty.tydef_desc

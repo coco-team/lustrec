@@ -70,7 +70,7 @@ let _ =
      end) in
      let module Sem = CPS.Semantics (T) (Model) in
      let prog = Sem.code_gen modularmode in
-
+     Options.print_dec_types := true;
      Format.printf "%a@." Printers.pp_prog prog;
 
      let prog, deps = Main_lustre_compiler.stage1 prog "" "" in

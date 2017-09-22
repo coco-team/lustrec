@@ -39,7 +39,7 @@ struct
     Format.fprintf fmt "%t" (fun fmt -> Utils.fprintf_list ~sep:", " (pp_path sin) fmt (ActiveStates.Vars.elements vars))
   let pp_vars_decl sin fmt vars =
     Format.fprintf fmt "%t" (fun fmt -> Utils.fprintf_list ~sep:"; " (pp_typed_path sin) fmt (ActiveStates.Vars.elements vars))
-
+       
   let var_to_ident prefix p =
     pp_path prefix Format.str_formatter p;
     Format.flush_str_formatter ()
