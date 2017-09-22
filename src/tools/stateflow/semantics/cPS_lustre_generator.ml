@@ -350,7 +350,7 @@ struct
     let call_stmt =
       (* (%t) -> pre (thetaCallD_from_principal (event, %a)) *)
       let init = mkexpr
-	(LustreSpec.Expr_tuple (vars_to_exprl ~prefix:"sout_" Vars.state_vars))
+	(LustreSpec.Expr_tuple (List.map (fun _ -> expr_of_bool false) (ActiveStates.Vars.elements Vars.state_vars)))
       in
       let args = (Corelang.expr_of_vdecl event_var)::
 	(vars_to_exprl ~prefix:"sout_" Vars.state_vars)
