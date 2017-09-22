@@ -69,7 +69,7 @@ AS_IF([test "x$enable_salsa" != "xno"], [
   if (test "x$salsa" = xyes ); then
    AC_SUBST(SALSA, "(module Salsa_plugin.Plugin : PluginType.PluginType);")
    AC_SUBST(SALSA_TAG, "<**/*.native> or <plugins/salsa/*.cm?> : package(salsa)")
-  fi	
+  fi
 ])
 
 
@@ -80,12 +80,12 @@ AS_IF([test "x$enable_salsa" != "xno"], [
 
 
 
-AC_CHECK_LIB(gmp, __gmpz_init, 
+AC_CHECK_LIB(gmp, __gmpz_init,
       [gmp=yes],
       [AC_MSG_RESULT([GNU MP not found])
       gmp=no])
 
-AC_CHECK_LIB(mpfr, mpfr_add, [mpfr=yes], 
+AC_CHECK_LIB(mpfr, mpfr_add, [mpfr=yes],
 		   [AC_MSG_RESULT(
 [MPFR not found])
 mpfr=no])
@@ -105,7 +105,7 @@ AC_ARG_WITH([tests-path],
 AC_MSG_NOTICE($tests_path)
 AC_CHECK_FILE(${tests_path}/CMakeLists.txt,
               [
-	      valid_test_path=true	
+	      valid_test_path=true
 	      ],
 	      [
 	      valid_test_path=false
@@ -151,13 +151,13 @@ AC_MSG_NOTICE(********    Plugins    ********)
 
   if (test "x$gmp" = xyes -a "x$mpfr" = xyes ); then
       AC_MSG_NOTICE([MPFR option enabled])
-  else 
+  else
       AC_MSG_WARN([MPFR option cannot be activated. Requires GMP and MPFR libs])
   fi
 
   if (test "x$salsa" = xyes -a "x$enable_salsa" != xno); then
       AC_MSG_NOTICE([Salsa plugin enabled])
-  else 
+  else
       AC_MSG_NOTICE([Salsa plugin disabled])
   fi
 AC_MSG_NOTICE(****** Regression Tests  ******)

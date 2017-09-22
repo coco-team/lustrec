@@ -9,6 +9,7 @@
 "tools/stateflow/common": include
 "tools/stateflow/semantics": include
 "tools/stateflow/models": include
+"tools/stateflow/parser-json": include
 
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic
@@ -18,10 +19,11 @@
 <**/*.native>: use_unix
 <**/*.native>: package(num)
 
+# for JSON parser: really dirty, to be cleaned
+true: package(yojson)
 
 # Required for ocamldoc. Otherwise failed to build
 <*.ml{,i}>: package(ocamlgraph)
 
 # Plugin dependencies
 @SALSA_TAG@
-
