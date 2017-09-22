@@ -3,11 +3,11 @@
 type backend = GenLus | GenImp
 
 (* Model choice *)
-let model_name = ref "stopwatch" (*"simple"*)
+let model_name = ref "simple"
 
 let models = [(module Model_simple : Datatype.MODEL_T);
 	      (module Model_stopwatch : Datatype.MODEL_T);
-	      (module Model_medium : Datatype.MODEL_T)
+	     (*  (module Model_medium : Datatype.MODEL_T)*)
 	     ]
 let get_model_name m = let module M = (val m : Datatype.MODEL_T) in M.name
 let set_model name = 
@@ -56,7 +56,8 @@ let _ =
     let module Model = (val model) in
     let module T = CPS_ccode_generator.CodeGenerator in
     let module Sem = CPS.Semantics (T) (Model) in
-    Sem.code_gen Format.std_formatter modularmode
+    let _ = Sem.code_gen modularmode in
+    ()
   )				     
   | GenLus ->
      let module Model = (val model) in
@@ -68,7 +69,27 @@ let _ =
        let global_vars = global_vars 
      end) in
      let module Sem = CPS.Semantics (T) (Model) in
-     Sem.code_gen Format.std_formatter modularmode
+     let prog = Sem.code_gen modularmode in
+
+     Format.printf "%a@." Printers.pp_prog prog;
+
+     let prog, deps = Main_lustre_compiler.stage1 prog "" "" in
+
+     
+     (* (\* Importing source *\) *)
+     (* let _ = Modules.load_program Utils.ISet.empty prog in *)
+
+     (* (\* Extracting dependencies *\) *)
+     (* let dependencies, type_env, clock_env = Compiler_common.import_dependencies prog in *)
+
+
+     (* (\* Typing *\) *)
+     (* let computed_types_env = Compiler_common.type_decls type_env prog in *)
+     
+     (* (\* Clock calculus *\) *)
+     (* let computed_clocks_env = Compiler_common.clock_decls clock_env prog in *)
+
+     Format.printf "%a@." Printers.pp_prog prog
 
 
   

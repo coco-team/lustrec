@@ -162,7 +162,7 @@ let rec load_header_rec imported header =
        if ISet.mem basename imported then imported else
 	 let lusic = import_dependency_aux decl.top_decl_loc (local, dep)
 	 in load_header_rec (ISet.add basename imported) lusic.Lusic.contents
-		 ) imported header
+  ) imported header
 
 let load_header imported header =
   try
@@ -187,8 +187,8 @@ let rec load_program_rec imported program =
        if ISet.mem basename imported then imported else
 	 let lusic = import_dependency_aux decl.top_decl_loc (local, dep)
 	 in load_header_rec (ISet.add basename imported) lusic.Lusic.contents
-		 ) imported program
-
+  ) imported program
+    
 let load_program imported program =
   try
     load_program_rec imported program

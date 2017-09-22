@@ -16,6 +16,7 @@ struct
   type t_base = { statements : LustreSpec.statement list; assert_false: bool }
   type t = name_t -> name_t -> (ActiveStates.Vars.t * t_base)
 
+	
   let new_loc, reset_loc =
     let cpt = ref 0 in
     ((fun () -> incr cpt; Format.sprintf "loc_%i" !cpt),
@@ -39,10 +40,6 @@ struct
   let pp_vars_decl sin fmt vars =
     Format.fprintf fmt "%t" (fun fmt -> Utils.fprintf_list ~sep:"; " (pp_typed_path sin) fmt (ActiveStates.Vars.elements vars))
 
-  let pp_locals fmt locs =
-    ActiveStates.Vars.iter (fun v -> Format.fprintf fmt "%a;@ " (pp_vars_decl (List.hd v)) Vars.state_vars) locs;
-    () (* TODO: declare global vars *)
-
   let var_to_ident prefix p =
     pp_path prefix Format.str_formatter p;
     Format.flush_str_formatter ()
@@ -65,6 +62,12 @@ struct
       (fun v -> var_to_vdecl ~prefix:prefix v bool_type)
       (ActiveStates.Vars.elements vars)
 
+  let mk_locals locs =
+    ActiveStates.Vars.fold (fun v accu ->
+      (state_vars_to_vdecl_list ~prefix:(List.hd v) Vars.state_vars)@accu
+    ) locs []
+     (* TODO: declare global vars *)
+
   let mkeq = Corelang.mkeq Location.dummy_loc
   let mkexpr = Corelang.mkexpr Location.dummy_loc
   let mkpredef_call = Corelang.mkpredef_call Location.dummy_loc
@@ -80,6 +83,12 @@ struct
       ];
       assert_false = false
     }
+  let base_to_assert b =
+    if b.assert_false then
+      [{LustreSpec.assert_expr = expr_of_bool false; assert_loc = Location.dummy_loc}]
+    else
+      []
+
     
   let var_to_expr ?(prefix="") p =
     let id = var_to_ident prefix p in
@@ -146,36 +155,37 @@ struct
        assert_false = tr1.assert_false || tr2.assert_false
      }
     )
-       
+      
+  let pp_name :
+  type c. c call_t  -> c -> unit =
+    fun call -> 
+      match call with
+      | Ecall -> (fun (p, p', f) ->
+	Format.fprintf Format.str_formatter "theta%a%a%a_%a"
+	  pp_call call
+	  (pp_path "_from_") p
+	  (pp_path "_to_") p'
+	  pp_frontier f)
+      | Dcall -> (fun p          ->
+	Format.fprintf Format.str_formatter "theta%a%a"
+	  pp_call call
+	  (pp_path "_from_") p)
+      | Xcall -> (fun (p, f)     ->
+	Format.fprintf Format.str_formatter "theta%a%a_%a"
+	  pp_call call
+	  (pp_path "_from_") p
+	  pp_frontier f)
+	     
+
   let mkcall' :
   type c. name_t -> name_t -> c call_t -> c -> t_base =
-    fun sin sout call ->
-      let pp_name : type c. c call_t  -> c -> unit =
-	fun call -> 
-	  match call with
-	  | Ecall -> (fun (p, p', f) ->
-	    Format.fprintf Format.str_formatter "theta%a%a%a_%a"
-	      pp_call call
-	      (pp_path "_from_") p
-	      (pp_path "_to_") p'
-	      pp_frontier f)
-	  | Dcall -> (fun p          ->
-	    Format.fprintf Format.str_formatter "theta%a%a"
-	      pp_call call
-	      (pp_path "_from_") p)
-	  | Xcall -> (fun (p, f)     ->
-	    Format.fprintf Format.str_formatter "theta%a%a_%a"
-	      pp_call call
-	      (pp_path "_from_") p
-	      pp_frontier f)
-      in
-      fun arg ->
-	pp_name call arg;
-	let funname = Format.flush_str_formatter () in
-	let args = (Corelang.expr_of_vdecl event_var)::(vars_to_exprl ~prefix:sin Vars.state_vars) in
-	let rhs = mkpredef_call funname args in
-	mkstmt_eq ~prefix_lhs:sout Vars.state_vars rhs
-
+    fun sin sout call arg ->
+      pp_name call arg;
+      let funname = Format.flush_str_formatter () in
+      let args = (Corelang.expr_of_vdecl event_var)::(vars_to_exprl ~prefix:sin Vars.state_vars) in
+      let rhs = mkpredef_call funname args in
+      mkstmt_eq ~prefix_lhs:sout Vars.state_vars rhs
+	
   let mkact' action sin sout =
     match action with
     | Action.Call (c, a) -> mkcall' sin sout c a
@@ -241,7 +251,7 @@ struct
 							  mkcond' sin cond2]
     | Condition.Quote c            -> c (* TODO: shall we prefix with sin ? *)
 
-  let rec eval_cond condition ok ko sin sout =
+  let rec eval_cond condition (ok:t) ko sin sout =
     let open LustreSpec in
     let loc = Location.dummy_loc in
     (*Format.printf "----- cond = %a@." Condition.pp_cond condition;*)
@@ -266,10 +276,7 @@ struct
 		   hand_until = [];
 		   hand_locals = [];
 		   hand_stmts = tr0.statements;
-		   hand_asserts = if tr0.assert_false then
-		       [{assert_expr = expr_of_bool false; assert_loc = loc}]
-		     else
-		       [];
+		   hand_asserts = base_to_assert tr0;
 		   hand_annots = [];
 		   hand_loc = loc;
 		 };
@@ -279,12 +286,9 @@ struct
 		   hand_until = [
 		     (loc, expr_of_bool true, true (* restart *), "CenterPoint_" ^ aut);
 		   ];
-		   hand_locals = [vars1] (* TODO convert to valid type *);
+		   hand_locals = mk_locals vars1;
 		   hand_stmts = tr1.statements;
-		   hand_asserts = if tr1.assert_false then
-		       [{assert_expr = expr_of_bool false; assert_loc = loc}]
-		     else
-		       [];
+		   hand_asserts = base_to_assert tr1;
 		   hand_annots = [];
 		   hand_loc = loc;
 		 };
@@ -294,12 +298,9 @@ struct
 		   hand_until = [
 		     (loc, expr_of_bool true, true (* restart *), "CenterPoint_" ^ aut);
 		   ];
-		   hand_locals = [vars2] (* TODO convert to valid type *);
+		   hand_locals = mk_locals vars2;
 		   hand_stmts = tr2.statements;
-		   hand_asserts = if tr2.assert_false then
-		       [{assert_expr = expr_of_bool false; assert_loc = loc}]
-		     else
-		       [];
+		   hand_asserts = base_to_assert tr2;
 		   hand_annots = [];
 		   hand_loc = loc;
 		 };
@@ -311,90 +312,76 @@ struct
      }
     )
       
-  let pp_transformer fmt tr =
+  let mktransformer tr =
     let (vars, tr) = tr "sin_" "sout_"
-    in tr fmt
+    in tr 
     
   let mkcomponent :
-  type c. c call_t -> c -> t -> prog =
-    fun fmt call -> match call with
-    | Ecall -> (fun (p, p', f) tr ->
-      reset_loc ();
-      let (vars', tr') = tr "sin_" "sout_" in
-      Format.fprintf fmt "node theta%a%a%a_%a(event : event_type; %a) returns (%a);@.%t%a@.let@.%t@.tel@."
-	pp_call call
-	(pp_path "_from_") p
-	(pp_path "_to_") p'
-	pp_frontier f
-	(pp_vars_decl "sin_") Vars.state_vars
-	(pp_vars_decl "sout_") Vars.state_vars
-	(fun fmt -> if ActiveStates.Vars.is_empty vars' then () else Format.fprintf fmt "var@.")
-	pp_locals vars'
-	tr')
-    | Dcall -> (fun p tr ->
-      reset_loc ();
-      let (vars', tr') = tr "sin_" "sout_" in
-      Format.fprintf fmt "node theta%a%a(event : event_type; %a) returns (%a);@.%t%a@.let@.%t@.tel@."
-	pp_call call
-	(pp_path "_from_") p
-	(pp_vars_decl "sin_") Vars.state_vars
-	(pp_vars_decl "sout_") Vars.state_vars
-	(fun fmt -> if ActiveStates.Vars.is_empty vars' then () else Format.fprintf fmt "var@.")
-	pp_locals vars'
-	tr')
-    | Xcall -> (fun (p, f) tr ->
-      reset_loc ();
-      let (vars', tr') = tr "sin_" "sout_" in
-      Format.fprintf fmt "node theta%a%a_%a(event : event_type; %a) returns (%a);@.%t%a@.let@.%t@.tel@."
-	pp_call call
-	(pp_path "_from_") p
-	pp_frontier f
-	(pp_vars_decl "sin_") Vars.state_vars
-	(pp_vars_decl "sout_") Vars.state_vars
-	(fun fmt -> if ActiveStates.Vars.is_empty vars' then () else Format.fprintf fmt "var@.")
-	pp_locals vars'
-	tr')
-
+  type c. c call_t -> c -> t -> LustreSpec.program =
+    fun call args ->
+      fun tr ->
+	reset_loc ();
+	let (vars', tr') = tr "sin_" "sout_" in
+	pp_name call args;
+	let funname = Format.flush_str_formatter () in
+	let node =
+	  Corelang.mktop (	
+	    LustreSpec.Node {LustreSpec.node_id = funname;
+			   node_type = Types.new_var ();
+			   node_clock = Clocks.new_var true;
+			   node_inputs = event_var :: state_vars_to_vdecl_list ~prefix:"sin_" Vars.state_vars;
+			   node_outputs = state_vars_to_vdecl_list ~prefix:"sout_" Vars.state_vars;
+			   node_locals = mk_locals vars'; (* TODO: add global vars *)
+			   node_gencalls = [];
+			   node_checks = [];
+			   node_stmts = tr'.statements;
+			   node_asserts = base_to_assert tr';
+			   node_dec_stateless = false;
+			   node_stateless = None;
+			   node_spec = None;
+			   node_annot = []}
+      )  
+	in
+	[node]
+	  
   let mk_main_loop () =
-    let loc = Location.dummy_loc in
+    (* let loc = Location.dummy_loc in *)
+    
+    let call_stmt =
+      (* (%t) -> pre (thetaCallD_from_principal (event, %a)) *)
+      let init = mkexpr
+	(LustreSpec.Expr_tuple (vars_to_exprl ~prefix:"sout_" Vars.state_vars))
+      in
+      let args = (Corelang.expr_of_vdecl event_var)::
+	(vars_to_exprl ~prefix:"sout_" Vars.state_vars)
+      in
+      let call_expr = mkpredef_call "thetaCallD_from_principal" args in
+      let pre_call_expr = mkexpr (LustreSpec.Expr_pre (call_expr)) in
+      let rhs = mkexpr (LustreSpec.Expr_arrow (init, pre_call_expr)) in
+      mkstmt_eq Vars.state_vars ~prefix_lhs:"sout_" rhs
+    in
     let node_principal =
       Corelang.mktop (	
 	LustreSpec.Node {LustreSpec.node_id = "principal_loop";
 			 node_type = Types.new_var ();
 			 node_clock = Clocks.new_var true;
 			 node_inputs = [event_var];
-			 node_outputs = state_vars_to_vdecl_list ~prefx:"sout_" Vars.state_vars;
+			 node_outputs = state_vars_to_vdecl_list ~prefix:"sout_" Vars.state_vars;
 			 node_locals = []; (* TODO: add global vars *)
 			 node_gencalls = [];
 			 node_checks = [];
-			 node_asserts = []; 
-			 node_stmts = call_stmt;
+			 node_asserts = base_to_assert call_stmt; 
+			 node_stmts = call_stmt.statements;
 			 node_dec_stateless = false;
 			 node_stateless = None;
 			 node_spec = None;
 			 node_annot = []}
       )  
     in
-    
-    let call_stmt =
-      (* (%t) -> pre (thetaCallD_from_principal (event, %a)) *)
-      let init = mkexpr loc
-	(Expr_tuple (vars_to_exprl ~prefix:"sout_" Vars.state_vars))
-      in
-      let args = (Corelang.expr_of_vdecl event_var)::
-	(vars_to_exprl ~prefix:"sout_" Vars.state_vars)
-      in
-      let call_expr = mkpredef_call "thetaCallD_from_principal" args in
-      let pre_call_expr = mkexpr loc (Expr_pre (call_expr)) in
-      let rhs = mkexpr loc (Expr_arrow (init, pre_call_expr)) in
-      mkstmt_eq Vars.state_vars ~prefix_lhs:"sout_" rhs
-    in
-    [
-      event_type_decl;
       node_principal
-    ]
+    
 
   let mkprincipal tr =
-    mk_main_loop () @ mkcomponent Dcall ["principal"] tr
+    event_type_decl :: mkcomponent Dcall ["principal"] tr @ [mk_main_loop ()]
 
 end
