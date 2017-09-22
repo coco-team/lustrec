@@ -158,7 +158,19 @@ and pp_expr_annot fmt expr_ann =
       pp_eexpr ee
   in
   fprintf_list ~sep:"@ " pp_annot fmt expr_ann.annots
-    
+
+
+let pp_asserts fmt asserts =
+  match asserts with 
+  | _::_ -> (
+    fprintf fmt "(* Asserts definitions *)@ ";
+    fprintf_list ~sep:"@ " (fun fmt assert_ -> 
+      let expr = assert_.assert_expr in
+      fprintf fmt "assert %a;" pp_expr expr 
+    ) fmt asserts 
+  )
+  | _ -> ()
+
 (*
 let pp_node_var fmt id = fprintf fmt "%s%s: %a(%a)%a" (if id.var_dec_const then "const " else "") id.var_id print_dec_ty id.var_dec_type.ty_dec_desc Types.print_ty id.var_type Clocks.print_ck_suffix id.var_clock
 *)
@@ -170,7 +182,7 @@ let pp_node_var fmt id =
     | Some v -> fprintf fmt " = %a" pp_expr v
   end 
 
-let pp_node_args = fprintf_list ~sep:"; " pp_node_var 
+let pp_node_args = fprintf_list ~sep:";@ " pp_node_var 
 
 let pp_node_eq fmt eq = 
   fprintf fmt "%a = %a;" 
@@ -181,21 +193,22 @@ let pp_restart fmt restart =
   Format.fprintf fmt "%s" (if restart then "restart" else "resume")
 
 let pp_unless fmt (_, expr, restart, st) =
-  Format.fprintf fmt "unless %a %a %s@ "
+  Format.fprintf fmt "unless %a %a %s"
     pp_expr expr
     pp_restart restart
     st
 
 let pp_until fmt (_, expr, restart, st) =
-  Format.fprintf fmt "until %a %a %s@ "
+  Format.fprintf fmt "until %a %a %s"
     pp_expr expr
     pp_restart restart
     st
 
 let rec pp_handler fmt handler =
-  Format.fprintf fmt "state %s ->@ @[<v 2>  %a%alet@,@[<v 2>  %a@]@,tel%a@]"
+  Format.fprintf fmt "state %s:@ @[<v 2>  %a%t%alet@,@[<v 2>  %a@ %a@ %a@]@,tel@ %a@]"
     handler.hand_state
-    (Utils.fprintf_list ~sep:"@," pp_unless) handler.hand_unless
+    (Utils.fprintf_list ~sep:"@ " pp_unless) handler.hand_unless
+    (fun fmt -> if not ([] = handler.hand_unless) then fprintf fmt "@ ")
     (fun fmt locals ->
       match locals with [] -> () | _ ->
 	Format.fprintf fmt "@[<v 4>var %a@]@ " 
@@ -203,7 +216,9 @@ let rec pp_handler fmt handler =
 	     (fun fmt v -> Format.fprintf fmt "%a;" pp_node_var v))
 	  locals)
     handler.hand_locals
+    (fprintf_list ~sep:"@ " pp_expr_annot) handler.hand_annots
     pp_node_stmts handler.hand_stmts
+    pp_asserts handler.hand_asserts
     (Utils.fprintf_list ~sep:"@," pp_until) handler.hand_until
 
 and pp_node_stmt fmt stmt =
@@ -269,20 +284,9 @@ let pp_spec fmt spec =
   fprintf fmt "@]*)";
   ()
 
-
-let pp_asserts fmt asserts =
-  match asserts with 
-  | _::_ -> (
-  fprintf fmt "(* Asserts definitions *)@ ";
-  fprintf_list ~sep:"@ " (fun fmt assert_ -> 
-    let expr = assert_.assert_expr in
-    fprintf fmt "assert %a;" pp_expr expr 
-  ) fmt asserts 
-  )
-  | _ -> ()
     
 let pp_node fmt nd = 
-fprintf fmt "@[<v 0>%a%t%s %s (%a) returns (%a)@ %a%alet@[<h 2>   @ @[<v>%a@ %a@ %a@]@]@ tel@]@ "
+fprintf fmt "@[<v 0>%a%t%s @[<hov 0>%s (@[%a)@]@ returns (@[%a)@]@]@ %a%alet@[<h 2>   @ @[<v>%a@ %a@ %a@]@]@ tel@]@ "
   (fun fmt s -> match s with Some s -> pp_spec fmt s | _ -> ()) nd.node_spec
   (fun fmt -> match nd.node_spec with None -> () | Some _ -> Format.fprintf fmt "@ ")
   (if nd.node_dec_stateless then "function" else "node")
