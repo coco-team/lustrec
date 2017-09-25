@@ -1,3 +1,7 @@
+# general config
+true: bin_annot, color(always)
+
+# paths to sources
 "backends": include
 "backends/C": include
 "backends/Horn": include
@@ -14,6 +18,7 @@
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic
 
+# packages
 <**/*.native>: package(ocamlgraph)
 <**/*.native>: use_str
 <**/*.native>: use_unix
@@ -27,3 +32,7 @@ true: package(yojson)
 
 # Plugin dependencies
 @SALSA_TAG@
+
+# Local Variables:
+# mode: conf
+# End:
