@@ -40,13 +40,11 @@ let compute modular  =
   let module Eval = (val (eval modular)) in
   Eval.eval_prog 
     
-let code_gen fmt modular  =
+let code_gen modular  =
   let module Eval = (val (eval modular)) in
   let principal, components =  Eval.eval_prog, Eval.eval_components in
-  [
-    List.map (fun (c, tr) -> T.mkcomponent Ecall c tr) (components Ecall);
-    List.map (fun (c, tr) -> T.mkcomponent Dcall c tr) (components Dcall);
-    List.map (fun (c, tr) -> T.mkcomponent Xcall c tr) (components Xcall);
-    T.mkprincipal principal;
-  ]
+  List.flatten (List.map (fun (c, tr) -> T.mkcomponent Ecall c tr) (components Ecall))@
+    List.flatten (List.map (fun (c, tr) -> T.mkcomponent Dcall c tr) (components Dcall))@
+    List.flatten (List.map (fun (c, tr) -> T.mkcomponent Xcall c tr) (components Xcall))@
+    (T.mkprincipal principal)
 end

@@ -77,7 +77,7 @@ sig
   val ( >> ) : t -> t -> t
   val eval_act : (module ThetaType with type t = t) -> act_t -> t
   val eval_cond : cond_t -> t -> t -> t
-  val mktransformer : Format.formatter -> t -> unit
+  (* val mktransformer : t -> unit *)
   val mkprincipal : t -> LustreSpec.program
   val mkcomponent : 'c call_t -> 'c -> t -> LustreSpec.program
 end

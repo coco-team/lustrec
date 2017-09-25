@@ -4,7 +4,7 @@ open SF
 let name = "simple"
 
   let condition x = condition (Corelang.mkexpr Location.dummy_loc (LustreSpec.Expr_const (Corelang.const_of_bool true)))
-
+  let action _ = no_action
  
 let model : prog_t =
     let state_main = "main" in

@@ -28,28 +28,39 @@ let pp_as_c_macro pp_fun fmt v =
     pp_set_formatter_out_functions fmt formatter_out_funs;
   end
 
-let rec print_dec_struct_ty_field fmt (label, cty) =
-  fprintf fmt "%a : %a" pp_print_string label print_dec_ty cty
-and print_dec_ty fmt cty =
-  match (*get_repr_type*) cty with
-  | Tydec_any -> fprintf fmt "Any"
+let rec pp_var_struct_type_field fmt (label, tdesc) =
+  fprintf fmt "%a : %a;" pp_print_string label pp_var_type_dec_desc tdesc
+and pp_var_type_dec_desc fmt tdesc =
+  match tdesc with 
+  | Tydec_any -> fprintf fmt "<any>"
   | Tydec_int -> fprintf fmt "int"
   | Tydec_real -> fprintf fmt "real"
+  (* | Tydec_float -> fprintf fmt "float" *)
   | Tydec_bool -> fprintf fmt "bool"
-  | Tydec_clock cty' -> fprintf fmt "%a clock" print_dec_ty cty'
-  | Tydec_const c -> fprintf fmt "%s" c
-  | Tydec_enum taglist -> fprintf fmt "enum {%a }"
-      (Utils.fprintf_list ~sep:", " pp_print_string) taglist
-  | Tydec_struct fieldlist -> fprintf fmt "struct {%a }"
-      (Utils.fprintf_list ~sep:"; " print_dec_struct_ty_field) fieldlist
-  | Tydec_array (d, cty') -> fprintf fmt "%a^%a" print_dec_ty cty' Dimension.pp_dimension d
+  | Tydec_clock t -> fprintf fmt "%a clock" pp_var_type_dec_desc t
+  | Tydec_const t -> fprintf fmt "%s" t
+  | Tydec_enum id_list -> fprintf fmt "enum {%a }" (fprintf_list ~sep:", " pp_print_string) id_list
+  | Tydec_struct f_list -> fprintf fmt "struct {%a }" (fprintf_list ~sep:" " pp_var_struct_type_field) f_list
+  | Tydec_array (s, t) -> fprintf fmt "%a^%a" pp_var_type_dec_desc t Dimension.pp_dimension s
+
+let pp_var_type_dec fmt ty =
+  pp_var_type_dec_desc fmt ty.ty_dec_desc
 
 let pp_var_name fmt id = fprintf fmt "%s" id.var_id
-let pp_var_type fmt id = Types.print_node_ty fmt id.var_type
+let pp_var_type fmt id =
+  if !Options.print_dec_types then
+    pp_var_type_dec fmt id.var_dec_type
+  else
+    Types.print_node_ty fmt id.var_type
+let pp_var_clock fmt id = Clocks.print_ck_suffix fmt id.var_clock
   
 let pp_eq_lhs = fprintf_list ~sep:", " pp_print_string
 
-let pp_var fmt id = fprintf fmt "%s%s: %a" (if id.var_dec_const then "const " else "") id.var_id Types.print_ty id.var_type
+let pp_var fmt id =
+  fprintf fmt "%s%s: %a"
+    (if id.var_dec_const then "const " else "")
+    id.var_id
+    pp_var_type id
 
 let pp_quantifiers fmt (q, vars) =
   match q with
@@ -158,19 +169,35 @@ and pp_expr_annot fmt expr_ann =
       pp_eexpr ee
   in
   fprintf_list ~sep:"@ " pp_annot fmt expr_ann.annots
-    
+
+
+let pp_asserts fmt asserts =
+  match asserts with 
+  | _::_ -> (
+    fprintf fmt "(* Asserts definitions *)@ ";
+    fprintf_list ~sep:"@ " (fun fmt assert_ -> 
+      let expr = assert_.assert_expr in
+      fprintf fmt "assert %a;" pp_expr expr 
+    ) fmt asserts 
+  )
+  | _ -> ()
+
 (*
 let pp_node_var fmt id = fprintf fmt "%s%s: %a(%a)%a" (if id.var_dec_const then "const " else "") id.var_id print_dec_ty id.var_dec_type.ty_dec_desc Types.print_ty id.var_type Clocks.print_ck_suffix id.var_clock
 *)
 let pp_node_var fmt id =
   begin
-    fprintf fmt "%s%s: %a%a" (if id.var_dec_const then "const " else "") id.var_id Types.print_node_ty id.var_type Clocks.print_ck_suffix id.var_clock;
+    fprintf fmt "%s%s: %a%a"
+      (if id.var_dec_const then "const " else "")
+      id.var_id
+      pp_var_type id
+      pp_var_clock id;
     match id.var_dec_value with
     | None -> () 
     | Some v -> fprintf fmt " = %a" pp_expr v
   end 
 
-let pp_node_args = fprintf_list ~sep:"; " pp_node_var 
+let pp_node_args = fprintf_list ~sep:";@ " pp_node_var 
 
 let pp_node_eq fmt eq = 
   fprintf fmt "%a = %a;" 
@@ -181,21 +208,22 @@ let pp_restart fmt restart =
   Format.fprintf fmt "%s" (if restart then "restart" else "resume")
 
 let pp_unless fmt (_, expr, restart, st) =
-  Format.fprintf fmt "unless %a %a %s@ "
+  Format.fprintf fmt "unless %a %a %s"
     pp_expr expr
     pp_restart restart
     st
 
 let pp_until fmt (_, expr, restart, st) =
-  Format.fprintf fmt "until %a %a %s@ "
+  Format.fprintf fmt "until %a %a %s"
     pp_expr expr
     pp_restart restart
     st
 
 let rec pp_handler fmt handler =
-  Format.fprintf fmt "state %s ->@ @[<v 2>  %a%alet@,@[<v 2>  %a@]@,tel%a@]"
+  Format.fprintf fmt "state %s:@ @[<v 2>  %a%t%alet@,@[<v 2>  %a@ %a@ %a@]@,tel@ %a@]"
     handler.hand_state
-    (Utils.fprintf_list ~sep:"@," pp_unless) handler.hand_unless
+    (Utils.fprintf_list ~sep:"@ " pp_unless) handler.hand_unless
+    (fun fmt -> if not ([] = handler.hand_unless) then fprintf fmt "@ ")
     (fun fmt locals ->
       match locals with [] -> () | _ ->
 	Format.fprintf fmt "@[<v 4>var %a@]@ " 
@@ -203,7 +231,9 @@ let rec pp_handler fmt handler =
 	     (fun fmt v -> Format.fprintf fmt "%a;" pp_node_var v))
 	  locals)
     handler.hand_locals
+    (fprintf_list ~sep:"@ " pp_expr_annot) handler.hand_annots
     pp_node_stmts handler.hand_stmts
+    pp_asserts handler.hand_asserts
     (Utils.fprintf_list ~sep:"@," pp_until) handler.hand_until
 
 and pp_node_stmt fmt stmt =
@@ -219,24 +249,6 @@ and pp_node_aut fmt aut =
     (Utils.fprintf_list ~sep:"@ " pp_handler) aut.aut_handlers
 
 and pp_node_eqs fmt eqs = fprintf_list ~sep:"@ " pp_node_eq fmt eqs
-
-let rec pp_var_struct_type_field fmt (label, tdesc) =
-  fprintf fmt "%a : %a;" pp_print_string label pp_var_type_dec_desc tdesc
-and pp_var_type_dec_desc fmt tdesc =
-  match tdesc with 
-  | Tydec_any -> fprintf fmt "<any>"
-  | Tydec_int -> fprintf fmt "int"
-  | Tydec_real -> fprintf fmt "real"
-  (* | Tydec_float -> fprintf fmt "float" *)
-  | Tydec_bool -> fprintf fmt "bool"
-  | Tydec_clock t -> fprintf fmt "%a clock" pp_var_type_dec_desc t
-  | Tydec_const t -> fprintf fmt "%s" t
-  | Tydec_enum id_list -> fprintf fmt "enum {%a }" (fprintf_list ~sep:", " pp_print_string) id_list
-  | Tydec_struct f_list -> fprintf fmt "struct {%a }" (fprintf_list ~sep:" " pp_var_struct_type_field) f_list
-  | Tydec_array (s, t) -> fprintf fmt "%a^%a" pp_var_type_dec_desc t Dimension.pp_dimension s
-
-let pp_var_type_dec fmt ty =
-  pp_var_type_dec_desc fmt ty.ty_dec_desc
 
 let pp_typedef fmt ty =
   fprintf fmt "type %s = %a;@ " ty.tydef_id pp_var_type_dec_desc ty.tydef_desc
@@ -269,20 +281,9 @@ let pp_spec fmt spec =
   fprintf fmt "@]*)";
   ()
 
-
-let pp_asserts fmt asserts =
-  match asserts with 
-  | _::_ -> (
-  fprintf fmt "(* Asserts definitions *)@ ";
-  fprintf_list ~sep:"@ " (fun fmt assert_ -> 
-    let expr = assert_.assert_expr in
-    fprintf fmt "assert %a;" pp_expr expr 
-  ) fmt asserts 
-  )
-  | _ -> ()
     
 let pp_node fmt nd = 
-fprintf fmt "@[<v 0>%a%t%s %s (%a) returns (%a)@ %a%alet@[<h 2>   @ @[<v>%a@ %a@ %a@]@]@ tel@]@ "
+fprintf fmt "@[<v 0>%a%t%s @[<hov 0>%s (@[%a)@]@ returns (@[%a)@]@]@ %a%alet@[<h 2>   @ @[<v>%a@ %a@ %a@]@]@ tel@]@ "
   (fun fmt s -> match s with Some s -> pp_spec fmt s | _ -> ()) nd.node_spec
   (fun fmt -> match nd.node_spec with None -> () | Some _ -> Format.fprintf fmt "@ ")
   (if nd.node_dec_stateless then "function" else "node")

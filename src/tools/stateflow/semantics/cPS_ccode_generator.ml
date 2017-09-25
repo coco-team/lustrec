@@ -57,5 +57,10 @@ struct
       Format.fprintf fmt "component %a(%a) =@.@[<v 2>begin@ %a@]@.end" pp_call call pp_path p pp_transformer tr)
     | Xcall -> (fun (p, f) tr ->
       Format.fprintf fmt "component %a(%a, %a) =@.@[<v 2>begin@ %a@]@.end" pp_call call pp_path p pp_frontier f pp_transformer tr)
+
+		     let mkcomponent _  = assert false
+		     let mkprincipal _  = assert false
+		     let mktransformer _  = assert false
+		       
 end
 
