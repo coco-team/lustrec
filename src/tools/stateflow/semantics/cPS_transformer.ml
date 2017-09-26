@@ -80,6 +80,8 @@ sig
   (* val mktransformer : t -> unit *)
   val mkprincipal : t -> LustreSpec.program
   val mkcomponent : 'c call_t -> 'c -> t -> LustreSpec.program
+  val pp_principal : Format.formatter -> t -> unit
+  val pp_component : Format.formatter -> 'c call_t -> 'c -> t -> unit
 end
 
 module type ComparableTransformerType =
@@ -88,7 +90,3 @@ sig
 
   val ( == ) : t -> t -> bool
 end
-
-
-  
-  

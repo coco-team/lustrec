@@ -26,15 +26,16 @@ struct
     with
       Type_error _ -> [ json ]
 
-  let rec parse_prog json =
+  let rec parse_prog json : prog_t =
      (*Format.printf "parse_prog@.";*)
-    Prog (
+    Program (
       json |> member "name"        |> to_string,
      (json |> member "states"      |> to_list |> List.map parse_state) @
      (json |> member "junctions"   |> to_list |> List.map parse_junction)
      @
      (json |> member "sffunctions" |> to_list |> List.map
-        (fun res -> SFFunction (parse_prog res)))
+        (fun res -> SFFunction (parse_prog res))),
+      [] (* TODO: to be replaced by variables ! *)
     )
   and parse_variables json =
      (*Format.printf "parse_variables@.";*)
