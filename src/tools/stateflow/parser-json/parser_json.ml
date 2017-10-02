@@ -4,7 +4,9 @@ open Datatype
 (* open Transformer *)
 open Basetypes
 open Basic
+open Corelang
 open CPS
+open LustreSpec
 
 module type ParseExt =
 sig
@@ -35,11 +37,11 @@ struct
      @
      (json |> member "sffunctions" |> to_list |> List.map
         (fun res -> SFFunction (parse_prog res))),
-      [] (* TODO: to be replaced by variables ! *)
+      json |> member "data"        |> to_list |> List.map parse_variable
     )
-  and parse_variables json =
-     (*Format.printf "parse_variables@.";*)
-    json |> member "data"       |> to_list |> List.map parse_variable
+  (* and parse_variables json = *)
+  (*    (\*Format.printf "parse_variables@.";*\) *)
+  (*   json |> member "data"       |> to_list |> List.map parse_variable *)
   and parse_state json =
     (*Format.printf "parse_state@.";*)
     State (
@@ -117,11 +119,32 @@ struct
     | _      -> failwith ("Invalid datatype " ^ datatype
                           ^ " for variable " ^ (json |> member "name"
                                                 |> to_string))
+  and lustre_datatype_of_json json location =
+    let datatype      = json |> member "datatype"      |> to_string in
+    let initial_value = json |> member "initial_value" |> to_string in
+    match datatype with
+    | "bool" -> (Tydec_bool, mkexpr location
+                   (Expr_const (Const_bool
+                                  (bool_of_string initial_value))))
+    | "int"  -> (Tydec_int, mkexpr location
+                   (Expr_const (Const_int (int_of_string
+                                             initial_value))))
+    | "real" -> (Tydec_real, mkexpr location
+                   (Expr_const (Const_real (Num.num_of_int 0,
+                                           0,
+                                           initial_value))))
+    | _      -> failwith ("Invalid datatype " ^ datatype
+                          ^ " for variable " ^ (json |> member "name"
+                                                |> to_string))
   and parse_variable json =
-    (*Format.printf "parse_variables@.";*)
-    (
-      json |> member "name"          |> to_string,
-      json |> member "scope"         |> to_string |> scope_of_string,
-      json                           |> datatype_of_json
-    )
+    (*Format.printf "parse_variable@.";*)
+    let location                  = Location.dummy_loc in
+    let (datatype, initial_value) = lustre_datatype_of_json json location in
+    mkvar_decl location ~orig:true
+      ( json |> member "name" |> to_string,
+        {ty_dec_desc = datatype;  ty_dec_loc = location},
+        {ck_dec_desc = Ckdec_any; ck_dec_loc = location},
+        false,
+        Some initial_value
+      )
 end

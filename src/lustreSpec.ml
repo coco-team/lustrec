@@ -43,10 +43,11 @@ type clock_dec =
 
 and clock_dec_desc =
   | Ckdec_any
-  | Ckdec_bool of (ident * ident) list 
+  | Ckdec_bool of (ident * ident) list
 
 
 type constant =
+  | Const_bool of bool
   | Const_int of int
   | Const_real of Num.num * int * string (* (a, b, c) means a * 10^-b. c is the original string *)
   | Const_array of constant list
@@ -56,7 +57,7 @@ type constant =
 
 type quantifier_type = Exists | Forall
 
-type var_decl = 
+type var_decl =
     {var_id: ident;
      var_orig:bool;
      var_dec_type: type_dec;
@@ -100,7 +101,7 @@ and expr_desc =
   | Expr_merge of ident * (label * expr) list
   | Expr_appl of call_t
 
-and call_t = ident * expr * expr option 
+and call_t = ident * expr * expr option
      (* The third part denotes the boolean condition for resetting *)
 
 and eq =
@@ -134,7 +135,7 @@ type offset =
 | Index of Dimension.dim_expr
 | Field of label
 
-type assert_t = 
+type assert_t =
     {
       assert_expr: expr;
       assert_loc: Location.t;
@@ -168,7 +169,7 @@ type node_desc =
      node_locals: var_decl list;
      mutable node_gencalls: expr list;
      mutable node_checks: Dimension.dim_expr list;
-     node_asserts: assert_t list; 
+     node_asserts: assert_t list;
      node_stmts: statement list;
      mutable node_dec_stateless: bool;
      mutable node_stateless: bool option;
@@ -188,10 +189,10 @@ type imported_node_desc =
      nodei_in_lib: string list;
     }
 
-type const_desc = 
-    {const_id: ident; 
-     const_loc: Location.t; 
-     const_value: constant;      
+type const_desc =
+    {const_id: ident;
+     const_loc: Location.t;
+     const_value: constant;
      mutable const_type: Types.type_expr;
     }
 
@@ -199,7 +200,7 @@ type top_decl_desc =
 | Node of node_desc
 | Const of const_desc
 | ImportedNode of imported_node_desc
-| Open of bool * string (* the boolean set to true denotes a local 
+| Open of bool * string (* the boolean set to true denotes a local
 			   lusi vs a lusi installed at system level *)
 | TypeDef of typedef_desc
 
@@ -211,16 +212,16 @@ type top_decl =
 
 type program = top_decl list
 
-type dep_t = Dep of 
-    bool 
+type dep_t = Dep of
+    bool
   * ident
-  * (top_decl list) 
+  * (top_decl list)
   * bool (* is stateful *)
 
 
 (************ Machine code types *************)
 
-type value_t = 
+type value_t =
   {
     value_desc: value_t_desc;
     value_type: Types.type_expr;
@@ -230,7 +231,7 @@ and value_t_desc =
   | Cst of constant
   | LocalVar of var_decl
   | StateVar of var_decl
-  | Fun of ident * value_t list 
+  | Fun of ident * value_t list
   | Array of value_t list
   | Access of value_t * value_t
   | Power of value_t * value_t

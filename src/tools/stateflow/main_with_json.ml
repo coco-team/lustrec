@@ -23,7 +23,7 @@ struct
   let json                       = Yojson.Basic.from_file "GPCA_Alarm_Alarm_SFIR_pp.json"
   let Program (init, defs, vars) = Parse.parse_prog json
   let prog                       = Parse.parse_prog json
-  let user_vars                  = Parse.parse_variables json
+  (* let user_vars                  = Parse.parse_variables json *)
   (*let _ = Format.printf "Model definitions@.%a@.####" Simulink.pp_src defs; ()*)
 end
 
@@ -55,7 +55,7 @@ module EvalProg = Interp.Evaluation (Thetaify) (Prog)
 let main ()  =
   begin
     SF.pp_prog Format.std_formatter (Parse.parse_prog Prog.json);
-    SF.pp_vars Format.std_formatter (Parse.parse_variables Prog.json);
+    (* SF.pp_vars Format.std_formatter (Parse.parse_variables Prog.json); *)
   end
 
 let _ = main ()
