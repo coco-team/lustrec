@@ -12,8 +12,8 @@ open Str
 module type ParseExt =
 sig
   val parse_condition : json -> Condition.t
-  val parse_action : json -> Action.t
-  val parse_event : json -> Basetypes.event_t
+  val parse_action    : json -> Action.t
+  val parse_event     : json -> Basetypes.event_t
 end
 
 module Parser (Ext : ParseExt) =
@@ -40,8 +40,6 @@ struct
         (fun res -> SFFunction (parse_prog res))),
       json |> member "data"        |> to_list |> List.map parse_variable
     )
-  (* and parse_variables json = *)
-  (*    (\*Format.printf "parse_variables@.";*\) *)
   (*   json |> member "data"       |> to_list |> List.map parse_variable *)
   and parse_state json =
     (*Format.printf "parse_state@.";*)
@@ -150,7 +148,7 @@ struct
       ( json |> member "name" |> to_string,
         {ty_dec_desc = datatype;  ty_dec_loc = location},
         {ck_dec_desc = Ckdec_any; ck_dec_loc = location},
-        false,
+        true,
         Some initial_value
       )
 end

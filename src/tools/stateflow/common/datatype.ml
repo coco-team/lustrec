@@ -150,10 +150,16 @@ struct
       name
       (pp_src pp_sffunction) component_list
 
-  let pp_prog fmt (Program (name, component_list, _)) =
-    Format.fprintf fmt "Main node name: %s@ %a@ "
+  let pp_vars fmt src =
+    Format.fprintf fmt "@[<v>%a@ @]"
+      (Utils.fprintf_list ~sep:"@ " Printers.pp_var)
+    src
+
+  let pp_prog fmt (Program (name, component_list, vars)) =
+    Format.fprintf fmt "Main node name: %s@ %a@ %a@"
       name
       (pp_src pp_sffunction) component_list
+      pp_vars vars
 
   let pp_scope fmt src =
     Format.fprintf fmt (match src with
@@ -162,23 +168,4 @@ struct
         | Local     -> "Local"
         | Output    -> "Output"
         | Parameter -> "Parameter")
-
-  let pp_vars fmt src =
-    Format.fprintf fmt "@[<v>%a@ @]"
-      (Utils.fprintf_list ~sep:"@ "
-         (fun fmt src -> match src with
-	    | (name, scope, Bool b) -> Format.fprintf fmt "%s: %a %s := %s"
-                                  name
-                                  pp_scope scope
-                                  "Bool" (string_of_bool b)
-	    | (name, scope, Real f) -> Format.fprintf fmt "%s: %a %s := %s"
-                                  name
-                                  pp_scope scope
-                                  "Real" (string_of_float f)
-	    | (name, scope, Int i)  -> Format.fprintf fmt "%s: %a %s := %s"
-                                  name
-                                  pp_scope scope
-                                  "Int" (string_of_int i)
-         ))
-    src
 end
