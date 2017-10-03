@@ -7,6 +7,7 @@ open Basic
 open Corelang
 open CPS
 open LustreSpec
+open Str
 
 module type ParseExt =
 sig
@@ -109,16 +110,23 @@ struct
     | "Output"    -> Output
     | "Parameter" -> Parameter
     | _           -> failwith ("Invalid scope for variable: " ^ s)
-  and datatype_of_json json =
-    let datatype = json |> member "datatype" |> to_string in
-    let init_value = json |> member "initial_value" |> to_string in
-    match datatype with
-    | "bool" -> Bool (bool_of_string init_value)
-    | "int"  -> Int  (int_of_string init_value)
-    | "real" -> Real (float_of_string init_value)
-    | _      -> failwith ("Invalid datatype " ^ datatype
-                          ^ " for variable " ^ (json |> member "name"
-                                                |> to_string))
+  and parse_real_value s =
+    let real_regexp_simp = regexp "-?\\([0-9][0-9]*\\)\\.\\([0-9]*\\)" in
+    let real_regexp_e    = regexp "-?\\([0-9][0-9]*\\)\\.\\([0-9]*\\)(E|e)\\((\\+|\\-)[0-9][0-9]*\\)" in
+    if string_match real_regexp_e s 0 then
+      let l = matched_group 1 s in
+      let r = matched_group 2 s in
+      let e = matched_group 3 s in
+      Const_real (Num.num_of_string (l ^ r),
+                  String.length r + -1 * int_of_string e,
+                  s)
+    else
+    if string_match real_regexp_simp s 0 then
+      let l = matched_group 1 s in
+      let r = matched_group 2 s in
+      Const_real (Num.num_of_string (l ^ r), String.length r, s)
+    else
+      failwith ("Invalid real constant " ^ s)
   and lustre_datatype_of_json json location =
     let datatype      = json |> member "datatype"      |> to_string in
     let initial_value = json |> member "initial_value" |> to_string in
@@ -130,9 +138,7 @@ struct
                    (Expr_const (Const_int (int_of_string
                                              initial_value))))
     | "real" -> (Tydec_real, mkexpr location
-                   (Expr_const (Const_real (Num.num_of_int 0,
-                                           0,
-                                           initial_value))))
+                   (Expr_const (parse_real_value initial_value)))
     | _      -> failwith ("Invalid datatype " ^ datatype
                           ^ " for variable " ^ (json |> member "name"
                                                 |> to_string))
