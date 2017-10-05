@@ -130,8 +130,13 @@ struct
     let initial_value = json |> member "initial_value" |> to_string in
     match datatype with
     | "bool" -> (Tydec_bool, mkexpr location
-                   (Expr_const (Const_bool
-                                  (bool_of_string initial_value))))
+                   (Expr_const (Const_tag
+                                  ((fun s -> match s with
+                                     | "true"  -> tag_true
+                                     | "false" -> tag_false
+                                     | _       ->
+                                       failwith ("Invalid constant for
+     boolean: " ^ s)) initial_value))))
     | "int"  -> (Tydec_int, mkexpr location
                    (Expr_const (Const_int (int_of_string
                                              initial_value))))

@@ -47,7 +47,6 @@ and clock_dec_desc =
 
 
 type constant =
-  | Const_bool of bool
   | Const_int of int
   | Const_real of Num.num * int * string (* (a, b, c) means a * 10^-b. c is the original string *)
   | Const_array of constant list
