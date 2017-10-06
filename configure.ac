@@ -47,14 +47,35 @@ if test x"$FINDLIB_CHECK" != x"yes" ; then
 fi
 dnl AC_MSG_RESULT(Hourrah: ocamlfind found!)
 
-# Checks for libraries. OCamlgraph
+# Checks for libraries.
+# OCamlgraph
 AC_MSG_CHECKING(ocamlgraph library)
 AS_IF([ocamlfind query ocamlgraph >/dev/null 2>&1],
     [],[AC_MSG_ERROR(ocamlgraph required. opam install ocamlgraph should solve the issue)],
 )
 AC_MSG_RESULT(yes)
 
+#Yojson
+AC_MSG_CHECKING(yojson library)
+AS_IF([ocamlfind query yojson >/dev/null 2>&1],
+    [],[AC_MSG_ERROR(yojson required. opam install yojson should solve the issue)],
+)
+AC_MSG_RESULT(yes)
 
+# logging and command line librairies
+AC_MSG_CHECKING(cmdliner library)
+AS_IF([ocamlfind query cmdliner >/dev/null 2>&1],
+    [],[AC_MSG_ERROR(cmdliner required. opam install cmdliner should solve the issue)],
+)
+AC_MSG_RESULT(yes)
+
+AC_MSG_CHECKING(fmt and logs library)
+AS_IF([ocamlfind query fmt logs >/dev/null 2>&1],
+    [],[AC_MSG_ERROR(fmt and logs required. opam install fmt logs should solve the issue)],
+)
+AC_MSG_RESULT(yes)
+
+# Salsa
 AC_ARG_ENABLE(salsa, [AS_HELP_STRING([--disable-salsa],
               [disable Salsa plugin. Enabled by default if available.])])
 
@@ -72,14 +93,7 @@ AS_IF([test "x$enable_salsa" != "xno"], [
   fi
 ])
 
-
-
-
-
-
-
-
-
+# GMP
 AC_CHECK_LIB(gmp, __gmpz_init,
       [gmp=yes],
       [AC_MSG_RESULT([GNU MP not found])
