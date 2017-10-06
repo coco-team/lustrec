@@ -1,11 +1,8 @@
 open Yojson
 open Datatype
-(* open Simulink *)
-(* open Transformer *)
 open Basetypes
 open Basic
 open Corelang
-(* open CPS *)
 open LustreSpec
 open Str
 
@@ -75,19 +72,21 @@ struct
     }
   and parse_dest json =
     Logs.debug (fun m -> m "parse_dest");
-    (json |> member "type" |> to_string |>
+    let dest_type = json |> member "type" |> to_string in
+    (dest_type |>
 	(function
 	| "State"    -> (fun p -> DPath p)
 	| "Junction" -> (fun j -> DJunction (path_concat j))
-	| _ -> assert false))
+	| _ -> failwith ("Invalid destination type: " ^ dest_type)))
       (json |> member "name" |> parse_path)
   and parse_internal_composition json =
     Logs.debug (fun m -> m "parse_internal_composition");
-    (json |> member "type" |> to_string |>
+    let state_type = json |> member "type" |> to_string in
+    (state_type |>
 	(function
 	| "EXCLUSIVE_OR" -> (fun tinit substates ->                      Or  (tinit, substates))
 	| "PARALLEL_AND" -> (fun tinit substates -> assert (tinit = []); And (substates))
-	| _ -> assert false))
+	| _ -> failwith ("Invalid state type: " ^ state_type)))
       (json |> member "tinit"     |> parse_tinit)
       (json |> member "substates" |> to_list |> List.map to_string)
   and parse_tinit json =
