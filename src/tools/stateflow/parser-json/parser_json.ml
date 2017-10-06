@@ -5,7 +5,7 @@ open Datatype
 open Basetypes
 open Basic
 open Corelang
-open CPS
+(* open CPS *)
 open LustreSpec
 open Str
 
@@ -30,7 +30,7 @@ struct
       Type_error _ -> [ json ]
 
   let rec parse_prog json : prog_t =
-     (*Format.printf "parse_prog@.";*)
+    Logs.info  (fun m -> m "parse_prog %s" (json |> member "name" |> to_string));
     Program (
       json |> member "name"        |> to_string,
      (json |> member "states"      |> to_list |> List.map parse_state) @
@@ -40,18 +40,17 @@ struct
         (fun res -> SFFunction (parse_prog res))),
       json |> member "data"        |> to_list |> List.map parse_variable
     )
-  (*   json |> member "data"       |> to_list |> List.map parse_variable *)
   and parse_state json =
-    (*Format.printf "parse_state@.";*)
+    Logs.debug (fun m -> m "parse_state");
     State (
       json |> member "path" |> parse_path,
       json |> parse_state_def
     )
   and parse_path json =
-      (*Format.printf "parse_path@.";*)
-      json |> to_string |> path_split
+    Logs.debug (fun m -> m "parse_path %s" (json |> to_string));
+    json |> to_string |> path_split
   and parse_state_def json =
-    (*Format.printf "parse_state_def@.";*)
+    Logs.debug (fun m -> m "parse_state_def");
     {
       state_actions        = json |> member "state_actions"        |> parse_state_actions;
       outer_trans          = json |> member "outer_trans"          |> to_list |> List.map parse_transition;
@@ -59,14 +58,14 @@ struct
       internal_composition = json |> member "internal_composition" |> parse_internal_composition
     }
   and parse_state_actions json =
-    (*Format.printf "parse_state_actions@.";*)
+    Logs.debug (fun m -> m "parse_state_actions");
     {
       entry_act  = json |> member "entry_act"  |> Ext.parse_action;
       during_act = json |> member "during_act" |> Ext.parse_action;
       exit_act   = json |> member "exit_act"   |> Ext.parse_action;
     }
   and parse_transition json =
-    (*Format.printf "parse_transition@.";*)
+    Logs.debug (fun m -> m "parse_transition");
     {
       event          = json |> member "event"          |> Ext.parse_event;
       condition      = json |> member "condition"      |> Ext.parse_condition;
@@ -75,7 +74,7 @@ struct
       dest           = json |> member "dest"           |> parse_dest
     }
   and parse_dest json =
-    (*Format.printf "parse_dest@.";*)
+    Logs.debug (fun m -> m "parse_dest");
     (json |> member "type" |> to_string |>
 	(function
 	| "State"    -> (fun p -> DPath p)
@@ -83,7 +82,7 @@ struct
 	| _ -> assert false))
       (json |> member "name" |> parse_path)
   and parse_internal_composition json =
-    (*Format.printf "parse_internal_composition@.";*)
+    Logs.debug (fun m -> m "parse_internal_composition");
     (json |> member "type" |> to_string |>
 	(function
 	| "EXCLUSIVE_OR" -> (fun tinit substates ->                      Or  (tinit, substates))
@@ -92,10 +91,10 @@ struct
       (json |> member "tinit"     |> parse_tinit)
       (json |> member "substates" |> to_list |> List.map to_string)
   and parse_tinit json =
-    (*Format.printf "parse_tinit@.";*)
+    Logs.debug (fun m -> m "parse_tinit");
     json |> to_list |> List.map parse_transition
   and parse_junction json =
-    (*Format.printf "parse_junction@.";*)
+    Logs.debug (fun m -> m "parse_junction");
     Junction (
       json |> member "path"        |> to_string,
       json |> member "outer_trans" |> to_list |> List.map parse_transition
@@ -109,6 +108,7 @@ struct
     | "Parameter" -> Parameter
     | _           -> failwith ("Invalid scope for variable: " ^ s)
   and parse_real_value s =
+    Logs.debug (fun m -> m "parse_real_value %s" s);
     let real_regexp_simp = regexp "-?\\([0-9][0-9]*\\)\\.\\([0-9]*\\)" in
     let real_regexp_e    = regexp "-?\\([0-9][0-9]*\\)\\.\\([0-9]*\\)(E|e)\\((\\+|\\-)[0-9][0-9]*\\)" in
     if string_match real_regexp_e s 0 then
@@ -146,7 +146,7 @@ struct
                           ^ " for variable " ^ (json |> member "name"
                                                 |> to_string))
   and parse_variable json =
-    (*Format.printf "parse_variable@.";*)
+    Logs.debug (fun m -> m "parse_variable %s" (json |> member "name" |> to_string));
     let location                  = Location.dummy_loc in
     let (datatype, initial_value) = lustre_datatype_of_json json location in
     mkvar_decl location ~orig:true
