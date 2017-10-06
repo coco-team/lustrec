@@ -356,7 +356,7 @@ let pp_lusi_header fmt basename prog =
   fprintf fmt "(* by Lustre-C compiler version %s, %a *)@ " Version.number pp_date (Unix.gmtime (Unix.time ()));
   fprintf fmt "(* Feel free to mask some of the definitions by removing them from this file. *)@ @ ";
   List.iter (fprintf fmt "%a@ " pp_lusi) prog;
-  fprintf fmt "@]"
+  fprintf fmt "@]@."
 
 let pp_offset fmt offset =
   match offset with
