@@ -49,7 +49,7 @@ let return_code kind =
     fprintf fmt
       "library %s.lusic has a different version number and may crash compiler.@.Please recompile the corresponding interface or source file.@."
       sym
-  | AlgebraicLoop _ -> assert false (* should have been handled yet *)
+  | AlgebraicLoop  -> assert false (* should have been handled yet *)
      
 let pp_warning loc pp_msg =
   Format.eprintf "%a@.Warning: %t@."
