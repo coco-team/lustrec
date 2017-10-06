@@ -365,7 +365,7 @@ struct
 	LustreSpec.Node {LustreSpec.node_id = "principal_loop";
 			 node_type = Types.new_var ();
 			 node_clock = Clocks.new_var true;
-			 node_inputs = [event_var];
+			 node_inputs = List.map Corelang.copy_var_decl [event_var];
 			 node_outputs = state_vars_to_vdecl_list ~prefix:"sout_" Vars.state_vars;
 			 node_locals = []; (* TODO: add global vars *)
 			 node_gencalls = [];
