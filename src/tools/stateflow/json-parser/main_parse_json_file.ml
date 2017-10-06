@@ -1,7 +1,7 @@
 open Basetypes
 open Cmdliner
 open Datatype
-open Parser_json
+open Json_parser
 open Sys
 
 module ParseExt =
@@ -53,13 +53,7 @@ let info =
     `S Manpage.s_bugs;
     `P "Report bug to Github issues tracking." ]
   in
-  Term.info "json-parser-example" ~doc ~exits:Term.default_exits ~man
-
-let main () =
-  begin
-    let json = Yojson.Basic.from_file Sys.argv.(1) in
-    SF.pp_prog Format.std_formatter (Parse.parse_prog json);
-  end
+  Term.info "parse_json_file" ~doc ~exits:Term.default_exits ~man
 
 (* program *)
 let _ = Term.exit @@ Term.eval (json_parse_t, info)

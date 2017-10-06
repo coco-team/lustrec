@@ -30,11 +30,11 @@ lustresf:
 	@mkdir -p $(LOCAL_BINDIR)
 	@mv _build/tools/stateflow/sf_sem.native $(LOCAL_BINDIR)/lustresf
 
-json-parser-ex:
+json-parser:
 	@echo Compiling binary json-parser-ex
-	@$(OCAMLBUILD) tools/stateflow/main_with_json.native
+	@$(OCAMLBUILD) tools/stateflow/json-parser/main_parse_json_file.native
 	@mkdir -p $(LOCAL_BINDIR)
-	@mv _build/tools/stateflow/main_with_json.native $(LOCAL_BINDIR)/json-parser-ex
+	@mv _build/tools/stateflow/json-parser/main_parse_json_file.native $(LOCAL_BINDIR)/json-parser
 
 doc:
 	@echo Generating doc
