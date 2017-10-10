@@ -36,6 +36,14 @@ json-parser:
 	@mkdir -p $(LOCAL_BINDIR)
 	@mv _build/tools/stateflow/json-parser/main_parse_json_file.native $(LOCAL_BINDIR)/json-parser
 
+tests:	test-simple-var
+
+test-simple-var:
+	@echo Compiling simple tests for JSON parser -- tests on variables
+	@$(OCAMLBUILD) tools/stateflow/json-parser/test_json_parser_variables.native
+	@echo Lauching simple tests for JSON parser -- tests on variables
+	./_build/tools/stateflow/json-parser/test_json_parser_variables.native
+
 doc:
 	@echo Generating doc
 	@$(OCAMLBUILD) lustrec.docdir/index.html
@@ -57,4 +65,4 @@ dist-clean: clean
 install:
 	make -C .. install
 
-.PHONY: compile-lusi doc dot lustrec lustret lustrec.odocl clean install dist-clean
+.PHONY: compile-lusi doc dot lustrec lustret lustrec.odocl clean install dist-clean tests

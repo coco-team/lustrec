@@ -112,5 +112,8 @@ test-full-submit: test-config
 test-full: test-config
 	cd test; ctest -D Experimental
 
+tests:
+	@echo Launching tests
+	@make -C src tests
 
-.PHONY: all compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean
+.PHONY: all compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean tests

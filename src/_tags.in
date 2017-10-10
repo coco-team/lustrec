@@ -15,6 +15,7 @@ true: bin_annot, color(always)
 "tools/stateflow/models": include
 "tools/stateflow/json-parser": include
 
+# svn
 <**/.svn>: -traverse
 <**/.svn>: not_hygienic
 
@@ -33,6 +34,8 @@ true: bin_annot, color(always)
 <**/main_parse_json_file.*>     : package(logs.fmt)
 <**/main_parse_json_file.*>     : package(logs.cli)
 <**/main_parse_json_file.*>     : package(yojson)
+<**/test_*.*>                   : package(oUnit)
+<**/test_json*.*>               : package(yojson)
 
 # Required for ocamldoc. Otherwise failed to build
 <*.ml{,i}>: package(ocamlgraph)
