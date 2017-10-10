@@ -1,0 +1,15 @@
+{
+    "data": [
+        {
+            "datatype": "real",
+            "initial_value": "21.15",
+            "name": "my_real_var_pos",
+            "scope": "Output"
+        }
+    ],
+    "junctions": [],
+    "name": "simple_var_real_pos",
+    "origin_path": "simple_var_real_pos",
+    "sffunctions": [],
+    "states": []
+}

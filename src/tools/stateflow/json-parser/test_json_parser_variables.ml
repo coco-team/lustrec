@@ -66,12 +66,96 @@ let test_simple_var_bool_true tests_ctxt =
   | _ -> raise (OUnitTest.OUnit_failure
                   "Program obtained from simple-var-bool-true.json is not correct")
 
+let test_simple_var_int_zero tests_ctxt =
+  let prog = Parse.parse_prog
+      (Yojson.Basic.from_file "../data-test/simple-var-int-zero.json") in
+  match prog with
+  | Program ("simple_var_int_zero", [ ], [ x ]) ->
+    test_var_skeleton x "my_int_var_zero"
+      Tydec_int (Expr_const (Const_int 0))
+  | _ -> raise (OUnitTest.OUnit_failure
+                  "Program obtained from simple-var-int-zero.json is not correct")
+
+let test_simple_var_int_pos tests_ctxt =
+  let prog = Parse.parse_prog
+      (Yojson.Basic.from_file "../data-test/simple-var-int-pos.json") in
+  match prog with
+  | Program ("simple_var_int_pos", [ ], [ x ]) ->
+    test_var_skeleton x "my_int_var_pos"
+      Tydec_int (Expr_const (Const_int 2))
+  | _ -> raise (OUnitTest.OUnit_failure
+                  "Program obtained from simple-var-int-pos.json is not correct")
+
+let test_simple_var_int_neg tests_ctxt =
+  let prog = Parse.parse_prog
+      (Yojson.Basic.from_file "../data-test/simple-var-int-neg.json") in
+  match prog with
+  | Program ("simple_var_int_neg", [ ], [ x ]) ->
+    test_var_skeleton x "my_int_var_neg"
+      Tydec_int (Expr_const (Const_int (-5)))
+  | _ -> raise (OUnitTest.OUnit_failure
+                  "Program obtained from simple-var-int-neg.json is not correct")
+
+let test_simple_var_real_zero tests_ctxt =
+  let prog = Parse.parse_prog
+      (Yojson.Basic.from_file "../data-test/simple-var-real-zero.json") in
+  match prog with
+  | Program ("simple_var_real_zero", [ ], [ x ]) ->
+    test_var_skeleton x "my_real_var_zero"
+      Tydec_real (Expr_const (Const_real (Num.num_of_int 0, 1, "0.0")))
+  | _ -> raise (OUnitTest.OUnit_failure
+                  "Program obtained from simple-var-real-zero.json is not correct")
+
+let test_simple_var_real_pos tests_ctxt =
+  let prog = Parse.parse_prog
+      (Yojson.Basic.from_file "../data-test/simple-var-real-pos.json") in
+  match prog with
+  | Program ("simple_var_real_pos", [ ], [ x ]) ->
+    test_var_skeleton x "my_real_var_pos"
+      Tydec_real (Expr_const (Const_real (Num.num_of_int 2115, 2, "21.15")))
+  | _ -> raise (OUnitTest.OUnit_failure
+                  "Program obtained from simple-var-real-pos.json is not correct")
+
+let test_simple_var_real_neg tests_ctxt =
+  let prog = Parse.parse_prog
+      (Yojson.Basic.from_file "../data-test/simple-var-real-neg.json") in
+  match prog with
+  | Program ("simple_var_real_neg", [ ], [ x ]) ->
+    test_var_skeleton x "my_real_var_neg"
+      Tydec_real (Expr_const (Const_real (Num.num_of_int (-224), 2, "-2.24")))
+  | _ -> raise (OUnitTest.OUnit_failure
+                  "Program obtained from simple-var-real-neg.json is not correct")
+
+let test_simple_var_real_wo_dec tests_ctxt =
+  let prog = Parse.parse_prog
+      (Yojson.Basic.from_file "../data-test/simple-var-real-wo-dec.json") in
+  match prog with
+  | Program ("simple_var_real_wo_dec", [ ], [ x ]) ->
+    test_var_skeleton x "my_real_var_wo_dec"
+      Tydec_real (Expr_const (Const_real (Num.num_of_int 2500, 0, "2500")))
+  | _ -> raise (OUnitTest.OUnit_failure
+                  "Program obtained from simple-var-real-wo-dec.json is not correct")
+
 let var_suite =
   "suite for variables" >:::
   [ "simple test for variable (boolean, false)" >::
     test_simple_var_bool_false;
     "simple test for variable (boolean, true)"  >::
-    test_simple_var_bool_true
+    test_simple_var_bool_true;
+    "simple test for variable (int, 0)"  >::
+    test_simple_var_int_zero;
+    "simple test for variable (int, 2)"  >::
+    test_simple_var_int_pos;
+    "simple test for variable (int, -5)"  >::
+    test_simple_var_int_neg;
+    "simple test for variable (real, 0.0)"  >::
+    test_simple_var_real_zero;
+    "simple test for variable (real, 21.15)"  >::
+    test_simple_var_real_pos;
+    "simple test for variable (real, -2.24)"  >::
+    test_simple_var_real_neg;
+    "simple test for variable (real, 2500)"  >::
+    test_simple_var_real_wo_dec;
   ]
 
 let _ =

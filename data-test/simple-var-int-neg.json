@@ -1,0 +1,15 @@
+{
+    "data": [
+        {
+            "datatype": "int",
+            "initial_value": "-5",
+            "name": "my_int_var_neg",
+            "scope": "Output"
+        }
+    ],
+    "junctions": [],
+    "name": "simple_var_int_neg",
+    "origin_path": "simple_var_int_neg",
+    "sffunctions": [],
+    "states": []
+}

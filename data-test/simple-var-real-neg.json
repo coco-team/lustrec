@@ -1,0 +1,15 @@
+{
+    "data": [
+        {
+            "datatype": "real",
+            "initial_value": "-2.24",
+            "name": "my_real_var_neg",
+            "scope": "Output"
+        }
+    ],
+    "junctions": [],
+    "name": "simple_var_real_neg",
+    "origin_path": "simple_var_real_neg",
+    "sffunctions": [],
+    "states": []
+}
