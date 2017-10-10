@@ -24,9 +24,9 @@ true: bin_annot, color(always)
 <**/main_lustre_compiler.native>: use_unix
 <**/main_lustre_testgen.native> : use_unix
 <**/*.native>                   : package(num)
-<**/json_parser.ml>             : package(logs)
+<**/*.ml>                       : package(logs)
+<**/*.native>                   : package(logs)
 <**/json_parser.ml>             : package(yojson)
-<**/main_parse_json_file.*>     : package(logs)
 <**/main_parse_json_file.*>     : package(cmdliner)
 <**/main_parse_json_file.*>     : package(fmt.tty)
 <**/main_parse_json_file.*>     : package(fmt.cli)

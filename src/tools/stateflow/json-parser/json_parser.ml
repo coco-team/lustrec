@@ -1,10 +1,10 @@
-open Yojson
-open Datatype
 open Basetypes
-open Basic
 open Corelang
+open Datatype
 open LustreSpec
 open Str
+open Yojson
+open Basic
 
 module type ParseExt =
 sig
