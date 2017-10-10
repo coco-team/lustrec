@@ -1,0 +1,15 @@
+{
+    "data": [
+        {
+            "datatype": "bool",
+            "initial_value": "false",
+            "name": "x",
+            "scope": "Output"
+        }
+    ],
+    "junctions": [],
+    "name": "simple-var-1",
+    "origin_path": "simple-var-1",
+    "sffunctions": [],
+    "states": []
+}
