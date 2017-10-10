@@ -46,18 +46,18 @@ let test_var_skeleton var id var_type value =
                           "User variables should have an initial value")
   end
 
-let test_simple_var_1 tests_ctxt =
+let test_simple_var_bool_false tests_ctxt =
   let prog = Parse.parse_prog
-      (Yojson.Basic.from_file "../data-test/simple-var-1.json") in
+      (Yojson.Basic.from_file "../data-test/simple-var-bool-false.json") in
   match prog with
   | Program ("simple-var-1", [ ], [ x ]) ->
     test_var_skeleton x "x" Tydec_bool (Expr_const (Const_tag tag_false))
   | _ -> raise (OUnitTest.OUnit_failure
-                  "Program obtained from simple-var-1 is not correct")
+                  "Program obtained from simple-var-bool-false.json is not correct")
 
 let var_suite =
   "suite for variables" >:::
-  [ "simple test for variable 1" >:: test_simple_var_1 ]
+  [ "simple test for variable (boolean, false)" >:: test_simple_var_bool_false ]
 
 let _ =
   run_test_tt_main var_suite
