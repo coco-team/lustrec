@@ -3,7 +3,7 @@
         {
             "datatype": "bool",
             "initial_value": "true",
-            "name": "my_var",
+            "name": "my_bool_var_true",
             "scope": "Input"
         }
     ],

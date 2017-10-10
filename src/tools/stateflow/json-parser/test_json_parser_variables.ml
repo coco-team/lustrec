@@ -51,7 +51,8 @@ let test_simple_var_bool_false tests_ctxt =
       (Yojson.Basic.from_file "../data-test/simple-var-bool-false.json") in
   match prog with
   | Program ("simple_var_bool_false", [ ], [ x ]) ->
-    test_var_skeleton x "x" Tydec_bool (Expr_const (Const_tag tag_false))
+    test_var_skeleton x "my_bool_var_false"
+      Tydec_bool (Expr_const (Const_tag tag_false))
   | _ -> raise (OUnitTest.OUnit_failure
                   "Program obtained from simple-var-bool-false.json is not correct")
 
@@ -60,7 +61,8 @@ let test_simple_var_bool_true tests_ctxt =
       (Yojson.Basic.from_file "../data-test/simple-var-bool-true.json") in
   match prog with
   | Program ("simple_var_bool_true", [ ], [ x ]) ->
-    test_var_skeleton x "my_var" Tydec_bool (Expr_const (Const_tag tag_true))
+    test_var_skeleton x "my_bool_var_true"
+      Tydec_bool (Expr_const (Const_tag tag_true))
   | _ -> raise (OUnitTest.OUnit_failure
                   "Program obtained from simple-var-bool-true.json is not correct")
 
