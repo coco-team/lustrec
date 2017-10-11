@@ -26,22 +26,22 @@ let test_var_skeleton var id var_type value =
       var.var_dec_const;
     assert_equal
       ~msg:("problem with variable " ^ var.var_id ^ " clock type")
-      var.var_dec_clock.ck_dec_desc
-      Ckdec_any;
+      Ckdec_any
+      var.var_dec_clock.ck_dec_desc;
     assert_equal
       ~msg:("problem with variable " ^ var.var_id ^ " ident")
-      var.var_id
-      id;
+      id
+      var.var_id;
     assert_equal
       ~msg:("problem with variable " ^ var.var_id ^ " type")
-      var.var_dec_type.ty_dec_desc
-      var_type;
+      var_type
+      var.var_dec_type.ty_dec_desc;
     match var.var_dec_value with
     | Some { expr_desc = d } ->
       assert_equal
         ~msg:("problem with variable " ^ var.var_id ^ " value")
-        d
         value
+        d
     | _       -> raise (OUnitTest.OUnit_failure
                           "User variables should have an initial value")
   end
