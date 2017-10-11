@@ -15,6 +15,8 @@ end
 
 module Parser (Ext : ParseExt) =
 struct
+  exception JSON_parse_error of string
+
   let path_split = String.split_on_char '/'
   let path_concat = String.concat (String.make 1 '/')
 
@@ -77,7 +79,7 @@ struct
 	(function
 	| "State"    -> (fun p -> DPath p)
 	| "Junction" -> (fun j -> DJunction (path_concat j))
-	| _ -> failwith ("Invalid destination type: " ^ dest_type)))
+	| _ -> raise (JSON_parse_error ("Invalid destination type: " ^ dest_type))))
       (json |> member "name" |> parse_path)
   and parse_internal_composition json =
     Logs.debug (fun m -> m "parse_internal_composition");
@@ -86,7 +88,7 @@ struct
 	(function
 	| "EXCLUSIVE_OR" -> (fun tinit substates ->                      Or  (tinit, substates))
 	| "PARALLEL_AND" -> (fun tinit substates -> assert (tinit = []); And (substates))
-	| _ -> failwith ("Invalid state type: " ^ state_type)))
+        | _ -> raise (JSON_parse_error ("Invalid state type: " ^ state_type))))
       (json |> member "tinit"     |> parse_tinit)
       (json |> member "substates" |> to_list |> List.map to_string)
   and parse_tinit json =
@@ -105,7 +107,7 @@ struct
     | "Local"     -> Local
     | "Output"    -> Output
     | "Parameter" -> Parameter
-    | _           -> failwith ("Invalid scope for variable: " ^ s)
+    | _           -> raise (JSON_parse_error ("Invalid scope for variable: " ^ s))
   and parse_real_value s =
     Logs.debug (fun m -> m "parse_real_value %s" s);
     let real_regexp_simp = regexp "-?\\([0-9][0-9]*\\)\\.\\([0-9]*\\)" in
@@ -123,7 +125,7 @@ struct
       let r = matched_group 2 s in
       Const_real (Num.num_of_string (l ^ r), String.length r, s)
     else
-      failwith ("Invalid real constant " ^ s)
+      raise (JSON_parse_error ("Invalid real constant " ^ s))
   and lustre_datatype_of_json json location =
     let datatype      = json |> member "datatype"      |> to_string in
     let initial_value = json |> member "initial_value" |> to_string in
@@ -134,16 +136,16 @@ struct
                                      | "true"  -> tag_true
                                      | "false" -> tag_false
                                      | _       ->
-                                       failwith ("Invalid constant for
-     boolean: " ^ s)) initial_value))))
+                                       raise (JSON_parse_error ("Invalid constant for
+     boolean: " ^ s))) initial_value))))
     | "int"  -> (Tydec_int, mkexpr location
                    (Expr_const (Const_int (int_of_string
                                              initial_value))))
     | "real" -> (Tydec_real, mkexpr location
                    (Expr_const (parse_real_value initial_value)))
-    | _      -> failwith ("Invalid datatype " ^ datatype
-                          ^ " for variable " ^ (json |> member "name"
-                                                |> to_string))
+    | _      -> raise (JSON_parse_error ("Invalid datatype " ^ datatype
+                                         ^ " for variable " ^ (json |> member "name"
+                                                               |> to_string)))
   and parse_variable json =
     Logs.debug (fun m -> m "parse_variable %s" (json |> member "name" |> to_string));
     let location                  = Location.dummy_loc in
