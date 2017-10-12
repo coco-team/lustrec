@@ -127,14 +127,9 @@ let test_simple_var_real_neg tests_ctxt =
                   "Program obtained from simple-var-real-neg.json is not correct")
 
 let test_simple_var_real_wo_dec tests_ctxt =
-  let prog = Parse.parse_prog
-      (Yojson.Basic.from_file "../data-test/simple-var-real-wo-dec.json") in
-  match prog with
-  | Program ("simple_var_real_wo_dec", [ ], [ x ]) ->
-    test_var_skeleton x "my_real_var_wo_dec"
-      Tydec_real (Expr_const (Const_real (Num.num_of_int 2500, 0, "2500")))
-  | _ -> raise (OUnitTest.OUnit_failure
-                  "Program obtained from simple-var-real-wo-dec.json is not correct")
+  assert_raises (Parse.JSON_parse_error("Invalid real constant 2500"))
+    (fun _ -> Parse.parse_prog (Yojson.Basic.from_file
+                                  "../data-test/simple-var-real-wo-dec.json"))
 
 let var_suite =
   "suite for variables" >:::
