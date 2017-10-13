@@ -111,13 +111,13 @@ struct
   and parse_real_value s =
     Logs.debug (fun m -> m "parse_real_value %s" s);
     let real_regexp_simp = regexp "\\(-?[0-9][0-9]*\\)\\.\\([0-9]*\\)" in
-    let real_regexp_e    = regexp "\\(-?[0-9][0-9]*\\)\\.\\([0-9]*\\)(E|e)\\((\\+|\\-)[0-9][0-9]*\\)" in
+    let real_regexp_e    = regexp "\\(-?[0-9][0-9]*\\)\\.\\([0-9]*\\)\\(E\\|e\\)\\(\\(\\+\\|\\-\\)[0-9][0-9]*\\)" in
     if string_match real_regexp_e s 0 then
       let l = matched_group 1 s in
       let r = matched_group 2 s in
-      let e = matched_group 3 s in
+      let e = matched_group 4 s in
       Const_real (Num.num_of_string (l ^ r),
-                  String.length r + -1 * int_of_string e,
+                  String.length r + (-1 * int_of_string e),
                   s)
     else
     if string_match real_regexp_simp s 0 then
