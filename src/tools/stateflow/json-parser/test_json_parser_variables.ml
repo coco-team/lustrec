@@ -146,6 +146,16 @@ let test_simple_var_real_neg tests_ctxt =
   | _ -> raise (OUnitTest.OUnit_failure
                   "Program obtained from simple-var-real-neg.json is not correct")
 
+let test_simple_var_real_e tests_ctxt =
+  let prog = Parse.parse_prog
+      (Yojson.Basic.from_file "../data-test/simple-var-real-e.json") in
+  match prog with
+  | Program ("simple_var_real_e", [ ], [ x ]) ->
+    test_var_skeleton x "my_real_var_e"
+      Tydec_real (Expr_const (Const_real (Num.num_of_int (-2115), 4, "-21.15e-02")))
+  | _ -> raise (OUnitTest.OUnit_failure
+                  "Program obtained from simple-var-real-e.json is not correct")
+
 let test_simple_var_real_wo_dec tests_ctxt =
   assert_raises (Parse.JSON_parse_error("Invalid real constant 2500"))
     (fun _ -> Parse.parse_prog (Yojson.Basic.from_file
@@ -169,6 +179,8 @@ let var_suite =
     test_simple_var_real_pos;
     "simple test for variable (real, -2.24)"  >::
     test_simple_var_real_neg;
+    "simple test for variable (real, -21.15e-02)"  >::
+    test_simple_var_real_e;
     "simple test for variable (real, 2500)"  >::
     test_simple_var_real_wo_dec;
   ]
