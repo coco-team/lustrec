@@ -110,8 +110,8 @@ struct
     | _           -> raise (JSON_parse_error ("Invalid scope for variable: " ^ s))
   and parse_real_value s =
     Logs.debug (fun m -> m "parse_real_value %s" s);
-    let real_regexp_simp = regexp "-?\\([0-9][0-9]*\\)\\.\\([0-9]*\\)" in
-    let real_regexp_e    = regexp "-?\\([0-9][0-9]*\\)\\.\\([0-9]*\\)(E|e)\\((\\+|\\-)[0-9][0-9]*\\)" in
+    let real_regexp_simp = regexp "\\(-?[0-9][0-9]*\\)\\.\\([0-9]*\\)" in
+    let real_regexp_e    = regexp "\\(-?[0-9][0-9]*\\)\\.\\([0-9]*\\)(E|e)\\((\\+|\\-)[0-9][0-9]*\\)" in
     if string_match real_regexp_e s 0 then
       let l = matched_group 1 s in
       let r = matched_group 2 s in
