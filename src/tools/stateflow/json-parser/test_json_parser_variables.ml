@@ -16,6 +16,23 @@ module Parse = Parser (ParseExt)
 
 let location = Location.dummy_loc
 
+let string_of_var_type var_type =
+  match var_type with
+  | Tydec_bool -> "bool"
+  | Tydec_int  -> "int"
+  | Tydec_real -> "real"
+  | _          -> "other"
+
+let string_of_var_value value =
+  match value with
+  | Expr_const (Const_tag label)      -> label
+  | Expr_const (Const_int v)          -> string_of_int v
+  | Expr_const (Const_real (n, l, s)) -> (Num.string_of_num n) ^
+                                         " x 10^-" ^
+                                         (string_of_int l) ^
+                                         " (" ^ s ^ ")"
+  | _                   -> "other value (not possible)"
+
 let test_var_skeleton var id var_type value =
   begin
     assert_bool
@@ -30,16 +47,19 @@ let test_var_skeleton var id var_type value =
       var.var_dec_clock.ck_dec_desc;
     assert_equal
       ~msg:("problem with variable " ^ var.var_id ^ " ident")
+      ~printer:(fun x -> x)
       id
       var.var_id;
     assert_equal
       ~msg:("problem with variable " ^ var.var_id ^ " type")
+      ~printer:string_of_var_type
       var_type
       var.var_dec_type.ty_dec_desc;
     match var.var_dec_value with
     | Some { expr_desc = d } ->
       assert_equal
         ~msg:("problem with variable " ^ var.var_id ^ " value")
+        ~printer:string_of_var_value
         value
         d
     | _       -> raise (OUnitTest.OUnit_failure
