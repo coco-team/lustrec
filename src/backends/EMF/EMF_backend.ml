@@ -117,25 +117,41 @@ let fprintf_list = Utils.fprintf_list
    -> false *)
 let is_arrow_fun m i =
   match Corelang.get_instr_desc i with
-  | MStep ([var], i, vl) -> (
-    try
-      let name = (Machine_code.get_node_def i m).node_id in
-      match name, vl with
-      | "_arrow", [v1; v2] -> (
-	match v1.value_desc, v2.value_desc with
-	| Cst c1, Cst c2 ->
-	   if c1 = Corelang.const_of_bool true && c2 = Corelang.const_of_bool false then
-	     true
-	   else
-	     assert false (* only handle true -> false *)
-	| _ -> assert false
-      )
-	 
-      | _ -> false
-    with
-    | Not_found -> false (* Not declared (should have been detected now, or imported node *)
-  )
+  | MStep ([var], i, vl) ->
+     (
+       try
+	 let name = (Machine_code.get_node_def i m).node_id in
+	 match name, vl with
+	 | "_arrow", [v1; v2] -> (
+	   match v1.value_desc, v2.value_desc with
+	   | Cst c1, Cst c2 ->
+	      if c1 = Corelang.const_of_bool true && c2 = Corelang.const_of_bool false then
+		true
+	      else
+		assert false (* only handle true -> false *)
+	   | _ -> assert false
+	 )
+	    
+	 | _ -> false
+       with
+       | Not_found -> false (* Not declared (should have been detected now, or
+			       imported node) *)
+     )
   | _ -> false
+     
+     
+     
+let is_resetable_fun lustre_eq =
+  (* We extract the clock if it exist from the original lustre equation *)
+  match lustre_eq with
+  | Some eq -> (
+    match eq.eq_rhs.expr_desc with
+    | Expr_appl(_,_,reset) -> (
+      match reset with None -> false | Some _ -> true
+    )
+    | _ ->  assert false
+  )
+  | None -> assert false (* should have been assigned to an original lustre equation *)
 
 (**********************************************)
 (*   Printing machine code as EMF             *)
@@ -154,30 +170,47 @@ let get_instr_id fmt i =
        (fun fmt -> fprintf fmt "%a_%s" (fprintf_list ~sep:"_" pp_var_name) outs id)
   | _ -> () (* No name *)
 
-let rec branch_block_vars il =
+let rec branch_block_vars m il =
   List.fold_left
     (fun (accu_all_def, accu_def, accu_read) i ->
-      let all_defined_vars, common_def_vars, read_vars = branch_instr_vars i in
+      let all_defined_vars, common_def_vars, read_vars = branch_instr_vars m i in
       ISet.union accu_all_def all_defined_vars,
       ISet.union accu_def common_def_vars,
       VSet.union accu_read read_vars)
     (ISet.empty, ISet.empty, VSet.empty) il
-and branch_instr_vars i =
+and branch_instr_vars m i =
   match Corelang.get_instr_desc i with
   | MLocalAssign (var,expr) 
   | MStateAssign (var,expr) -> ISet.singleton var.var_id, ISet.singleton var.var_id, get_expr_vars expr
-  | MStep (vars, _, args)  ->
+  | MStep (vars, f, args)  ->
+     let is_stateful = List.mem_assoc f m.minstances in 
      let lhs = ISet.of_list (List.map (fun v -> v.var_id) vars) in
+     let args_vars =
+       List.fold_left (fun accu v -> VSet.union accu (get_expr_vars v)) VSet.empty args in
+     
      lhs, lhs,
-     List.fold_left (fun accu v -> VSet.union accu (get_expr_vars v)) VSet.empty args
+     (
+       if is_stateful && is_resetable_fun i.lustre_eq then
+	 let reset_var =
+	   let loc = Location.dummy_loc in
+	   Corelang.mkvar_decl loc
+	     (reset_name f,
+	      Corelang.mktyp loc Tydec_bool, Corelang.mkclock loc Ckdec_any,
+	      false,
+	      None) 
+	 in
+	 VSet.add reset_var args_vars
+       else
+	 args_vars
+     )
   | MBranch (g,(_,hd_il)::tl)     -> (* We focus on variables defined in all branches *)
      let read_guard = get_expr_vars g in
-     let all_def_vars_hd, def_vars_hd, read_vars_hd = branch_block_vars hd_il in
+     let all_def_vars_hd, def_vars_hd, read_vars_hd = branch_block_vars m hd_il in
      let all_def_vars, def_vars, read_vars =
        List.fold_left
 	 (fun (all_def_vars, def_vars, read_vars) (_, il) ->
-	 (* We accumulate reads but intersect writes *)
-	   let all_writes_il, writes_il, reads_il = branch_block_vars il in
+	   (* We accumulate reads but intersect writes *)
+	   let all_writes_il, writes_il, reads_il = branch_block_vars m il in
 	   ISet.union all_def_vars all_writes_il,
 	   ISet.inter def_vars writes_il,
 	   VSet.union read_vars reads_il
@@ -256,7 +289,7 @@ let rec pp_emf_instr m fmt i =
       )
        
     | MBranch (g, hl) -> (
-      let all_outputs, outputs, inputs = branch_instr_vars i in
+      let all_outputs, outputs, inputs = branch_instr_vars m i in
       Format.eprintf "Mbranch %a@.vars: all_out: %a, out:%a, in:%a@.@."
 	Machine_code.pp_instr i
 	(fprintf_list ~sep:", " pp_var_string) (ISet.elements all_outputs)
@@ -283,7 +316,7 @@ let rec pp_emf_instr m fmt i =
       fprintf fmt "@[<v 2>\"branches\": {@ @[<v 0>%a@]@]@ }"
 	(fprintf_list ~sep:",@ "
 	   (fun fmt (tag, instrs_tag) ->
-	     let branch_all_lhs, _, branch_inputs = branch_block_vars instrs_tag in
+	     let branch_all_lhs, _, branch_inputs = branch_block_vars m instrs_tag in
 	     let branch_inputs = VSet.filter (fun v -> not (ISet.mem v.var_id branch_all_lhs)) branch_inputs in
 	     fprintf fmt "@[<v 2>\"%s\": {@ " tag;
 	     fprintf fmt "\"guard_value\": \"%a\",@ " pp_tag_id tag; 
@@ -317,17 +350,7 @@ let rec pp_emf_instr m fmt i =
       if is_stateful then
 	fprintf fmt ",@ \"reset\": { \"name\": \"%s\", \"resetable\": \"%b\"}"
 	  (reset_name f)
-	  ( (* We extract the clock if it exist from the original lustre equation *)
-	    match i.lustre_eq with
-	    | Some eq -> (
-	      match eq.eq_rhs.expr_desc with
-	      | Expr_appl(_,_,reset) -> (
-		match reset with None -> false | Some _ -> true
-	      )
-	      | _ ->  assert false
-	    )
-	    | None -> assert false (* should have been assigned to an original lustre equation *)
-	  )
+	  (is_resetable_fun i.lustre_eq)	  
       else fprintf fmt "@ "
     )
 
