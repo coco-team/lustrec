@@ -337,17 +337,10 @@ let rec pp_emf_instr m fmt i =
     | MComment _ 
       -> Format.eprintf "unhandled comment in EMF@.@?"; assert false
   (* not  available for EMF output *)
-
   in
-  match Corelang.get_instr_desc i with
-  | MBranch (_, [_, single_branch]) -> (
-    pp_emf_instrs m fmt single_branch (* Single branch hack treated as regular instrs *)
-  )
-  | _ -> (
     fprintf fmt "@[ @[<v 2>\"%a\": {@ " get_instr_id i;
     fprintf fmt "%a" pp_content i;
     fprintf fmt "@]@]@ }"
-  )
 and pp_emf_instrs m fmt instrs = fprintf_list ~sep:",@ " (pp_emf_instr m) fmt instrs
        
 let pp_machine fmt m =
