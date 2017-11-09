@@ -316,6 +316,7 @@ let stage3 prog machine_code dependencies basename =
        let source_out = open_out source_file in
        let fmt = formatter_of_out_channel source_out in
        Printers.pp_prog fmt prog;
+       Format.fprintf fmt "@.@?";
        (*	Lustre_backend.translate fmt basename normalized_prog machine_code *)
        ()
      end
