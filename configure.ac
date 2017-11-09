@@ -22,6 +22,12 @@ AC_MSG_RESULT(valid ocaml version detected: $ocamlc_version)
 
 AC_PATH_PROG([OCAMLBUILD],[ocamlbuild],[:])
 
+# Handle a mismatch in available function btw 4.02 and 4.04
+if (test $"$major" -eq 4 -a "$minor" -gt 2); then
+   AC_SUBST(UPPERCASEFUN, "String.uppercase_ascii")
+else
+   AC_SUBST(UPPERCASEFUN, "String.uppercase")
+fi
 
 # default prefix is /usr/local
 AC_PREFIX_DEFAULT(/usr/local)
@@ -138,6 +144,7 @@ AC_CONFIG_FILES([Makefile
 		 src/version.ml
 		 src/pluginList.ml
 		 src/_tags
+		 src/ocaml_utils.ml
 		 ])
 
 AC_OUTPUT
