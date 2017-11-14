@@ -22,71 +22,22 @@ let usage = "Usage: lustret [options] \x1b[4msource file\x1b[0m"
 
 let extensions = [".lus"]
 
-(* From prog to prog *)
-let stage1 prog dirname basename =
-  (* Removing automata *) 
-  let prog = expand_automata prog in
-
-  Log.report ~level:4 (fun fmt -> fprintf fmt ".. after automata expansion:@.@[<v 2>@ %a@]@," Printers.pp_prog prog);
-
-  (* Importing source *)
-  let _ = Modules.load_program ISet.empty prog in
-
-  (* Extracting dependencies *)
-  let dependencies, type_env, clock_env = import_dependencies prog in
-
-  (* Sorting nodes *)
-  let prog = SortProg.sort prog in
-
-  (* Perform inlining before any analysis *)
-  let orig, prog =
-    if !Options.global_inline && !Options.main_node <> "" then
-      (if !Options.witnesses then prog else []),
-      Inliner.global_inline basename prog type_env clock_env
-    else (* if !Option.has_local_inline *)
-      [],
-      Inliner.local_inline prog (* type_env clock_env *)
-  in
-
-  check_stateless_decls prog;
+let pp_trace trace_filename mutation_list = 
+  let trace_file = open_out trace_filename in
+  let trace_fmt = formatter_of_out_channel trace_file in
+  Format.fprintf trace_fmt "@[<v 2>{@ %a@ }@]"
+    (fprintf_list
+       ~sep:",@ "
+       (fun fmt (mutation, mutation_loc, mutant_name) ->
+	 Format.fprintf fmt "\"%s\": { @[<v 0>%a,@ %a@ }@]" 
+	   mutant_name
+	   Mutation.print_directive_json mutation
+	   Mutation.print_loc_json mutation_loc
+       ))
+    mutation_list;
+  Format.fprintf trace_fmt "@.@?" 
   
-  (* Typing *)
-  let _ (*computed_types_env*) = type_decls type_env prog in
-
-  (* Clock calculus *)
-  let _ (*computed_clocks_env*) = clock_decls clock_env prog in
-
-  (* Creating destination directory if needed *)
-  create_dest_dir ();
-
-  Typing.uneval_prog_generics prog;
-  Clock_calculus.uneval_prog_generics prog;
-
-  if !Options.global_inline && !Options.main_node <> "" && !Options.witnesses then
-    begin
-      let orig = Corelang.copy_prog orig in
-      Log.report ~level:1 (fun fmt -> fprintf fmt ".. generating witness file@,");
-      check_stateless_decls orig;
-      let _ = Typing.type_prog type_env orig in
-      let _ = Clock_calculus.clock_prog clock_env orig in
-      Typing.uneval_prog_generics orig;
-      Clock_calculus.uneval_prog_generics orig;
-      Inliner.witness
-	basename
-	!Options.main_node
-	orig prog type_env clock_env
-    end;
-
-  (* Normalization phase *)
-  Log.report ~level:1 (fun fmt -> fprintf fmt ".. normalization@,");
-  (* Special treatment of arrows in lustre backend. We want to keep them *)
-  if !Options.output = "lustre" then
-    Normalization.unfold_arrow_active := false;
-  let prog = Normalization.normalize_prog prog in
-  Log.report ~level:2 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
-
-  prog, dependencies
-
+  
 let testgen_source dirname basename extension =
   let source_name = dirname ^ "/" ^ basename ^ extension in
 
@@ -95,18 +46,26 @@ let testgen_source dirname basename extension =
   (* Parsing source *)
   let prog = parse_source source_name in
 
-  let prog, dependencies = stage1 prog dirname basename in
+  let prog, dependencies = Compiler_stages.stage1 prog dirname basename in
 
+  (* Two cases
+     - generation of coverage conditions
+     - generation of mutants: a number of mutated lustre files 
+  *)
+  
   if !Options.gen_mcdc then (
     PathConditions.mcdc prog;
     exit 0
   ) ;
+
+  
   (* generate mutants *)
-  let mutants, mutation_printer = Mutation.mutate !Options.nb_mutants prog in
+  let mutants = Mutation.mutate !Options.nb_mutants prog in
   
   (* Print generated mutants in target directory. *)
   let cpt = ref 0 in
-  List.iter (fun (mutation, mutant) ->
+  let mutation_list =
+    List.map (fun (mutation, mutation_loc, mutant) ->
     (* Debugging code *)
     (* if List.mem !cpt [238;371;601;799;875;998] then *)
     (*   Format.eprintf "Mutant %i: %a -> %a" !cpt Printers.pp_expr orig_e Printers.pp_expr new_e  *)
@@ -115,9 +74,9 @@ let testgen_source dirname basename extension =
     let mutant_filename = 
       match !Options.dest_dir with
       | "" -> (* Mutants are generated in source directory *)
-	basename^ ".mutant.n" ^ (string_of_int !cpt) ^ extension 
+	 basename^ ".mutant.n" ^ (string_of_int !cpt) ^ extension 
       | dir ->  (* Mutants are generated in target directory *)
-	dir ^ "/" ^ (Filename.basename basename)^ ".mutant.n" ^ (string_of_int !cpt) ^ extension 
+	 dir ^ "/" ^ (Filename.basename basename)^ ".mutant.n" ^ (string_of_int !cpt) ^ extension 
     in
     let mutant_out = (
       try 
@@ -127,14 +86,29 @@ let testgen_source dirname basename extension =
     )
     in
     let mutant_fmt = formatter_of_out_channel mutant_out in
-    report ~level:1 (fun fmt -> fprintf fmt ".. generating mutant %s: %a@,@?" mutant_filename mutation_printer mutation);
-    Format.fprintf mutant_fmt "%a@." Printers.pp_prog mutant    
-  )
-    mutants;
+    report ~level:1 (fun fmt -> fprintf fmt ".. generating mutant %s: %a@,@?"
+      mutant_filename
+      Mutation.print_directive mutation
+    );
+    Format.fprintf mutant_fmt "%a@." Printers.pp_prog mutant;
+    mutation, mutation_loc, mutant_filename
+    )
+      mutants
+  in
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. done @ @]@.");
-    (* We stop the process here *)
+  
+  (* Printing traceability *)
+  let trace_filename = 
+    match !Options.dest_dir with
+    | "" -> (* Mutant report is generated in source directory *)
+       basename^ ".mutation.json" 
+    | dir ->  (* Mutants are generated in target directory *)
+       dir ^ "/" ^ (Filename.basename basename)^ ".mutation.json"
+  in
+  pp_trace trace_filename mutation_list;
+  (* We stop the process here *)
   exit 0
-
+    
 let testgen dirname basename extension =
   match extension with
   | ".lus"   -> testgen_source dirname basename extension

@@ -344,7 +344,21 @@ let rdm_mutate nb prog =
 
 type mutant_t = Boolexpr of int | Pre of int | Op of string * int * string | IncrIntCst of int | DecrIntCst of int | SwitchIntCst of int * int 
 
+(* Denotes the parent node, the equation lhs and the location of the mutation *)
+type mutation_loc = ident * ident list * Location.t
 let target : mutant_t option ref = ref None
+
+let mutation_info : mutation_loc option ref = ref None
+let current_node: ident option ref = ref None 
+let current_eq_lhs : ident list option ref = ref None
+let current_loc : Location.t option ref = ref None
+  
+let set_mutation_loc () =
+  target := None;
+  match !current_node, !current_eq_lhs, !current_loc with
+  | Some n, Some elhs, Some l ->  mutation_info := Some (n, elhs, l)
+  | _ -> assert false (* Those global vars should be defined during the
+			   visitor pattern execution *)
 
 let print_directive fmt d =
   match d with
@@ -355,6 +369,21 @@ let print_directive fmt d =
   | DecrIntCst n ->  Format.fprintf fmt "decr int cst %i" n
   | SwitchIntCst (n, m) ->  Format.fprintf fmt "switch int cst %i -> %i" n m
 
+let print_directive_json fmt d =
+  match d with
+  | Pre _ -> Format.fprintf fmt "\"mutation\": \"pre\""
+  | Boolexpr _ -> Format.fprintf fmt "\"mutation\": \"not\"" 
+  | Op (o, _, d) -> Format.fprintf fmt "\"mutation\": \"op_conv\", \"from\": \"%s\", \"to\": \"%s\"" o d
+  | IncrIntCst n ->  Format.fprintf fmt "\"mutation\": \"cst_incr\""
+  | DecrIntCst n ->  Format.fprintf fmt "\"mutation\": \"cst_decr\""
+  | SwitchIntCst (n, m) ->  Format.fprintf fmt "\"mutation\": \"cst_switch\", \"to_cst\": \"%i\"" m
+  
+let print_loc_json fmt (n,eqlhs, l) =
+  Format.fprintf fmt "\"node_id\": \"%s\", \"eq_lhs\": [%a], \"loc_line\": \"%i\""
+    n
+    (Utils.fprintf_list ~sep:", " (fun fmt s -> Format.fprintf fmt "\"%s\"" s)) eqlhs
+    (Location.loc_line l)
+    
 let fold_mutate_int i = 
   if Random.int 100 > threshold_inc_int then
     i+1
@@ -390,7 +419,7 @@ let fold_mutate_op op =
 (* | _ -> op *)
   match !target with
   | Some (Op(op_orig, 0, op_new)) when op_orig = op -> (
-    target := None;
+    set_mutation_loc ();
     op_new
   )
   | Some (Op(op_orig, n, op_new)) when op_orig = op -> (
@@ -413,7 +442,8 @@ let fold_mutate_var expr =
 let fold_mutate_boolexpr expr =
   match !target with
   | Some (Boolexpr 0) -> (
-    target := None;
+     set_mutation_loc ();
+
     mkpredef_call expr.expr_loc "not" [expr]
   )
   | Some (Boolexpr n) ->
@@ -423,7 +453,7 @@ let fold_mutate_boolexpr expr =
 let fold_mutate_pre orig_expr e = 
   match !target with
     Some (Pre 0) -> (
-      target := None;
+      set_mutation_loc ();
       Expr_pre ({orig_expr with expr_desc = Expr_pre e}) 
     )
   | Some (Pre n) -> (
@@ -436,9 +466,9 @@ let fold_mutate_const_value c =
 match c with
 | Const_int i -> (
   match !target with
-  | Some (IncrIntCst 0) -> (target := None; Const_int (i+1))
-  | Some (DecrIntCst 0) -> (target := None; Const_int (i-1))
-  | Some (SwitchIntCst (0, id)) -> (target := None; Const_int (List.nth (IntSet.elements (IntSet.remove i !records.consts)) id)) 
+  | Some (IncrIntCst 0) -> (set_mutation_loc (); Const_int (i+1))
+  | Some (DecrIntCst 0) -> (set_mutation_loc (); Const_int (i-1))
+  | Some (SwitchIntCst (0, id)) -> (set_mutation_loc (); Const_int (List.nth (IntSet.elements (IntSet.remove i !records.consts)) id)) 
   | Some (IncrIntCst n) -> (target := Some (IncrIntCst (n-1)); c)
   | Some (DecrIntCst n) -> (target := Some (DecrIntCst (n-1)); c)
   | Some (SwitchIntCst (n, id)) -> (target := Some (SwitchIntCst (n-1, id)); c)
@@ -459,6 +489,7 @@ let fold_mutate_const c =
   { c with const_value = fold_mutate_const_value c.const_value }
 
 let rec fold_mutate_expr expr =
+  current_loc := Some expr.expr_loc;
   let new_expr = 
     match expr.expr_desc with
     | Expr_ident id -> fold_mutate_var expr
@@ -492,6 +523,7 @@ let rec fold_mutate_expr expr =
     new_expr
 
 let fold_mutate_eq eq =
+  current_eq_lhs := Some eq.eq_lhs;
   { eq with eq_rhs = fold_mutate_expr eq.eq_rhs }
 
 let fold_mutate_stmt stmt =
@@ -499,7 +531,8 @@ let fold_mutate_stmt stmt =
   | Eq eq   -> Eq (fold_mutate_eq eq)
   | Aut aut -> assert false
 
-let fold_mutate_node nd = 
+let fold_mutate_node nd =
+  current_node := Some nd.node_id;
   { nd with 
     node_stmts = 
       List.fold_right (fun stmt res -> (fold_mutate_stmt stmt)::res) nd.node_stmts [];
@@ -519,8 +552,14 @@ let fold_mutate_prog prog =
 let create_mutant prog directive =  
   target := Some directive; 
   let prog' = fold_mutate_prog prog in
-  target := None;
-  prog'
+  let mutation_info = match !target , !mutation_info with
+    | None, Some mi -> mi
+    | _ -> assert false (* The mutation has not been performed. *)
+     
+  in
+(*  target := None; (* should happen only if no mutation occured during the
+    visit *)*)
+  prog', mutation_info
   
 
 let op_mutation op = 
@@ -645,7 +684,9 @@ let fold_mutate nb prog =
 	create_mutants_directives (rnb-1) (random_mutation::mutants)
   in
   let mutants_directives = create_mutants_directives nb [] in
-  List.map (fun d -> d, create_mutant prog d) mutants_directives 
+  List.map (fun d ->
+    let mutant, loc = create_mutant prog d in
+    d, loc, mutant ) mutants_directives 
   
 
 let mutate nb prog =
@@ -655,7 +696,7 @@ let mutate nb prog =
 (*     !records.nb_boolexpr *)
 (*     (\* !records.op *\) *)
 (* ;  *)   
-  fold_mutate nb prog, print_directive
+  fold_mutate nb prog 
 
 
 
