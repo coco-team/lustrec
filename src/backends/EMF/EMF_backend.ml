@@ -379,6 +379,7 @@ let pp_machine fmt m =
       pp_emf_vars_decl m.mstep.step_outputs
       pp_emf_vars_decl m.mstep.step_locals
     ;
+    fprintf fmt "\"original_name\": \"%s\",@ " m.mname.node_id;
     fprintf fmt "\"instrs\": {@[<v 0> %a@]@ }"
       (pp_emf_instrs m) instrs;
     fprintf fmt "@]@ }"

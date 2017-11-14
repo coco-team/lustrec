@@ -151,9 +151,10 @@ let pp_var_type fmt v =
 (******** Other print functions *)
     
 let pp_emf_var_decl fmt v =
-  fprintf fmt "@[{\"name\": \"%a\", \"datatype\":\"%a\"}@]"
+  fprintf fmt "@[{\"name\": \"%a\", \"datatype\":\"%a\", \"original_name\": \"%a\"}@]"
     pp_var_name v
     pp_var_type v
+    Printers.pp_var_name v
     
 let pp_emf_vars_decl fmt vl =
   fprintf fmt "@[";
@@ -200,6 +201,7 @@ let pp_emf_cst_or_var fmt v =
   | StateVar v -> (
     fprintf fmt "{@[\"type\": \"variable\",@ \"value\": \"%a\",@ "
       pp_var_name v;
+    (*    fprintf fmt "\"original_name\": \"%a\",@ " Printers.pp_var_name v; *)
     fprintf fmt "\"datatype\": \"%a\"@ " pp_var_type v;
     fprintf fmt "@]}"
   )
