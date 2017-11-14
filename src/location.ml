@@ -78,11 +78,12 @@ let print loc =
   print_string ":";
   print_newline ()
 
-
+let loc_line loc = loc.loc_start.Lexing.pos_lnum 
+  
 let pp_loc fmt loc =
   if loc == dummy_loc then () else
   let filename = loc.loc_start.Lexing.pos_fname in
-  let line = loc.loc_start.Lexing.pos_lnum in
+  let line = loc_line loc in
   let start_char =
     loc.loc_start.Lexing.pos_cnum - loc.loc_start.Lexing.pos_bol
   in
