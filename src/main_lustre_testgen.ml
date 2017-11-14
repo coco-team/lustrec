@@ -70,13 +70,14 @@ let testgen_source dirname basename extension =
     (* if List.mem !cpt [238;371;601;799;875;998] then *)
     (*   Format.eprintf "Mutant %i: %a -> %a" !cpt Printers.pp_expr orig_e Printers.pp_expr new_e  *)
     (* ; *)
-    incr cpt;
-    let mutant_filename = 
-      match !Options.dest_dir with
-      | "" -> (* Mutants are generated in source directory *)
-	 basename^ ".mutant.n" ^ (string_of_int !cpt) ^ extension 
+      incr cpt;
+      let mutant_basename = (Filename.basename basename)^ ".mutant.n" ^ (string_of_int !cpt) ^ extension  in
+      let mutant_filename = 
+	match !Options.dest_dir with
+	| "" -> (* Mutants are generated in source directory *)
+	   basename^ ".mutant.n" ^ (string_of_int !cpt) ^ extension 
       | dir ->  (* Mutants are generated in target directory *)
-	 dir ^ "/" ^ (Filename.basename basename)^ ".mutant.n" ^ (string_of_int !cpt) ^ extension 
+	 dir ^ "/" ^ mutant_basename 
     in
     let mutant_out = (
       try 
@@ -91,7 +92,7 @@ let testgen_source dirname basename extension =
       Mutation.print_directive mutation
     );
     Format.fprintf mutant_fmt "%a@." Printers.pp_prog mutant;
-    mutation, mutation_loc, mutant_filename
+    mutation, mutation_loc, mutant_basename
     )
       mutants
   in
@@ -99,8 +100,11 @@ let testgen_source dirname basename extension =
   
   (* Printing traceability *)
   let trace_filename = 
-       (* Mutant report is generated in source directory *)
-    basename^ ".mutation.json" 
+    match !Options.dest_dir with
+    | "" -> (* Mutant report is generated in source directory *)
+       basename^ ".mutation.json" 
+    | dir ->  (* Mutants are generated in target directory *)
+       dir ^ "/" ^ (Filename.basename basename)^ ".mutation.json"
   in
   pp_trace trace_filename mutation_list;
   (* We stop the process here *)
