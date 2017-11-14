@@ -99,11 +99,8 @@ let testgen_source dirname basename extension =
   
   (* Printing traceability *)
   let trace_filename = 
-    match !Options.dest_dir with
-    | "" -> (* Mutant report is generated in source directory *)
-       basename^ ".mutation.json" 
-    | dir ->  (* Mutants are generated in target directory *)
-       dir ^ "/" ^ (Filename.basename basename)^ ".mutation.json"
+       (* Mutant report is generated in source directory *)
+    basename^ ".mutation.json" 
   in
   pp_trace trace_filename mutation_list;
   (* We stop the process here *)
