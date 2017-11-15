@@ -54,7 +54,17 @@ let testgen_source dirname basename extension =
   *)
   
   if !Options.gen_mcdc then (
-    PathConditions.mcdc prog;
+    let prog_mcdc = PathConditions.mcdc prog in
+  let _, type_env, _ = import_dependencies prog_mcdc in
+
+    let _ = type_decls type_env prog_mcdc in
+
+    let destname = !Options.dest_dir ^ "/" ^ basename in
+    let source_file = destname ^ ".mcdc.lus" in (* Could be changed *)
+    let source_out = open_out source_file in
+    let fmt = formatter_of_out_channel source_out in
+    Printers.pp_prog fmt prog_mcdc;
+    Format.fprintf fmt "@.@?";
     exit 0
   ) ;
 

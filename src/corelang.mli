@@ -98,7 +98,7 @@ val call_of_expr: expr -> (ident * expr list * expr option)
 val expr_of_dimension: Dimension.dim_expr -> expr
 val dimension_of_expr: expr -> Dimension.dim_expr
 val dimension_of_const: Location.t -> constant -> Dimension.dim_expr
-
+val expr_to_eexpr: expr -> eexpr
 (* REMOVED, pushed in utils.ml   val new_tag : unit -> tag *)
 
 val add_internal_funs: unit -> unit

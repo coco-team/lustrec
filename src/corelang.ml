@@ -894,45 +894,46 @@ let rec substitute_expr vars_to_replace defs e =
 	  ed
 
   }
-(* FAUT IL RETIRER ?
   
  let rec expr_to_eexpr  expr =
    { eexpr_tag = expr.expr_tag;
-     eexpr_desc = expr_desc_to_eexpr_desc expr.expr_desc;
+     eexpr_qfexpr = expr;
+     eexpr_quantifiers = [];
      eexpr_type = expr.expr_type;
      eexpr_clock = expr.expr_clock;
-     eexpr_loc = expr.expr_loc
+     eexpr_loc = expr.expr_loc;
+     eexpr_normalized = None
    }
- and expr_desc_to_eexpr_desc expr_desc =
-   let conv = expr_to_eexpr in
-   match expr_desc with
-   | Expr_const c -> EExpr_const (match c with
-     | Const_int x -> EConst_int x 
-     | Const_real x -> EConst_real x 
-     | Const_float x -> EConst_float x 
-     | Const_tag x -> EConst_tag x 
-     | _ -> assert false
+ (* and expr_desc_to_eexpr_desc expr_desc = *)
+ (*   let conv = expr_to_eexpr in *)
+ (*   match expr_desc with *)
+ (*   | Expr_const c -> EExpr_const (match c with *)
+ (*     | Const_int x -> EConst_int x  *)
+ (*     | Const_real x -> EConst_real x  *)
+ (*     | Const_float x -> EConst_float x  *)
+ (*     | Const_tag x -> EConst_tag x  *)
+ (*     | _ -> assert false *)
 
-   )
-   | Expr_ident i -> EExpr_ident i
-   | Expr_tuple el -> EExpr_tuple (List.map conv el)
+ (*   ) *)
+ (*   | Expr_ident i -> EExpr_ident i *)
+ (*   | Expr_tuple el -> EExpr_tuple (List.map conv el) *)
 
-   | Expr_arrow (e1, e2)-> EExpr_arrow (conv e1, conv e2) 
-   | Expr_fby (e1, e2) -> EExpr_fby (conv e1, conv e2)
-   | Expr_pre e' -> EExpr_pre (conv e')
-   | Expr_appl (i, e', i') -> 
-     EExpr_appl 
-       (i, conv e', match i' with None -> None | Some(id, _) -> Some id)
+ (*   | Expr_arrow (e1, e2)-> EExpr_arrow (conv e1, conv e2)  *)
+ (*   | Expr_fby (e1, e2) -> EExpr_fby (conv e1, conv e2) *)
+ (*   | Expr_pre e' -> EExpr_pre (conv e') *)
+ (*   | Expr_appl (i, e', i') ->  *)
+ (*     EExpr_appl  *)
+ (*       (i, conv e', match i' with None -> None | Some(id, _) -> Some id) *)
 
-   | Expr_when _
-   | Expr_merge _ -> assert false
-   | Expr_array _ 
-   | Expr_access _ 
-   | Expr_power _  -> assert false
-   | Expr_ite (c, t, e) -> assert false 
-   | _ -> assert false
-
-     *)
+ (*   | Expr_when _ *)
+ (*   | Expr_merge _ -> assert false *)
+ (*   | Expr_array _  *)
+ (*   | Expr_access _  *)
+ (*   | Expr_power _  -> assert false *)
+ (*   | Expr_ite (c, t, e) -> assert false  *)
+ (*   | _ -> assert false *)
+      
+     
 let rec get_expr_calls nodes e =
   let get_calls = get_expr_calls nodes in
   match e.expr_desc with
