@@ -31,6 +31,8 @@ A future version can be specialized for concrete datatypes (single, double,
 *)
 
 -- open <math>
+function fmod (x,y: real) returns (z: real) prototype C lib m;
+
 function exp_scalar_real (x: real) returns (y: real) prototype C lib m;
 function log_scalar_real (x: real) returns (y: real) prototype C lib m;
 function _10u_scalar_real (x: real) returns (y: real) prototype C lib m;
