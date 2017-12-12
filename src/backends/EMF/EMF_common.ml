@@ -43,10 +43,10 @@ let print_protect fmt f =
   let s = flush_str_formatter () in
   let l = String.length s in
   if l > 30 then
-    let _ = Format.eprintf "Looking for variable %s in hash @[<v 0>%t@]@."
-      s
-      (fun fmt -> Hashtbl.iter (fun s new_s -> fprintf fmt "%s -> %s@ " s new_s) hash_map)
-    in
+    (* let _ = Format.eprintf "Looking for variable %s in hash @[<v 0>%t@]@." *)
+    (*   s *)
+    (*   (fun fmt -> Hashtbl.iter (fun s new_s -> fprintf fmt "%s -> %s@ " s new_s) hash_map) *)
+    (* in *)
     if Hashtbl.mem hash_map s then
     fprintf fmt "%s" (Hashtbl.find hash_map s)
     else

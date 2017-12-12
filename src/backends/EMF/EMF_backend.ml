@@ -290,20 +290,20 @@ let rec pp_emf_instr m fmt i =
        
     | MBranch (g, hl) -> (
       let all_outputs, outputs, inputs = branch_instr_vars m i in
-      Format.eprintf "Mbranch %a@.vars: all_out: %a, out:%a, in:%a@.@."
-	Machine_code.pp_instr i
-	(fprintf_list ~sep:", " pp_var_string) (ISet.elements all_outputs)
-	(fprintf_list ~sep:", " pp_var_string) (ISet.elements outputs)
-	pp_emf_vars_decl
-	(VSet.elements inputs)
+      (* Format.eprintf "Mbranch %a@.vars: all_out: %a, out:%a, in:%a@.@." *)
+      (* 	Machine_code.pp_instr i *)
+      (* 	(fprintf_list ~sep:", " pp_var_string) (ISet.elements all_outputs) *)
+      (* 	(fprintf_list ~sep:", " pp_var_string) (ISet.elements outputs) *)
+      (* 	pp_emf_vars_decl *)
+      (* 	(VSet.elements inputs) *)
 
-      ;
+      (* ; *)
       let inputs = VSet.filter (fun v -> not (ISet.mem v.var_id all_outputs)) inputs in
-      Format.eprintf "Filtering in: %a@.@."
-	pp_emf_vars_decl
-	(VSet.elements inputs)
+      (* Format.eprintf "Filtering in: %a@.@." *)
+      (* 	pp_emf_vars_decl *)
+      (* 	(VSet.elements inputs) *)
 
-      ;
+      (* ; *)
       fprintf fmt "\"kind\": \"branch\",@ ";
       fprintf fmt "\"guard\": %a,@ " pp_emf_cst_or_var g; (* it has to be a variable or a constant *)
       fprintf fmt "\"outputs\": [%a],@ " (fprintf_list ~sep:", " pp_var_string) (ISet.elements outputs);
@@ -318,7 +318,7 @@ let rec pp_emf_instr m fmt i =
 	   (fun fmt (tag, instrs_tag) ->
 	     let branch_all_lhs, _, branch_inputs = branch_block_vars m instrs_tag in
 	     let branch_inputs = VSet.filter (fun v -> not (ISet.mem v.var_id branch_all_lhs)) branch_inputs in
-	     fprintf fmt "@[<v 2>\"%s\": {@ " tag;
+	     fprintf fmt "@[<v 2>\"%a\": {@ " print_protect (fun fmt -> Format.pp_print_string fmt tag);
 	     fprintf fmt "\"guard_value\": \"%a\",@ " pp_tag_id tag; 
 	     fprintf fmt "\"inputs\": [%a],@ " pp_emf_vars_decl (VSet.elements branch_inputs); 
 	     fprintf fmt "@[<v 2>\"instrs\": {@ ";
