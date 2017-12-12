@@ -1,18 +1,18 @@
-open Basetypes 
+open Basetypes
 open Datatype
 open CPS_transformer
-open Theta 
+open Theta
 
 module Semantics = functor (T: TransformerType) (M: MODEL_T) ->
 struct
-  
+
 module Prog =
 struct
-  let init, defs, state_vars = 
-    let (init, defs, globals) = M.model in
+  let init, defs, state_vars =
+    let Program (init, defs, globals) = M.model in
     let state_vars = SF.states M.model in
     init, defs, state_vars
-    
+
 (*let _ = Format.printf "Model definitions@.%a@.####" Simulink.pp_src defs; () *)
 end
 
@@ -35,11 +35,11 @@ let eval ((modular_entry:bool), (modular_during:bool), (modular_exit:bool)) =
   let module Thetaify = KenvTheta.ModularThetaify (Tables) (Modularity) in
   let module EvalProg = Interp.Evaluation (Thetaify) (Prog) in
   (module EvalProg: Interp.EvaluationType)
-  
+
 let compute modular  =
   let module Eval = (val (eval modular)) in
-  Eval.eval_prog 
-    
+  Eval.eval_prog
+
 let code_gen modular  =
   let module Eval = (val (eval modular)) in
   let principal, components =  Eval.eval_prog, Eval.eval_components in

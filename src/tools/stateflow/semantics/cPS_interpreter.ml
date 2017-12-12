@@ -1,9 +1,9 @@
-open Basetypes 
+open Basetypes
 open Datatype
 (* open ActiveEnv *)
 open CPS_transformer
 (* open Simulink *)
-open Theta 
+open Theta
 
 module Interpreter (Transformer : TransformerType) =
 struct
@@ -165,7 +165,7 @@ struct
 	match tag with
 	| E -> fun path frontier -> Transformer.(
 	  Log.report ~level:sf_level (fun fmt -> Format.fprintf fmt "@[<v 2>S_%a[[node %a, dest %a, frontier %a]]@ " pp_tag tag pp_path p pp_path path pp_frontier frontier);
-	  ((frontier = Loose) >? (eval_act (module Theta) p_def.state_actions.entry_act >> eval_act (module Theta) (open_path p))) >> 
+	  ((frontier = Loose) >? (eval_act (module Theta) p_def.state_actions.entry_act >> eval_act (module Theta) (open_path p))) >>
 	  match path with
 	  | []         -> eval_C E p p_def.internal_composition
 	  | s::path_tl -> Theta.theta E (p@[s]) path_tl Loose
@@ -195,7 +195,7 @@ struct
   module type ProgType =
   sig
     val init : state_name_t
-    val defs : src_components_t list
+    val defs : prog_t src_components_t list
   end
 
   module type EvaluationType =
@@ -204,7 +204,7 @@ struct
     val eval_prog : Transformer.t
     val eval_components : 'c call_t -> ('c * Transformer.t) list
   end
-    
+
   module Evaluation (Thetaify : ThetaifyType) (Prog : ProgType) : EvaluationType =
   struct
     module Denotation = Denotation (Thetaify)
@@ -216,9 +216,12 @@ struct
       let kenv =
 	List.fold_left (
 	  fun accu d -> match d with
-   | State (p, defp) -> { accu with cont_node = (p, ((fun kenv -> eval_S kenv E p defp), (fun kenv -> eval_S kenv D p defp), (fun kenv -> eval_S kenv X p defp)))::accu.cont_node  }
-	  | Junction (j, defj) -> { accu with cont_junc = (j, (fun kenv -> eval_T kenv defj))::accu.cont_junc  }
-	) {cont_node = []; cont_junc = []} Prog.defs
+          | State (p, defp)    -> { accu with cont_node = (p, ((fun kenv -> eval_S kenv E p defp),
+                                                               (fun kenv -> eval_S kenv D p defp),
+                                                               (fun kenv -> eval_S kenv X p defp)))::accu.cont_node }
+	  | Junction (j, defj) -> { accu with cont_junc = (j, (fun kenv -> eval_T kenv defj))::accu.cont_junc }
+          | SFFunction _       -> accu
+        ) {cont_node = []; cont_junc = []} Prog.defs
     end
 
     module AppDenotation = Denotation (Kenv)

@@ -3,4 +3,13 @@
 /setup.data
 /setup.log
 /src/version.ml
+/src/pluginList.ml
 /myocamlbuild.ml
+*.cmt
+*.log
+Makefile
+/configure
+/src/_tags
+/bin
+*cache/
+/config.status

@@ -25,6 +25,10 @@ lustresf:
 	@echo Compiling binary lustresf
 	@make -C src lustresf
 
+json-parser:
+	@echo Compiling binary json-parser
+	@make -C src json-parser
+
 configure: configure.ac
 	@echo configure.ac has changed relaunching autoconf
 	@autoconf
@@ -59,7 +63,7 @@ dist-clean: dist-src-clean
 
 %.lusic: %.lusi
 	@echo Compiling $<
-	@$(LOCAL_BINDIR)/lustrec -verbose 0 -d include $< 
+	@$(LOCAL_BINDIR)/lustrec -verbose 0 -d include $<
 
 clean-lusic:
 	@rm -f $(LUSI_LIBS:%.lusi=%.lusic)
@@ -81,7 +85,7 @@ install-base: clean-lusic
 	mkdir -p ${datarootdir}
 	install -m 0655 share/FindLustre.cmake ${datarootdir}
 
-install: install-base install-include 
+install: install-base install-include
 
 test-config: ${bindir}/lustrec
 	if @PATH_TO_TESTS_DEFINED@; then \
@@ -100,14 +104,16 @@ test: test-config
 	cd test; ctest -D Experimental -R ${DEFAULT_TEST_TARGET}
 
 test-full-no-submit: test-config
-	cd test; ctest -M Experimental -T Start -T Update -T Configure -T Build -T Test 
+	cd test; ctest -M Experimental -T Start -T Update -T Configure -T Build -T Test
 
 test-full-submit: test-config
-	cd test; ctest -M Experimental -T Submit 
+	cd test; ctest -M Experimental -T Submit
 
 test-full: test-config
-	cd test; ctest -D Experimental 
+	cd test; ctest -D Experimental
 
+tests:
+	@echo Launching tests
+	@make -C src tests
 
-.PHONY: all compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean 
-
+.PHONY: all compile-lusi doc dot lustrec lustrec.odocl clean install dist-clean tests
