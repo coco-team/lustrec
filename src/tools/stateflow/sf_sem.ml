@@ -29,6 +29,7 @@ let set_mode m =
 (* Main *)
     
 let options = [
+  "-verbose", Arg.Set_int Options.verbose_level, "changes verbose \x1b[4mlevel\x1b[0m <default: 1>";
   "-model", Arg.String set_model, "model in {simple, stopwatch} (default: simple)";
   (* "-eval", Arg.Int set_trace_run_mode, "execute the model on trace <int>"; *)
   (* "-eval-mode", Arg.String set_eval_mode, "select evaluator: cps"; *)
@@ -73,9 +74,14 @@ let _ =
      Options.print_dec_types := true;
      Format.printf "%a@." Printers.pp_prog prog;
 
-     let prog, deps = Main_lustre_compiler.stage1 prog "" "" in
-
+     let auto_file = "sf_gen_test_auto.lus" in (* Could be changed *)
+     let auto_out = open_out auto_file in
+     let auto_fmt = Format.formatter_of_out_channel auto_out in
+     Format.fprintf auto_fmt "%a@." Printers.pp_prog prog;
      
+     let prog, deps = Compiler_stages.stage1 prog "" "" in
+
+    
      (* (\* Importing source *\) *)
      (* let _ = Modules.load_program Utils.ISet.empty prog in *)
 
@@ -89,7 +95,14 @@ let _ =
      (* (\* Clock calculus *\) *)
      (* let computed_clocks_env = Compiler_common.clock_decls clock_env prog in *)
 
-     Format.printf "%a@." Printers.pp_prog prog
+     Format.printf "%a@." Printers.pp_prog prog;
+     let noauto_file = "sf_gen_test_noauto.lus" in (* Could be changed *)
+     let noauto_out = open_out noauto_file in
+     let noauto_fmt = Format.formatter_of_out_channel noauto_out in
+     Format.fprintf noauto_fmt "%a@." Printers.pp_prog prog
 
 
   
+(* Local Variables: *)
+(* compile-command: "make -C ../.. lustresf" *)
+(* End: *)
