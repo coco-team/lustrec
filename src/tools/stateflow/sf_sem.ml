@@ -81,19 +81,6 @@ let _ =
 
      let prog, deps = Compiler_stages.stage1 prog "" "" in
 
-    
-     (* (\* Importing source *\) *)
-     (* let _ = Modules.load_program Utils.ISet.empty prog in *)
-
-     (* (\* Extracting dependencies *\) *)
-     (* let dependencies, type_env, clock_env = Compiler_common.import_dependencies prog in *)
-
-
-     (* (\* Typing *\) *)
-     (* let computed_types_env = Compiler_common.type_decls type_env prog in *)
-     
-     (* (\* Clock calculus *\) *)
-     (* let computed_clocks_env = Compiler_common.clock_decls clock_env prog in *)
 
      Options.print_dec_types := false;
      Format.printf "%a@." Printers.pp_prog prog;
