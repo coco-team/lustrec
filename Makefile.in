@@ -21,13 +21,7 @@ lustret:
 	@echo Compiling binary lustret
 	@make -C src lustret
 
-lustresf:
-	@echo Compiling binary lustresf
-	@make -C src lustresf
-
-json-parser:
-	@echo Compiling binary json-parser
-	@make -C src json-parser
+@lustresf@
 
 configure: configure.ac
 	@echo configure.ac has changed relaunching autoconf

@@ -61,13 +61,6 @@ AS_IF([ocamlfind query ocamlgraph >/dev/null 2>&1],
 )
 AC_MSG_RESULT(yes)
 
-#Yojson
-AC_MSG_CHECKING(yojson library)
-AS_IF([ocamlfind query yojson >/dev/null 2>&1],
-    [],[AC_MSG_ERROR(yojson required. opam install yojson should solve the issue)],
-)
-AC_MSG_RESULT(yes)
-
 # logging and command line librairies
 AC_MSG_CHECKING(cmdliner library)
 AS_IF([ocamlfind query cmdliner >/dev/null 2>&1],
@@ -81,10 +74,15 @@ AS_IF([ocamlfind query fmt logs >/dev/null 2>&1],
 )
 AC_MSG_RESULT(yes)
 
+#Yojson
+AC_MSG_CHECKING(yojson library)
+AS_IF([ocamlfind query yojson >/dev/null 2>&1],
+    [yojson=yes; AC_MSG_RESULT(yes)],[yojson=no; AC_MSG_WARN(Yojson required for lustresf. opam install yojson should solve the issue)],
+)
+
 # Salsa
 AC_ARG_ENABLE(salsa, [AS_HELP_STRING([--disable-salsa],
               [disable Salsa plugin. Enabled by default if available.])])
-
 
 AC_MSG_CHECKING(salsa library)
 AS_IF([ocamlfind query salsa >/dev/null 2>&1],
@@ -110,6 +108,19 @@ AC_CHECK_LIB(mpfr, mpfr_add, [mpfr=yes],
 [MPFR not found])
 mpfr=no])
 
+# lustresf
+AC_ARG_ENABLE(lustresf, [AS_HELP_STRING([--disable-lustresf],
+              [disable lustresf compilation. Enabled by default.])])
+
+AC_SUBST_FILE(lustresf)
+AC_SUBST_FILE(lustresf_src)
+lustresf=/dev/null
+lustresf_src=/dev/null
+
+AS_IF([test "x$enable_lustresf" != "xno" -a "x$yojson" = "xyes"], [
+  lustresf=Makefile-lustresf.in
+  lustresf_src=src/Makefile-lustresf.in
+])
 
 # Checking availability of path to regression tests
 tests_path="../lustrec-tests/regression_tests"
@@ -181,6 +192,17 @@ AC_MSG_NOTICE(********    Plugins    ********)
   else
       AC_MSG_NOTICE([Salsa plugin disabled])
   fi
+
+  if (test "x$yojson" = xyes -a "x$enable_lustresf" != "xno"); then
+      AC_MSG_NOTICE([lustresf available])
+  else
+      if (test "x$enable_lustresf" = "xno"); then
+        AC_MSG_NOTICE([lustresf not available (you explicitely disabled it)])
+      else
+        AC_MSG_NOTICE([lustresf not available])
+      fi
+  fi
+
 AC_MSG_NOTICE(****** Regression Tests  ******)
 if (test "x$valid_test_path" = xfalse); then
   AC_MSG_NOTICE(no valid tests path provided ($tests_path))
