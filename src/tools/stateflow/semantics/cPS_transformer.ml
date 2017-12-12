@@ -88,7 +88,3 @@ sig
 
   val ( == ) : t -> t -> bool
 end
-
-
-  
-  

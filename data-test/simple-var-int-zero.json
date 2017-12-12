@@ -1,0 +1,15 @@
+{
+    "data": [
+        {
+            "datatype": "int",
+            "initial_value": "0",
+            "name": "my_int_var_zero",
+            "scope": "Output"
+        }
+    ],
+    "junctions": [],
+    "name": "simple_var_int_zero",
+    "origin_path": "simple_var_int_zero",
+    "sffunctions": [],
+    "states": []
+}
