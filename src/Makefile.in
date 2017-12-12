@@ -1,4 +1,4 @@
-OCAMLBUILD=@OCAMLBUILD@ -use-ocamlfind -no-links 
+OCAMLBUILD=@OCAMLBUILD@ -use-ocamlfind -no-links
 
 prefix=@prefix@
 exec_prefix=@exec_prefix@
@@ -25,7 +25,7 @@ lustret:
 	@mv _build/main_lustre_testgen.native $(LOCAL_BINDIR)/lustret
 
 lustresf:
-	@echo Compiling binary lustret
+	@echo Compiling binary lustresf
 	@$(OCAMLBUILD) tools/stateflow/sf_sem.native
 	@mkdir -p $(LOCAL_BINDIR)
 	@mv _build/tools/stateflow/sf_sem.native $(LOCAL_BINDIR)/lustresf
@@ -52,4 +52,3 @@ install:
 	make -C .. install
 
 .PHONY: compile-lusi doc dot lustrec lustret lustrec.odocl clean install dist-clean
-
