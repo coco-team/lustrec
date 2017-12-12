@@ -81,20 +81,6 @@ let _ =
      
      let prog, deps = Compiler_stages.stage1 prog "" "" in
 
-    
-     (* (\* Importing source *\) *)
-     (* let _ = Modules.load_program Utils.ISet.empty prog in *)
-
-     (* (\* Extracting dependencies *\) *)
-     (* let dependencies, type_env, clock_env = Compiler_common.import_dependencies prog in *)
-
-
-     (* (\* Typing *\) *)
-     (* let computed_types_env = Compiler_common.type_decls type_env prog in *)
-     
-     (* (\* Clock calculus *\) *)
-     (* let computed_clocks_env = Compiler_common.clock_decls clock_env prog in *)
-
      Format.printf "%a@." Printers.pp_prog prog;
      let noauto_file = "sf_gen_test_noauto.lus" in (* Could be changed *)
      let noauto_out = open_out noauto_file in

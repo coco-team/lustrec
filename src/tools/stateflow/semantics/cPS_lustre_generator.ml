@@ -262,51 +262,48 @@ struct
     (ActiveStates.Vars.empty,
      {
        statements = [
-	 Aut (
-	   { aut_id = aut;
-	     aut_loc = loc;
-	     aut_handlers =
-	       [
-		 (* Default mode : CenterPoint *)
-		 { hand_state = "CenterPoint_" ^ aut;
-		   hand_unless = [
-		     (loc, mkcond' sin condition, true (* restart *), "Cond_" ^ aut);
-		     (loc, mkcond' sin (Condition.Neg condition), true (* restart *), "NotCond_" ^ aut);
-		   ];
-		   hand_until = [];
-		   hand_locals = [];
-		   hand_stmts = tr0.statements;
-		   hand_asserts = base_to_assert tr0;
-		   hand_annots = [];
-		   hand_loc = loc;
-		 };
-		 (* Cond mode *)
-		 { hand_state = "Cond_" ^ aut;
-		   hand_unless = [];
-		   hand_until = [
-		     (loc, expr_of_bool true, true (* restart *), "CenterPoint_" ^ aut);
-		   ];
-		   hand_locals = mk_locals vars1;
-		   hand_stmts = tr1.statements;
-		   hand_asserts = base_to_assert tr1;
-		   hand_annots = [];
-		   hand_loc = loc;
-		 };
-		 (* NotCond mode *)
-		 { hand_state = "NotCond_" ^ aut;
-		   hand_unless = [];
-		   hand_until = [
-		     (loc, expr_of_bool true, true (* restart *), "CenterPoint_" ^ aut);
-		   ];
-		   hand_locals = mk_locals vars2;
-		   hand_stmts = tr2.statements;
-		   hand_asserts = base_to_assert tr2;
-		   hand_annots = [];
-		   hand_loc = loc;
-		 };
-	       ]
-	   }
-	 )
+	 let handler_default_mode =          	      (* Default mode : CenterPoint *)
+	   let handler_default_mode_unless = [
+	     (loc, mkcond' sin condition, true (* restart *), "Cond_" ^ aut);
+	     (loc, mkcond' sin (Condition.Neg condition), true (* restart *), "NotCond_" ^ aut);
+	   ]
+	   in
+	   Automata.mkhandler
+	     loc                                      (* location *)
+	     ("CenterPoint_" ^ aut)                   (* state name *)
+	     handler_default_mode_unless              (* unless *)
+	     []                                       (* until *)
+	     []                                       (* locals *)
+	     (tr0.statements, base_to_assert tr0, []) (* stmts, asserts, annots *)
+	 in
+	 let handler_cond_mode =                       	 (* Cond mode *)
+       	   let handler_cond_mode_until = [
+	     (loc, expr_of_bool true, true (* restart *), "CenterPoint_" ^ aut);
+       	   ]
+	   in
+	   Automata.mkhandler
+	     loc                                      (* location *)
+	     ("Cond_" ^ aut)                          (* state name *)
+	     []                                       (* unless *)
+	     handler_cond_mode_until                  (* until *)
+	     (mk_locals vars1)                        (* locals *)
+	     (tr1.statements, base_to_assert tr1, []) (* stmts, asserts, annots *)
+	 in
+	 let handler_notcond_mode =                       	 (* NotCond mode *)
+       	   let handler_notcond_mode_until = [
+	     (loc, expr_of_bool true, true (* restart *), "CenterPoint_" ^ aut);
+       	   ]
+	   in
+	   Automata.mkhandler
+	     loc                                      (* location *)
+	     ("NotCond_" ^ aut)                       (* state name *)
+	     []                                       (* unless *)
+	     handler_notcond_mode_until               (* until *)
+	     (mk_locals vars2)                        (* locals *)
+	     (tr2.statements, base_to_assert tr2, []) (* stmts, asserts, annots *)
+	 in
+	 let handlers = [ handler_default_mode; handler_cond_mode; handler_notcond_mode ] in
+	 Aut (Automata.mkautomata loc aut handlers)
        ];
        assert_false = false
      }
