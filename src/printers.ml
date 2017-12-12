@@ -331,8 +331,12 @@ let pp_decl fmt decl =
   | Open (local, s) -> if local then fprintf fmt "#open \"%s\"@ " s else fprintf fmt "#open <%s>@ " s
   | TypeDef tdef -> fprintf fmt "%a@ " pp_typedef tdef
 
-let pp_prog fmt prog = 
-  fprintf_list ~sep:"@ " pp_decl fmt prog
+let pp_prog fmt prog =
+  (* we first print types *)
+  let type_decl, others =
+    List.partition (fun decl -> match decl.top_decl_desc with TypeDef _ -> true | _ -> false) prog
+  in
+  fprintf_list ~sep:"@ " pp_decl fmt (type_decl@others)
 
 let pp_short_decl fmt decl =
   match decl.top_decl_desc with
