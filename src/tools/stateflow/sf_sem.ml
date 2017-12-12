@@ -73,12 +73,12 @@ let _ =
      let prog = Sem.code_gen modularmode in
      Options.print_dec_types := true;
      Format.printf "%a@." Printers.pp_prog prog;
-
+     
      let auto_file = "sf_gen_test_auto.lus" in (* Could be changed *)
      let auto_out = open_out auto_file in
      let auto_fmt = Format.formatter_of_out_channel auto_out in
      Format.fprintf auto_fmt "%a@." Printers.pp_prog prog;
-     
+
      let prog, deps = Compiler_stages.stage1 prog "" "" in
 
     
@@ -95,6 +95,7 @@ let _ =
      (* (\* Clock calculus *\) *)
      (* let computed_clocks_env = Compiler_common.clock_decls clock_env prog in *)
 
+     Options.print_dec_types := false;
      Format.printf "%a@." Printers.pp_prog prog;
      let noauto_file = "sf_gen_test_noauto.lus" in (* Could be changed *)
      let noauto_out = open_out noauto_file in
