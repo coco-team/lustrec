@@ -6,10 +6,10 @@ let verbose = false
 let actionv x = no_action (*TODO if verbose then action x else no_action*)
 let action x = no_action (* TODO *)
 let condition x = condition (Corelang.mkexpr Location.dummy_loc (LustreSpec.Expr_const (Corelang.const_of_bool true)))
-    
+
 let name = "stopwatch"
-  
-let model = 
+
+let model =
   let smain    = "main" in
   let sstop    = "stop" in
   let sreset   = "reset" in
@@ -53,7 +53,7 @@ let model =
     dest = DPath [smain;srun;srunning];
   }
   in
-  
+
   let tlapstop_lap  = {
     event = event "LAP";
     condition = no_condition;
@@ -259,7 +259,7 @@ let model =
        "cont"
       ]
   in
-  (smain, src, globals)
+  Program (smain, src, globals)
 
 let traces : trace_t list =
   [

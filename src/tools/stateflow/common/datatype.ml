@@ -83,7 +83,7 @@ struct
 
   let init_env model = ActiveStates.Env.from_set (states model) false
 
-  let global_vars (_, _, env) = env
+  let global_vars (Program (_, _, env)) = env
 
   (* Printers *)
 
