@@ -70,14 +70,14 @@ compile-mpfr-lusi: $(LUSI_MPFR_LIB)
 	@$(LOCAL_BINDIR)/lustrec -verbose 0 -mpfr 1 -d include $<
 
 install-include: compile-lusi compile-mpfr-lusi
-	mkdir -p ${includedir}/lustrec
-	cp include/* ${includedir}/lustrec
 
 install-base: clean-lusic
 	mkdir -p ${bindir}
 	install -m 0755 $(LOCAL_BINDIR)/* ${bindir}
 	mkdir -p ${datarootdir}
 	install -m 0655 share/FindLustre.cmake ${datarootdir}
+	mkdir -p ${includedir}/lustrec
+	install -m 0655 include/* ${includedir}/lustrec
 
 install: install-base install-include
 
