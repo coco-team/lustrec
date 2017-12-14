@@ -32,7 +32,7 @@ let lusi = ref false
 let print_reuse = ref false
 let const_unfold = ref false
 let mpfr = ref false
-let mpfr_prec = ref 0
+let mpfr_prec = ref 100
 let print_dec_types = ref false
 
 let traces = ref false

@@ -66,11 +66,20 @@ let set_mpfr prec =
   if prec > 0 then (
     mpfr := true;
     mpfr_prec := prec;
+    real_type := "mpfr";
     (* salsa_enabled := false; (* We deactivate salsa *) TODO *)
   )
   else
     failwith "mpfr requires a positive integer"
 
+let set_real_type s =
+  match s with
+    "mpfr" -> (
+      mpfr := true;
+      real_type := "mpfr";
+    )
+  | _ -> real_type := s
+     
 let set_backend s =
   output := s;
   Backends.setup ()
@@ -113,7 +122,7 @@ let lustrec_options =
     
     "-c++" , Arg.Set        cpp      , "c++ backend";
     "-int" , Arg.Set_string int_type , "specifies the integer type (default=\"int\")";
-    "-real", Arg.Set_string real_type, "specifies the real type (default=\"double\" without mpfr option)";
+    "-real", Arg.String set_real_type, "specifies the real type (default=\"double\" without mpfr option)";
     "-real-print-prec", Arg.Set_int print_prec_double, "specifies the number of digits to be printed for real values (default=15)";
 
     "-mauve", Arg.String (fun node -> mauve := node; cpp := true; static_mem := false), "generates the mauve code";
