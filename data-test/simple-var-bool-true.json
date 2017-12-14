@@ -1,0 +1,15 @@
+{
+    "data": [
+        {
+            "datatype": "bool",
+            "initial_value": "true",
+            "name": "my_bool_var_true",
+            "scope": "Input"
+        }
+    ],
+    "junctions": [],
+    "name": "simple_var_bool_true",
+    "origin_path": "simple_var_bool_true",
+    "sffunctions": [],
+    "states": []
+}

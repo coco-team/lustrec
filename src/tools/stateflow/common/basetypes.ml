@@ -1,25 +1,26 @@
 
 let sf_level = 2
-  
+
 (* Basic datatype for model elements: state and junction name, events ... *)
-type state_name_t    = string
-type junction_name_t = string
-type path_t = state_name_t list
-type event_base_t = string
-type event_t      = event_base_t option
+type state_name_t         = string
+type junction_name_t      = string
+type path_t               = state_name_t list
+type event_base_t         = string
+type event_t              = event_base_t option
+type user_variable_name_t = string
 
 (* Connected to lustrec types *)
-type base_action_t = { defs : LustreSpec.eq list; ident : string }
+type base_action_t    = { defs : LustreSpec.eq list; ident : string }
 type base_condition_t = LustreSpec.expr
-  
+
 (* P(r)etty printers *)
-let pp_state_name = Format.pp_print_string
-let pp_junction_name = Format.pp_print_string
-let pp_path fmt p = Utils.fprintf_list ~sep:"." pp_state_name fmt p
-let pp_event fmt e = match e with None -> Format.fprintf fmt "none" | Some s -> Format.fprintf fmt "%s" s
+let pp_state_name     = Format.pp_print_string
+let pp_junction_name  = Format.pp_print_string
+let pp_path fmt p     = Utils.fprintf_list ~sep:"." pp_state_name fmt p
+let pp_event fmt e    = match e with None -> Format.fprintf fmt "none" | Some s -> Format.fprintf fmt "%s" s
 let pp_base_act fmt a = Utils.fprintf_list ~sep:",@ " Printers.pp_node_eq fmt a.defs
-let pp_base_cond = Printers.pp_expr
-  
+let pp_base_cond      = Printers.pp_expr
+
 (* Action and Condition types and functions. *)
 
 (* Actions are defined by string + the opening and closing of states *)
@@ -44,13 +45,13 @@ type _ call_t =
   | Xcall : (path_t * frontier_t) call_t
 
 let pp_call :
-type a. Format.formatter -> a call_t -> unit = 
+type a. Format.formatter -> a call_t -> unit =
   fun fmt call ->
     match call with
     | Ecall -> Format.fprintf fmt "CallE"
     | Dcall -> Format.fprintf fmt "CallD"
     | Xcall -> Format.fprintf fmt "CallX"
-  
+
 module type ActionType =
 sig
   type t
@@ -59,7 +60,7 @@ sig
   val open_path : path_t -> t
   val close_path : path_t -> t
   val call : 'c call_t -> 'c -> t
-    
+
   val pp_act : Format.formatter -> t -> unit
 end
 
@@ -73,7 +74,7 @@ struct
     | Call  : 'c call_t * 'c -> t
     | Nil   : t
 
-    
+
   let nil = Nil
   let aquote act = Quote act
   let open_path p = Open p
@@ -96,7 +97,7 @@ struct
     | Nil              -> Format.fprintf fmt "Nil"
 end
 
-let _ = (module Action : ActionType) 
+let _ = (module Action : ActionType)
 
 
 (* Conditions are either (1) simple strings, (2) the active status of a state or

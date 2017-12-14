@@ -1,0 +1,19 @@
+lustresf:
+	@echo Compiling binary lustresf
+	@$(OCAMLBUILD) tools/stateflow/sf_sem.native
+	@mkdir -p $(LOCAL_BINDIR)
+	@mv _build/tools/stateflow/sf_sem.native $(LOCAL_BINDIR)/lustresf
+
+json-parser:
+	@echo Compiling binary json-parser-ex
+	@$(OCAMLBUILD) tools/stateflow/json-parser/main_parse_json_file.native
+	@mkdir -p $(LOCAL_BINDIR)
+	@mv _build/tools/stateflow/json-parser/main_parse_json_file.native $(LOCAL_BINDIR)/json-parser
+
+tests:	test-simple-var
+
+test-simple-var:
+	@echo Compiling simple tests for JSON parser -- tests on variables
+	@$(OCAMLBUILD) tools/stateflow/json-parser/test_json_parser_variables.native
+	@echo Lauching simple tests for JSON parser -- tests on variables
+	./_build/tools/stateflow/json-parser/test_json_parser_variables.native

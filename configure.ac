@@ -53,17 +53,36 @@ if test x"$FINDLIB_CHECK" != x"yes" ; then
 fi
 dnl AC_MSG_RESULT(Hourrah: ocamlfind found!)
 
-# Checks for libraries. OCamlgraph
+# Checks for libraries.
+# OCamlgraph
 AC_MSG_CHECKING(ocamlgraph library)
 AS_IF([ocamlfind query ocamlgraph >/dev/null 2>&1],
     [],[AC_MSG_ERROR(ocamlgraph required. opam install ocamlgraph should solve the issue)],
 )
 AC_MSG_RESULT(yes)
 
+# logging and command line librairies
+AC_MSG_CHECKING(cmdliner library)
+AS_IF([ocamlfind query cmdliner >/dev/null 2>&1],
+    [],[AC_MSG_ERROR(cmdliner required. opam install cmdliner should solve the issue)],
+)
+AC_MSG_RESULT(yes)
 
+AC_MSG_CHECKING(fmt and logs library)
+AS_IF([ocamlfind query fmt logs >/dev/null 2>&1],
+    [],[AC_MSG_ERROR(fmt and logs required. opam install fmt logs should solve the issue)],
+)
+AC_MSG_RESULT(yes)
+
+#Yojson
+AC_MSG_CHECKING(yojson library)
+AS_IF([ocamlfind query yojson >/dev/null 2>&1],
+    [yojson=yes; AC_MSG_RESULT(yes)],[yojson=no; AC_MSG_WARN(Yojson required for lustresf. opam install yojson should solve the issue)],
+)
+
+# Salsa
 AC_ARG_ENABLE(salsa, [AS_HELP_STRING([--disable-salsa],
               [disable Salsa plugin. Enabled by default if available.])])
-
 
 AC_MSG_CHECKING(salsa library)
 AS_IF([ocamlfind query salsa >/dev/null 2>&1],
@@ -75,27 +94,33 @@ AS_IF([test "x$enable_salsa" != "xno"], [
   if (test "x$salsa" = xyes ); then
    AC_SUBST(SALSA, "(module Salsa_plugin.Plugin : PluginType.PluginType);")
    AC_SUBST(SALSA_TAG, "<**/*.native> or <plugins/salsa/*.cm?> : package(salsa)")
-  fi	
+  fi
 ])
 
-
-
-
-
-
-
-
-
-AC_CHECK_LIB(gmp, __gmpz_init, 
+# GMP
+AC_CHECK_LIB(gmp, __gmpz_init,
       [gmp=yes],
       [AC_MSG_RESULT([GNU MP not found])
       gmp=no])
 
-AC_CHECK_LIB(mpfr, mpfr_add, [mpfr=yes], 
+AC_CHECK_LIB(mpfr, mpfr_add, [mpfr=yes],
 		   [AC_MSG_RESULT(
 [MPFR not found])
 mpfr=no])
 
+# lustresf
+AC_ARG_ENABLE(lustresf, [AS_HELP_STRING([--disable-lustresf],
+              [disable lustresf compilation. Enabled by default.])])
+
+AC_SUBST_FILE(lustresf)
+AC_SUBST_FILE(lustresf_src)
+lustresf=/dev/null
+lustresf_src=/dev/null
+
+AS_IF([test "x$enable_lustresf" != "xno" -a "x$yojson" = "xyes"], [
+  lustresf=Makefile-lustresf.in
+  lustresf_src=src/Makefile-lustresf.in
+])
 
 # Checking availability of path to regression tests
 tests_path="../lustrec-tests/regression_tests"
@@ -111,7 +136,7 @@ AC_ARG_WITH([tests-path],
 AC_MSG_NOTICE($tests_path)
 AC_CHECK_FILE(${tests_path}/CMakeLists.txt,
               [
-	      valid_test_path=true	
+	      valid_test_path=true
 	      ],
 	      [
 	      valid_test_path=false
@@ -158,15 +183,26 @@ AC_MSG_NOTICE(********    Plugins    ********)
 
   if (test "x$gmp" = xyes -a "x$mpfr" = xyes ); then
       AC_MSG_NOTICE([MPFR option enabled])
-  else 
+  else
       AC_MSG_WARN([MPFR option cannot be activated. Requires GMP and MPFR libs])
   fi
 
   if (test "x$salsa" = xyes -a "x$enable_salsa" != xno); then
       AC_MSG_NOTICE([Salsa plugin enabled])
-  else 
+  else
       AC_MSG_NOTICE([Salsa plugin disabled])
   fi
+
+  if (test "x$yojson" = xyes -a "x$enable_lustresf" != "xno"); then
+      AC_MSG_NOTICE([lustresf available])
+  else
+      if (test "x$enable_lustresf" = "xno"); then
+        AC_MSG_NOTICE([lustresf not available (you explicitely disabled it)])
+      else
+        AC_MSG_NOTICE([lustresf not available])
+      fi
+  fi
+
 AC_MSG_NOTICE(****** Regression Tests  ******)
 if (test "x$valid_test_path" = xfalse); then
   AC_MSG_NOTICE(no valid tests path provided ($tests_path))
