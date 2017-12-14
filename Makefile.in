@@ -8,6 +8,7 @@ LUSI_LIBS=include/lustrec_math.lusi include/simulink_math_fcn.lusi include/conv.
 LUSI_MPFR_LIB=include/mpfr_lustre.lusi
 LOCAL_BINDIR=bin
 LOCAL_DOCDIR=doc/manual
+BIN_TARGETS = lustrec lustret lustresf
 
 DEFAULT_TEST_TARGET=COMPIL_LUS\|MAKE\|BIN\|DIFF
 
@@ -74,13 +75,18 @@ install-include: compile-lusi compile-mpfr-lusi
 
 install-base: clean-lusic
 	mkdir -p ${bindir}
-	install -m 0755 $(LOCAL_BINDIR)/* ${bindir}
+	for x in $(BIN_TARGETS); do install -m 0755 $(LOCAL_BINDIR)/$$x ${bindir}; done
 	mkdir -p ${datarootdir}
 	install -m 0655 share/FindLustre.cmake ${datarootdir}
 	mkdir -p ${includedir}/lustrec
 	install -m 0655 include/* ${includedir}/lustrec
 
 install: install-base install-include
+
+uninstall:
+	rm -Rf ${includedir}/lustrec
+	rm -Rf ${datarootdir}/share/FindLustre.cmake
+	for x in $(BIN_TARGETS); do rm -f ${bindir}/$$x; done
 
 test-config: ${bindir}/lustrec
 	if @PATH_TO_TESTS_DEFINED@; then \
