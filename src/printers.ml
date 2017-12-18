@@ -332,7 +332,8 @@ let pp_decl fmt decl =
   | TypeDef tdef -> fprintf fmt "%a@ " pp_typedef tdef
 
 let pp_prog fmt prog =
-  (* we first print types *)
+  (* we first print types: the function SortProg.sort could do the job but ut
+     introduces a cyclic dependance *)
   let type_decl, others =
     List.partition (fun decl -> match decl.top_decl_desc with TypeDef _ -> true | _ -> false) prog
   in

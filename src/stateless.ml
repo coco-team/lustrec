@@ -36,8 +36,10 @@ let rec check_expr expr =
   | Expr_appl (i, e', i') ->
     check_expr e' &&
       (Basic_library.is_stateless_fun i || check_node (node_from_name i))
-and compute_node nd =
- List.for_all (fun eq -> check_expr eq.eq_rhs) (get_node_eqs nd)
+and compute_node nd = (* returns true iff the node is stateless.*)
+  let eqs, aut = get_node_eqs nd in
+  aut = [] && (* A node containinig an automaton will be stateful *)
+      List.for_all (fun eq -> check_expr eq.eq_rhs) eqs
 and check_node td =
   match td.top_decl_desc with 
   | Node nd         -> (

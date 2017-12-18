@@ -681,7 +681,9 @@ let clock_node env loc nd =
   let new_env = clock_var_decl_list env false nd.node_inputs in
   let new_env = clock_var_decl_list new_env true nd.node_outputs in
   let new_env = clock_var_decl_list new_env true nd.node_locals in
-  List.iter (clock_eq new_env) (get_node_eqs nd);
+  let eqs, auts = get_node_eqs nd in (* TODO XXX: perform the clocking on auts.
+					For the moment, it is ignored *)
+  List.iter (clock_eq new_env) eqs;
   let ck_ins = clock_of_vlist nd.node_inputs in
   let ck_outs = clock_of_vlist nd.node_outputs in
   let ck_node = new_ck (Carrow (ck_ins,ck_outs)) false in
@@ -690,14 +692,14 @@ let clock_node env loc nd =
   (* Local variables may contain first-order carrier variables that should be generalized.
      That's not the case for types. *)
   try_generalize ck_node loc;
-(*
-  List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_inputs;
-  List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_outputs;*)
+  (*
+    List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_inputs;
+    List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_outputs;*)
   (*List.iter (fun vdecl -> try_generalize vdecl.var_clock vdecl.var_loc) nd.node_locals;*)
   (* TODO : Xavier pourquoi ai je cette erreur ? *)
-(*  if (is_main && is_polymorphic ck_node) then
-    raise (Error (loc,(Cannot_be_polymorphic ck_node)));
-*)
+  (*  if (is_main && is_polymorphic ck_node) then
+      raise (Error (loc,(Cannot_be_polymorphic ck_node)));
+  *)
   Log.report ~level:3 (fun fmt -> print_ck fmt ck_node);
   nd.node_clock <- ck_node;
   Env.add_value env nd.node_id ck_node

@@ -562,6 +562,8 @@ let rec check_type_declaration loc cty =
  | Tydec_clock ty
  | Tydec_array (_, ty) -> check_type_declaration loc ty
  | Tydec_const tname   ->
+    Format.printf "TABLE: %a@." print_type_table ();
+   (* TODO REMOVE *)
    if not (Hashtbl.mem type_table cty)
    then raise (Error (loc, Unbound_type tname));
  | _                   -> ()
@@ -622,7 +624,9 @@ let type_node env nd loc =
       (fun uvs v -> ISet.add v.var_id uvs)
       ISet.empty vd_env_ol in
   let undefined_vars =
-    List.fold_left (type_eq (new_env, vd_env) is_main) undefined_vars_init (get_node_eqs nd)
+    let eqs, auts = get_node_eqs nd in
+    (* TODO XXX: il faut typer les handlers de l'automate *)
+    List.fold_left (type_eq (new_env, vd_env) is_main) undefined_vars_init eqs
   in
   (* Typing asserts *)
   List.iter (fun assert_ ->

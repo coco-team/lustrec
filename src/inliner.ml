@@ -32,14 +32,15 @@ let is_node_var node v =
    ignore (Corelang.get_node_var v node); true
  with Not_found -> false
 
-let rename_expr rename expr = expr_replace_var rename expr
-
+(* let rename_expr rename expr = expr_replace_var rename expr *)
+(*
 let rename_eq rename eq = 
   { eq with
     eq_lhs = List.map rename eq.eq_lhs; 
     eq_rhs = rename_expr rename eq.eq_rhs
   }
-
+*)
+   
 let rec add_expr_reset_cond cond expr =
   let aux = add_expr_reset_cond cond in
   let new_desc = 
@@ -113,7 +114,9 @@ let inline_call node loc uid args reset locals caller =
     if v = tag_true || v = tag_false || not (is_node_var node v) then v else
       Corelang.mk_new_node_name caller (Format.sprintf "%s_%i_%s" node.node_id uid v)
   in
-  let eqs' = List.map (rename_eq rename) (get_node_eqs node) in
+  let eqs, auts = get_node_eqs node in
+  let eqs' = List.map (rename_eq (fun x -> x) rename) eqs in
+  let auts' = List.map (rename_aut (fun x -> x) rename) auts in
   let input_arg_list = List.combine node.node_inputs (Corelang.expr_list_of_expr args) in
   let static_inputs, dynamic_inputs = List.partition (fun (vdecl, arg) -> vdecl.var_dec_const) input_arg_list in
   let static_inputs = List.map (fun (vdecl, arg) -> vdecl, Corelang.dimension_of_expr arg) static_inputs in
@@ -134,7 +137,7 @@ let inline_call node loc uid args reset locals caller =
 	 { v.var_dec_type  with ty_dec_desc = Corelang.rename_static rename_static v.var_dec_type.ty_dec_desc },
 	 { v.var_dec_clock with ck_dec_desc = Corelang.rename_carrier rename_carrier v.var_dec_clock.ck_dec_desc },
 	 v.var_dec_const,
-	 Utils.option_map (rename_expr rename) v.var_dec_value) in
+	 Utils.option_map (rename_expr (fun x -> x) rename) v.var_dec_value) in
     begin
       (*
 	(try
@@ -162,13 +165,17 @@ in
   assert (node.node_gencalls = []);
 
   (* Expressing reset locally in equations *)
-  let eqs_r' =
+  let eqs_r' = 
+    let all_eqs = (List.map (fun eq -> Eq eq) eqs') @ (List.map (fun aut -> Aut aut) auts') in
     match reset with
-      None -> eqs'
-    | Some cond -> List.map (add_eq_reset_cond cond) eqs'
+      None -> all_eqs
+    | Some cond -> (
+      assert (auts' = []); (* TODO: we do not handle properly automaton in case of reset call *)
+      List.map (fun eq -> Eq (add_eq_reset_cond cond eq)) eqs'
+    )
   in
-  let assign_inputs = mkeq loc (List.map (fun v -> v.var_id) inputs',
-                                expr_of_expr_list args.expr_loc (List.map snd dynamic_inputs)) in
+  let assign_inputs = Eq (mkeq loc (List.map (fun v -> v.var_id) inputs',
+                                expr_of_expr_list args.expr_loc (List.map snd dynamic_inputs))) in
   let expr = expr_of_expr_list loc (List.map expr_of_vdecl outputs')
   in
   let asserts' = (* We rename variables in assert expressions *)
@@ -176,7 +183,7 @@ in
       (fun a -> 
 	{a with assert_expr = 
 	    let expr = a.assert_expr in
-	    rename_expr rename expr
+	    rename_expr (fun x -> x) rename expr
 	})
       node.node_asserts 
   in
@@ -224,91 +231,94 @@ let rec inline_expr ?(selection_on_annotation=false) expr locals node nodes =
   
   match expr.expr_desc with
   | Expr_appl (id, args, reset) ->
-    let args', locals', eqs', asserts', annots' = inline_expr args locals node nodes in 
-    if List.exists (check_node_name id) nodes && (* the current node call is provided
-						    as arguments nodes *)
-      (not selection_on_annotation || is_inline_expr expr) (* and if selection on annotation is activated, 
-							      it is explicitely inlined here *)
-    then (
-      (* Format.eprintf "Inlining call to %s in expression %a@." id Printers.pp_expr expr; *)
-      (* The node should be inlined *)
-      (* let _ =     Format.eprintf "Inlining call to %s@." id in *)
-      let called = try List.find (check_node_name id) nodes 
-	with Not_found -> (assert false) in
-      let called = node_of_top called in
-      let called' = inline_node called nodes in
-      let expr, locals', eqs'', asserts'', annots'' = 
-	inline_call called' expr.expr_loc expr.expr_tag args' reset locals' node in
-      expr, locals', eqs'@eqs'', asserts'@asserts'', annots'@annots''
-    )
-    else 
-      (* let _ =     Format.eprintf "Not inlining call to %s@." id in *)
-      { expr with expr_desc = Expr_appl(id, args', reset)}, 
-      locals', 
-      eqs', 
-      asserts',
-      annots'
+     let args', locals', eqs', asserts', annots' = inline_expr args locals node nodes in 
+     if List.exists (check_node_name id) nodes && (* the current node call is provided
+						     as arguments nodes *)
+       (not selection_on_annotation || is_inline_expr expr) (* and if selection on annotation is activated, 
+							       it is explicitely inlined here *)
+     then (
+       (* Format.eprintf "Inlining call to %s in expression %a@." id Printers.pp_expr expr; *)
+       (* The node should be inlined *)
+       (* let _ =     Format.eprintf "Inlining call to %s@." id in *)
+       let called = try List.find (check_node_name id) nodes 
+	 with Not_found -> (assert false) in
+       let called = node_of_top called in
+       let called' = inline_node called nodes in
+       let expr, locals', eqs'', asserts'', annots'' = 
+	 inline_call called' expr.expr_loc expr.expr_tag args' reset locals' node in
+       expr, locals', eqs'@eqs'', asserts'@asserts'', annots'@annots''
+     )
+     else 
+       (* let _ =     Format.eprintf "Not inlining call to %s@." id in *)
+       { expr with expr_desc = Expr_appl(id, args', reset)}, 
+       locals', 
+       eqs', 
+       asserts',
+       annots'
 
   (* For other cases, we just keep the structure, but convert sub-expressions *)
   | Expr_const _ 
   | Expr_ident _ -> expr, locals, [], [], []
   | Expr_tuple el -> 
-    let el', l', eqs', asserts', annots' = inline_tuple el in
-    { expr with expr_desc = Expr_tuple el' }, l', eqs', asserts', annots'
+     let el', l', eqs', asserts', annots' = inline_tuple el in
+     { expr with expr_desc = Expr_tuple el' }, l', eqs', asserts', annots'
   | Expr_ite (g, t, e) ->
-    let g', t', e', l', eqs', asserts', annots' = inline_triple g t e in
-    { expr with expr_desc = Expr_ite (g', t', e') }, l', eqs', asserts', annots'
+     let g', t', e', l', eqs', asserts', annots' = inline_triple g t e in
+     { expr with expr_desc = Expr_ite (g', t', e') }, l', eqs', asserts', annots'
   | Expr_arrow (e1, e2) ->
-    let e1', e2', l', eqs', asserts', annots' = inline_pair e1 e2 in
-    { expr with expr_desc = Expr_arrow (e1', e2') } , l', eqs', asserts', annots'
+     let e1', e2', l', eqs', asserts', annots' = inline_pair e1 e2 in
+     { expr with expr_desc = Expr_arrow (e1', e2') } , l', eqs', asserts', annots'
   | Expr_fby (e1, e2) ->
-    let e1', e2', l', eqs', asserts', annots' = inline_pair e1 e2 in
-    { expr with expr_desc = Expr_fby (e1', e2') }, l', eqs', asserts', annots'
+     let e1', e2', l', eqs', asserts', annots' = inline_pair e1 e2 in
+     { expr with expr_desc = Expr_fby (e1', e2') }, l', eqs', asserts', annots'
   | Expr_array el ->
-    let el', l', eqs', asserts', annots' = inline_tuple el in
-    { expr with expr_desc = Expr_array el' }, l', eqs', asserts', annots'
+     let el', l', eqs', asserts', annots' = inline_tuple el in
+     { expr with expr_desc = Expr_array el' }, l', eqs', asserts', annots'
   | Expr_access (e, dim) ->
-    let e', l', eqs', asserts', annots' = inline_expr e locals node nodes in 
-    { expr with expr_desc = Expr_access (e', dim) }, l', eqs', asserts', annots'
+     let e', l', eqs', asserts', annots' = inline_expr e locals node nodes in 
+     { expr with expr_desc = Expr_access (e', dim) }, l', eqs', asserts', annots'
   | Expr_power (e, dim) ->
-    let e', l', eqs', asserts', annots' = inline_expr e locals node nodes in 
-    { expr with expr_desc = Expr_power (e', dim) }, l', eqs', asserts', annots'
+     let e', l', eqs', asserts', annots' = inline_expr e locals node nodes in 
+     { expr with expr_desc = Expr_power (e', dim) }, l', eqs', asserts', annots'
   | Expr_pre e ->
-    let e', l', eqs', asserts', annots' = inline_expr e locals node nodes in 
-    { expr with expr_desc = Expr_pre e' }, l', eqs', asserts', annots'
+     let e', l', eqs', asserts', annots' = inline_expr e locals node nodes in 
+     { expr with expr_desc = Expr_pre e' }, l', eqs', asserts', annots'
   | Expr_when (e, id, label) ->
-    let e', l', eqs', asserts', annots' = inline_expr e locals node nodes in 
-    { expr with expr_desc = Expr_when (e', id, label) }, l', eqs', asserts', annots'
+     let e', l', eqs', asserts', annots' = inline_expr e locals node nodes in 
+     { expr with expr_desc = Expr_when (e', id, label) }, l', eqs', asserts', annots'
   | Expr_merge (id, branches) ->
-    let el, l', eqs', asserts', annots' = inline_tuple (List.map snd branches) in
-    let branches' = List.map2 (fun (label, _) v -> label, v) branches el in
-    { expr with expr_desc = Expr_merge (id, branches') }, l', eqs', asserts', annots'
+     let el, l', eqs', asserts', annots' = inline_tuple (List.map snd branches) in
+     let branches' = List.map2 (fun (label, _) v -> label, v) branches el in
+     { expr with expr_desc = Expr_merge (id, branches') }, l', eqs', asserts', annots'
 
 and inline_node ?(selection_on_annotation=false) node nodes =
   try copy_node (Hashtbl.find inline_table node.node_id)
   with Not_found ->
-  let inline_expr = inline_expr ~selection_on_annotation:selection_on_annotation in
-  let new_locals, eqs, asserts, annots = 
-    List.fold_left (fun (locals, eqs, asserts, annots) eq ->
-      let eq_rhs', locals', new_eqs', asserts', annots' = 
-	inline_expr eq.eq_rhs locals node nodes 
-      in
-      locals', { eq with eq_rhs = eq_rhs' }::new_eqs'@eqs, asserts'@asserts, annots'@annots
-    ) (node.node_locals, [], node.node_asserts, node.node_annot) (get_node_eqs node)
-  in
-  let inlined = 
-  { node with
-    node_locals = new_locals;
-    node_stmts = List.map (fun eq -> Eq eq) eqs;
-    node_asserts = asserts;
-    node_annot = annots;
-  }
-  in
-  begin
-    (*Format.eprintf "inline node:<< %a@.>>@." Printers.pp_node inlined;*)
-    Hashtbl.add inline_table node.node_id inlined;
-    inlined
-  end
+    let inline_expr = inline_expr ~selection_on_annotation:selection_on_annotation in
+    let eqs, auts = get_node_eqs node in
+    assert (auts = []); (* No inlining of automaton yet. One should visit each
+			   handler eqs and perform similar computation *)
+    let new_locals, stmts, asserts, annots = 
+      List.fold_left (fun (locals, stmts, asserts, annots) eq ->
+	let eq_rhs', locals', new_stmts', asserts', annots' = 
+	  inline_expr eq.eq_rhs locals node nodes 
+	in
+	locals', Eq { eq with eq_rhs = eq_rhs' }::new_stmts'@stmts, asserts'@asserts, annots'@annots
+      ) (node.node_locals, [], node.node_asserts, node.node_annot) eqs
+    in
+    let inlined = 
+      { node with
+	node_locals = new_locals;
+	node_stmts = stmts;
+	node_asserts = asserts;
+	node_annot = annots;
+      }
+    in
+    begin
+      (*Format.eprintf "inline node:<< %a@.>>@." Printers.pp_node inlined;*)
+      Hashtbl.add inline_table node.node_id inlined;
+      inlined
+    end
 
 let inline_all_calls node nodes =
   let nd = match node.top_decl_desc with Node nd -> nd | _ -> assert false in
@@ -333,7 +343,7 @@ let witness filename main_name orig inlined type_env clock_env =
   let inlined_rename = rename_local_node inlined "inlined_" in
   let identity = (fun x -> x) in
   let is_node top = match top.top_decl_desc with Node _ -> true | _ -> false in
-  let orig = rename_prog orig_rename identity identity orig in
+  let orig = rename_prog orig_rename (* f_node *) identity (* f_var *) identity (* f_const *) orig in
   let inlined = rename_prog inlined_rename identity identity inlined in
   let nodes_origs, others = List.partition is_node orig in
   let nodes_inlined, _ = List.partition is_node inlined in

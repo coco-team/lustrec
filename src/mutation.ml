@@ -103,8 +103,10 @@ let rec compute_records_expr expr =
 
 let compute_records_eq eq = compute_records_expr eq.eq_rhs
 
-let compute_records_node nd = 
-  merge_records (List.map compute_records_eq (get_node_eqs nd))
+let compute_records_node nd =
+  let eqs, auts = get_node_eqs nd in
+  assert (auts=[]); (* Automaton should be expanded by now *)
+  merge_records (List.map compute_records_eq eqs)
 
 let compute_records_top_decl td =
   match td.top_decl_desc with

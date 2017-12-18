@@ -75,7 +75,7 @@ val const_impl: constant -> constant -> constant
 
 val get_node_vars: node_desc -> var_decl list
 val get_node_var: ident -> node_desc -> var_decl
-val get_node_eqs: node_desc -> eq list
+val get_node_eqs: node_desc -> eq list * automata_desc list
 val get_node_eq: ident -> node_desc -> eq
 val get_node_interface: node_desc -> imported_node_desc
 
@@ -124,10 +124,17 @@ val rename_static: (ident -> Dimension.dim_expr) -> type_dec_desc -> type_dec_de
 val rename_carrier: (ident -> ident) -> clock_dec_desc -> clock_dec_desc
 
 val get_expr_vars: expr -> Utils.ISet.t
-val expr_replace_var: (ident -> ident) -> expr -> expr
+(*val expr_replace_var: (ident -> ident) -> expr -> expr*)
+
 val eq_replace_rhs_var: (ident -> bool) -> (ident -> ident) -> eq -> eq
 
-(** rename_prog f_node f_var f_const prog *)
+(** val rename_expr f_node f_var expr *)
+val rename_expr : (ident -> ident) -> (ident -> ident) -> expr -> expr
+(** val rename_eq f_node f_var eq *)
+val rename_eq : (ident -> ident) -> (ident -> ident) -> eq -> eq
+(** val rename_aut f_node f_var aut *)
+val rename_aut : (ident -> ident) -> (ident -> ident) -> automata_desc -> automata_desc
+(** rename_prog f_node f_var prog *)
 val rename_prog: (ident -> ident) -> (ident -> ident) -> (ident -> ident) -> program -> program
 
 val substitute_expr: var_decl list -> eq list -> expr -> expr

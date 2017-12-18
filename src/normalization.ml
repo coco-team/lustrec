@@ -399,7 +399,9 @@ let normalize_node node =
     List.for_all ((!=) v) inputs_outputs in
   let orig_vars = inputs_outputs@node.node_locals in
   let defs, vars =
-    List.fold_left (normalize_eq node) ([], orig_vars) (get_node_eqs node) in
+    let eqs, auts = get_node_eqs node in
+    if auts != [] then assert false; (* Automata should be expanded by now. *)
+    List.fold_left (normalize_eq node) ([], orig_vars) eqs in
   (* Normalize the asserts *)
   let vars, assert_defs, asserts =
     List.fold_left (
