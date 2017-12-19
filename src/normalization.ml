@@ -395,9 +395,9 @@ let rec normalize_eq node defvars eq =
 let normalize_node node =
   cpt_fresh := 0;
   let inputs_outputs = node.node_inputs@node.node_outputs in
-  let is_local v =
-    List.for_all ((!=) v) inputs_outputs in
   let orig_vars = inputs_outputs@node.node_locals in
+  let not_is_orig_var v =
+    List.for_all ((!=) v) orig_vars in
   let defs, vars =
     let eqs, auts = get_node_eqs node in
     if auts != [] then assert false; (* Automata should be expanded by now. *)
@@ -405,20 +405,24 @@ let normalize_node node =
   (* Normalize the asserts *)
   let vars, assert_defs, asserts =
     List.fold_left (
-    fun (vars, def_accu, assert_accu) assert_ ->
-      let assert_expr = assert_.assert_expr in
-      let (defs, vars'), expr = 
-	normalize_expr 
-	  ~alias:true (* forcing introduction of new equations for fcn calls *) 
-	  node 
-	  [] (* empty offset for arrays *)
-	  ([], vars) (* defvar only contains vars *)
-	  assert_expr
-      in
+      fun (vars, def_accu, assert_accu) assert_ ->
+	let assert_expr = assert_.assert_expr in
+	let (defs, vars'), expr = 
+	  normalize_expr 
+	    ~alias:true (* forcing introduction of new equations for fcn calls *) 
+	    node 
+	    [] (* empty offset for arrays *)
+	    ([], vars) (* defvar only contains vars *)
+	    assert_expr
+	in
       (*Format.eprintf "New assert vars: %a@.@?" (fprintf_list ~sep:", " Printers.pp_var) vars';*)
-      vars', defs@def_accu, {assert_ with assert_expr = expr}::assert_accu
+	vars', defs@def_accu, {assert_ with assert_expr = expr}::assert_accu
     ) (vars, [], []) node.node_asserts in
-  let new_locals = List.filter is_local vars in
+  let new_locals = List.filter not_is_orig_var vars in (* we filter out inout
+							  vars and initial locals ones *)
+  let new_locals = node.node_locals @ new_locals in (* we add again, at the
+						       beginning of the list the
+						       local declared ones *)
   (*Format.eprintf "New locals: %a@.@?" (fprintf_list ~sep:", " Printers.pp_var) new_locals;*)
 
   let new_annots =
@@ -454,15 +458,15 @@ let normalize_node node =
   in
 
   let node =
-  { node with
-    node_locals = new_locals;
-    node_stmts = List.map (fun eq -> Eq eq) (defs @ assert_defs);
-    node_asserts = asserts;
-    node_annot = new_annots;
-  }
+    { node with
+      node_locals = new_locals;
+      node_stmts = List.map (fun eq -> Eq eq) (defs @ assert_defs);
+      node_asserts = asserts;
+      node_annot = new_annots;
+    }
   in ((*Printers.pp_node Format.err_formatter node;*)
     node
-)
+  )
 
 
 let normalize_decl decl =
