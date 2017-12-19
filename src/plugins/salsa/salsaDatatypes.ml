@@ -85,7 +85,7 @@ struct
 
   (* Compute a join per variable *)  
   let merge ranges1 ranges2 = 
-    Format.eprintf "Mergeing rangesint %a with %a@." pp ranges1 pp ranges2;
+    (* Format.eprintf "Mergeing rangesint %a with %a@." pp ranges1 pp ranges2; *)
     let ranges = Hashtbl.copy ranges1 in
     Hashtbl.iter (fun k v -> 
       if Hashtbl.mem ranges k then (
@@ -99,7 +99,7 @@ struct
       else
 	 Hashtbl.add ranges k v
     ) ranges2;
-    Format.eprintf "Merge result %a@." pp ranges;
+    (* Format.eprintf "Merge result %a@." pp ranges; *)
     ranges
 
 end
@@ -176,9 +176,9 @@ let rec value_t2salsa_expr constEnv vt =
     (* 	Format.eprintf "Const tag %s unhandled@.@?" t ; *)
     (* 	raise (Salsa.Prelude.Error ("Entschuldigung6, constant tag not yet implemented")) *)
     (*   ) *)
-    | LT.Cst(cst)                ->        Format.eprintf "v2s: cst tag 2: %a@." Printers.pp_const cst; FloatIntSalsa.inject cst
+    | LT.Cst(cst)                ->        (* Format.eprintf "v2s: cst tag 2: %a@." Printers.pp_const cst;  *)FloatIntSalsa.inject cst
     | LT.LocalVar(v)            
-    | LT.StateVar(v)            ->       Format.eprintf "v2s: var %s@." v.LT.var_id; 
+    | LT.StateVar(v)            ->       (* Format.eprintf "v2s: var %s@." v.LT.var_id; *) 
       let sel_fun = (fun (vname, _) -> v.LT.var_id = vname) in
       if List.exists sel_fun  constEnv then
 	let _, cst = List.find sel_fun constEnv in
@@ -268,7 +268,8 @@ let rec salsa_expr2value_t vars_env cst_env e  =
 	else
 	  (f1 +. f2) /. 2.0 
       in
-      Format.eprintf "Converting [%.45f, %.45f] in %.45f@." f1 f2 new_float;
+      Log.report ~level:3
+	(fun fmt -> Format.fprintf fmt  "projecting [%.45f, %.45f] -> %.45f@ " f1 f2 new_float);
       let cst =  
 	let s = 
 	  if new_float = 0. then "0." else
@@ -281,21 +282,21 @@ let rec salsa_expr2value_t vars_env cst_env e  =
       in
       MC.mk_val (LT.Cst(cst)) Type_predef.type_real
   | ST.Id(id, _)          -> 
-    Format.eprintf "Looking for id=%s@.@?" id;
-    if List.mem_assoc id cst_env then (
-      let cst = List.assoc id cst_env in
-      Format.eprintf "Found cst = %a@.@?" Printers.pp_const cst;
-      MC.mk_val (LT.Cst cst) Type_predef.type_real
-    )
-    else
+    (* Format.eprintf "Looking for id=%s@.@?" id; *)
+     if List.mem_assoc id cst_env then (
+       let cst = List.assoc id cst_env in
+      (* Format.eprintf "Found cst = %a@.@?" Printers.pp_const cst; *)
+       MC.mk_val (LT.Cst cst) Type_predef.type_real
+     )
+     else
       (* if is_const salsa_label then *)
       (*   MC.Cst(LT.Const_tag(get_const salsa_label)) *)
       (* else *) 
-      let var_id = try get_var vars_env id with Not_found -> assert false in
-      if var_id.is_local then
-	MC.mk_val (LT.LocalVar(var_id.vdecl)) var_id.vdecl.LT.var_type
-      else
-	MC.mk_val (LT.StateVar(var_id.vdecl)) var_id.vdecl.LT.var_type
+       let var_id = try get_var vars_env id with Not_found -> assert false in
+       if var_id.is_local then
+	 MC.mk_val (LT.LocalVar(var_id.vdecl)) var_id.vdecl.LT.var_type
+       else
+	 MC.mk_val (LT.StateVar(var_id.vdecl)) var_id.vdecl.LT.var_type
   | ST.Plus(x, y, _)               -> binop "+" x y Type_predef.type_real
   | ST.Minus(x, y, _)              -> binop "-" x y Type_predef.type_real
   | ST.Times(x, y, _)              -> binop "*" x y Type_predef.type_real

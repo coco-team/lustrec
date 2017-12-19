@@ -84,7 +84,7 @@ let optimize_expr nodename constEnv printed_vars vars_env ranges formalEnv e : L
   let rec opt_expr ranges formalEnv e =
     match e.LT.value_desc with
     | LT.Cst cst ->
-      Format.eprintf "optmizing constant expr ? @ ";
+      (* Format.eprintf "optmizing constant expr @ "; *)
       (* the expression is a constant, we optimize it directly if it is a real
   	 constant *)
       let typ = Typing.type_const Location.dummy_loc cst in
@@ -118,20 +118,20 @@ let optimize_expr nodename constEnv printed_vars vars_env ranges formalEnv e : L
     | LT.Access _
     | LT.Power _ -> assert false  
   and opt_num_expr ranges formalEnv e = 
-    if debug then Format.eprintf "Optimizing expression %a@ " MC.pp_val e; 
+    (* if debug then Format.eprintf "Optimizing expression %a with Salsa@ " MC.pp_val e; *)
     let fresh_id = "toto"  in (* TODO more meaningful name *)
     (* Convert expression *)
-    List.iter (fun (l,c) -> Format.eprintf "%s -> %a@ " l Printers.pp_const c) constEnv;
+    (* List.iter (fun (l,c) -> Format.eprintf "%s -> %a@ " l Printers.pp_const c) constEnv; *)
     let e_salsa : Salsa.SalsaTypes.expression = value_t2salsa_expr constEnv e in
-    Format.eprintf "apres deplaige constantes ok%a @." MC.pp_val (salsa_expr2value_t vars_env [](* constEnv *) e_salsa) ; 
+    (* Format.eprintf "apres deplaige constantes ok%a @." MC.pp_val (salsa_expr2value_t vars_env [](\* constEnv *\) e_salsa) ;  *)
 
     (* Convert formalEnv *)
-    if debug then Format.eprintf "Formal env is [%a]@ " FormalEnv.pp formalEnv;
+    (* if debug then Format.eprintf "Formal env is [%a]@ " FormalEnv.pp formalEnv; *)
     let formalEnv_salsa = 
       FormalEnv.fold (fun id expr accu ->
 	(id, value_t2salsa_expr constEnv expr)::accu
 		     ) formalEnv []  in
-    if debug then Format.eprintf "Formal env converted to salsa@ ";
+    (* if debug then Format.eprintf "Formal env converted to salsa@ "; *)
     (* Substitute all occurences of variables by their definition in env *)
     let (e_salsa: Salsa.SalsaTypes.expression), _ = 
       Salsa.Rewrite.substVars 
@@ -139,7 +139,7 @@ let optimize_expr nodename constEnv printed_vars vars_env ranges formalEnv e : L
 	formalEnv_salsa
 	0 (* TODO: Nasrine, what is this integer value for ? *)
     in
-    if debug then Format.eprintf "Substituted def in expr@ ";
+    (* if debug then Format.eprintf "Substituted def in expr@ "; *)
     let abstractEnv = Hashtbl.fold 
       (fun id value accu -> (id,value)::accu) 
       ranges
@@ -150,15 +150,15 @@ let optimize_expr nodename constEnv printed_vars vars_env ranges formalEnv e : L
        valEnv2ExprEnv remplce les paires id, abstractVal par id, Cst itv - on
        garde evalPartExpr remplace les variables e qui sont dans env par la cst
        - on garde *)
-    if debug then Format.eprintf "avant avant eval part@ ";
-     Format.eprintf "avant evalpart: %a@." MC.pp_val (salsa_expr2value_t vars_env constEnv e_salsa); 
+    (* if debug then Format.eprintf "avant avant eval part@ "; *)
+    (*  Format.eprintf "avant evalpart: %a@." MC.pp_val (salsa_expr2value_t vars_env constEnv e_salsa);  *)
     let e_salsa =  
       Salsa.Float.evalPartExpr 
 	e_salsa
 	(Salsa.Float.valEnv2ExprEnv abstractEnv) 
 	([] (* no blacklisted variables *))  
     in
-     Format.eprintf "apres evalpart: %a@." MC.pp_val (salsa_expr2value_t vars_env constEnv e_salsa); 
+     (* Format.eprintf "apres evalpart: %a@." MC.pp_val (salsa_expr2value_t vars_env constEnv e_salsa);  *)
     (* Checking if we have all necessary information *)
 
     let free_vars = get_salsa_free_vars vars_env constEnv abstractEnv  e_salsa in
@@ -245,11 +245,11 @@ let assign_vars nodename constEnv vars_env printed_vars ranges formalEnv vars_to
    ranges, formalEnv, printed_vars, and remaining vars to be printed) *)
 let rec rewrite_instrs nodename constEnv  vars_env m instrs ranges formalEnv printed_vars vars_to_print = 
   let assign_vars = assign_vars nodename constEnv vars_env in
-  if debug then (
-    Format.eprintf "------------@ ";
-    Format.eprintf "Current printed_vars: [%a]@ " Vars.pp printed_vars;
-    Format.eprintf "Formal env is [%a]@ " FormalEnv.pp formalEnv;
-  );
+  (* if debug then ( *)
+  (*   Format.eprintf "------------@ "; *)
+  (*   Format.eprintf "Current printed_vars: [%a]@ " Vars.pp printed_vars; *)
+  (*   Format.eprintf "Formal env is [%a]@ " FormalEnv.pp formalEnv; *)
+  (* ); *)
   match instrs with
   | [] -> 
      (* End of instruction list: we produce the definition of each variable that
@@ -270,7 +270,8 @@ let rec rewrite_instrs nodename constEnv  vars_env m instrs ranges formalEnv pri
 	 match Corelang.get_instr_desc hd_instr with 
 	 | LT.MLocalAssign(vd,vt) when Types.is_real_type vd.LT.var_type  && not (Vars.mem vd vars_to_print) -> 
 	    (* LocalAssign are injected into formalEnv *)
-	    if debug then Format.eprintf "Registering local assign %a@ " MC.pp_instr hd_instr;
+	    (* if debug then Format.eprintf "Registering local assign %a@ " MC.pp_instr hd_instr; *)
+	    if debug then Format.eprintf "%a@ " MC.pp_instr hd_instr;
 	    let formalEnv' = FormalEnv.def formalEnv vd vt in (* formelEnv updated with vd = vt *)
 	    [],                        (* no instr generated *)
 	    ranges,                    (* no new range computed *)
@@ -280,7 +281,12 @@ let rec rewrite_instrs nodename constEnv  vars_env m instrs ranges formalEnv pri
 	      
 	 | LT.MLocalAssign(vd,vt) when Types.is_real_type vd.LT.var_type && Vars.mem vd vars_to_print ->
 
-            if debug then Format.eprintf "Registering and producing state assign %a@ " MC.pp_instr hd_instr;
+            (* if debug then Format.eprintf "Registering and producing state assign %a@ " MC.pp_instr hd_instr; *)
+            (* if debug then Format.eprintf "Registering and producing state assign %a@ " MC.pp_instr hd_instr; *)
+           if debug then (
+	     Format.eprintf "%a@]@ " MC.pp_instr hd_instr;
+	     Format.eprintf "Selected var %a: producing expression@ " Printers.pp_var vd;
+	   );
 	    let formalEnv' = FormalEnv.def formalEnv vd vt in (* formelEnv updated with vd = vt *) 
 	    let instrs', ranges' = (* printing vd = optimized vt *)
 	      assign_vars printed_vars ranges formalEnv' (Vars.singleton vd)  
@@ -296,7 +302,11 @@ let rec rewrite_instrs nodename constEnv  vars_env m instrs ranges formalEnv pri
 	    (* StateAssign are produced since they are required by the function. We still
 	     keep their definition in the formalEnv in case it can optimize later
 	     outputs. vd is removed from remaining vars_to_print *)
-	    if debug then Format.eprintf "Registering and producing state assign %a@ " MC.pp_instr hd_instr;
+	    (* if debug then Format.eprintf "Registering and producing state assign %a@ " MC.pp_instr hd_instr; *)
+           if debug then (
+	     Format.eprintf "%a@]@ " MC.pp_instr hd_instr;
+	     Format.eprintf "State assign %a: producing expression@ " Printers.pp_var vd;
+	   );
 	    let formalEnv' = FormalEnv.def formalEnv vd vt in (* formelEnv updated with vd = vt *) 
 	    let instrs', ranges' = (* printing vd = optimized vt *)
 	      assign_vars printed_vars ranges formalEnv' (Vars.singleton vd)  
@@ -506,7 +516,7 @@ let salsaStep constEnv  m s =
 	    assert false 
 	in
 	let minv, maxv = get_cst minv, get_cst maxv in
-	if debug then Format.eprintf "%s in [%f, %f]@ " v minv maxv;
+	if debug then Format.eprintf "variable %s in [%f, %f]@ " v minv maxv;
 	RangesInt.enlarge ranges v (Salsa.SalsaTypes.I(minv, maxv),Salsa.SalsaTypes.J(0.,0.))
       )
       | _ -> 
@@ -527,6 +537,8 @@ let salsaStep constEnv  m s =
   in 
   (* TODO: should be at least step output + may be memories *)
   let vars_env = compute_vars_env m in
+  
+  if debug then Format.eprintf "@[<v 2>Registering node equations@ "; 
   let new_instrs, _, _, printed_vars, _ = 
     rewrite_instrs
       m.MC.mname.LT.node_id
@@ -557,9 +569,9 @@ let salsaStep constEnv  m s =
 
 let machine_t2machine_t_optimized_by_salsa constEnv  mt = 
   try
-    if debug then Format.eprintf "@[<v 2>------------------ Optimizing machine %s@ " mt.MC.mname.LT.node_id;
+    if debug then Format.eprintf "@[<v 8>[salsa] Optimizing machine %s@ " mt.MC.mname.LT.node_id;
     let new_step = salsaStep constEnv  mt mt.MC.mstep in
-    if debug then Format.eprintf "@]@.";
+    if debug then Format.eprintf "@]@ ";
     { mt with MC.mstep = new_step } 
     
       
