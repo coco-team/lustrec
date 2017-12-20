@@ -18,6 +18,7 @@ type error =
   | Unfinished_string
   | Unfinished_comment
   | Syntax_error
+  | String_Syntax_error of string
   | Unfinished_annot
   | Unfinished_node_spec 
   | Annot_error of string
@@ -32,7 +33,8 @@ let pp_error fmt err =
   | Undefined_token tok   -> fprintf fmt "undefined token '%s'" tok
   | Unfinished_string        -> fprintf fmt "unfinished string"
   | Unfinished_comment  -> fprintf fmt "unfinished comment"
-  | Syntax_error               -> fprintf fmt ""
+  | Syntax_error               -> fprintf fmt "syntax error"
+  | String_Syntax_error s              -> fprintf fmt "syntax error in %s" s
   | Unfinished_annot        -> fprintf fmt "unfinished annotation"
   | Unfinished_node_spec -> fprintf fmt "unfinished node specification"
   | Annot_error s              -> fprintf fmt "impossible to parse the following annotation:@.%s@.@?" s
