@@ -120,6 +120,14 @@ let rec fby expr n init =
 %start signed_const
 %type <LustreSpec.constant> signed_const
 
+%start expr
+%type <LustreSpec.expr> expr
+
+%start stmt_list
+%type <LustreSpec.statement list * LustreSpec.assert_t list * LustreSpec.expr_annot list > stmt_list
+
+%start vdecl_list
+%type <LustreSpec.var_decl list> vdecl_list
 %%
 
 module_ident:
