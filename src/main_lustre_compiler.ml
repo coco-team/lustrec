@@ -249,7 +249,7 @@ let _ =
   | Types.Error (_,_) | Clocks.Error (_,_) -> exit 1
   | Corelang.Error (_ (* loc *), kind) (*| Task_set.Error _*) -> exit (Error.return_code kind)
   (* | Causality.Error _  -> exit (Error.return_code Error.AlgebraicLoop) *)
-  | Sys_error msg -> (eprintf "Failure: %s@." msg)
+  | Sys_error msg -> (eprintf "Failure: %s@." msg); exit 1
   | exc -> (track_exception (); raise exc) 
 
 (* Local Variables: *)
