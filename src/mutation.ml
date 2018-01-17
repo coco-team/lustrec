@@ -1,3 +1,15 @@
+
+(* Comments in function fold_mutate
+
+ TODO: check if we can generate more cases. The following lines were
+	     cylcing and missing to detect that the enumaration was complete,
+	     leading to a non terminating process. The current setting is harder
+	     but may miss enumerating some cases. To be checked! 
+	
+
+*)
+
+
 open LustreSpec
 open Corelang
 open Log
@@ -556,7 +568,11 @@ let create_mutant prog directive =
   let prog' = fold_mutate_prog prog in
   let mutation_info = match !target , !mutation_info with
     | None, Some mi -> mi
-    | _ -> assert false (* The mutation has not been performed. *)
+    | _ -> (
+      Format.eprintf "Failed when creating mutant for directive %a@.@?" print_directive directive;
+      let _ = match !target with Some dir' -> Format.eprintf "New directive %a@.@?" print_directive dir' | _ -> () in
+      assert false (* The mutation has not been performed. *)
+    )
      
   in
 (*  target := None; (* should happen only if no mutation occured during the
@@ -640,7 +656,7 @@ let next_change m =
     else first_boolexpr ()
 
   in
-  (* Format.eprintf "from: %a to: %a@." print_directive m print_directive res; *)
+   (* Format.eprintf "from: %a to: %a@." print_directive m print_directive res;  *)
   res
 
 let fold_mutate nb prog = 
@@ -648,42 +664,84 @@ let fold_mutate nb prog =
   Random.init !random_seed;
   let find_next_new mutants mutant =
     let rec find_next_new init current =
-      if init = current then raise Not_found else
-	if List.mem current mutants then
-	  find_next_new init (next_change current)
-	else
-	  current
+      if init = current || List.mem current mutants then raise Not_found else
+
+	  (* TODO: check if we can generate more cases. The following lines were
+	     cylcing and missing to detect that the enumaration was complete,
+	     leading to a non terminating process. The current setting is harder
+	     but may miss enumerating some cases. To be checked! *)
+	
+	  (* if List.mem current mutants then *)
+	  (*   find_next_new init (next_change current) *)
+	  (* else *)
+	current
     in
     find_next_new mutant (next_change mutant) 
   in
   (* Creating list of nb elements of mutants *)
   let rec create_mutants_directives rnb mutants = 
     if rnb <= 0 then mutants 
-    else 
-      let random_mutation = 
-	match Random.int 6 with
-	| 5 -> IncrIntCst (try Random.int (IntSet.cardinal !records.consts) with _ -> 0)
-	| 4 -> DecrIntCst (try Random.int (IntSet.cardinal !records.consts) with _ -> 0)
-	| 3 -> SwitchIntCst ((try Random.int (IntSet.cardinal !records.consts) with _ -> 0), (try Random.int (-1 + IntSet.cardinal !records.consts) with _ -> 0))
-	| 2 -> Pre (try Random.int !records.nb_pre with _ -> 0)
-	| 1 -> Boolexpr (try Random.int !records.nb_boolexpr with _ -> 0)
-	| 0 -> let bindings = OpCount.bindings !records.nb_op in
-	       let op, nb_op = List.nth bindings (try Random.int (List.length bindings) with _ -> 0) in
-	       let new_op = List.nth (op_mutation op) (try Random.int (List.length (op_mutation op)) with _ -> 0) in
-	       Op (op, (try Random.int nb_op with _ -> 0), new_op)
-	| _ -> assert false
+    else
+      (* Initial list of transformation *)
+      let rec init_list x = if x <= 0 then [0] else x::(init_list (x-1)) in
+      let init_list = init_list 5 in
+      (* We generate a random permutation of the list: the first item is the
+	 transformation, the rest of the list act as fallback choices to make
+	 sure we produce something *)
+      let shuffle l =
+	let nd = List.map (fun c -> Random.bits (), c) l in
+	let sond = List.sort compare nd in
+	List.map snd sond
       in
-      if List.mem random_mutation mutants then
+      let transforms = shuffle init_list in
+      let rec apply_transform transforms =
+	let f id = 
+	  match id with
+	  | 5 -> let card = IntSet.cardinal !records.consts in
+		 card > 0, IncrIntCst (try Random.int (IntSet.cardinal !records.consts) with _ -> 0)
+	  | 4 -> let card = IntSet.cardinal !records.consts in
+		 card > 0, DecrIntCst (try Random.int (IntSet.cardinal !records.consts) with _ -> 0)
+	  | 3 -> let card = IntSet.cardinal !records.consts in
+		 card > 0, SwitchIntCst ((try Random.int (-1  + IntSet.cardinal !records.consts) with _ -> 0), (try Random.int (-1 + IntSet.cardinal !records.consts) with _ -> 0))
+	  | 2 -> !records.nb_pre >0, Pre (try Random.int !records.nb_pre with _ -> 0)
+	  | 1 -> !records.nb_boolexpr > 0, Boolexpr (try Random.int !records.nb_boolexpr with _ -> 0)
+	  | 0 -> let bindings = OpCount.bindings !records.nb_op in
+		 let bindings_len = List.length bindings in
+		 let op, nb_op = List.nth bindings (try Random.int (List.length bindings) with _ -> 0) in
+		 let new_op = List.nth (op_mutation op) (try Random.int (List.length (op_mutation op)) with _ -> 0) in
+	         bindings_len > 0, Op (op, (try Random.int nb_op with _ -> 0), new_op)
+	  | _ -> assert false
+	in
+	match transforms with
+	| [] -> assert false
+	| [hd] -> f hd
+	| hd::tl -> let ok, random_mutation = f hd in
+		    if ok then
+		      ok, random_mutation
+		    else
+		      apply_transform tl
+      in
+      let ok, random_mutation = apply_transform transforms in
+      let stop_process () =
+	report ~level:1 (fun fmt -> fprintf fmt
+	  "Only %i mutants directives generated out of %i expected@."
+	  (nb-rnb)
+	  nb); 
+	mutants
+      in
+      if not ok then
+	stop_process ()
+      else if List.mem random_mutation mutants then
 	try
 	  let new_mutant = (find_next_new mutants random_mutation) in
-	  report ~level:2 (fun fmt -> fprintf fmt " %i mutants generated out of %i expected@." (nb-rnb) nb);
-	 create_mutants_directives (rnb-1) (new_mutant::mutants) 
+	  report ~level:2 (fun fmt -> fprintf fmt " %i mutants directive generated out of %i expected@." (nb-rnb) nb);
+	  create_mutants_directives (rnb-1) (new_mutant::mutants) 
 	with Not_found -> (
-	  report ~level:1 (fun fmt -> fprintf fmt "Only %i mutants generated out of %i expected@." (nb-rnb) nb); 
-	  mutants
+	  stop_process ()
 	)
-      else
+      else (
 	create_mutants_directives (rnb-1) (random_mutation::mutants)
+      )
   in
   let mutants_directives = create_mutants_directives nb [] in
   List.map (fun d ->
