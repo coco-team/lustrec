@@ -77,7 +77,7 @@ install-base: clean-lusic
 	mkdir -p ${bindir}
 	for x in $(BIN_TARGETS); do install -m 0755 $(LOCAL_BINDIR)/$$x ${bindir}; done
 	mkdir -p ${datarootdir}
-	install -m 0655 share/FindLustre.cmake ${datarootdir}
+	install -m 0655 share/* ${datarootdir}
 	mkdir -p ${includedir}/lustrec
 	install -m 0655 include/* ${includedir}/lustrec
 

@@ -26,6 +26,7 @@
 # The VERBOSE level is a numeric value passed directly to the -verbose
 # command line option of the lustre compiler
 #
+include("/home/ploc/Local/share/helpful_functions.cmake")
 
 if(LUSTRE_PATH_HINT)
   message(STATUS "FindLustre: using PATH HINT: ${LUSTRE_PATH_HINT}")
@@ -103,21 +104,24 @@ function(Lustre_Compile)
 
   file(MAKE_DIRECTORY ${LUSTRE_OUTPUT_DIR})
   set(GLOBAL_LUSTRE_GENERATED_C_FILES "")
+  set(GLOBAL_LUSTRE_DEP_C_FILES "")
   # create list of generated C files in parent scope
   set(LUSTRE_GENERATED_C_FILES_${LUS_LIBNAME} "" PARENT_SCOPE)
   foreach(LFILE IN LISTS LUS_LUS_FILES)
-    get_filename_component(L ${LFILE} NAME_WE)
-    get_filename_component(E ${LFILE} EXT)
-    if ("${E}" STREQUAL ".lus")
+    get_lustre_name_ext(${LFILE} L E)
+    
+    if ("${E}" STREQUAL "lus")
       set(LUSTRE_GENERATED_FILES ${LUSTRE_OUTPUT_DIR}/${L}.h ${LUSTRE_OUTPUT_DIR}/${L}.c ${LUSTRE_OUTPUT_DIR}/${L}_alloc.h)
+      set(LUSTRE_DEP_FILES "")
       if(LUS_NODE)
          list(APPEND LUSTRE_GENERATED_FILES ${LUSTRE_OUTPUT_DIR}/${L}_main.c)
-         list(APPEND LUSTRE_GENERATED_FILES ${LUSTRE_INCLUDE_DIR}/io_frontend.c)
+         list(APPEND LUSTRE_DEP_FILES ${LUSTRE_INCLUDE_DIR}/io_frontend.c)
       endif()
-    elseif("${E}" STREQUAL ".lusi")
+    elseif("${E}" STREQUAL "lusi")
       set(LUSTRE_GENERATED_FILES ${LUSTRE_OUTPUT_DIR}/${L}.h)
     endif()
     list(APPEND GLOBAL_LUSTRE_GENERATED_C_FILES ${LUSTRE_GENERATED_FILES})
+    list(APPEND GLOBAL_LUSTRE_DEP_FILES ${LUSTRE_DEP_FILES}) # todo: add if not already in the list
     set(LUSTRE_GENERATED_FILES ${LUSTRE_GENERATED_FILES} ${LUSTRE_OUTPUT_DIR}/${L}.lusic)
     if (LUS_LUSI)
       add_custom_command(
@@ -142,11 +146,11 @@ function(Lustre_Compile)
   include_directories(${LUSTRE_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${LUSTRE_OUTPUT_DIR})
   if(LUS_NODE)
   add_executable(${LUS_LIBNAME}
-              ${GLOBAL_LUSTRE_GENERATED_C_FILES} ${LUS_USER_C_FILES}
+              ${GLOBAL_LUSTRE_GENERATED_C_FILES} ${GLOBAL_LUSTRE_DEP_FILES} ${LUS_USER_C_FILES}
               )
   else()
   add_library(${LUS_LIBNAME} SHARED
-              ${GLOBAL_LUSTRE_GENERATED_C_FILES} ${LUS_USER_C_FILES}
+              ${GLOBAL_LUSTRE_GENERATED_C_FILES} ${GLOBAL_LUSTRE_DEP_FILES} ${LUS_USER_C_FILES}
               )
   endif()
   set_target_properties(${LUS_LIBNAME} PROPERTIES COMPILE_FLAGS "-std=c99")
