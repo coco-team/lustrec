@@ -23,9 +23,12 @@ let print_version fmt =
     (if !Options.ansi then "ANSI C90" else "C99")
     (if !Options.mpfr then "MPFR multi-precision" else "(double) floating-point")
 
+let protect_filename s =
+  Str.global_replace (Str.regexp "\\.\\|\\ ") "_" s
+
 let file_to_module_name basename =
   let baseNAME = Ocaml_utils.uppercase basename in
-  let baseNAME = Str.global_replace (Str.regexp "\\.\\|\\ ") "_" baseNAME in
+  let baseNAME = protect_filename baseNAME in
   baseNAME
 
 (* Generation of a non-clashing name for the self memory variable (for step and reset functions) *)
