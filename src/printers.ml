@@ -251,10 +251,10 @@ and pp_node_aut fmt aut =
 and pp_node_eqs fmt eqs = fprintf_list ~sep:"@ " pp_node_eq fmt eqs
 
 let pp_typedef fmt ty =
-  fprintf fmt "type %s = %a;@ " ty.tydef_id pp_var_type_dec_desc ty.tydef_desc
+  fprintf fmt "type %s = %a;" ty.tydef_id pp_var_type_dec_desc ty.tydef_desc
 
 let pp_typedec fmt ty =
-  fprintf fmt "type %s;@ " ty.tydec_id
+  fprintf fmt "type %s;" ty.tydec_id
 
 (* let rec pp_var_type fmt ty =  *)
 (*   fprintf fmt "%a" (match ty.tdesc with  *)
@@ -324,12 +324,12 @@ let pp_const_decl_list fmt clist =
 
 let pp_decl fmt decl =
   match decl.top_decl_desc with
-  | Node nd -> fprintf fmt "%a@ " pp_node nd
+  | Node nd -> fprintf fmt "%a" pp_node nd
   | ImportedNode ind ->
-    fprintf fmt "imported %a;@ " pp_imported_node ind
-  | Const c -> fprintf fmt "const %a@ " pp_const_decl c
-  | Open (local, s) -> if local then fprintf fmt "#open \"%s\"@ " s else fprintf fmt "#open <%s>@ " s
-  | TypeDef tdef -> fprintf fmt "%a@ " pp_typedef tdef
+    fprintf fmt "imported %a;" pp_imported_node ind
+  | Const c -> fprintf fmt "const %a" pp_const_decl c
+  | Open (local, s) -> if local then fprintf fmt "#open \"%s\"" s else fprintf fmt "#open <%s>" s
+  | TypeDef tdef -> fprintf fmt "%a" pp_typedef tdef
 
 let pp_prog fmt prog =
   (* we first print types: the function SortProg.sort could do the job but ut
@@ -337,7 +337,7 @@ let pp_prog fmt prog =
   let type_decl, others =
     List.partition (fun decl -> match decl.top_decl_desc with TypeDef _ -> true | _ -> false) prog
   in
-  fprintf_list ~sep:"@ " pp_decl fmt (type_decl@others)
+  fprintf fmt "@[<v 0>%a@]" (fprintf_list ~sep:"@ " pp_decl) (type_decl@others)
 
 let pp_short_decl fmt decl =
   match decl.top_decl_desc with
