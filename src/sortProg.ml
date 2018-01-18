@@ -9,10 +9,8 @@
 (*                                                                  *)
 (********************************************************************)
 
-open Graph
 open LustreSpec
 open Corelang
-module TopologicalDepGraph = Topological.Make(Causality.IdentDepGraph)
 
 let get_node nid prog =
   List.find (fun t -> match t.top_decl_desc with Node n -> n.node_id = nid | _ -> false) prog
@@ -29,7 +27,7 @@ let sort prog =
       Causality.CycleDetection.check_cycles g;
     
       (
-	TopologicalDepGraph.fold 
+	Causality.TopologicalDepGraph.fold 
 	  (fun x accu -> 
 	    try 
 	      (get_node x nodes)::accu
@@ -50,6 +48,19 @@ let sort prog =
     (fun fmt -> Format.fprintf fmt "Ordered list of declarations:@.%a@.@?" (Utils.fprintf_list ~sep:"@." Printers.pp_short_decl) sorted);
   	  not_nodes@sorted
 
+
+let sort_node_locals nd =
+  { nd with node_locals = Causality.VarClockDep.sort nd.node_locals}
+    
+let sort_nodes_locals prog =
+  List.map
+    (fun top ->
+      match top.top_decl_desc with
+      | Node nd -> {top with top_decl_desc = Node (sort_node_locals nd)}
+      | _ -> top
+    )
+    prog
+    
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

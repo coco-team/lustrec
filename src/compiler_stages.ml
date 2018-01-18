@@ -187,4 +187,6 @@ let stage1 prog dirname basename =
       Access.check_prog prog;
     end;
 
+  let prog = SortProg.sort_nodes_locals prog in
+  
   prog, dependencies

@@ -29,6 +29,8 @@ exception Error of error
 
 
 module IdentDepGraph = Graph.Imperative.Digraph.ConcreteBidirectional (IdentModule)
+module TopologicalDepGraph = Topological.Make(IdentDepGraph)
+
 (*module DotGraph = Graphviz.Dot (IdentDepGraph)*)
 module Bfs = Traverse.Bfs (IdentDepGraph)
   
@@ -652,6 +654,35 @@ let global_dependency node =
       raise (Error (exc))
   )
 
+(* A module to sort dependencies among local variables when relying on clocked declarations *)
+module VarClockDep =
+struct
+  let rec get_clock_dep ck =
+    match ck.Clocks.cdesc with
+    | Clocks.Con (ck ,c ,l) -> l::(get_clock_dep ck)
+    | Clocks.Clink ck' 
+    | Clocks.Ccarrying (_, ck') -> get_clock_dep ck'
+    | _ -> []
+      
+  let sort locals =
+    let g = new_graph () in
+    let g = List.fold_left (
+      fun g var_decl ->
+	let deps = get_clock_dep var_decl.var_clock in
+	add_edges [var_decl.var_id] deps g
+    ) g locals
+    in
+    let sorted, no_deps =
+      TopologicalDepGraph.fold (fun vid (accu, remaining) -> (
+	let select v = v.var_id = vid in
+	let selected, not_selected = List.partition select remaining in
+	selected@accu, not_selected
+      )) g ([],locals)
+    in
+    no_deps @ sorted
+    
+end
+  
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)
