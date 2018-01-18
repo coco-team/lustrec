@@ -55,7 +55,7 @@ let testgen_source dirname basename extension =
   
   if !Options.gen_mcdc then (
     let prog_mcdc = PathConditions.mcdc prog in
-  let _, type_env, _ = import_dependencies prog_mcdc in
+    let _, type_env, _ = import_dependencies prog_mcdc in
 
     let _ = type_decls type_env prog_mcdc in
 
@@ -130,8 +130,9 @@ let testgen_source dirname basename extension =
   Format.fprintf cmake_fmt "LUSTREFILES(LFILES ${CMAKE_CURRENT_SOURCE_DIR} )@.";
   Format.fprintf cmake_fmt "@[<v 2>FOREACH(lus_file ${LFILES})@ ";
   Format.fprintf cmake_fmt "get_lustre_name_ext(${lus_file} L E)@ ";
-  Format.fprintf cmake_fmt "Lustre_Compile(@[<v 0>NODE \"top_mutant\"@ ";
-  Format.fprintf cmake_fmt "LIBNAME \"${L}_top_mutant\"@ ";
+  Format.fprintf cmake_fmt "Lustre_Compile(@[<v 0>@ ";
+  if !Options.main_node <> "" then Format.fprintf cmake_fmt "NODE \"%s_mutant\"@ " !Options.main_node;
+  Format.fprintf cmake_fmt "LIBNAME \"${L}_%s_mutant\"@ " !Options.main_node;
   Format.fprintf cmake_fmt "LUS_FILES \"${lus_file}\")@]@]@.";
   Format.fprintf cmake_fmt "ENDFOREACH()@.@?";
   
