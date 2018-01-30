@@ -54,7 +54,7 @@ let load_file f =
   let s = Bytes.create n in
   really_input ic s 0 n;
   close_in ic;
-  (s)
+  Bytes.to_string s
 
 let print_type_definitions fmt =
   let cpt_type = ref 0 in
