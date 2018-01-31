@@ -45,7 +45,6 @@ let testgen_source dirname basename extension =
 
   (* Parsing source *)
   let prog = parse_source source_name in
-
   let prog, dependencies = Compiler_stages.stage1 prog dirname basename in
 
   (* Two cases
@@ -55,16 +54,32 @@ let testgen_source dirname basename extension =
   
   if !Options.gen_mcdc then (
     let prog_mcdc = PathConditions.mcdc prog in
+    (* We re-type the fresh equations *)
     let _, type_env, _ = import_dependencies prog_mcdc in
-
     let _ = type_decls type_env prog_mcdc in
 
     let destname = !Options.dest_dir ^ "/" ^ basename in
-    let source_file = destname ^ ".mcdc.lus" in (* Could be changed *)
-    let source_out = open_out source_file in
+    let source_file = destname ^ ".mcdc" in (* Could be changed *)
+
+    (* Modified Lustre is produced in fresh .lus file *)
+    let source_lus = source_file ^ ".lus" in
+    let source_out = open_out source_lus in
     let fmt = formatter_of_out_channel source_out in
     Printers.pp_prog fmt prog_mcdc;
     Format.fprintf fmt "@.@?";
+
+    (* Prog is 
+       (1) cleaned from initial equations TODO
+       (2) produced as EMF
+    *)
+    Options.output := "emf";
+    let prog_mcdc = Normalization.normalize_prog ~backend:"emf" prog_mcdc in
+    let machine_code = Compiler_stages.stage2 prog_mcdc in
+    let source_emf = source_file ^ ".emf" in 
+    let source_out = open_out source_emf in
+    let fmt = formatter_of_out_channel source_out in
+    EMF_backend.translate fmt basename prog_mcdc machine_code;
+
     exit 0
   ) ;
 
