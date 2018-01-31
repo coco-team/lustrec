@@ -19,10 +19,10 @@ let pp_machine_step_name fmt id = fprintf fmt "%s_step" id
 let pp_machine_stateless_name fmt id = fprintf fmt "%s_fun" id
 
 let rec pp_type fmt t =
+  if Types.is_bool_type t  then fprintf fmt "Bool" else
+  if Types.is_int_type t then fprintf fmt "Int" else 
+  if Types.is_real_type t then fprintf fmt "Real" else 
   match (Types.repr t).Types.tdesc with
-  | Types.Tbool           -> fprintf fmt "Bool"
-  | Types.Tint            -> fprintf fmt "Int"
-  | Types.Treal           -> fprintf fmt "Real"
   | Types.Tconst ty       -> pp_print_string fmt ty
   | Types.Tclock t        -> pp_type fmt t
   | Types.Tarray(dim,ty)   -> fprintf fmt "(Array Int "; pp_type fmt ty; fprintf fmt ")"

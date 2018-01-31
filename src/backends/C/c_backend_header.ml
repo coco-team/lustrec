@@ -35,15 +35,19 @@ struct
 
 let print_import_standard fmt =
   begin
+    (* if Machine_types.has_machine_type () then *)
+    (*   begin *)
+	fprintf fmt "#include <stdint.h>@.";
+      (* end; *)
     if !Options.mpfr then
       begin
 	fprintf fmt "#include <mpfr.h>@."
       end;
-  if !Options.cpp then
-    fprintf fmt "#include \"%s/arrow.hpp\"@.@." arrow_top_decl.top_decl_owner 
-  else
-    fprintf fmt "#include \"%s/arrow.h\"@.@." arrow_top_decl.top_decl_owner 
-
+    if !Options.cpp then
+      fprintf fmt "#include \"%s/arrow.hpp\"@.@." arrow_top_decl.top_decl_owner 
+    else
+      fprintf fmt "#include \"%s/arrow.h\"@.@." arrow_top_decl.top_decl_owner 
+	
   end
 
 let rec print_static_val pp_var fmt v =

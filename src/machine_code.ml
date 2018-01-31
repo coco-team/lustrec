@@ -178,6 +178,7 @@ let dummy_var_decl name typ =
     var_dec_clock = dummy_clock_dec;
     var_dec_const = false;
     var_dec_value = None;
+    var_parent_nodeid = None;
     var_type =  typ;
     var_clock = Clocks.new_ck Clocks.Cvar true;
     var_loc = Location.dummy_loc
@@ -218,7 +219,7 @@ let mk_val v t = { value_desc = v;
 
 let arrow_machine =
   let state = "_first" in
-  let var_state = dummy_var_decl state (Types.new_ty Types.Tbool) in
+  let var_state = dummy_var_decl state Type_predef.type_bool(* (Types.new_ty Types.Tbool) *) in
   let var_input1 = List.nth arrow_desc.node_inputs 0 in
   let var_input2 = List.nth arrow_desc.node_inputs 1 in
   let var_output = List.nth arrow_desc.node_outputs 0 in
@@ -622,10 +623,11 @@ let translate_decl nd sch =
 	       mktyp loc Tydec_bool,
 	       mkclock loc Ckdec_any,
 	       false, (* not a constant *)
-	       None (* no default value *)
+	       None, (* no default value *)
+	       Some nd.node_id
 	      )
 	  in
-	  assert_var.var_type <- Types.new_ty (Types.Tbool); 
+	  assert_var.var_type <- Type_predef.type_bool (* Types.new_ty (Types.Tbool) *); 
 	  let eq = mkeq loc ([var_id], expr) in
 	  (i+1, assert_var::vars, eq::eqlist, {expr with expr_desc = Expr_ident var_id}::assertlist)
 	) (1, [], [], []) exprl

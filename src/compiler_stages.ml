@@ -48,6 +48,9 @@ let compile_source_to_header prog computed_types_env computed_clocks_env dirname
 
 (* From prog to prog *)
 let stage1 prog dirname basename =
+  (* Updating parent node information for variables *)
+  Compiler_common.update_vdecl_parents_prog prog;
+
   (* Removing automata *)
   let prog = expand_automata prog in
   Log.report ~level:4 (fun fmt -> fprintf fmt ".. after automata expansion:@,  @[<v 2>@,%a@]@ " Printers.pp_prog prog);
@@ -82,6 +85,10 @@ let stage1 prog dirname basename =
 
   (* Clock calculus *)
   let computed_clocks_env = clock_decls clock_env prog in
+
+  (* Registering and checking machine types *)
+  Machine_types.load prog;
+  
 
   (* Generating a .lusi header file only *)
   if !Options.lusi then
@@ -131,6 +138,7 @@ let stage1 prog dirname basename =
   Typing.uneval_prog_generics prog;
   Clock_calculus.uneval_prog_generics prog;
 
+
   if !Options.global_inline && !Options.main_node <> "" && !Options.witnesses then
     begin
       let orig = Corelang.copy_prog orig in
@@ -160,7 +168,11 @@ let stage1 prog dirname basename =
     else
       prog
   in
-  
+
+
+  (* (\* Registering and checking machine types *\) *)
+  (* Machine_types.load prog; *)
+
   (* Normalization phase *)
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. normalization@,");
   let prog = Normalization.normalize_prog ~backend:!Options.output prog in
@@ -187,6 +199,103 @@ let stage1 prog dirname basename =
       Access.check_prog prog;
     end;
 
+  
   let prog = SortProg.sort_nodes_locals prog in
   
   prog, dependencies
+
+
+    (* from source to machine code, with optimization *)
+let stage2 prog =    
+  (* Computation of node equation scheduling. It also breaks dependency cycles
+     and warns about unused input or memory variables *)
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. @[<v 2>scheduling@ ");
+  let prog, node_schs =
+    try 
+      Scheduling.schedule_prog prog
+    with Causality.Error _ -> (* Error is not kept. It is recomputed in a more
+				 systemtic way in AlgebraicLoop module *)
+      AlgebraicLoop.analyze prog
+  in
+  Log.report ~level:1 (fun fmt -> fprintf fmt "%a"              Scheduling.pp_warning_unused node_schs);
+  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_schedule node_schs);
+  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_fanin_table node_schs);
+  Log.report ~level:5 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Scheduling.pp_dep_graph node_schs);
+  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@," Printers.pp_prog prog);
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
+
+  (* TODO Salsa optimize prog: 
+     - emits warning for programs with pre inside expressions
+     - make sure each node arguments and memory is bounded by a local annotation
+     - introduce fresh local variables for each real pure subexpression
+  *)
+  (* DFS with modular code generation *)
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,");
+  let machine_code = Machine_code.translate_prog prog node_schs in
+
+  Log.report ~level:3 (fun fmt -> fprintf fmt ".. generated machines (unoptimized):@ %a@ "Machine_code.pp_machines machine_code);
+
+  (* Optimize machine code *)
+  Optimize_machine.optimize prog node_schs machine_code
+
+
+(* printing code *)
+let stage3 prog machine_code dependencies basename =
+  let basename    =  Filename.basename basename in
+  match !Options.output with
+    "C" -> 
+      begin
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. C code generation@,");
+	C_backend.translate_to_c
+	  (* alloc_header_file source_lib_file source_main_file makefile_file *)
+	  basename prog machine_code dependencies
+      end
+  | "java" ->
+     begin
+       (Format.eprintf "internal error: sorry, but not yet supported !"; assert false)
+     (*let source_file = basename ^ ".java" in
+       Log.report ~level:1 (fun fmt -> fprintf fmt ".. opening file %s@,@?" source_file);
+       let source_out = open_out source_file in
+       let source_fmt = formatter_of_out_channel source_out in
+       Log.report ~level:1 (fun fmt -> fprintf fmt ".. java code generation@,@?");
+       Java_backend.translate_to_java source_fmt basename normalized_prog machine_code;*)
+     end
+  | "horn" ->
+     begin
+       let destname = !Options.dest_dir ^ "/" ^ basename in
+       let source_file = destname ^ ".smt2" in (* Could be changed *)
+       let source_out = open_out source_file in
+       let fmt = formatter_of_out_channel source_out in
+       Log.report ~level:1 (fun fmt -> fprintf fmt ".. hornification@,");
+       Horn_backend.translate fmt basename prog (Machine_code.arrow_machine::machine_code);
+       (* Tracability file if option is activated *)
+       if !Options.traces then (
+	 let traces_file = destname ^ ".traces.xml" in (* Could be changed *)
+	 let traces_out = open_out traces_file in
+	 let fmt = formatter_of_out_channel traces_out in
+         Log.report ~level:1 (fun fmt -> fprintf fmt ".. tracing info@,");
+	 Horn_backend_traces.traces_file fmt basename prog machine_code;
+       )
+     end
+  | "lustre" ->
+     begin
+       let destname = !Options.dest_dir ^ "/" ^ basename in
+       let source_file = destname ^ ".lustrec.lus" in (* Could be changed *)
+       let source_out = open_out source_file in
+       let fmt = formatter_of_out_channel source_out in
+       Printers.pp_prog fmt prog;
+       Format.fprintf fmt "@.@?";
+       (*	Lustre_backend.translate fmt basename normalized_prog machine_code *)
+       ()
+     end
+  | "emf" ->
+     begin
+       let destname = !Options.dest_dir ^ "/" ^ basename in
+       let source_file = destname ^ ".emf" in (* Could be changed *)
+       let source_out = open_out source_file in
+       let fmt = formatter_of_out_channel source_out in
+       EMF_backend.translate fmt basename prog machine_code;
+       ()
+     end
+
+  | _ -> assert false

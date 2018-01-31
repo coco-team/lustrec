@@ -61,6 +61,7 @@ let mk_call_var_decl loc id =
     var_dec_clock = mkclock Location.dummy_loc Ckdec_any;
     var_dec_const = false;
     var_dec_value = None;
+    var_parent_nodeid = None;
     var_type = Type_predef.type_arrow (Types.new_var ()) (Types.new_var ());
     var_clock = Clocks.new_var true;
     var_loc = loc }
@@ -124,34 +125,41 @@ let rec pp_c_dimension fmt dim =
  | Dimension.Dunivar    -> fprintf fmt "'%s" (Utils.name_of_dimension dim.Dimension.dim_id)
 
 let is_basic_c_type t =
-  match (Types.repr t).Types.tdesc with
-  | Types.Tbool | Types.Treal | Types.Tint  -> true
-  | _                                       -> false
+  Types.is_int_type t || Types.is_real_type t || Types.is_bool_type t
 
-let pp_c_basic_type_desc t_dsec =
-  match t_dsec with
-  | Types.Tbool when !Options.cpp  -> "bool"
-  | Types.Tbool                    -> "_Bool"
-  | Types.Tint                     -> !Options.int_type
-  | Types.Treal when !Options.mpfr -> Mpfr.mpfr_t
-  | Types.Treal                    -> !Options.real_type
-  | _ -> assert false (* Not a basic C type. Do not handle arrays or pointers *)
+let pp_c_basic_type_desc t_desc =
+  if Types.is_bool_type t_desc then
+    if !Options.cpp then "bool" else "_Bool"
+  else if Types.is_int_type t_desc then !Options.int_type
+  else if Types.is_real_type t_desc then
+    if !Options.mpfr then Mpfr.mpfr_t else !Options.real_type
+  else
+    assert false (* Not a basic C type. Do not handle arrays or pointers *)
 
-let pp_basic_c_type fmt t = fprintf fmt "%s" (pp_c_basic_type_desc (Types.repr t).Types.tdesc)
+let pp_basic_c_type ?(var_opt=None) fmt t =
+  match var_opt with
+  | Some v when Machine_types.is_exportable v ->
+     Machine_types.pp_c_var_type fmt v
+  | _ ->
+     fprintf fmt "%s" (pp_c_basic_type_desc t)
 
-let pp_c_type var fmt t =
+let pp_c_type ?(var_opt=None) var_id fmt t =
   let rec aux t pp_suffix =
-    match (Types.repr t).Types.tdesc with
-    | Types.Tclock t'       -> aux t' pp_suffix
-    | Types.Tbool | Types.Tint | Types.Treal
-                            -> fprintf fmt "%a %s%a" pp_basic_c_type t var pp_suffix ()
-    | Types.Tarray (d, t')  ->
-      let pp_suffix' fmt () = fprintf fmt "%a[%a]" pp_suffix () pp_c_dimension d in
-      aux t' pp_suffix'
-    | Types.Tstatic (_, t') -> fprintf fmt "const "; aux t' pp_suffix
-    | Types.Tconst ty       -> fprintf fmt "%s %s" ty var
-    | Types.Tarrow (_, _)   -> fprintf fmt "void (*%s)()" var
-    | _                     -> eprintf "internal error: C_backend_common.pp_c_type %a@." Types.print_ty t; assert false
+    if is_basic_c_type  t then
+       fprintf fmt "%a %s%a"
+	 (pp_basic_c_type ~var_opt) t
+	 var_id
+	 pp_suffix ()
+    else
+      match (Types.repr t).Types.tdesc with
+      | Types.Tclock t'       -> aux t' pp_suffix
+      | Types.Tarray (d, t')  ->
+	 let pp_suffix' fmt () = fprintf fmt "%a[%a]" pp_suffix () pp_c_dimension d in
+	 aux t' pp_suffix'
+      | Types.Tstatic (_, t') -> fprintf fmt "const "; aux t' pp_suffix
+      | Types.Tconst ty       -> fprintf fmt "%s %s" ty var_id
+      | Types.Tarrow (_, _)   -> fprintf fmt "void (*%s)()" var_id
+      | _                     -> eprintf "internal error: C_backend_common.pp_c_type %a@." Types.print_ty t; assert false
   in aux t (fun fmt () -> ())
 (*
 let rec pp_c_initialize fmt t = 
@@ -241,8 +249,8 @@ let pp_c_var_write m fmt id =
 *)
 let pp_c_decl_input_var fmt id =
   if !Options.ansi && Types.is_address_type id.var_type
-  then pp_c_type (sprintf "(*%s)" id.var_id) fmt (Types.array_base_type id.var_type)
-  else pp_c_type id.var_id fmt id.var_type
+  then pp_c_type ~var_opt:(Some id) (sprintf "(*%s)" id.var_id) fmt (Types.array_base_type id.var_type)
+  else pp_c_type ~var_opt:(Some id) id.var_id fmt id.var_type
 
 (* Declaration of an output variable:
    - if its type is scalar, then pass its address
@@ -252,8 +260,8 @@ let pp_c_decl_input_var fmt id =
 *)
 let pp_c_decl_output_var fmt id =
   if (not !Options.ansi) && Types.is_address_type id.var_type
-  then pp_c_type                  id.var_id  fmt id.var_type
-  else pp_c_type (sprintf "(*%s)" id.var_id) fmt (Types.array_base_type id.var_type)
+  then pp_c_type  ~var_opt:(Some id)                  id.var_id  fmt id.var_type
+  else pp_c_type  ~var_opt:(Some id) (sprintf "(*%s)" id.var_id) fmt (Types.array_base_type id.var_type)
 
 (* Declaration of a local/mem variable:
    - if it's an array/matrix/etc, its size(s) should be
@@ -264,11 +272,11 @@ let pp_c_decl_local_var m fmt id =
   if id.var_dec_const
   then
     Format.fprintf fmt "%a = %a"
-      (pp_c_type id.var_id) id.var_type
+      (pp_c_type  ~var_opt:(Some id) id.var_id) id.var_type
       (pp_c_val "" (pp_c_var_read m)) (get_const_assign m id)
   else
     Format.fprintf fmt "%a"
-      (pp_c_type id.var_id) id.var_type
+      (pp_c_type  ~var_opt:(Some id) id.var_id) id.var_type
 
 let pp_c_decl_array_mem self fmt id =
   fprintf fmt "%a = (%a) (%s->_reg.%s)"
@@ -409,7 +417,7 @@ let print_stateless_C_prototype fmt (name, inputs, outputs) =
     | _ -> assert false
   in
   fprintf fmt "%a %s (@[<v>@[%a@]@,@])"
-    pp_basic_c_type output.var_type
+    (pp_basic_c_type ~var_opt:None) output.var_type
     name
     (Utils.fprintf_list ~sep:",@ " pp_c_decl_input_var) inputs
     
@@ -650,16 +658,49 @@ let pp_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list
     aux [] fmt (List.hd inputs).value_type
   end
 
-
-(*** Common functions for main ***)
+  (*** Common functions for main ***)
 
 let print_put_var fmt file_suffix name var_type var_id =
-  match (Types.unclock_type var_type).Types.tdesc with
-  | Types.Tint -> fprintf fmt "_put_int(f_out%s, \"%s\", %s)" file_suffix name var_id
-  | Types.Tbool -> fprintf fmt "_put_bool(f_out%s, \"%s\", %s)" file_suffix name var_id
-  | Types.Treal when !Options.mpfr -> fprintf fmt "_put_double(f_out%s, \"%s\", mpfr_get_d(%s, %s), %i)" file_suffix name var_id (Mpfr.mpfr_rnd ()) !Options.print_prec_double
-  | Types.Treal -> fprintf fmt "_put_double(f_out%s, \"%s\", %s, %i)" file_suffix name var_id !Options.print_prec_double
-  | _ -> Format.eprintf "Impossible to print the _put_xx for type %a@.@?" Types.print_ty var_type; assert false
+  let unclocked_t = Types.unclock_type var_type in
+  if Types.is_int_type unclocked_t then
+    fprintf fmt "_put_int(f_out%s, \"%s\", %s)" file_suffix name var_id
+  else if Types.is_bool_type unclocked_t then
+    fprintf fmt "_put_bool(f_out%s, \"%s\", %s)" file_suffix name var_id
+  else if Types.is_real_type unclocked_t then
+    if !Options.mpfr then
+      fprintf fmt "_put_double(f_out%s, \"%s\", mpfr_get_d(%s, %s), %i)" file_suffix name var_id (Mpfr.mpfr_rnd ()) !Options.print_prec_double
+    else
+      fprintf fmt "_put_double(f_out%s, \"%s\", %s, %i)" file_suffix name var_id !Options.print_prec_double
+  else
+    (Format.eprintf "Impossible to print the _put_xx for type %a@.@?" Types.print_ty var_type; assert false)
+
+      
+let print_get_inputs fmt m =
+  let pi fmt (id, v', v) =
+
+    let unclocked_t = Types.unclock_type v.var_type in
+    if Types.is_int_type unclocked_t then
+      fprintf fmt "%s = _get_int(f_in%i, \"%s\")" v.var_id id v'.var_id
+    else if Types.is_bool_type unclocked_t then
+      fprintf fmt "%s = _get_bool(f_in%i, \"%s\")" v.var_id id v'.var_id
+    else if Types.is_real_type unclocked_t then
+      if !Options.mpfr then
+	fprintf fmt "mpfr_set_d(%s, _get_double(f_in%i, \"%s\"), %i)" v.var_id id v'.var_id (Mpfr.mpfr_prec ())
+      else
+	fprintf fmt "%s = _get_double(f_in%i, \"%s\")" v.var_id id v'.var_id
+    else
+      begin
+	Global.main_node := !Options.main_node;
+	Format.eprintf "Code generation error: %a%a@."
+	  Error.pp_error_msg Error.Main_wrong_kind
+	  Location.pp_loc v'.var_loc;
+	raise (Error (v'.var_loc, Error.Main_wrong_kind))
+      end
+  in
+  Utils.List.iteri2 (fun idx v' v ->
+    fprintf fmt "@ %a;" pi ((idx+1), v', v);
+  ) m.mname.node_inputs m.mstep.step_inputs
+
 
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)

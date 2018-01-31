@@ -80,6 +80,12 @@ and pp_const fmt c =
     | Const_string s -> pp_print_string fmt ("\"" ^ s ^ "\"")
 
 
+let pp_annot_key fmt kwds =
+  match kwds with
+  | [] -> assert false
+  | [x] -> Format.pp_print_string fmt x
+  | _ -> Format.fprintf fmt "/%a/" (fprintf_list ~sep:"/" Format.pp_print_string) kwds
+
 let rec pp_expr fmt expr =
   (match expr.expr_annot with 
   | None -> fprintf fmt "%t" 
@@ -164,8 +170,8 @@ and pp_s_function fmt expr_ann =
 
 and pp_expr_annot fmt expr_ann =
   let pp_annot fmt (kwds, ee) =
-    Format.fprintf fmt "(*! %t: %a; *)"
-      (fun fmt -> match kwds with | [] -> assert false | [x] -> Format.pp_print_string fmt x | _ -> Format.fprintf fmt "/%a/" (fprintf_list ~sep:"/" Format.pp_print_string) kwds)
+    Format.fprintf fmt "(*! %a: %a; *)"
+      pp_annot_key kwds
       pp_eexpr ee
   in
   fprintf_list ~sep:"@ " pp_annot fmt expr_ann.annots

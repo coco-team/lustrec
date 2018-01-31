@@ -27,6 +27,7 @@ let exists_value env ident =
   IMap.mem ident env
 
 let iter env f = IMap.iter f env
+let fold = IMap.fold
 
 (* Merges x and y. In case of conflicting definitions,
    overwrites definitions in x by definitions in y *)

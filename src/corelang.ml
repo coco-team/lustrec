@@ -41,7 +41,7 @@ let mktyp loc d =
 let mkclock loc d =
   { ck_dec_desc = d; ck_dec_loc = loc }
 
-let mkvar_decl loc ?(orig=false) (id, ty_dec, ck_dec, is_const, value) =
+let mkvar_decl loc ?(orig=false) (id, ty_dec, ck_dec, is_const, value, parentid) =
   assert (value = None || is_const);
   { var_id = id;
     var_orig = orig;
@@ -49,6 +49,7 @@ let mkvar_decl loc ?(orig=false) (id, ty_dec, ck_dec, is_const, value) =
     var_dec_clock = ck_dec;
     var_dec_const = is_const;
     var_dec_value = value;
+    var_parent_nodeid = parentid;
     var_type = Types.new_var ();
     var_clock = Clocks.new_var true;
     var_loc = loc }
@@ -62,13 +63,14 @@ let mkexpr loc d =
     expr_annot = None;
     expr_loc = loc }
 
-let var_decl_of_const c =
+let var_decl_of_const ?(parentid=None) c =
   { var_id = c.const_id;
     var_orig = true;
     var_dec_type = { ty_dec_loc = c.const_loc; ty_dec_desc = Tydec_any };
     var_dec_clock = { ck_dec_loc = c.const_loc; ck_dec_desc = Ckdec_any };
     var_dec_const = true;
     var_dec_value = None;
+    var_parent_nodeid = parentid;
     var_type = c.const_type;
     var_clock = Clocks.new_var false;
     var_loc = c.const_loc }
@@ -626,6 +628,7 @@ let get_node_interface nd =
   nodei_outputs = nd.node_outputs;
   nodei_stateless = nd.node_dec_stateless;
   nodei_spec = nd.node_spec;
+  (* nodei_annot = nd.node_annot; *)
   nodei_prototype = None;
   nodei_in_lib = [];
  }
@@ -901,7 +904,7 @@ let vdecls_of_typ_ck cpt ty =
   List.map
     (fun _ -> incr cpt;
               let name = sprintf "_var_%d" !cpt in
-              mkvar_decl loc (name, mktyp loc Tydec_any, mkclock loc Ckdec_any, false, None))
+              mkvar_decl loc (name, mktyp loc Tydec_any, mkclock loc Ckdec_any, false, None, None))
     (Types.type_list_of_type ty)
 
 let mk_internal_node id =
@@ -920,6 +923,7 @@ let mk_internal_node id =
 	nodei_outputs = vdecls_of_typ_ck cpt tout;
 	nodei_stateless = Types.get_static_value ty <> None;
 	nodei_spec = spec;
+	(* nodei_annot = []; *)
 	nodei_prototype = None;
        	nodei_in_lib = [];
        })
@@ -1104,7 +1108,7 @@ and node_has_arrows node =
 
 
 let copy_var_decl vdecl =
-  mkvar_decl vdecl.var_loc ~orig:vdecl.var_orig (vdecl.var_id, vdecl.var_dec_type, vdecl.var_dec_clock, vdecl.var_dec_const, vdecl.var_dec_value)
+  mkvar_decl vdecl.var_loc ~orig:vdecl.var_orig (vdecl.var_id, vdecl.var_dec_type, vdecl.var_dec_clock, vdecl.var_dec_const, vdecl.var_dec_value, vdecl.var_parent_nodeid)
 
 let copy_const cdecl =
   { cdecl with const_type = Types.new_var () }

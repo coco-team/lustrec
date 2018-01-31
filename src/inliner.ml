@@ -137,7 +137,9 @@ let inline_call node loc uid args reset locals caller =
 	 { v.var_dec_type  with ty_dec_desc = Corelang.rename_static rename_static v.var_dec_type.ty_dec_desc },
 	 { v.var_dec_clock with ck_dec_desc = Corelang.rename_carrier rename_carrier v.var_dec_clock.ck_dec_desc },
 	 v.var_dec_const,
-	 Utils.option_map (rename_expr (fun x -> x) rename) v.var_dec_value) in
+	 Utils.option_map (rename_expr (fun x -> x) rename) v.var_dec_value,
+	 v.var_parent_nodeid (* we keep the original parent name *)
+	) in
     begin
       (*
 	(try
@@ -358,7 +360,9 @@ let witness filename main_name orig inlined type_env clock_env =
        {ty_dec_desc=Tydec_bool; ty_dec_loc=loc},
        {ck_dec_desc=Ckdec_any; ck_dec_loc=loc},
        false,
-       None)
+       None,
+       None
+      )
   ) (Utils.enumerate nb_outputs) 
   in
 
@@ -369,7 +373,9 @@ let witness filename main_name orig inlined type_env clock_env =
      {ty_dec_desc=Tydec_bool; ty_dec_loc=loc},
      {ck_dec_desc=Ckdec_any; ck_dec_loc=loc},
      false,
-     None)
+     None,
+     None
+    )
   in
   let main_ok_expr =
     let mkv x = mkexpr loc (Expr_ident x) in

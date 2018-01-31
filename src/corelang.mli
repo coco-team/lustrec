@@ -20,9 +20,16 @@ val dummy_clock_dec: clock_dec
 
 val mktyp: Location.t -> type_dec_desc -> type_dec
 val mkclock: Location.t -> clock_dec_desc -> clock_dec
-val mkvar_decl: Location.t -> ?orig:bool -> ident * type_dec * clock_dec * bool (* is const *) * expr option (* value *) -> var_decl
+val mkvar_decl: Location.t -> ?orig:bool ->
+  ident *
+    type_dec *
+    clock_dec *
+    bool (* is const *) *
+    expr option (* value *) *
+    string option (* parent id *)
+  -> var_decl
 
-val var_decl_of_const: const_desc -> var_decl
+val var_decl_of_const: ?parentid:LustreSpec.ident option -> const_desc -> var_decl
 val mkexpr: Location.t ->  expr_desc -> expr
 val mkeq: Location.t -> ident list * expr -> eq
 val mkassert: Location.t -> expr -> assert_t

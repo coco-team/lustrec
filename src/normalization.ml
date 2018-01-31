@@ -90,6 +90,7 @@ let mk_fresh_var node loc ty ck =
     var_dec_clock = dummy_clock_dec;
     var_dec_const = false;
     var_dec_value = None;
+    var_parent_nodeid = Some node.node_id;
     var_type = ty;
     var_clock = ck;
     var_loc = loc
@@ -167,7 +168,10 @@ let mk_expr_alias_opt opt node (defs, vars) expr =
 	    (Clocks.clock_list_of_clock expr.expr_clock) in
 	let new_def =
 	  mkeq expr.expr_loc (List.map (fun v -> v.var_id) new_aliases, expr)
-	in (new_def::defs, new_aliases@vars), replace_expr new_aliases expr
+	in
+	(* Typing and Registering machine type *) 
+	let _ = Machine_types.type_def node new_aliases expr  in
+	(new_def::defs, new_aliases@vars), replace_expr new_aliases expr
       else
 	(defs, vars), expr
 
@@ -420,19 +424,23 @@ let normalize_node node =
     ) (vars, [], []) node.node_asserts in
   let new_locals = List.filter not_is_orig_var vars in (* we filter out inout
 							  vars and initial locals ones *)
-  let new_locals = node.node_locals @ new_locals in (* we add again, at the
+  
+  let all_locals = node.node_locals @ new_locals in (* we add again, at the
 						       beginning of the list the
 						       local declared ones *)
   (*Format.eprintf "New locals: %a@.@?" (fprintf_list ~sep:", " Printers.pp_var) new_locals;*)
 
+
+  (* Updating annotations: traceability and machine types for fresh variables *)
+  
+  (* Compute traceability info:
+     - gather newly bound variables
+     - compute the associated expression without aliases
+  *)
   let new_annots =
     if !Options.traces then
       begin
-	(* Compute traceability info:
-	   - gather newly bound variables
-	   - compute the associated expression without aliases
-	*)
-	let diff_vars = List.filter (fun v -> not (List.mem v node.node_locals) ) new_locals in
+	let diff_vars = List.filter (fun v -> not (List.mem v node.node_locals) ) all_locals in
 	let norm_traceability = {
 	  annots = List.map (fun v ->
 	    let eq =
@@ -446,6 +454,7 @@ let normalize_node node =
 	    in
 	    let expr = substitute_expr diff_vars (defs@assert_defs) eq.eq_rhs in
 	    let pair = mkeexpr expr.expr_loc (mkexpr expr.expr_loc (Expr_tuple [expr_of_ident v.var_id expr.expr_loc; expr])) in
+	    Annotations.add_expr_ann node.node_id pair.eexpr_tag ["traceability"];
 	    (["traceability"], pair)
 	  ) diff_vars;
 	  annot_loc = Location.dummy_loc
@@ -457,9 +466,29 @@ let normalize_node node =
       node.node_annot
   in
 
+  let new_annots =
+    List.fold_left (fun annots v ->
+      if Machine_types.is_exportable v then
+	let typ = Machine_types.get_specified_type v in
+  	let typ_name = Machine_types.type_name typ in
+
+	let loc = v.var_loc in
+	let typ_as_string =
+	  mkexpr
+	    loc
+	    (Expr_const
+	       (Const_string typ_name))
+	in
+	let pair = expr_to_eexpr (expr_of_expr_list loc [expr_of_vdecl v; typ_as_string]) in
+	Annotations.add_expr_ann node.node_id pair.eexpr_tag Machine_types.keyword;
+	{annots = [Machine_types.keyword, pair]; annot_loc = loc}::annots
+      else
+	annots
+    ) new_annots new_locals
+  in
   let node =
     { node with
-      node_locals = new_locals;
+      node_locals = all_locals;
       node_stmts = List.map (fun eq -> Eq eq) (defs @ assert_defs);
       node_asserts = asserts;
       node_annot = new_annots;

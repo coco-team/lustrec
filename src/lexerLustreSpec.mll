@@ -154,9 +154,9 @@ and string_parse = parse
    try
      Parser_lustre.lustre_annot(* ParserLustreSpec.lustre_annot *) token lexbuf
    with Parsing.Parse_error as _e -> (
-     Format.eprintf "Lexing error at position %a:@.unexpected token %s@.@?"
+     Format.eprintf "Lexing error at position %a:@.unexpected token %s when parsing annotation %s@.@?"
        (fun fmt p -> Format.fprintf fmt "%s l%i c%i" p.Lexing.pos_fname p.Lexing.pos_lnum p.Lexing.pos_cnum) lexbuf.Lexing.lex_curr_p
-       (Lexing.lexeme lexbuf);
+       (Lexing.lexeme lexbuf) s;
      raise (Error (Location.curr lexbuf)))
      
 
