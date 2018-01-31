@@ -55,27 +55,14 @@ dnl AC_MSG_RESULT(Hourrah: ocamlfind found!)
 
 # Checks for libraries.
 # OCamlgraph
-AC_MSG_CHECKING(ocamlgraph library)
-AS_IF([ocamlfind query ocamlgraph >/dev/null 2>&1],
-    [],[AC_MSG_ERROR(ocamlgraph required. opam install ocamlgraph should solve the issue)],
-)
-AC_MSG_RESULT(yes)
-
-# logging and command line librairies
-AC_MSG_CHECKING(cmdliner library)
-AS_IF([ocamlfind query cmdliner >/dev/null 2>&1],
-    [],[AC_MSG_ERROR(cmdliner required. opam install cmdliner should solve the issue)],
-)
-AC_MSG_RESULT(yes)
-
-AC_MSG_CHECKING(fmt and logs library)
-AS_IF([ocamlfind query fmt logs >/dev/null 2>&1],
-    [],[AC_MSG_ERROR(fmt and logs required. opam install fmt logs should solve the issue)],
+AC_MSG_CHECKING(ocaml libraries required)
+AS_IF([ocamlfind query ocamlgraph cmdliner fmt logs num >/dev/null 2>&1],
+    [],[AC_MSG_ERROR(A few ocaml library required. opam install ocamlgraph cmdliner fmt logs num should solve the issue)],
 )
 AC_MSG_RESULT(yes)
 
 #Yojson
-AC_MSG_CHECKING(yojson library)
+AC_MSG_CHECKING(yojson library (optional))
 AS_IF([ocamlfind query yojson >/dev/null 2>&1],
     [yojson=yes; AC_MSG_RESULT(yes)],[yojson=no; AC_MSG_WARN(Yojson required for lustresf. opam install yojson should solve the issue)],
 )
@@ -120,6 +107,7 @@ lustresf_src=/dev/null
 AS_IF([test "x$enable_lustresf" != "xno" -a "x$yojson" = "xyes"], [
   lustresf=Makefile-lustresf.in
   lustresf_src=src/Makefile-lustresf.in
+  AC_SUBST(lustresf_target, "lustresf")
 ])
 
 # Checking availability of path to regression tests
