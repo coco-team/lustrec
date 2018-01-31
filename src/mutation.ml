@@ -93,7 +93,7 @@ let compute_records_const_value c =
 
 let rec compute_records_expr expr =
   let boolexpr = 
-    if (Types.repr expr.expr_type).Types.tdesc = Types.Tbool then
+    if Types.is_bool_type expr.expr_type then
       {empty_records with nb_boolexpr = 1}
     else
       empty_records
@@ -202,15 +202,15 @@ match op with
 | _ -> op
 
 
-let rdm_mutate_var expr = 
-  match (Types.repr expr.expr_type).Types.tdesc with 
-  | Types.Tbool ->
+let rdm_mutate_var expr =
+  if Types.is_bool_type expr.expr_type then
     (* if Random.int 100 > threshold_negate_bool_var then *)
     let new_e = mkpredef_call expr.expr_loc "not" [expr] in
     Some (expr, new_e), new_e
     (* else  *)
-    (*   expr *)
-  | _ -> None, expr
+  (*   expr *)
+  else
+    None, expr
     
 let rdm_mutate_pre orig_expr = 
   let new_e = Expr_pre orig_expr in
@@ -540,7 +540,7 @@ let rec fold_mutate_expr expr =
       { expr with expr_desc = new_desc }
     )
   in
-  if (Types.repr expr.expr_type).Types.tdesc = Types.Tbool then
+  if Types.is_bool_type expr.expr_type then
     fold_mutate_boolexpr new_expr  
   else
     new_expr
