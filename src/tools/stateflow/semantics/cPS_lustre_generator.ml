@@ -190,10 +190,16 @@ struct
     match action with
     | Action.Call (c, a) -> mkcall' sin sout c a
     | Action.Quote a     ->
-	let funname = "action_" ^ a.ident in
+        (* TODO: check. This seems to be innappropriate *)
+        (* let funname = "action_" ^ a.ident in
 	let args = vars_to_exprl ~prefix:sin Vars.state_vars in
 	let rhs = mkpredef_call funname args in
 	mkstmt_eq ~prefix_lhs:sout Vars.state_vars rhs
+	*)
+       {
+	 statements = a.defs;
+	 assert_false = false
+       }
     | Action.Open p      ->
        let vars' = ActiveStates.Vars.remove p Vars.state_vars in
        (* eq1: sout_p = true *)
@@ -249,7 +255,7 @@ struct
     | Condition.Neg cond           -> mkpredef_call "not" [mkcond' sin cond]
     | Condition.And (cond1, cond2) -> mkpredef_call "&&" [mkcond' sin cond1;
 							  mkcond' sin cond2]
-    | Condition.Quote c            -> c (* TODO: shall we prefix with sin ? *)
+    | Condition.Quote c            -> c.expr (* TODO: shall we prefix with sin ? *)
 
   let rec eval_cond condition (ok:t) ko sin sout =
     let open LustreSpec in

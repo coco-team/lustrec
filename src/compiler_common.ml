@@ -262,4 +262,19 @@ let track_exception () =
   else ()
 
 
-
+let update_vdecl_parents_prog prog =
+  let update_vdecl_parents parent v =
+    v.var_parent_nodeid <- Some parent
+  in
+  List.iter (
+    fun top -> match top.top_decl_desc with
+    | Node nd ->
+       List.iter
+	 (update_vdecl_parents nd.node_id)
+	 (nd.node_inputs @ nd.node_outputs @ nd.node_locals )  
+    | ImportedNode ind -> 
+       List.iter
+	 (update_vdecl_parents ind.nodei_id)
+	 (ind.nodei_inputs @ ind.nodei_outputs )  
+    | _ -> ()
+  ) prog

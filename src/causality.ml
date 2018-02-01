@@ -29,6 +29,8 @@ exception Error of error
 
 
 module IdentDepGraph = Graph.Imperative.Digraph.ConcreteBidirectional (IdentModule)
+module TopologicalDepGraph = Topological.Make(IdentDepGraph)
+
 (*module DotGraph = Graphviz.Dot (IdentDepGraph)*)
 module Bfs = Traverse.Bfs (IdentDepGraph)
   
@@ -88,8 +90,14 @@ let add_vertices vtc g =
 let new_graph () =
   IdentDepGraph.create ()
 
+    
 module ExprDep = struct
-
+  let get_node_eqs nd =
+    let eqs, auts = get_node_eqs nd in
+    if auts != [] then assert false (* No call on causality on a Lustre model
+				       with automaton. They should be expanded by now. *);
+    eqs
+      
   let instance_var_cpt = ref 0
 
 (* read vars represent input/mem read-only vars,
@@ -317,12 +325,27 @@ module NodeDep = struct
     | Expr_appl (id, args, _) -> Some (id, expr_list_of_expr args)
     | _ -> None
 
-  let get_calls prednode eqs =
-    let deps =
-      List.fold_left 
-	(fun accu eq -> ESet.union accu (get_expr_calls prednode eq.eq_rhs))
-	ESet.empty
-	eqs in
+  let get_calls prednode nd =
+    let accu f init objl = List.fold_left (fun accu o -> ESet.union accu (f o)) init objl in
+    let get_eq_calls eq = get_expr_calls prednode eq.eq_rhs in
+    let rec get_stmt_calls s =
+      match s with Eq eq -> get_eq_calls eq | Aut aut -> get_aut_calls aut 
+    and get_aut_calls aut =
+      let get_handler_calls h =
+	let get_cond_calls c = accu (fun (_,e,_,_) -> get_expr_calls prednode e) ESet.empty c in
+	let until = get_cond_calls h.hand_until in
+	let unless = get_cond_calls h.hand_unless in
+	let calls = ESet.union until unless in 
+	let calls = accu get_stmt_calls calls h.hand_stmts in
+	let calls = accu (fun a -> get_expr_calls prednode a.assert_expr) calls h.hand_asserts in
+	(* let calls = accu xx calls h.hand_annots in *) (* TODO: search for calls in eexpr *)
+	calls
+      in
+      accu get_handler_calls ESet.empty aut.aut_handlers
+    in
+    let eqs, auts = get_node_eqs nd in
+    let deps = accu get_eq_calls ESet.empty eqs in
+    let deps = accu get_aut_calls deps auts in
     ESet.elements deps
 
   let dependence_graph prog =
@@ -335,7 +358,7 @@ module NodeDep = struct
 	   let accu = add_vertices [nd.node_id] accu in
 	   let deps = List.map
 	     (fun e -> fst (desome (get_callee e)))
-	     (get_calls (fun _ -> true) (get_node_eqs nd)) 
+	     (get_calls (fun _ -> true) nd) 
 	   in
 	     (* Adding assert expressions deps *)
 	   let deps_asserts =
@@ -378,7 +401,7 @@ module NodeDep = struct
 	match td.top_decl_desc with 
 	| Node nd ->
 	   let prednode n = is_generic_node (Hashtbl.find node_table n) in
-	   nd.node_gencalls <- get_calls prednode (get_node_eqs nd)
+	   nd.node_gencalls <- get_calls prednode nd
 	| _ -> ()
 	   
       ) prog
@@ -459,7 +482,9 @@ module CycleDetection = struct
      - a modified acyclic version of [g]
   *)
   let break_cycles node mems g =
-    let (mem_eqs, non_mem_eqs) = List.partition (fun eq -> List.exists (fun v -> ISet.mem v mems) eq.eq_lhs) (get_node_eqs node) in
+    let eqs , auts = get_node_eqs node in
+    assert (auts = []); (* TODO: check: For the moment we assume that auts are expanded by now *)
+    let (mem_eqs, non_mem_eqs) = List.partition (fun eq -> List.exists (fun v -> ISet.mem v mems) eq.eq_lhs) eqs in
     let rec break vdecls mem_eqs g =
       let scc_l = Cycles.scc_list g in
       let wrong = List.filter (wrong_partition g) scc_l in
@@ -629,6 +654,35 @@ let global_dependency node =
       raise (Error (exc))
   )
 
+(* A module to sort dependencies among local variables when relying on clocked declarations *)
+module VarClockDep =
+struct
+  let rec get_clock_dep ck =
+    match ck.Clocks.cdesc with
+    | Clocks.Con (ck ,c ,l) -> l::(get_clock_dep ck)
+    | Clocks.Clink ck' 
+    | Clocks.Ccarrying (_, ck') -> get_clock_dep ck'
+    | _ -> []
+      
+  let sort locals =
+    let g = new_graph () in
+    let g = List.fold_left (
+      fun g var_decl ->
+	let deps = get_clock_dep var_decl.var_clock in
+	add_edges [var_decl.var_id] deps g
+    ) g locals
+    in
+    let sorted, no_deps =
+      TopologicalDepGraph.fold (fun vid (accu, remaining) -> (
+	let select v = v.var_id = vid in
+	let selected, not_selected = List.partition select remaining in
+	selected@accu, not_selected
+      )) g ([],locals)
+    in
+    no_deps @ sorted
+    
+end
+  
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

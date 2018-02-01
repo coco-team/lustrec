@@ -123,9 +123,12 @@ dim_list:
 
 expr:
 /* constants */
-  INT {mkexpr (Expr_const (Const_int $1))}
+| INT {mkexpr (Expr_const (Const_int $1))}
 | REAL {mkexpr (Expr_const (Const_real $1))}
 | FLOAT {mkexpr (Expr_const (Const_float $1))}
+| TRUE {mkexpr (Expr_const (Const_bool true))}
+| FALSE {mkexpr (Expr_const (Const_bool false))}
+| STRING {mkexpr (Expr_const (Const_string $1))}
 /* Idents or type enum tags */
 | IDENT {
   if Hashtbl.mem tag_table $1

@@ -100,7 +100,7 @@ let rec compute_neg_expr cpt_pre (expr: LustreSpec.expr) =
      let vl, neg = neg_list l in
      vl, combine (fun l' -> {expr with expr_desc = Expr_tuple l'}) neg l
        
-  | Expr_ite (i,t,e) when (Types.repr t.expr_type).Types.tdesc = Types.Tbool -> (
+  | Expr_ite (i,t,e) when (Types.is_bool_type t.expr_type) -> (
     let list = [i; t; e] in
     let vl, neg = neg_list list in
     vl, combine (fun l ->
@@ -141,7 +141,7 @@ let rec compute_neg_expr cpt_pre (expr: LustreSpec.expr) =
        (fun (v, negv) -> (v, { expr with expr_desc = Expr_appl (op_name, negv, r) } ))
        args'
 
-  | Expr_ident _ when (Types.repr expr.expr_type).Types.tdesc = Types.Tbool ->
+  | Expr_ident _ when (Types.is_bool_type expr.expr_type) ->
      [], [(expr, cpt_pre), mkpredef_call expr.expr_loc "not" [expr]]
   | _ -> [] (* empty vars *) , [] 
 and gen_mcdc_cond_var v expr =
@@ -199,18 +199,18 @@ let rec mcdc_expr cpt_pre expr =
   | _ -> []
 
 let mcdc_var_def v expr = 
-  match (Types.repr expr.expr_type).Types.tdesc with
-  | Types.Tbool ->
+  if Types.is_bool_type expr.expr_type then
      let vl = gen_mcdc_cond_var v expr in
      vl
-  | _ -> let vl = mcdc_expr 0 expr in
-	 vl
-
+  else
+    let vl = mcdc_expr 0 expr in
+    vl
+      
 let mcdc_node_eq eq =
   let vl =
-    match eq.eq_lhs, (Types.repr eq.eq_rhs.expr_type).Types.tdesc, eq.eq_rhs.expr_desc with
-    | [lhs], Types.Tbool, _ ->  gen_mcdc_cond_var lhs eq.eq_rhs 
-    | _::_, Types.Ttuple tl, Expr_tuple rhs ->
+    match eq.eq_lhs, Types.is_bool_type eq.eq_rhs.expr_type, (Types.repr eq.eq_rhs.expr_type).Types.tdesc, eq.eq_rhs.expr_desc with
+    | [lhs], true, _, _ ->  gen_mcdc_cond_var lhs eq.eq_rhs 
+    | _::_, false, Types.Ttuple tl, Expr_tuple rhs ->
        (* We iterate trough pairs, but accumulate variables aside. The resulting
 	  expression shall remain a tuple defintion *)
        let vl = List.fold_right2 (fun lhs rhs accu ->
@@ -248,17 +248,29 @@ let mcdc_top_decl td =
        Format.fprintf Format.str_formatter "__cov_%i_%i" i nb_total;
        let cov_id = Format.flush_str_formatter () in
        let cov_var = mkvar_decl loc
-	 (cov_id, mktyp loc Tydec_bool, mkclock loc Ckdec_any, false, None) in
+	 (cov_id, mktyp loc Tydec_bool, mkclock loc Ckdec_any, false, None, None) in
        let cov_def = Eq (mkeq loc ([cov_id], cov_expr)) in
-       cov_var, cov_def
+       cov_var, cov_def, cov_expr
      ) fresh_cov_defs
      in
-     let fresh_vars, fresh_eqs = List.split fresh_cov_vars in
-     let fresh_annots =
+     let fresh_vars, fresh_eqs =
+       List.fold_right
+	 (fun (v,eq,_) (accuv, accueq)-> v::accuv, eq::accueq )
+	 fresh_cov_vars
+	 ([], [])
+     in
+     let fresh_annots = (* We produce two sets of annotations: PROPERTY ones for
+			   kind2, and regular ones to keep track of the nature
+			   of the annotations. *)
        List.map
-	 (fun v -> {annots =  [["PROPERTY"], expr_to_eexpr (expr_of_vdecl v)]; annot_loc = td.top_decl_loc})
-	 fresh_vars in
-     Format.printf "We have %i coverage criteria for node %s@." nb_total nd.node_id;
+	 (fun v -> let ee = expr_to_eexpr (expr_of_vdecl v) in
+		   {annots =  [["PROPERTY"], ee;
+			       ["coverage";"mcdc"], ee
+			      ];
+		    annot_loc = v.var_loc})
+	 fresh_vars
+     in
+     Format.printf "%i coverage criteria generated for node %s@ " nb_total nd.node_id;
      (* And add them as annotations --%PROPERTY: var TODO *)
      {td with top_decl_desc = Node {nd with
        node_locals = nd.node_locals@fresh_vars;
@@ -284,6 +296,8 @@ let mcdc prog =
       | _ -> assert false);
   List.map mcdc_top_decl prog
 
+
+    
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

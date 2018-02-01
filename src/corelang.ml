@@ -41,7 +41,7 @@ let mktyp loc d =
 let mkclock loc d =
   { ck_dec_desc = d; ck_dec_loc = loc }
 
-let mkvar_decl loc ?(orig=false) (id, ty_dec, ck_dec, is_const, value) =
+let mkvar_decl loc ?(orig=false) (id, ty_dec, ck_dec, is_const, value, parentid) =
   assert (value = None || is_const);
   { var_id = id;
     var_orig = orig;
@@ -49,6 +49,7 @@ let mkvar_decl loc ?(orig=false) (id, ty_dec, ck_dec, is_const, value) =
     var_dec_clock = ck_dec;
     var_dec_const = is_const;
     var_dec_value = value;
+    var_parent_nodeid = parentid;
     var_type = Types.new_var ();
     var_clock = Clocks.new_var true;
     var_loc = loc }
@@ -62,13 +63,14 @@ let mkexpr loc d =
     expr_annot = None;
     expr_loc = loc }
 
-let var_decl_of_const c =
+let var_decl_of_const ?(parentid=None) c =
   { var_id = c.const_id;
     var_orig = true;
     var_dec_type = { ty_dec_loc = c.const_loc; ty_dec_desc = Tydec_any };
     var_dec_clock = { ck_dec_loc = c.const_loc; ck_dec_desc = Ckdec_any };
     var_dec_const = true;
     var_dec_value = None;
+    var_parent_nodeid = parentid;
     var_type = c.const_type;
     var_clock = Clocks.new_var false;
     var_loc = c.const_loc }
@@ -130,7 +132,17 @@ let consts_of_enum_type top_decl =
   match top_decl.top_decl_desc with
   | TypeDef tdef ->
     (match tdef.tydef_desc with
-     | Tydec_enum tags -> List.map (fun tag -> let cdecl = { const_id = tag; const_loc = top_decl.top_decl_loc; const_value = Const_tag tag; const_type = Type_predef.type_const tdef.tydef_id } in { top_decl with top_decl_desc = Const cdecl }) tags
+    | Tydec_enum tags ->
+       List.map
+	 (fun tag ->
+	   let cdecl = {
+	     const_id = tag;
+	     const_loc = top_decl.top_decl_loc;
+	     const_value = Const_tag tag;
+	     const_type = Type_predef.type_const tdef.tydef_id
+	   } in
+	   { top_decl with top_decl_desc = Const cdecl })
+	 tags
      | _               -> [])
   | _ -> assert false
 
@@ -538,16 +550,17 @@ let get_node_var id node =
     (* Format.eprintf "Unable to find variable %s in node %s@.@?" id node.node_id; *)
     raise Not_found
   end
-    
+
+
 let get_node_eqs =
   let get_eqs stmts =
     List.fold_right
-      (fun stmt res ->
+      (fun stmt (res_eq, res_aut) ->
 	match stmt with
-	| Eq eq -> eq :: res
-	| Aut _ -> assert false)
+	| Eq eq -> eq :: res_eq, res_aut
+	| Aut aut -> res_eq, aut::res_aut)
       stmts
-      [] in
+      ([], []) in
   let table_eqs = Hashtbl.create 23 in
   (fun nd ->
     try
@@ -561,8 +574,12 @@ let get_node_eqs =
       end)
 
 let get_node_eq id node =
- List.find (fun eq -> List.mem id eq.eq_lhs) (get_node_eqs node)
-
+  let eqs, auts = get_node_eqs node in
+  try
+    List.find (fun eq -> List.mem id eq.eq_lhs) eqs
+  with
+    Not_found -> (* Shall be defined in automata auts *) raise Not_found
+      
 let get_nodes prog = 
   List.fold_left (
     fun nodes decl ->
@@ -611,6 +628,7 @@ let get_node_interface nd =
   nodei_outputs = nd.node_outputs;
   nodei_stateless = nd.node_dec_stateless;
   nodei_spec = nd.node_spec;
+  (* nodei_annot = nd.node_annot; *)
   nodei_prototype = None;
   nodei_in_lib = [];
  }
@@ -630,70 +648,34 @@ let rec rename_carrier rename cck =
  | Ckdec_bool cl -> Ckdec_bool (List.map (fun (c, l) -> rename c, l) cl)
  | _             -> cck
 
-(*Format.eprintf "Types.rename_static %a = %a@." print_ty ty print_ty res; res*)
+ (*Format.eprintf "Types.rename_static %a = %a@." print_ty ty print_ty res; res*)
 
 (* applies the renaming function [fvar] to all variables of expression [expr] *)
- let rec expr_replace_var fvar expr =
-  { expr with expr_desc = expr_desc_replace_var fvar expr.expr_desc }
+ (* let rec expr_replace_var fvar expr = *)
+ (*  { expr with expr_desc = expr_desc_replace_var fvar expr.expr_desc } *)
 
- and expr_desc_replace_var fvar expr_desc =
-   match expr_desc with
-   | Expr_const _ -> expr_desc
-   | Expr_ident i -> Expr_ident (fvar i)
-   | Expr_array el -> Expr_array (List.map (expr_replace_var fvar) el)
-   | Expr_access (e1, d) -> Expr_access (expr_replace_var fvar e1, d)
-   | Expr_power (e1, d) -> Expr_power (expr_replace_var fvar e1, d)
-   | Expr_tuple el -> Expr_tuple (List.map (expr_replace_var fvar) el)
-   | Expr_ite (c, t, e) -> Expr_ite (expr_replace_var fvar c, expr_replace_var fvar t, expr_replace_var fvar e)
-   | Expr_arrow (e1, e2)-> Expr_arrow (expr_replace_var fvar e1, expr_replace_var fvar e2) 
-   | Expr_fby (e1, e2) -> Expr_fby (expr_replace_var fvar e1, expr_replace_var fvar e2)
-   | Expr_pre e' -> Expr_pre (expr_replace_var fvar e')
-   | Expr_when (e', i, l)-> Expr_when (expr_replace_var fvar e', fvar i, l)
-   | Expr_merge (i, hl) -> Expr_merge (fvar i, List.map (fun (t, h) -> (t, expr_replace_var fvar h)) hl)
-   | Expr_appl (i, e', i') -> Expr_appl (i, expr_replace_var fvar e', Utils.option_map (expr_replace_var fvar) i')
-
-(* Applies the renaming function [fvar] to every rhs
-   only when the corresponding lhs satisfies predicate [pvar] *)
- let eq_replace_rhs_var pvar fvar eq =
-   let pvar l = List.exists pvar l in
-   let rec replace lhs rhs =
-     { rhs with expr_desc =
-     match lhs with
-     | []  -> assert false
-     | [_] -> if pvar lhs then expr_desc_replace_var fvar rhs.expr_desc else rhs.expr_desc
-     | _   ->
-       (match rhs.expr_desc with
-       | Expr_tuple tl ->
-	 Expr_tuple (List.map2 (fun v e -> replace [v] e) lhs tl)
-       | Expr_appl (f, arg, None) when Basic_library.is_expr_internal_fun rhs ->
-	 let args = expr_list_of_expr arg in
-	 Expr_appl (f, expr_of_expr_list arg.expr_loc (List.map (replace lhs) args), None)
-       | Expr_array _
-       | Expr_access _
-       | Expr_power _
-       | Expr_const _
-       | Expr_ident _
-       | Expr_appl _   ->
-	 if pvar lhs
-	 then expr_desc_replace_var fvar rhs.expr_desc
-	 else rhs.expr_desc
-       | Expr_ite (c, t, e)   -> Expr_ite (replace lhs c, replace lhs t, replace lhs e)
-       | Expr_arrow (e1, e2)  -> Expr_arrow (replace lhs e1, replace lhs e2) 
-       | Expr_fby (e1, e2)    -> Expr_fby (replace lhs e1, replace lhs e2)
-       | Expr_pre e'          -> Expr_pre (replace lhs e')
-       | Expr_when (e', i, l) -> let i' = if pvar lhs then fvar i else i
-				 in Expr_when (replace lhs e', i', l)
-       | Expr_merge (i, hl)   -> let i' = if pvar lhs then fvar i else i
-				 in Expr_merge (i', List.map (fun (t, h) -> (t, replace lhs h)) hl)
-       )
-     }
-   in { eq with eq_rhs = replace eq.eq_lhs eq.eq_rhs }
+ (* and expr_desc_replace_var fvar expr_desc = *)
+ (*   match expr_desc with *)
+ (*   | Expr_const _ -> expr_desc *)
+ (*   | Expr_ident i -> Expr_ident (fvar i) *)
+ (*   | Expr_array el -> Expr_array (List.map (expr_replace_var fvar) el) *)
+ (*   | Expr_access (e1, d) -> Expr_access (expr_replace_var fvar e1, d) *)
+ (*   | Expr_power (e1, d) -> Expr_power (expr_replace_var fvar e1, d) *)
+ (*   | Expr_tuple el -> Expr_tuple (List.map (expr_replace_var fvar) el) *)
+ (*   | Expr_ite (c, t, e) -> Expr_ite (expr_replace_var fvar c, expr_replace_var fvar t, expr_replace_var fvar e) *)
+ (*   | Expr_arrow (e1, e2)-> Expr_arrow (expr_replace_var fvar e1, expr_replace_var fvar e2)  *)
+ (*   | Expr_fby (e1, e2) -> Expr_fby (expr_replace_var fvar e1, expr_replace_var fvar e2) *)
+ (*   | Expr_pre e' -> Expr_pre (expr_replace_var fvar e') *)
+ (*   | Expr_when (e', i, l)-> Expr_when (expr_replace_var fvar e', fvar i, l) *)
+ (*   | Expr_merge (i, hl) -> Expr_merge (fvar i, List.map (fun (t, h) -> (t, expr_replace_var fvar h)) hl) *)
+ (*   | Expr_appl (i, e', i') -> Expr_appl (i, expr_replace_var fvar e', Utils.option_map (expr_replace_var fvar) i') *)
 
 
- let rec rename_expr  f_node f_var f_const expr =
-   { expr with expr_desc = rename_expr_desc f_node f_var f_const expr.expr_desc }
- and rename_expr_desc f_node f_var f_const expr_desc =
-   let re = rename_expr  f_node f_var f_const in
+
+ let rec rename_expr  f_node f_var expr =
+   { expr with expr_desc = rename_expr_desc f_node f_var expr.expr_desc }
+ and rename_expr_desc f_node f_var expr_desc =
+   let re = rename_expr  f_node f_var in
    match expr_desc with
    | Expr_const _ -> expr_desc
    | Expr_ident i -> Expr_ident (f_var i)
@@ -710,61 +692,114 @@ let rec rename_carrier rename cck =
      Expr_merge (f_var i, List.map (fun (t, h) -> (t, re h)) hl)
    | Expr_appl (i, e', i') -> 
      Expr_appl (f_node i, re e', Utils.option_map re i')
-  
- let rename_node_annot f_node f_var f_const expr  =
-   expr
- (* TODO assert false *)
 
- let rename_expr_annot f_node f_var f_const annot =
-   annot
- (* TODO assert false *)
+ let rename_dec_type f_node f_var t = assert false (*
+						     Types.rename_dim_type (Dimension.rename f_node f_var) t*)
 
-let rename_node f_node f_var f_const nd =
-  let rename_var v = { v with var_id = f_var v.var_id } in
-  let rename_eq eq = { eq with
-      eq_lhs = List.map f_var eq.eq_lhs; 
-      eq_rhs = rename_expr f_node f_var f_const eq.eq_rhs
-    } 
-  in
-  let inputs = List.map rename_var nd.node_inputs in
-  let outputs = List.map rename_var nd.node_outputs in
-  let locals = List.map rename_var nd.node_locals in
-  let gen_calls = List.map (rename_expr f_node f_var f_const) nd.node_gencalls in
-  let node_checks = List.map (Dimension.expr_replace_var f_var)  nd.node_checks in
-  let node_asserts = List.map 
-    (fun a -> 
-      {a with assert_expr = 
-	  let expr = a.assert_expr in
-	  rename_expr f_node f_var f_const expr})
-    nd.node_asserts
-  in
-  let node_stmts = List.map (fun eq -> Eq (rename_eq eq)) (get_node_eqs nd) in
-  let spec = 
-    Utils.option_map 
-      (fun s -> rename_node_annot f_node f_var f_const s) 
-      nd.node_spec 
-  in
-  let annot =
-    List.map 
-      (fun s -> rename_expr_annot f_node f_var f_const s) 
-      nd.node_annot
-  in
-  {
-    node_id = f_node nd.node_id;
-    node_type = nd.node_type;
-    node_clock = nd.node_clock;
-    node_inputs = inputs;
-    node_outputs = outputs;
-    node_locals = locals;
-    node_gencalls = gen_calls;
-    node_checks = node_checks;
-    node_asserts = node_asserts;
-    node_stmts = node_stmts;
-    node_dec_stateless = nd.node_dec_stateless;
-    node_stateless = nd.node_stateless;
-    node_spec = spec;
-    node_annot = annot;
-  }
+ let rename_dec_clock f_node f_var c = assert false (* 
+					  Clocks.rename_clock_expr f_var c*)
+   
+ let rename_var f_node f_var v = {
+   v with
+     var_id = f_var v.var_id;
+     var_dec_type = rename_dec_type f_node f_var v.var_type;
+     var_dec_clock = rename_dec_clock f_node f_var v.var_clock
+ } 
+
+ let rename_vars f_node f_var = List.map (rename_var f_node f_var) 
+
+ let rec rename_eq f_node f_var eq = { eq with
+   eq_lhs = List.map f_var eq.eq_lhs; 
+   eq_rhs = rename_expr f_node f_var eq.eq_rhs
+ } 
+ and rename_handler f_node f_var  h = {h with
+   hand_state = f_var h.hand_state;
+   hand_unless = List.map (
+     fun (l,e,b,id) -> l, rename_expr f_node f_var e, b, f_var id
+   ) h.hand_unless;
+   hand_until = List.map (
+     fun (l,e,b,id) -> l, rename_expr f_node f_var e, b, f_var id
+   ) h.hand_until;
+   hand_locals = rename_vars f_node f_var h.hand_locals;
+   hand_stmts = rename_stmts f_node f_var h.hand_stmts;
+   hand_annots = rename_annots f_node f_var h.hand_annots;
+   
+ } 
+ and rename_aut f_node f_var  aut = { aut with
+   aut_id = f_var aut.aut_id;
+   aut_handlers = List.map (rename_handler f_node f_var) aut.aut_handlers;
+ }
+ and rename_stmts f_node f_var stmts = List.map (fun stmt -> match stmt with
+   | Eq eq -> Eq (rename_eq f_node f_var eq)
+   | Aut at -> Aut (rename_aut f_node f_var at))
+   stmts
+ and rename_annotl f_node f_var  annots = 
+   List.map 
+     (fun (key, value) -> key, rename_eexpr f_node f_var value) 
+     annots
+ and rename_annot f_node f_var annot =
+   { annot with annots = rename_annotl f_node f_var annot.annots }
+ and rename_annots f_node f_var annots =
+   List.map (rename_annot f_node f_var) annots
+and rename_eexpr f_node f_var ee =
+   { ee with
+     eexpr_tag = Utils.new_tag ();
+     eexpr_qfexpr = rename_expr f_node f_var ee.eexpr_qfexpr;
+     eexpr_quantifiers = List.map (fun (typ,vdecls) -> typ, rename_vars f_node f_var vdecls) ee.eexpr_quantifiers;
+     eexpr_normalized = Utils.option_map 
+       (fun (vdecl, eqs, vdecls) ->
+	 rename_var f_node f_var vdecl,
+	 List.map (rename_eq f_node f_var) eqs,
+	 rename_vars f_node f_var vdecls
+       ) ee.eexpr_normalized;
+     
+   }
+ 
+     
+     
+   
+ let rename_node f_node f_var nd =
+   let rename_var = rename_var f_node f_var in
+   let rename_expr = rename_expr f_node f_var in
+   let rename_stmts = rename_stmts f_node f_var in
+   let inputs = List.map rename_var nd.node_inputs in
+   let outputs = List.map rename_var nd.node_outputs in
+   let locals = List.map rename_var nd.node_locals in
+   let gen_calls = List.map rename_expr nd.node_gencalls in
+   let node_checks = List.map (Dimension.rename f_node f_var)  nd.node_checks in
+   let node_asserts = List.map 
+     (fun a -> 
+       {a with assert_expr = 
+	   let expr = a.assert_expr in
+	   rename_expr expr})
+     nd.node_asserts
+   in
+   let node_stmts = rename_stmts nd.node_stmts
+
+     
+   in
+   let spec = 
+     Utils.option_map 
+       (fun s -> assert false; (*rename_node_annot f_node f_var s*) ) (* TODO: implement! *) 
+       nd.node_spec 
+   in
+   let annot = rename_annots f_node f_var nd.node_annot in
+   {
+     node_id = f_node nd.node_id;
+     node_type = nd.node_type;
+     node_clock = nd.node_clock;
+     node_inputs = inputs;
+     node_outputs = outputs;
+     node_locals = locals;
+     node_gencalls = gen_calls;
+     node_checks = node_checks;
+     node_asserts = node_asserts;
+     node_stmts = node_stmts;
+     node_dec_stateless = nd.node_dec_stateless;
+     node_stateless = nd.node_stateless;
+     node_spec = spec;
+     node_annot = annot;
+   }
 
 
 let rename_const f_const c =
@@ -780,7 +815,7 @@ let rename_prog f_node f_var f_const prog =
     List.fold_left (fun accu top ->
       (match top.top_decl_desc with
       | Node nd -> 
-	 { top with top_decl_desc = Node (rename_node f_node f_var f_const nd) }
+	 { top with top_decl_desc = Node (rename_node f_node f_var nd) }
       | Const c -> 
 	 { top with top_decl_desc = Const (rename_const f_const c) }
       | TypeDef tdef ->
@@ -791,6 +826,44 @@ let rename_prog f_node f_var f_const prog =
 ) [] prog
 		   )
 
+(* Applies the renaming function [fvar] to every rhs
+   only when the corresponding lhs satisfies predicate [pvar] *)
+ let eq_replace_rhs_var pvar fvar eq =
+   let pvar l = List.exists pvar l in
+   let rec replace lhs rhs =
+     { rhs with expr_desc =
+     match lhs with
+     | []  -> assert false
+     | [_] -> if pvar lhs then rename_expr_desc (fun x -> x) fvar rhs.expr_desc else rhs.expr_desc
+     | _   ->
+       (match rhs.expr_desc with
+       | Expr_tuple tl ->
+	 Expr_tuple (List.map2 (fun v e -> replace [v] e) lhs tl)
+       | Expr_appl (f, arg, None) when Basic_library.is_expr_internal_fun rhs ->
+	 let args = expr_list_of_expr arg in
+	 Expr_appl (f, expr_of_expr_list arg.expr_loc (List.map (replace lhs) args), None)
+       | Expr_array _
+       | Expr_access _
+       | Expr_power _
+       | Expr_const _
+       | Expr_ident _
+       | Expr_appl _   ->
+	 if pvar lhs
+	 then rename_expr_desc (fun x -> x) fvar rhs.expr_desc
+	 else rhs.expr_desc
+       | Expr_ite (c, t, e)   -> Expr_ite (replace lhs c, replace lhs t, replace lhs e)
+       | Expr_arrow (e1, e2)  -> Expr_arrow (replace lhs e1, replace lhs e2) 
+       | Expr_fby (e1, e2)    -> Expr_fby (replace lhs e1, replace lhs e2)
+       | Expr_pre e'          -> Expr_pre (replace lhs e')
+       | Expr_when (e', i, l) -> let i' = if pvar lhs then fvar i else i
+				 in Expr_when (replace lhs e', i', l)
+       | Expr_merge (i, hl)   -> let i' = if pvar lhs then fvar i else i
+				 in Expr_merge (i', List.map (fun (t, h) -> (t, replace lhs h)) hl)
+       )
+     }
+   in { eq with eq_rhs = replace eq.eq_lhs eq.eq_rhs }
+
+    
 (**********************************************************************)
 (* Pretty printers *)
 
@@ -831,7 +904,7 @@ let vdecls_of_typ_ck cpt ty =
   List.map
     (fun _ -> incr cpt;
               let name = sprintf "_var_%d" !cpt in
-              mkvar_decl loc (name, mktyp loc Tydec_any, mkclock loc Ckdec_any, false, None))
+              mkvar_decl loc (name, mktyp loc Tydec_any, mkclock loc Ckdec_any, false, None, None))
     (Types.type_list_of_type ty)
 
 let mk_internal_node id =
@@ -850,6 +923,7 @@ let mk_internal_node id =
 	nodei_outputs = vdecls_of_typ_ck cpt tout;
 	nodei_stateless = Types.get_static_value ty <> None;
 	nodei_spec = spec;
+	(* nodei_annot = []; *)
 	nodei_prototype = None;
        	nodei_in_lib = [];
        })
@@ -964,8 +1038,24 @@ let rec get_expr_calls nodes e =
 
 and get_eq_calls nodes eq =
   get_expr_calls nodes eq.eq_rhs
+and get_aut_handler_calls nodes h =
+  List.fold_left (fun accu stmt -> match stmt with
+  | Eq eq -> Utils.ISet.union (get_eq_calls nodes eq) accu
+  | Aut aut' ->  Utils.ISet.union (get_aut_calls nodes aut') accu
+  ) Utils.ISet.empty h.hand_stmts 
+and get_aut_calls nodes aut =
+  List.fold_left (fun accu h -> Utils.ISet.union (get_aut_handler_calls nodes h) accu)
+    Utils.ISet.empty aut.aut_handlers
 and get_node_calls nodes node =
-  List.fold_left (fun accu eq -> Utils.ISet.union (get_eq_calls nodes eq) accu) Utils.ISet.empty (get_node_eqs node)
+  let eqs, auts = get_node_eqs node in
+  let aut_calls =
+    List.fold_left
+      (fun accu aut -> Utils.ISet.union (get_aut_calls nodes aut) accu)
+      Utils.ISet.empty auts
+  in
+  List.fold_left
+    (fun accu eq -> Utils.ISet.union (get_eq_calls nodes eq) accu)
+    aut_calls eqs
 
 let get_expr_vars e =
   let rec get_expr_vars vars e =
@@ -1010,12 +1100,15 @@ and expr_desc_has_arrows expr_desc =
 
 and eq_has_arrows eq =
   expr_has_arrows eq.eq_rhs
+and aut_has_arrows aut = List.exists (fun h -> List.exists (fun stmt -> match stmt with Eq eq -> eq_has_arrows eq | Aut aut' -> aut_has_arrows aut') h.hand_stmts ) aut.aut_handlers 
 and node_has_arrows node =
-  List.exists (fun eq -> eq_has_arrows eq) (get_node_eqs node)
+  let eqs, auts = get_node_eqs node in
+  List.exists (fun eq -> eq_has_arrows eq) eqs || List.exists (fun aut -> aut_has_arrows aut) auts
+
 
 
 let copy_var_decl vdecl =
-  mkvar_decl vdecl.var_loc ~orig:vdecl.var_orig (vdecl.var_id, vdecl.var_dec_type, vdecl.var_dec_clock, vdecl.var_dec_const, vdecl.var_dec_value)
+  mkvar_decl vdecl.var_loc ~orig:vdecl.var_orig (vdecl.var_id, vdecl.var_dec_type, vdecl.var_dec_clock, vdecl.var_dec_const, vdecl.var_dec_value, vdecl.var_parent_nodeid)
 
 let copy_const cdecl =
   { cdecl with const_type = Types.new_var () }

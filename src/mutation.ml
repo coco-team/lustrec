@@ -1,3 +1,15 @@
+
+(* Comments in function fold_mutate
+
+ TODO: check if we can generate more cases. The following lines were
+	     cylcing and missing to detect that the enumaration was complete,
+	     leading to a non terminating process. The current setting is harder
+	     but may miss enumerating some cases. To be checked! 
+	
+
+*)
+
+
 open LustreSpec
 open Corelang
 open Log
@@ -17,8 +29,14 @@ let threshold_bool_op = 95
 
 let int_consts = ref []
 
-let rename_app id = 
-  if !Options.no_mutation_suffix then
+let rename_app id =
+  let node = Corelang.node_from_name id in
+  let is_imported =
+    match node.top_decl_desc with
+    | ImportedNode _ -> true
+    | _ -> false
+  in
+  if !Options.no_mutation_suffix || is_imported then
     id
   else
     id ^ "_mutant"
@@ -32,6 +50,7 @@ module OpCount = Mmap.Make (struct type t = string let compare = compare end)
 
 type records = {
   consts: IntSet.t;
+  nb_consts: int;
   nb_boolexpr: int;
   nb_pre: int;
   nb_op: int OpCount.t;
@@ -44,7 +63,7 @@ let ops = arith_op @ bool_op @ rel_op
 let all_ops = "not" :: ops
 
 let empty_records = 
-  {consts=IntSet.empty; nb_boolexpr=0; nb_pre=0; nb_op=OpCount.empty}
+  {consts=IntSet.empty; nb_consts=0; nb_boolexpr=0; nb_pre=0; nb_op=OpCount.empty}
 
 let records = ref empty_records
 
@@ -53,6 +72,7 @@ let merge_records records_list =
     {
       consts = IntSet.union r1.consts r2.consts;
 
+      nb_consts = r1.nb_consts + r2.nb_consts;
       nb_boolexpr = r1.nb_boolexpr + r2.nb_boolexpr;
       nb_pre = r1.nb_pre + r2.nb_pre;
 
@@ -68,12 +88,12 @@ let merge_records records_list =
   
 let compute_records_const_value c =
   match c with
-  | Const_int i -> {empty_records with consts = IntSet.singleton i}
+  | Const_int i -> {empty_records with consts = IntSet.singleton i; nb_consts = 1}
   | _ -> empty_records
 
 let rec compute_records_expr expr =
   let boolexpr = 
-    if (Types.repr expr.expr_type).Types.tdesc = Types.Tbool then
+    if Types.is_bool_type expr.expr_type then
       {empty_records with nb_boolexpr = 1}
     else
       empty_records
@@ -103,8 +123,10 @@ let rec compute_records_expr expr =
 
 let compute_records_eq eq = compute_records_expr eq.eq_rhs
 
-let compute_records_node nd = 
-  merge_records (List.map compute_records_eq (get_node_eqs nd))
+let compute_records_node nd =
+  let eqs, auts = get_node_eqs nd in
+  assert (auts=[]); (* Automaton should be expanded by now *)
+  merge_records (List.map compute_records_eq eqs)
 
 let compute_records_top_decl td =
   match td.top_decl_desc with
@@ -180,15 +202,15 @@ match op with
 | _ -> op
 
 
-let rdm_mutate_var expr = 
-  match (Types.repr expr.expr_type).Types.tdesc with 
-  | Types.Tbool ->
+let rdm_mutate_var expr =
+  if Types.is_bool_type expr.expr_type then
     (* if Random.int 100 > threshold_negate_bool_var then *)
     let new_e = mkpredef_call expr.expr_loc "not" [expr] in
     Some (expr, new_e), new_e
     (* else  *)
-    (*   expr *)
-  | _ -> None, expr
+  (*   expr *)
+  else
+    None, expr
     
 let rdm_mutate_pre orig_expr = 
   let new_e = Expr_pre orig_expr in
@@ -287,7 +309,7 @@ let rnd_mutate_stmt stmt =
   match stmt with
   | Eq eq   -> let mut, new_eq = rdm_mutate_eq eq in
 		 report ~level:1 
-		   (fun fmt -> fprintf fmt "mutation: %a becomes %a@." 
+		   (fun fmt -> fprintf fmt "mutation: %a becomes %a@ " 
 		     Printers.pp_node_eq eq
 		     Printers.pp_node_eq new_eq);
 		 mut, Eq new_eq 
@@ -329,7 +351,7 @@ let rdm_mutate nb prog =
 	  iterate nb res
 	)
 	else (
-	  report ~level:1 (fun fmt -> fprintf fmt "%i mutants remaining@." nb); 
+	  report ~level:1 (fun fmt -> fprintf fmt "%i mutants remaining@ " nb); 
 	  iterate (nb-1) ((mutation, new_mutant)::res)
 	)
       )
@@ -468,7 +490,8 @@ match c with
   match !target with
   | Some (IncrIntCst 0) -> (set_mutation_loc (); Const_int (i+1))
   | Some (DecrIntCst 0) -> (set_mutation_loc (); Const_int (i-1))
-  | Some (SwitchIntCst (0, id)) -> (set_mutation_loc (); Const_int (List.nth (IntSet.elements (IntSet.remove i !records.consts)) id)) 
+  | Some (SwitchIntCst (0, id)) ->
+     (set_mutation_loc (); Const_int id) 
   | Some (IncrIntCst n) -> (target := Some (IncrIntCst (n-1)); c)
   | Some (DecrIntCst n) -> (target := Some (DecrIntCst (n-1)); c)
   | Some (SwitchIntCst (n, id)) -> (target := Some (SwitchIntCst (n-1, id)); c)
@@ -517,7 +540,7 @@ let rec fold_mutate_expr expr =
       { expr with expr_desc = new_desc }
     )
   in
-  if (Types.repr expr.expr_type).Types.tdesc = Types.Tbool then
+  if Types.is_bool_type expr.expr_type then
     fold_mutate_boolexpr new_expr  
   else
     new_expr
@@ -554,7 +577,11 @@ let create_mutant prog directive =
   let prog' = fold_mutate_prog prog in
   let mutation_info = match !target , !mutation_info with
     | None, Some mi -> mi
-    | _ -> assert false (* The mutation has not been performed. *)
+    | _ -> (
+      Format.eprintf "Failed when creating mutant for directive %a@.@?" print_directive directive;
+      let _ = match !target with Some dir' -> Format.eprintf "New directive %a@.@?" print_directive dir' | _ -> () in
+      assert false (* The mutation has not been performed. *)
+    )
      
   in
 (*  target := None; (* should happen only if no mutation occured during the
@@ -638,50 +665,143 @@ let next_change m =
     else first_boolexpr ()
 
   in
-  (* Format.eprintf "from: %a to: %a@." print_directive m print_directive res; *)
+   (* Format.eprintf "from: %a to: %a@." print_directive m print_directive res;  *)
   res
 
 let fold_mutate nb prog = 
   incr random_seed;
   Random.init !random_seed;
+  (* Local references to keep track of generated directives *)
+
+  (* build a set of integer 0, 1, ... n-1 for input n *)
+  let cpt_to_intset cpt =
+    let arr = Array.init cpt (fun x -> x) in
+    Array.fold_right IntSet.add arr IntSet.empty
+  in
+  
+  let possible_const_id = cpt_to_intset !records.nb_consts in
+  (* let possible_boolexpr_id = cpt_to_intset !records.nb_boolexpr in *)
+  (* let possible_pre_id = cpt_to_intset !records.nb_pre in *)
+  
+  let incremented_const_id = ref IntSet.empty in
+  let decremented_const_id = ref IntSet.empty in
+  
+  let create_new_incr_decr registered build =
+    let possible = IntSet.diff possible_const_id !registered |> IntSet.elements in
+    let len = List.length possible in
+    if len <= 0 then
+      false, build (-1) (* Should not be stored *)
+    else
+      let picked = List.nth possible (Random.int (List.length possible)) in
+      registered := IntSet.add picked !registered;
+      true, build picked
+  in
+
+
+  let module DblIntSet = Set.Make (struct type t = int * int let compare = compare end) in
+  let switch_const_id = ref DblIntSet.empty in
+  let switch_set =
+    if IntSet.cardinal !records.consts <= 1 then
+      DblIntSet.empty
+    else
+      (* First element is cst id (the ith cst) while second is the
+		       ith element of the set of gathered constants
+		       !record.consts *)
+      IntSet.fold (fun cst_id set ->
+	IntSet.fold (fun ith_cst set ->
+	  DblIntSet.add (cst_id, ith_cst) set
+	) !records.consts set
+      ) possible_const_id DblIntSet.empty 
+  in
+
+  let create_new_switch registered build =
+    let possible = DblIntSet.diff switch_set !registered |> DblIntSet.elements in
+    let len = List.length possible in
+    if len <= 0 then
+      false, build (-1,-1) (* Should not be stored *)
+    else
+      let picked = List.nth possible (Random.int (List.length possible)) in
+      registered := DblIntSet.add picked !registered;
+      true, build picked
+  in
+  
   let find_next_new mutants mutant =
     let rec find_next_new init current =
-      if init = current then raise Not_found else
-	if List.mem current mutants then
-	  find_next_new init (next_change current)
-	else
-	  current
+      if init = current || List.mem current mutants then raise Not_found else
+
+	(* TODO: check if we can generate more cases. The following lines were
+	   cylcing and missing to detect that the enumaration was complete,
+	   leading to a non terminating process. The current setting is harder
+	   but may miss enumerating some cases. To be checked! *)
+	
+	(* if List.mem current mutants then *)
+	(*   find_next_new init (next_change current) *)
+	(* else *)
+	current
     in
     find_next_new mutant (next_change mutant) 
   in
   (* Creating list of nb elements of mutants *)
   let rec create_mutants_directives rnb mutants = 
     if rnb <= 0 then mutants 
-    else 
-      let random_mutation = 
-	match Random.int 6 with
-	| 5 -> IncrIntCst (try Random.int (IntSet.cardinal !records.consts) with _ -> 0)
-	| 4 -> DecrIntCst (try Random.int (IntSet.cardinal !records.consts) with _ -> 0)
-	| 3 -> SwitchIntCst ((try Random.int (IntSet.cardinal !records.consts) with _ -> 0), (try Random.int (-1 + IntSet.cardinal !records.consts) with _ -> 0))
-	| 2 -> Pre (try Random.int !records.nb_pre with _ -> 0)
-	| 1 -> Boolexpr (try Random.int !records.nb_boolexpr with _ -> 0)
-	| 0 -> let bindings = OpCount.bindings !records.nb_op in
-	       let op, nb_op = List.nth bindings (try Random.int (List.length bindings) with _ -> 0) in
-	       let new_op = List.nth (op_mutation op) (try Random.int (List.length (op_mutation op)) with _ -> 0) in
-	       Op (op, (try Random.int nb_op with _ -> 0), new_op)
-	| _ -> assert false
+    else
+      (* Initial list of transformation *)
+      let rec init_list x = if x <= 0 then [0] else x::(init_list (x-1)) in
+      let init_list = init_list 5 in
+      (* We generate a random permutation of the list: the first item is the
+	 transformation, the rest of the list act as fallback choices to make
+	 sure we produce something *)
+      let shuffle l =
+	let nd = List.map (fun c -> Random.bits (), c) l in
+	let sond = List.sort compare nd in
+	List.map snd sond
       in
-      if List.mem random_mutation mutants then
+      let transforms = shuffle init_list in
+      let rec apply_transform transforms =
+	let f id = 
+	  match id with
+	  | 5 -> create_new_incr_decr incremented_const_id (fun x -> IncrIntCst x)
+	  | 4 -> create_new_incr_decr decremented_const_id (fun x -> DecrIntCst x)
+	  | 3 -> create_new_switch switch_const_id (fun (x,y) -> SwitchIntCst(x, y))
+	  | 2 -> !records.nb_pre >0, Pre (try Random.int !records.nb_pre with _ -> 0)
+	  | 1 -> !records.nb_boolexpr > 0, Boolexpr (try Random.int !records.nb_boolexpr with _ -> 0)
+	  | 0 -> let bindings = OpCount.bindings !records.nb_op in
+		 let bindings_len = List.length bindings in
+		 let op, nb_op = List.nth bindings (try Random.int (List.length bindings) with _ -> 0) in
+		 let new_op = List.nth (op_mutation op) (try Random.int (List.length (op_mutation op)) with _ -> 0) in
+	         bindings_len > 0, Op (op, (try Random.int nb_op with _ -> 0), new_op)
+	  | _ -> assert false
+	in
+	match transforms with
+	| [] -> assert false
+	| [hd] -> f hd
+	| hd::tl -> let ok, random_mutation = f hd in
+		    if ok then
+		      ok, random_mutation
+		    else
+		      apply_transform tl
+      in
+      let ok, random_mutation = apply_transform transforms in
+      let stop_process () =
+	report ~level:1 (fun fmt -> fprintf fmt
+	  "Only %i mutants directives generated out of %i expected@ "
+	  (nb-rnb)
+	  nb); 
+	mutants
+      in
+      if not ok then
+	stop_process ()
+      else if List.mem random_mutation mutants then
 	try
 	  let new_mutant = (find_next_new mutants random_mutation) in
-	  report ~level:2 (fun fmt -> fprintf fmt " %i mutants generated out of %i expected@." (nb-rnb) nb);
-	 create_mutants_directives (rnb-1) (new_mutant::mutants) 
+	  report ~level:2 (fun fmt -> fprintf fmt " %i mutants directive generated out of %i expected@ " (nb-rnb) nb);
+	  create_mutants_directives (rnb-1) (new_mutant::mutants) 
 	with Not_found -> (
-	  report ~level:1 (fun fmt -> fprintf fmt "Only %i mutants generated out of %i expected@." (nb-rnb) nb); 
-	  mutants
+	  stop_process ()
 	)
-      else
+      else (
 	create_mutants_directives (rnb-1) (random_mutation::mutants)
+      )
   in
   let mutants_directives = create_mutants_directives nb [] in
   List.map (fun d ->

@@ -114,7 +114,7 @@ let rec handler_write writes handler =
 let node_vars_of_idents node iset =
   List.fold_right (fun v res -> if ISet.mem v.var_id iset then v :: res else res) (get_node_vars node) []
 
-let mkautomata_state used typedef loc id =
+let mkautomata_state nodeid used typedef loc id =
   let tydec_bool = { ty_dec_desc = Tydec_bool; ty_dec_loc = loc } in
   let tydec_state id = { ty_dec_desc = Tydec_const id; ty_dec_loc = loc } in
   let ckdec_any = { ck_dec_desc = Ckdec_any; ck_dec_loc = loc } in
@@ -125,12 +125,12 @@ let mkautomata_state used typedef loc id =
   let actual_r = mk_new_name used (id ^ "__restart_act") in
   let actual_s = mk_new_name used (id ^ "__state_act") in
   {
-    incoming_r' = mkvar_decl loc (incoming_r', tydec_bool, ckdec_any, false, None);
-    incoming_s' = mkvar_decl loc (incoming_s', tydec_state typedef.tydef_id, ckdec_any, false, None);
-    incoming_r = mkvar_decl loc (incoming_r, tydec_bool, ckdec_any, false, None);
-    incoming_s = mkvar_decl loc (incoming_s, tydec_state typedef.tydef_id, ckdec_any, false, None);
-    actual_r = mkvar_decl loc (actual_r  , tydec_bool, ckdec_any, false, None);
-    actual_s = mkvar_decl loc (actual_s  , tydec_state typedef.tydef_id, ckdec_any, false, None)
+    incoming_r' = mkvar_decl loc (incoming_r', tydec_bool, ckdec_any, false, None, Some nodeid);
+    incoming_s' = mkvar_decl loc (incoming_s', tydec_state typedef.tydef_id, ckdec_any, false, None, Some nodeid);
+    incoming_r = mkvar_decl loc (incoming_r, tydec_bool, ckdec_any, false, None, Some nodeid);
+    incoming_s = mkvar_decl loc (incoming_s, tydec_state typedef.tydef_id, ckdec_any, false, None, Some nodeid);
+    actual_r = mkvar_decl loc (actual_r  , tydec_bool, ckdec_any, false, None, Some nodeid);
+    actual_s = mkvar_decl loc (actual_s  , tydec_state typedef.tydef_id, ckdec_any, false, None, Some nodeid)
   }
 
 let vars_of_aut_state aut_state =
@@ -225,7 +225,7 @@ let typedef_of_automata aut =
 
 let expand_automata nused used owner typedef node aut =
   let initial = (List.hd aut.aut_handlers).hand_state in
-  let aut_state = mkautomata_state used typedef aut.aut_loc aut.aut_id in
+  let aut_state = mkautomata_state node.node_id used typedef aut.aut_loc aut.aut_id in
   let unodes = List.map (fun h -> node_of_unless nused used node aut.aut_id aut_state h) aut.aut_handlers in
   let aunodes = List.map (fun h -> node_of_assign_until nused used node aut.aut_id aut_state h) aut.aut_handlers in
   let all_outputs = List.fold_left (fun all (outputs, _, _) -> ISet.union outputs all) ISet.empty aunodes in

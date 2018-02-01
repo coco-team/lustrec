@@ -197,6 +197,7 @@ and branch_instr_vars m i =
 	     (reset_name f,
 	      Corelang.mktyp loc Tydec_bool, Corelang.mkclock loc Ckdec_any,
 	      false,
+	      None,
 	      None) 
 	 in
 	 VSet.add reset_var args_vars
@@ -365,23 +366,40 @@ let rec pp_emf_instr m fmt i =
     fprintf fmt "%a" pp_content i;
     fprintf fmt "@]@]@ }"
 and pp_emf_instrs m fmt instrs = fprintf_list ~sep:",@ " (pp_emf_instr m) fmt instrs
-       
+
+let pp_emf_annot cpt fmt (key, ee) =
+  let _ =
+    fprintf fmt "\"ann%i\": { @[<hov 0>\"key\": [%a],@ \"eexpr\": %a@] }"
+      !cpt
+      (fprintf_list ~sep:"," (fun fmt s -> fprintf fmt "\"%s\"" s)) key
+      pp_emf_eexpr ee
+  in
+  incr cpt
+  
+let pp_emf_annots cpt fmt annots = fprintf_list ~sep:",@ " (pp_emf_annot cpt) fmt annots.annots
+let pp_emf_annots_list cpt fmt annots_list = fprintf_list ~sep:",@ " (pp_emf_annots cpt) fmt annots_list
 let pp_machine fmt m =
   let instrs = (*merge_branches*) m.mstep.step_instrs in
   try
     fprintf fmt "@[<v 2>\"%a\": {@ "
        print_protect (fun fmt -> pp_print_string fmt m.mname.node_id);
-    fprintf fmt "\"kind\": %t,@ \"inputs\": [%a],@ \"outputs\": [%a],@ \"locals\": [%a],@ "
+    fprintf fmt "\"kind\": %t,@ "
       (fun fmt -> if not ( snd (get_stateless_status m) )
 	then fprintf fmt "\"stateful\""
-	else fprintf fmt "\"stateless\"")
-      pp_emf_vars_decl m.mstep.step_inputs
-      pp_emf_vars_decl m.mstep.step_outputs
-      pp_emf_vars_decl m.mstep.step_locals
-    ;
+	else fprintf fmt "\"stateless\"");
+    fprintf fmt "\"inputs\": [%a],@ "
+      pp_emf_vars_decl m.mstep.step_inputs;
+    fprintf fmt "\"outputs\": [%a],@ "
+      pp_emf_vars_decl m.mstep.step_outputs;
+    fprintf fmt "\"locals\": [%a],@ "
+      pp_emf_vars_decl m.mstep.step_locals;
+    fprintf fmt "\"mems\": [%a],@ "
+      pp_emf_vars_decl m.mmemory;
+    
     fprintf fmt "\"original_name\": \"%s\",@ " m.mname.node_id;
-    fprintf fmt "\"instrs\": {@[<v 0> %a@]@ }"
+    fprintf fmt "\"instrs\": {@[<v 0> %a@]@ },@ "
       (pp_emf_instrs m) instrs;
+    fprintf fmt "\"annots\": {@[<v 0> %a@]@ }" (pp_emf_annots_list (ref 0)) m.mannot;
     fprintf fmt "@]@ }"
   with Unhandled msg -> (
     eprintf "[Error] @[<v 0>EMF backend@ Issues while translating node %s@ "

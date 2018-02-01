@@ -67,7 +67,7 @@ struct
     Logs.debug (fun m -> m "parse_transition");
     {
       event          = json |> member "event"          |> Ext.parse_event;
-      condition      = json |> member "condition"      |> Ext.parse_condition;
+      condition      = json |> member "condition" |> Ext.parse_condition;
       condition_act  = json |> member "condition_act"  |> Ext.parse_action;
       transition_act = json |> member "transition_act" |> Ext.parse_action;
       dest           = json |> member "dest"           |> parse_dest
@@ -158,3 +158,4 @@ struct
         Some initial_value
       )
 end
+

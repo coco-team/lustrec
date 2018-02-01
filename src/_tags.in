@@ -9,6 +9,7 @@ true: bin_annot, color(always)
 "plugins/salsa": include
 "plugins/scopes": include
 "plugins/mpfr": include
+"features/machine_types": include
 "tools/stateflow": include
 "tools/stateflow/common": include
 "tools/stateflow/semantics": include

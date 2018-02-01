@@ -10,16 +10,24 @@ type event_t              = event_base_t option
 type user_variable_name_t = string
 
 (* Connected to lustrec types *)
-type base_action_t    = { defs : LustreSpec.eq list; ident : string }
-type base_condition_t = LustreSpec.expr
+type base_action_t    = { defs : LustreSpec.statement list;
+			  ainputs: LustreSpec.var_decl list;
+			  aoutputs: LustreSpec.var_decl list;
+			  avariables: LustreSpec.var_decl list;
+			  (* ident: string; *)
+			}
+type base_condition_t = { expr: LustreSpec.expr;
+			  cinputs: LustreSpec.var_decl list;
+			  coutputs: LustreSpec.var_decl list;
+			  cvariables: LustreSpec.var_decl list }
 
 (* P(r)etty printers *)
 let pp_state_name     = Format.pp_print_string
 let pp_junction_name  = Format.pp_print_string
 let pp_path fmt p     = Utils.fprintf_list ~sep:"." pp_state_name fmt p
 let pp_event fmt e    = match e with None -> Format.fprintf fmt "none" | Some s -> Format.fprintf fmt "%s" s
-let pp_base_act fmt a = Utils.fprintf_list ~sep:",@ " Printers.pp_node_eq fmt a.defs
-let pp_base_cond      = Printers.pp_expr
+let pp_base_act fmt a = Printers.pp_node_stmts fmt a.defs
+let pp_base_cond fmt c= Printers.pp_expr fmt c.expr
 
 (* Action and Condition types and functions. *)
 

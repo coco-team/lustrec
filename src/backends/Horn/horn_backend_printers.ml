@@ -96,10 +96,11 @@ let rec get_type v =
    for the type integer (arrays).
 *)
 let rec pp_default_val fmt t =
+  let t = Types.dynamic_type t in
+  if Types.is_bool_type t  then fprintf fmt "true" else
+  if Types.is_int_type t then fprintf fmt "0" else 
+  if Types.is_real_type t then fprintf fmt "0" else 
   match (Types.dynamic_type t).Types.tdesc with
-  | Types.Tint -> fprintf fmt "0"
-  | Types.Treal -> fprintf fmt "0"
-  | Types.Tbool -> fprintf fmt "true"
   | Types.Tarray(dim, l) -> (* TODO PL: this strange code has to be (heavily) checked *)
      let valt = Types.array_element_type t in
      fprintf fmt "((as const (Array Int %a)) %a)"

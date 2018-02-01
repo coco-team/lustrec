@@ -261,7 +261,7 @@ let machine_unfold fanin elim machine =
 
 let instr_of_const top_const =
   let const = const_of_top top_const in
-  let vdecl = mkvar_decl Location.dummy_loc (const.const_id, mktyp Location.dummy_loc Tydec_any, mkclock Location.dummy_loc Ckdec_any, true, None) in
+  let vdecl = mkvar_decl Location.dummy_loc (const.const_id, mktyp Location.dummy_loc Tydec_any, mkclock Location.dummy_loc Ckdec_any, true, None, None) in
   let vdecl = { vdecl with var_type = const.const_type }
   in mkinstr (MLocalAssign (vdecl, mk_val (Cst const.const_value) vdecl.var_type))
 

@@ -8,11 +8,12 @@ LUSI_LIBS=include/lustrec_math.lusi include/simulink_math_fcn.lusi include/conv.
 LUSI_MPFR_LIB=include/mpfr_lustre.lusi
 LOCAL_BINDIR=bin
 LOCAL_DOCDIR=doc/manual
-BIN_TARGETS = lustrec lustret lustresf
+BIN_TARGETS = lustrec lustret @lustresf_target@
 
 DEFAULT_TEST_TARGET=COMPIL_LUS\|MAKE\|BIN\|DIFF
+DEFAULT_EXCLUDE_TEST=LUSTRET
 
-all: lustrec lustret
+all: $(BIN_TARGETS)
 
 lustrec:
 	@echo Compiling binary lustrec
@@ -77,7 +78,7 @@ install-base: clean-lusic
 	mkdir -p ${bindir}
 	for x in $(BIN_TARGETS); do install -m 0755 $(LOCAL_BINDIR)/$$x ${bindir}; done
 	mkdir -p ${datarootdir}
-	install -m 0655 share/FindLustre.cmake ${datarootdir}
+	install -m 0655 share/* ${datarootdir}
 	mkdir -p ${includedir}/lustrec
 	install -m 0655 include/* ${includedir}/lustrec
 
@@ -96,13 +97,15 @@ test-config: ${bindir}/lustrec
 	fi
 
 test-no-submit: test-config
-	cd test; ctest -M Experimental -T Start -T Update -T Configure -T Build -T Test -R ${DEFAULT_TEST_TARGET}
+	cd test; ctest -M Experimental -T Start -T Update -T Configure -T Build -T Test -R ${DEFAULT_TEST_TARGET} -E ${DEFAULT_EXCLUDE_TEST}
 
 test-submit: test-config
-	cd test; ctest -M Experimental -T Submit -R ${DEFAULT_TEST_TARGET}
+	cd test; ctest -M Experimental -T Submit -R ${DEFAULT_TEST_TARGET} -E ${DEFAULT_EXCLUDE_TEST}
+
 
 test: test-config
-	cd test; ctest -D Experimental -R ${DEFAULT_TEST_TARGET}
+	cd test; ctest -D Experimental -R ${DEFAULT_TEST_TARGET} -E ${DEFAULT_EXCLUDE_TEST}
+
 
 test-full-no-submit: test-config
 	cd test; ctest -M Experimental -T Start -T Update -T Configure -T Build -T Test

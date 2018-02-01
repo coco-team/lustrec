@@ -8,7 +8,7 @@
 (*  version 2.1.                                                    *)
 (*                                                                  *)
 (********************************************************************)
-
+  
 type ident = Utils.ident
 type rat = Utils.rat
 type tag = Utils.tag
@@ -63,6 +63,7 @@ type var_decl =
      var_dec_clock: clock_dec;
      var_dec_const: bool;
      var_dec_value: expr option;
+     mutable var_parent_nodeid: ident option;
      mutable var_type: Types.type_expr;
      mutable var_clock: Clocks.clock_expr;
      var_loc: Location.t}
@@ -184,6 +185,7 @@ type imported_node_desc =
      nodei_outputs: var_decl list;
      nodei_stateless: bool;
      nodei_spec: node_annot option;
+     (* nodei_annot: expr_annot list; *)
      nodei_prototype: string option;
      nodei_in_lib: string list;
     }

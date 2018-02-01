@@ -33,7 +33,7 @@ and carrier_expr =
     {mutable carrier_desc: carrier_desc;
      mutable carrier_scoped: bool;
      carrier_id: int}
-
+     
 type clock_expr =
     {mutable cdesc: clock_desc;
      mutable cscoped: bool;
@@ -422,6 +422,36 @@ let uneval const cr =
   | Carry_name -> cr.carrier_desc <- Carry_const const
   | _         -> assert false
 
+
+(* Used in rename functions in Corelang. We have to propagate the renaming to
+   ids of variables clocking the signals *)
+
+(* Carrier are not renamed. They corresponds to enumerated type constants *)
+(*
+let rec rename_carrier f c =
+  { c with carrier_desc = rename_carrier_desc fvar c.carrier_desc }
+and rename_carrier_desc f 
+let re = rename_carrier f
+  match cd with
+  | Carry_const id -> Carry_const (f id)
+  | Carry_link ce -> Carry_link (re ce)
+  | _ -> cd
+*)
+
+     
+let rec rename_clock_expr fvar c =
+  { c with cdesc = rename_clock_desc fvar c.cdesc }
+and rename_clock_desc fvar cd =
+  let re = rename_clock_expr fvar in
+  match cd with
+  | Carrow (c1, c2) -> Carrow (re c1, re c2)
+  | Ctuple cl -> Ctuple (List.map re cl)
+  | Con (c1, car, id) -> Con (re c1, car, fvar id)
+  | Cvar 
+  | Cunivar -> cd
+  | Clink c -> Clink (re c)
+  | Ccarrying (car, c) -> Ccarrying (car, re c)
+    
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

@@ -31,32 +31,13 @@ struct
 (*                         Main related functions                                           *)
 (********************************************************************************************)
 
-let print_get_inputs fmt m =
-  let pi fmt (id, v', v) =
-  match (Types.unclock_type v.var_type).Types.tdesc with
-    | Types.Tint -> fprintf fmt "%s = _get_int(f_in%i, \"%s\")" v.var_id id v'.var_id
-    | Types.Tbool -> fprintf fmt "%s = _get_bool(f_in%i, \"%s\")" v.var_id id v'.var_id
-    | Types.Treal when !Options.mpfr -> fprintf fmt "mpfr_set_d(%s, _get_double(f_in%i, \"%s\"), %i)" v.var_id id v'.var_id (Mpfr.mpfr_prec ())
-    | Types.Treal -> fprintf fmt "%s = _get_double(f_in%i, \"%s\")" v.var_id id v'.var_id
-    | _ ->
-      begin
-	Global.main_node := !Options.main_node;
-	Format.eprintf "Code generation error: %a%a@."
-	  Error.pp_error_msg Error.Main_wrong_kind
-	  Location.pp_loc v'.var_loc;
-	raise (Error (v'.var_loc, Error.Main_wrong_kind))
-      end
-  in
-  List.iteri2 (fun idx v' v ->
-    fprintf fmt "@ %a;" pi ((idx+1), v', v);
-  ) m.mname.node_inputs m.mstep.step_inputs
 
 let print_put_outputs fmt m = 
   let po fmt (id, o', o) =
     let suff = string_of_int id in
     print_put_var fmt suff o'.var_id o.var_type o.var_id
   in
-  Utils.List.iteri2 (fun idx v' v -> fprintf fmt "@ %a;" po ((idx+1), v', v)) m.mname.node_outputs m.mstep.step_outputs
+  List.iteri2 (fun idx v' v -> fprintf fmt "@ %a;" po ((idx+1), v', v)) m.mname.node_outputs m.mstep.step_outputs
 
 let print_main_inout_declaration basename fmt m =
   let mname = m.mname.node_id in

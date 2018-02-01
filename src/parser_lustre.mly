@@ -120,6 +120,14 @@ let rec fby expr n init =
 %start signed_const
 %type <LustreSpec.constant> signed_const
 
+%start expr
+%type <LustreSpec.expr> expr
+
+%start stmt_list
+%type <LustreSpec.statement list * LustreSpec.assert_t list * LustreSpec.expr_annot list > stmt_list
+
+%start vdecl_list
+%type <LustreSpec.var_decl list> vdecl_list
 %%
 
 module_ident:
@@ -374,6 +382,8 @@ expr:
 /* constants */
   INT {mkexpr (Expr_const (Const_int $1))}
 | REAL {let c,e,s = $1 in mkexpr (Expr_const (Const_real (c,e,s)))}
+| STRING {mkexpr (Expr_const (Const_string $1))}
+
 /* | FLOAT {mkexpr (Expr_const (Const_float $1))}*/
 /* Idents or type enum tags */
 | IDENT { mkexpr (Expr_ident $1) }
@@ -571,11 +581,11 @@ vdecl_list:
 
 vdecl:
   ident_list COL typeconst clock 
-    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $3, $4, false, None) loc) $1 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $3, $4, false, None, None) loc) $1 }
 | CONST ident_list /* static parameters don't have clocks */
-    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, true, None) loc) $2 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, true, None, None) loc) $2 }
 | CONST ident_list COL typeconst /* static parameters don't have clocks */
-    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true, None) loc) $2 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true, None, None) loc) $2 }
 
 local_vdecl_list:
   local_vdecl {$1}
@@ -583,13 +593,13 @@ local_vdecl_list:
 
 local_vdecl:
 /* Useless no ?*/    ident_list
-    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, false, None) loc) $1 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, false, None, None) loc) $1 }
 | ident_list COL typeconst clock 
-    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $3, $4, false, None) loc) $1 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $3, $4, false, None, None) loc) $1 }
 | CONST vdecl_ident EQ expr /* static parameters don't have clocks */
-    { let (id, loc) = $2 in [ mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, true, Some $4) loc] }
+    { let (id, loc) = $2 in [ mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, true, Some $4, None) loc] }
 | CONST vdecl_ident COL typeconst EQ expr /* static parameters don't have clocks */
-    { let (id, loc) = $2 in [ mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true, Some $6) loc] }
+    { let (id, loc) = $2 in [ mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true, Some $6, None) loc] }
 
 cdecl_list:
   cdecl SCOL { (fun itf -> [$1 itf]) }

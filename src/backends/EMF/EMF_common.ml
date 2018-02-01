@@ -86,7 +86,7 @@ fprintf fmt "uint16"
       
    
      
-let pp_cst_type c infered_typ fmt =
+let pp_cst_type fmt c (*infered_typ*) =
   match c with
   | Const_tag t ->
      let typ = (Corelang.typedef_of_top (Hashtbl.find Corelang.tag_table t)) in
@@ -94,19 +94,17 @@ let pp_cst_type c infered_typ fmt =
        fprintf fmt "bool"
      else
        pp_tag_type fmt typ
-  | Const_int _ -> fprintf fmt "%s" !Options.int_type
-  | Const_real _ -> fprintf fmt "%s" !Options.real_type
-  | _ -> Format.eprintf "cst: %a@." Printers.pp_const c; assert false
+  | Const_int _ -> fprintf fmt "int" (*!Options.int_type*)
+  | Const_real _ -> fprintf fmt "real" (*!Options.real_type*)
+  | Const_string _ -> fprintf fmt "string" 
+  | _ -> eprintf "cst: %a@." Printers.pp_const c; assert false
 
 let rec pp_infered_type fmt t =
   let open Types in
+  if is_bool_type t  then fprintf fmt "bool" else
+  if is_int_type t then fprintf fmt "int" else (* !Options.int_type *)
+  if is_real_type t then fprintf fmt "real" else (* !Options.real_type *)
   match t.tdesc with
-  | Tint ->
-     fprintf fmt "%s" !Options.int_type
-  | Treal ->
-     fprintf fmt "%s" !Options.real_type
-  | Tbool ->
-     fprintf fmt "bool"
   | Tclock t ->
      pp_infered_type fmt t
   | Tstatic (_, t) ->
@@ -119,11 +117,12 @@ let rec pp_infered_type fmt t =
      pp_tag_type fmt typ
    | Tlink ty -> 
        pp_infered_type fmt ty 
-  | _ -> Format.eprintf "unhandled type: %a@." Types.print_node_ty t; assert false
+   | _ -> eprintf "unhandled type: %a@." Types.print_node_ty t; assert false
+     
 let rec pp_concrete_type dec_t infered_t fmt =
   match dec_t with
-  | Tydec_int -> fprintf fmt "%s" !Options.int_type
-  | Tydec_real -> fprintf fmt "%s" !Options.real_type
+  | Tydec_int -> fprintf fmt "int" (* !Options.int_type *)
+  | Tydec_real -> fprintf fmt "real" (* !Options.real_type *)
   (* TODO we could add more concrete types here if they were available in
      dec_t *)
   | Tydec_bool -> fprintf fmt "bool"
@@ -134,20 +133,25 @@ let rec pp_concrete_type dec_t infered_t fmt =
     pp_tag_type fmt typ
   )
   | Tydec_any -> pp_infered_type fmt infered_t 
-  | _ -> Format.eprintf
+  | _ -> eprintf
      "unhandled construct in type printing for EMF backend: %a@."
      Printers.pp_var_type_dec_desc dec_t; raise (Failure "var")
        
 
-let pp_cst_type fmt v =
+(*let pp_cst_type fmt v =
   match v.value_desc with
   | Cst c-> pp_cst_type c v.value_type fmt (* constants do not have declared type (yet) *)
   | _ -> assert false
-     
+*)
+       
 let pp_var_type fmt v =
   try
-  pp_concrete_type v.var_dec_type.ty_dec_desc v.var_type fmt
-  with Failure _ -> Format.eprintf "failed var: %a@." Printers.pp_var v; assert false
+    if Machine_types.is_specified v then
+      Machine_types.pp_var_type fmt v
+    else
+      pp_concrete_type v.var_dec_type.ty_dec_desc v.var_type fmt
+  with Failure _ -> eprintf "failed var: %a@." Printers.pp_var v; assert false
+    
 (******** Other print functions *)
     
 let pp_emf_var_decl fmt v =
@@ -171,16 +175,16 @@ let pp_tag_id fmt t =
   else
     let const_list = match typ.tydef_desc with Tydec_enum tl -> tl | _ -> assert false in
     fprintf fmt "%i" (get_idx t const_list)
-     
-let pp_emf_cst_or_var fmt v =
-  match v.value_desc with
-  | Cst ((Const_tag t) as c)->
+
+let pp_emf_cst fmt c =
+  match c with
+  | Const_tag t->
      let typ = (Corelang.typedef_of_top (Hashtbl.find Corelang.tag_table t)) in
      if typ.tydef_id = "bool" then (
        fprintf fmt "{@[\"type\": \"constant\",@ ";
        fprintf fmt"\"value\": \"%a\",@ "
 	 Printers.pp_const c;
-       fprintf fmt "\"datatype\": \"%a\"@ " pp_cst_type v;
+       fprintf fmt "\"datatype\": \"%a\"@ " pp_cst_type c;
        fprintf fmt "@]}"
      )
      else (
@@ -188,15 +192,25 @@ let pp_emf_cst_or_var fmt v =
 	 pp_tag_id t;
        fprintf fmt "\"origin_type\": \"%s\",@ \"origin_value\": \"%s\",@ "
 	 typ.tydef_id t;
-       fprintf fmt "\"datatype\": \"%a\"@ " pp_cst_type v;
+       fprintf fmt "\"datatype\": \"%a\"@ " pp_cst_type c;
        fprintf fmt "@]}"
      )
-  | Cst c -> (
+  | Const_string s ->
+    fprintf fmt "{@[\"type\": \"constant\",@ \"value\": \"%s\",@ " s;
+    fprintf fmt "\"datatype\": \"%a\"@ " pp_cst_type c;
+    fprintf fmt "@]}"
+     
+  | _ -> (
     fprintf fmt "{@[\"type\": \"constant\",@ \"value\": \"%a\",@ "
       Printers.pp_const c;
-    fprintf fmt "\"datatype\": \"%a\"@ " pp_cst_type v;
+    fprintf fmt "\"datatype\": \"%a\"@ " pp_cst_type c;
     fprintf fmt "@]}"
   )
+  
+  
+let pp_emf_cst_or_var fmt v =
+  match v.value_desc with
+  | Cst c -> pp_emf_cst fmt c
   | LocalVar v
   | StateVar v -> (
     fprintf fmt "{@[\"type\": \"variable\",@ \"value\": \"%a\",@ "
@@ -205,13 +219,59 @@ let pp_emf_cst_or_var fmt v =
     fprintf fmt "\"datatype\": \"%a\"@ " pp_var_type v;
     fprintf fmt "@]}"
   )
-  | _ -> Format.eprintf "Not of cst or var: %a@." Machine_code.pp_val v ; assert false (* Invalid argument *)
+  | _ -> eprintf "Not of cst or var: %a@." Machine_code.pp_val v ; assert false (* Invalid argument *)
 
 
 let pp_emf_cst_or_var_list =
   Utils.fprintf_list ~sep:",@ " pp_emf_cst_or_var
 
+(* Printer lustre expr and eexpr *)
+    
+let rec pp_emf_expr fmt e =
+  match e.expr_desc with
+  | Expr_const c -> pp_emf_cst fmt c
+  | Expr_ident id ->
+     fprintf fmt "{@[\"type\": \"variable\",@ \"value\": \"%a\",@ "
+       print_protect (fun fmt -> pp_print_string fmt id);
+    fprintf fmt "\"datatype\": \"%t\"@ "
+      (pp_concrete_type
+	 Tydec_any (* don't know much about that time since it was not
+		      declared. That may not work with clock constants *)
+	 e.expr_type
+      );
+    fprintf fmt "@]}"
 
+  | Expr_tuple el ->
+     fprintf fmt "[@[<hov 0>%a@ @]]"
+       (Utils.fprintf_list ~sep:",@ " pp_emf_expr) el
+  | _ -> (
+    Log.report ~level:2
+      (fun fmt ->
+	fprintf fmt "Warning: unhandled expression %a in annotation.@ "
+	  Printers.pp_expr e;
+	fprintf fmt "Will not be produced in the experted JSON EMF"
+      );    
+    fprintf fmt "\"unhandled construct, complain to Ploc\""
+  )
+(* Remaining constructs *)  
+(* | Expr_ite   of expr * expr * expr *)
+(* | Expr_arrow of expr * expr *)
+(* | Expr_fby of expr * expr *)
+(* | Expr_array of expr list *)
+(* | Expr_access of expr * Dimension.dim_expr *)
+(* | Expr_power of expr * Dimension.dim_expr *)
+(* | Expr_pre of expr *)
+(* | Expr_when of expr * ident * label *)
+(* | Expr_merge of ident * (label * expr) list *)
+(* | Expr_appl of call_t *)
+     
+
+let pp_emf_eexpr fmt ee =
+  fprintf fmt "{@[<hov 0>\"quantifiers\": \"%a\",@ \"qfexpr\": @[%a@]@] }"
+    (Utils.fprintf_list ~sep:"; " Printers.pp_quantifiers) ee.eexpr_quantifiers
+    pp_emf_expr ee.eexpr_qfexpr
+    
+    
 (* Local Variables: *)
 (* compile-command: "make -C ../.." *)
 (* End: *)

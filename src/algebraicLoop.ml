@@ -43,8 +43,9 @@ struct
   let resolve node partition : call list =
     let partition = ISet.of_list partition in
     (* Preprocessing calls: associate to each of them the eq.lhs associated *)
-    let eqs = get_node_eqs node in
-    let calls_expr = Causality.NodeDep.get_calls (fun _ -> true) eqs in
+    let calls_expr = Causality.NodeDep.get_calls (fun _ -> true) node in
+    let eqs, auts = get_node_eqs node in
+    assert (auts = []); (* TODO voir si on peut acceder directement aux eqs qui font les calls *)
     let calls = List.map (
       fun expr ->
 	let eq = List.find (fun eq ->

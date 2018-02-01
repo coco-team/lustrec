@@ -43,12 +43,10 @@ let print_mauve_header fmt mauve_machine basename prog machines _ (*dependencies
 let mauve_default_value v =
   (* let v_name = v.var_id in *)
 
-  let v_type = (Types.repr v.var_type).Types.tdesc in
-  match v_type with
-  | Types.Tbool -> "false"
-  | Types.Tint  -> "0"
-  | Types.Treal -> "0.0"
-  | _ -> assert false
+  if Types.is_bool_type v.var_type then "false"
+  else if Types.is_int_type v.var_type then "0"
+  else if Types.is_real_type v.var_type then "0.0"
+  else assert false
 
 let print_mauve_default fmt mauve_machine v = 
   let v_name: string = v.var_id in
@@ -80,7 +78,7 @@ let print_mauve_shell fmt mauve_machine basename prog machines _ (*dependencies*
   List.iter
     (fun v ->
       let v_name = v.var_id in
-      let v_type = pp_c_basic_type_desc (Types.repr v.var_type).Types.tdesc in
+      let v_type = pp_c_basic_type_desc v.var_type in
       fprintf fmt "\tReadPort<%s> & port_%s = mk_readPort<%s>(\"%s\", " v_type v_name v_type v_name;
       print_mauve_default fmt mauve_machine v;
       fprintf fmt ");@.";
@@ -90,7 +88,7 @@ let print_mauve_shell fmt mauve_machine basename prog machines _ (*dependencies*
   List.iter
     (fun v ->
       let v_name = v.var_id in
-      let v_type = pp_c_basic_type_desc (Types.repr v.var_type).Types.tdesc in
+      let v_type = pp_c_basic_type_desc v.var_type in
       fprintf fmt "\tWritePort<%s> & port_%s = mk_writePort<%s>(\"%s\");@." v_type v_name v_type v_name;
     ) mauve_machine.mstep.step_outputs;
 
@@ -134,13 +132,13 @@ let print_mauve_core fmt mauve_machine basename prog machines _ (*dependencies*)
   List.iter
     (fun v ->
       let v_name = v.var_id in
-      let v_type = pp_c_basic_type_desc (Types.repr v.var_type).Types.tdesc in
+      let v_type = pp_c_basic_type_desc v.var_type in
       fprintf fmt "\t\t%s %s = port_%s.read();@." v_type v_name v_name;
     ) mauve_machine.mstep.step_inputs;
   List.iter
     (fun v ->
       let v_name = v.var_id in
-      let v_type = pp_c_basic_type_desc (Types.repr v.var_type).Types.tdesc in
+      let v_type = pp_c_basic_type_desc v.var_type in
       fprintf fmt "\t\t%s %s;@." v_type v_name;
     ) mauve_machine.mstep.step_outputs;
   print_mauve_step fmt node_name mauve_machine;

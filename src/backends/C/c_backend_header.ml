@@ -35,15 +35,19 @@ struct
 
 let print_import_standard fmt =
   begin
+    (* if Machine_types.has_machine_type () then *)
+    (*   begin *)
+	fprintf fmt "#include <stdint.h>@.";
+      (* end; *)
     if !Options.mpfr then
       begin
 	fprintf fmt "#include <mpfr.h>@."
       end;
-  if !Options.cpp then
-    fprintf fmt "#include \"%s/arrow.hpp\"@.@." arrow_top_decl.top_decl_owner 
-  else
-    fprintf fmt "#include \"%s/arrow.h\"@.@." arrow_top_decl.top_decl_owner 
-
+    if !Options.cpp then
+      fprintf fmt "#include \"%s/arrow.hpp\"@.@." arrow_top_decl.top_decl_owner 
+    else
+      fprintf fmt "#include \"%s/arrow.h\"@.@." arrow_top_decl.top_decl_owner 
+	
   end
 
 let rec print_static_val pp_var fmt v =
@@ -281,7 +285,7 @@ let print_const_decl fmt cdecl =
       (pp_c_type cdecl.const_id) cdecl.const_type
 
 let rec pp_c_struct_type_field filename cpt fmt (label, tdesc) =
-  fprintf fmt "%a;" (pp_c_type_decl filename cpt label) tdesc
+   fprintf fmt "%a;" (pp_c_type_decl filename cpt label) tdesc
 and pp_c_type_decl filename cpt var fmt tdecl =
   match tdecl with
   | Tydec_any           -> assert false
@@ -297,12 +301,12 @@ and pp_c_type_decl filename cpt var fmt tdecl =
   | Tydec_enum tl ->
     begin
       incr cpt;
-      fprintf fmt "enum _enum_%s_%d { %a } %s" filename !cpt (Utils.fprintf_list ~sep:", " pp_print_string) tl var
+      fprintf fmt "enum _enum_%s_%d { %a } %s" (protect_filename filename) !cpt (Utils.fprintf_list ~sep:", " pp_print_string) tl var
     end
   | Tydec_struct fl ->
     begin
       incr cpt;
-      fprintf fmt "struct _struct_%s_%d { %a } %s" filename !cpt (Utils.fprintf_list ~sep:" " (pp_c_struct_type_field filename cpt)) fl var
+      fprintf fmt "struct _struct_%s_%d { %a } %s" (protect_filename filename) !cpt (Utils.fprintf_list ~sep:" " (pp_c_struct_type_field filename cpt)) fl var
     end
 
 let print_type_definitions fmt filename =
