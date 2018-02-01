@@ -278,6 +278,7 @@ let is_exportable v =
     let typ = get_specified_type v in
     match (MTypes.dynamic_type typ).MTypes.tdesc with
     | MTypes.Tbasic b -> MT.is_exportable b
+    | MTypes.Tconst _ -> false (* Enumerated types are not "machine type" customizeable *)
     | _ -> assert false  (* TODO deal with other constructs *)
   )      
 (* could depend on the actual computed type *)
@@ -307,7 +308,7 @@ let valid_subtype subtype typ =
     Format.eprintf "Subtype mismatch %a vs %a@." MTypes.print_ty subtyp Types.print_ty typ; false
   in
   match (MTypes.dynamic_type subtype).MTypes.tdesc with
-  
+  | MTypes.Tconst c -> Types.is_const_type typ c
   | MTypes.Tbasic MT.MTint _ -> Types.is_int_type typ
   | MTypes.Tbasic MT.MTreal _ -> Types.is_real_type typ
   | MTypes.Tbasic MT.MTbool -> Types.is_bool_type typ
@@ -470,7 +471,7 @@ let type_def node vars expr =
 
 let has_machine_type () =
   let annl = Annotations.get_expr_annotations keyword in
-  Format.eprintf "has _mchine _type annotations: %i@." (List.length annl);
+  (* Format.eprintf "has _mchine _type annotations: %i@." (List.length annl); *)
   List.length annl > 0
       
 (* Local Variables: *)
