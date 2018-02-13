@@ -8,10 +8,10 @@ struct
 
 module Prog =
 struct
-  let init, defs, state_vars =
+  let init, defs, state_vars, globals =
     let Program (init, defs, globals) = M.model in
     let state_vars = SF.states M.model in
-    init, defs, state_vars
+    init, defs, state_vars, globals
 
 (*let _ = Format.printf "Model definitions@.%a@.####" Simulink.pp_src defs; () *)
 end

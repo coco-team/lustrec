@@ -3,7 +3,13 @@ open SF
 
 let name = "simple"
 
-  let condition x = condition (Corelang.mkexpr Location.dummy_loc (LustreSpec.Expr_const (Corelang.const_of_bool true)))
+let condition x = condition {
+  expr = Corelang.mkexpr Location.dummy_loc (LustreSpec.Expr_const (Corelang.const_of_bool true));
+  cinputs = [];
+  coutputs = [];
+  cvariables = [];
+}
+  
   let action _ = no_action
 
 let model : prog_t =

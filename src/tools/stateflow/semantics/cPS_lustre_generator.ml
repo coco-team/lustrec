@@ -7,7 +7,8 @@ let ff = Format.fprintf
 module LustrePrinter (
   Vars : sig
     val state_vars : ActiveStates.Vars.t
-    val global_vars : LustreSpec.var_decl list
+    val global_vars : GlobalVarDef.t list
+
   end) : TransformerType =
 struct
   include TransformerStub
@@ -53,7 +54,7 @@ struct
     let loc = Location.dummy_loc in
     Corelang.mkvar_decl
       loc
-      (name, typ, Corelang.mkclock loc LustreSpec.Ckdec_any, false, None)
+      (name, typ, Corelang.mkclock loc LustreSpec.Ckdec_any, false, None, None (*"__no_parent__" *))
 
   let var_to_vdecl ?(prefix="") var typ = mkvar (var_to_ident prefix var) typ 
   let state_vars_to_vdecl_list ?(prefix="") vars =
@@ -115,7 +116,7 @@ struct
     LustreSpec.ty_dec_loc = Location.dummy_loc;
   }
     
-  let event_var = mkvar "event" event_type
+  let event_var = mkvar "event" event_type 
 
 
   let const_map : (event_base_t, int) Hashtbl.t = Hashtbl.create 13
@@ -327,13 +328,15 @@ struct
 	let (vars', tr') = tr "sin_" "sout_" in
 	pp_name call args;
 	let funname = Format.flush_str_formatter () in
+	let inputs = event_var :: state_vars_to_vdecl_list ~prefix:"sin_" Vars.state_vars in
+	let outputs = state_vars_to_vdecl_list ~prefix:"sout_" Vars.state_vars in
 	let node =
 	  Corelang.mktop (	
 	    LustreSpec.Node {LustreSpec.node_id = funname;
 			   node_type = Types.new_var ();
 			   node_clock = Clocks.new_var true;
-			   node_inputs = event_var :: state_vars_to_vdecl_list ~prefix:"sin_" Vars.state_vars;
-			   node_outputs = state_vars_to_vdecl_list ~prefix:"sout_" Vars.state_vars;
+			   node_inputs = inputs;
+			   node_outputs = outputs;
 			   node_locals = mk_locals vars'; (* TODO: add global vars *)
 			   node_gencalls = [];
 			   node_checks = [];
@@ -346,14 +349,30 @@ struct
       )  
 	in
 	[node]
+
+
+
+	  (* TODO
+	     C'est pas evident. 
+Il faut faire les choses suivantes:
+- rajouter dans un ensemble les variables manipulées localement
+- on doit comprendre comment les variables globales sont injectées dans le modele final:
+   - le node principal doit uniquement les afficher. Il peut les initialiser avec les valeurs init définies. Puis appeller la fcn thetacallD_from_principal.
+   - elles peuvent/doivent etre dans input et output de ce node thetacallD
+	  *)
+
 	  
   let mk_main_loop () =
     (* let loc = Location.dummy_loc in *)
     
     let call_stmt =
       (* (%t) -> pre (thetaCallD_from_principal (event, %a)) *)
-      let init = mkexpr
-	(LustreSpec.Expr_tuple (List.map (fun _ -> expr_of_bool false) (ActiveStates.Vars.elements Vars.state_vars)))
+      let init =
+	let init_state_false =
+	  List.map (fun _ -> expr_of_bool false) (ActiveStates.Vars.elements Vars.state_vars) in
+	let init_globals =
+	  List.map (fun v -> v.GlobalVarDef.init_val) Vars.global_vars in
+	mkexpr (LustreSpec.Expr_tuple (init_state_false @ init_globals))
       in
       let args = (Corelang.expr_of_vdecl event_var)::
 	(vars_to_exprl ~prefix:"sout_" Vars.state_vars)
@@ -363,13 +382,16 @@ struct
       let rhs = mkexpr (LustreSpec.Expr_arrow (init, pre_call_expr)) in
       mkstmt_eq Vars.state_vars ~prefix_lhs:"sout_" rhs
     in
+    let inputs = List.map Corelang.copy_var_decl [event_var] in
+    let outputs = state_vars_to_vdecl_list ~prefix:"sout_" Vars.state_vars in
+    (* TODO add the globals as sout_data_x entry values *)
     let node_principal =
       Corelang.mktop (	
 	LustreSpec.Node {LustreSpec.node_id = "principal_loop";
 			 node_type = Types.new_var ();
 			 node_clock = Clocks.new_var true;
-			 node_inputs = List.map Corelang.copy_var_decl [event_var];
-			 node_outputs = state_vars_to_vdecl_list ~prefix:"sout_" Vars.state_vars;
+			 node_inputs = inputs;
+			 node_outputs = outputs;
 			 node_locals = []; (* TODO: add global vars *)
 			 node_gencalls = [];
 			 node_checks = [];
@@ -381,7 +403,7 @@ struct
 			 node_annot = []}
       )  
     in
-      node_principal
+    node_principal
     
 
   let mkprincipal tr =
