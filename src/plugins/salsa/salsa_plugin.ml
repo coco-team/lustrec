@@ -12,8 +12,8 @@ module Plugin =
   let name = "salsa"
   
   let options = [
-
-  ]
+        "-debug", Arg.Set SalsaDatatypes.debug, "debug salsa plugin";
+      ]
 
   let activate () = salsa_enabled := true
 
