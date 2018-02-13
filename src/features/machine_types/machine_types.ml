@@ -38,6 +38,8 @@ EMF: rajouter les memoires dans les caracteristiques du node
 
 *)
 open LustreSpec
+
+let is_active = false
   
 let keyword = ["machine_types"]
 
@@ -434,7 +436,7 @@ let type_expr nd expr =
   let env, vars =
     Hashtbl.fold (fun vdecl machine_type (env, vds) ->
       if vdecl.var_parent_nodeid = Some nd.node_id then (
-	(* Format.eprintf "Adding variable %a to the environement@." Printers.pp_var vdecl; *)
+	 (* Format.eprintf "Adding variable %a to the environement@.@?" Printers.pp_var vdecl;  *)
 	let env = Env.add_value env vdecl.var_id machine_type in
 	env, vdecl::vds
       )
