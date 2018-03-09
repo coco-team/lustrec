@@ -10,41 +10,6 @@ let pp_hash ~sep f fmt r =
   Hashtbl.iter (fun k v -> Format.fprintf fmt "%t%s@ " (f k v) sep) r;
   Format.fprintf fmt "]@]";
 
-module FormalEnv =
-struct
-  type fe_t = (LT.ident, (int * LT.value_t)) Hashtbl.t
-  let cpt = ref 0
-
-  exception NoDefinition of LT.var_decl
-  (* Returns the expression associated to v in env *)
-  let get_def (env: fe_t) v = 
-    try 
-      snd (Hashtbl.find env v.LT.var_id) 
-    with Not_found -> raise (NoDefinition v)
-
-  let def (env: fe_t) d expr = 
-    incr cpt;
-    let fresh = Hashtbl.copy env in
-    Hashtbl.add fresh d.LT.var_id (!cpt, expr); fresh
-
-  let empty (): fe_t = Hashtbl.create 13
-
-  let pp fmt env = pp_hash ~sep:";" (fun k (_,v) fmt -> Format.fprintf fmt "%s -> %a" k MC.pp_val v) fmt env
-
-  let fold f = Hashtbl.fold (fun k (_,v) accu -> f k v accu)
-
-  let get_sort_fun env =
-    let order = Hashtbl.fold (fun k (cpt, _) accu -> (k,cpt)::accu) env [] in
-    fun v1 v2 -> 
-      if List.mem_assoc v1.LT.var_id order && List.mem_assoc v2.LT.var_id order then
-	if (List.assoc v1.LT.var_id order) <= (List.assoc v2.LT.var_id order) then 
-	  -1
-	else 
-	  1
-      else
-	assert false
-    
-end
 
 module Ranges = 
   functor (Value: sig type t val union: t -> t -> t val pp: Format.formatter -> t -> unit end)  ->
@@ -125,8 +90,8 @@ struct
       ST.(I(min x1 x1', max x2 x2'), J(min y1 y1', max y2 y2'))
     | _ -> Format.eprintf "%a cup %a failed@.@?" pp v1 pp v2; assert false 
 *)
-  let inject cst = match cst with
-    | LT.Const_int(i)  -> Salsa.Builder.mk_cst (ST.R(Num.num_of_int i, []), ST.R(Num.num_of_int i, []))
+  let inject cst = match cst with (* ATTENTION ATTENTION !!!!! Remettre les Num !!!! *) 
+    | LT.Const_int(i)  -> Salsa.Builder.mk_cst (ST.R(float_of_int i (*Num.num_of_int i*), []), ST.R(float_of_int i (*Num.num_of_int i*), []))
     | LT.Const_real (c,e,s) -> (* TODO: this is incorrect. We should rather
 				  compute the error associated to the float *)
        
@@ -269,7 +234,7 @@ let rec salsa_expr2value_t vars_env cst_env e  =
 					forget about errors and provide the
 					mean/middle value of the interval
 				     *)
-      let  new_float = Num.float_of_num c in
+      let  new_float = Salsa.NumMartel.float_of_num c in
       (* let new_float =  *)
       (* 	if f1 = f2 then *)
       (* 	  f1 *)
@@ -341,6 +306,54 @@ let rec get_salsa_free_vars vars_env constEnv absenv e =
   | ST.Cst _ -> Vars.empty
   | _ -> assert false
 
+
+module FormalEnv =
+struct
+  type fe_t = (LT.ident, (int * LT.value_t)) Hashtbl.t
+  let cpt = ref 0
+
+  exception NoDefinition of LT.var_decl
+  (* Returns the expression associated to v in env *)
+  let get_def (env: fe_t) v = 
+    try 
+      snd (Hashtbl.find env v.LT.var_id) 
+    with Not_found -> raise (NoDefinition v)
+
+  let fold f = Hashtbl.fold (fun k (_,v) accu -> f k v accu)
+      
+  let to_salsa constEnv formalEnv = 
+    fold (fun id expr accu ->
+      (id, value_t2salsa_expr constEnv expr)::accu
+    ) formalEnv [] 
+
+  let def constEnv vars_env (env: fe_t) d expr = 
+    incr cpt;
+    let fresh = Hashtbl.copy env in
+    let expr_salsa = value_t2salsa_expr constEnv expr in
+    let salsa_env = to_salsa constEnv env in
+    let expr_salsa, _ = Salsa.Rewrite.substVars expr_salsa salsa_env 0 in
+    let expr_salsa = Salsa.Analyzer.evalPartExpr expr_salsa salsa_env ([] (* no blacklisted vars *)) ([] (*no arrays *)) in
+    let expr_lustrec = salsa_expr2value_t vars_env [] expr_salsa in
+    Hashtbl.add fresh d.LT.var_id (!cpt, expr_lustrec); fresh
+
+  let empty (): fe_t = Hashtbl.create 13
+
+  let pp fmt env = pp_hash ~sep:";" (fun k (_,v) fmt -> Format.fprintf fmt "%s -> %a" k MC.pp_val v) fmt env
+
+
+  let get_sort_fun env =
+    let order = Hashtbl.fold (fun k (cpt, _) accu -> (k,cpt)::accu) env [] in
+    fun v1 v2 -> 
+      if List.mem_assoc v1.LT.var_id order && List.mem_assoc v2.LT.var_id order then
+	if (List.assoc v1.LT.var_id order) <= (List.assoc v2.LT.var_id order) then 
+	  -1
+	else 
+	  1
+      else
+	assert false
+end
+
+     
 (* Local Variables: *)
 (* compile-command:"make -C ../../.." *)
 (* End: *)
