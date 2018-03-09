@@ -130,31 +130,26 @@ let filter_original n vl =
 
 let schedule_node n =
   (* let node_vars = get_node_vars n in *)
-  try
-    let eq_equiv = ExprDep.node_eq_equiv n in
-    let eq_equiv v1 v2 =
-      try
-	Hashtbl.find eq_equiv v1 = Hashtbl.find eq_equiv v2
-      with Not_found -> false in
+  let eq_equiv = ExprDep.node_eq_equiv n in
+  let eq_equiv v1 v2 =
+    try
+      Hashtbl.find eq_equiv v1 = Hashtbl.find eq_equiv v2
+    with Not_found -> false in
 
-    let n', g = global_dependency n in
-    
-    (* TODO X: extend the graph with inputs (adapt the causality analysis to deal with inputs
+  let n', g = global_dependency n in
+  
+  (* TODO X: extend the graph with inputs (adapt the causality analysis to deal with inputs
      compute: coi predecessors of outputs
      warning (no modification) when memories are non used (do not impact output) or when inputs are not used (do not impact output)
-       DONE !
-     *)
+     DONE !
+  *)
 
-    let gg = IdentDepGraph.copy g in
-    let sort = topological_sort eq_equiv g in
-    let unused = Liveness.compute_unused_variables n gg in
-    let fanin = Liveness.compute_fanin n gg in
-    { node = n'; schedule = sort; unused_vars = unused; fanin_table = fanin; dep_graph = gg; }
+  let gg = IdentDepGraph.copy g in
+  let sort = topological_sort eq_equiv g in
+  let unused = Liveness.compute_unused_variables n gg in
+  let fanin = Liveness.compute_fanin n gg in
+  { node = n'; schedule = sort; unused_vars = unused; fanin_table = fanin; dep_graph = gg; }
 
-  with (Causality.Cycle vl) as exc ->
-    let vl = filter_original n vl in
-    pp_error Format.err_formatter vl;
-    raise exc
 
 let compute_node_reuse_table report =
   let disjoint = Disjunction.clock_disjoint_map (get_node_vars report.node) in
@@ -191,10 +186,10 @@ let schedule_prog prog =
   List.fold_right (
     fun top_decl (accu_prog, sch_map)  ->
       match top_decl.top_decl_desc with
-	| Node nd -> 
-	  let report = schedule_node nd in
-	  {top_decl with top_decl_desc = Node report.node}::accu_prog, 
-	  IMap.add nd.node_id report sch_map
+      | Node nd ->
+	let report = schedule_node nd in
+	{top_decl with top_decl_desc = Node report.node}::accu_prog, 
+	IMap.add nd.node_id report sch_map
 	| _ -> top_decl::accu_prog, sch_map
     ) 
     prog
@@ -259,7 +254,7 @@ let pp_warning_unused fmt node_schs =
 	 (fun u ->
 	   let vu = get_node_var u nd in
 	   if vu.var_orig
-	   then Format.fprintf fmt "Warning: variable '%s' seems unused@.%a@." u Location.pp_loc vu.var_loc)
+	   then Format.fprintf fmt "  Warning: variable '%s' seems unused@,  %a@,@," u Location.pp_loc vu.var_loc)
 	 unused
    )
    node_schs

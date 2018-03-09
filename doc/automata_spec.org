@@ -1,0 +1,316 @@
+* Syntax 
+
+An automaton definition is similar to the definition of flows in a Lustre node. 
+The syntax in lustrec is the following:
+
+automaton id
+   (state Id:
+     (unless cond (resume | restart) Id)*
+     (var (id: type)+)?
+     let
+        (lustre_defs)+
+     tel
+     (until cond (resume | restart) Id)*
+   )+
+
+where
+  id denotes regular lustre identifier 
+  Id denotes an identifier starting with an uppercase letter
+  type denotes a type
+  cond denotes a lustre expression of type bool
+  lustre_def denotes lustre flow definitions, either assignments or automata
+  *,+,? denotes classical notations for regular expressions
+
+
+Example
+
+node auto (x:bool) returns (ok: bool);
+var bit: bool;
+    coin: bool;
+let
+  automaton mini_states
+  state Even : 
+  let 
+    bit = true;
+  tel until true restart Odd
+  state Odd : 
+  let 
+    bit = false;
+  tel until true restart Even
+
+  coin = true -> not pre coin;
+  ok = bit = coin;
+tel
+  
+* Semantics
+
+In terms of semantics, each automaton defines a tuple of flows. In our modelling
+choice, each state should define all the elements of this tuple. Local variable
+specific to a given state will also have to be defined is this state.
+
+** Semantics
+
+The semantics is the following: 
+
+- the initial state is the first one described
+- when executing a transition, the current active state is evaluated. 
+  - UNLESS: First its unless definitions are executed, in order. The first one that
+    matches identifies the real state that will be executed. 
+  - CONTENT: If no such unless condition has been activated, the regular flow equations
+    of the current node are performed. Otherwise we evaluate the content of the
+    node selected by the activated unless definition. 
+  - UNTIL: Once these equations have been performed, the until definitions are executed
+    to identify the next active state. If no such until definition can be
+    activated, the current state remains active.
+- the kind resume/restart of state switch describe whether the node equation
+  will have to rely on the initial definition or the regular one. Eg if x = 0 ->
+  pre x in state S, a unless or until condition to state S with a restart will
+  execute the equation x = 0 when it would have been x = pre x with a resume.
+
+** Design choices 
+
+*** Id for state names
+During compilation, the tuple of variables defined by the automaton will be
+substituted by regular Lustre v4 flow equations using clocks and merge. Clocks
+will be defined over enumerated datatype representing the states of the
+automaton. This explains the use of Id instead of id for state names.
+
+*** No pre of internal memories for unless conditions
+A syntactic restriction of our language prevents the use of the Lustre pre
+construct over variables defined in the automaton in the condition appearing in
+a unless definition: this would introduce a (potentially spurious) algebraic
+loop. This is explained below.
+
+*** Modular Lustre v4 compiled code
+
+Our compilation scheme is modular and generates a Lustre v4 model where each
+state is defined by a dedicated node -- more specifically two of them, one for
+evaluating the unless conditions, and the other for node content and until
+conditions. The resulting model will rely on enumerated clocks, clocked
+expressions (expr when clock=clock_val) and merge of clocked expressions
+(merge(e1, e2, ...) ).
+ 
+* Comparison with other modeling choices
+
+** Pouzet, Colaco [CP]
+
+Our design is largely inspired by this publication. We made however a few
+different design choices:
+
+- in [CP] unless and until equations are gathered at the beginning of the node,
+  similar to our unless definitions. We assume that their order should be
+  preserved (unless before until) even if we don't have access to a specific
+  implementation of such paper. 
+  => This can be easily changed by accepting until transitions in state headers.
+
+- the compilation scheme proposed by [CP] amounts to inline all definitions of
+  states in the parent node. 
+  - pro wrt us: all equations defining unless/until/state contents are available
+    at the same 'level' without any encapsulating into node calls. Therefore no
+    spurious algebraic loop is introduced. This authorizes the use of (pre mem)
+    in unless conditions where mem is a stateful flow defined by the same
+    automaton.
+  - cons wrt us: because of inline and of the way the merge is clocked
+    expression is performed, all variables in the tuple of flows defined by the
+    automaton should share the same scheduling. In our design, since each state
+    content is defined by a specific node, it can accept a different state-local
+    scheduling of flows.
+    Let us consider the following automaton:
+
+    automaton foo
+      state Case1:
+      let
+         a = 0 -> pre a;
+         b = a + 1;
+      tel
+      state Case2:
+      let
+         b = 0 -> pre b;
+         a = b + 1;
+      tel
+
+    This automaton defined the flows (a,b) but requires to compute a before b in
+    Case1 and b before a in Case2. While this model is syntactically valid, it
+    will be rejected by [CP] scheduling and accepted by our.
+
+    On the contrary, let us consider the following automaton:
+
+    node triangle (r :bool) returns (o: int );
+    let
+      automaton trivial
+        state One:
+        unless r or (pre o = 100) restart One
+        let
+           o = 0 -> 1 + pre o;
+        tel
+    tel
+
+    Our produced v4 code with clocks is the following:
+
+    type trivial__type = enum {One };
+  
+    node trivial__One_handler_until (trivial__restart_act: bool) returns (trivial__restart_in: bool; trivial__state_in: trivial__type; o_out: int)
+    var __trivial__One_handler_until_2: int;
+        __trivial__One_handler_until_1: bool;
+        o: int;
+    let
+      trivial__restart_in, trivial__state_in = (false,One);
+      o_out = o;
+      o = (if __trivial__One_handler_until_1 then 0 else (1 + __trivial__One_handler_until_2));
+      __trivial__One_handler_until_2 = pre o;
+      __trivial__One_handler_until_1 = (true -> false);    
+    tel
+
+    node trivial__One_unless (trivial__restart_in: bool; r: bool; o: int) returns (trivial__restart_act: bool; trivial__state_act: trivial__type)
+    var __trivial__One_unless_2: bool;
+        __trivial__One_unless_1: int;
+    let 
+      trivial__restart_act, trivial__state_act = (if __trivial__One_unless_2 then (true,One) else (trivial__restart_in,One));
+      __trivial__One_unless_2 = (r or (__trivial__One_unless_1 = 100));
+      __trivial__One_unless_1 = pre o;
+    tel
+ 
+    node triangle (r: bool) returns (o: int)
+    var trivial__state_in: trivial__type clock;
+        trivial__state_act: trivial__type clock;
+        __triangle_7: bool;
+        __triangle_8: trivial__type;
+        __triangle_6: bool;
+        __triangle_3: bool when One(trivial__state_act);
+        __triangle_4: trivial__type when One(trivial__state_act);
+        __triangle_5: int when One(trivial__state_act);
+        __triangle_1: bool when One(trivial__state_in);
+        __triangle_2: trivial__type when One(trivial__state_in);
+        trivial__next_restart_in: bool;
+        trivial__restart_in: bool;
+        trivial__restart_act: bool;
+        trivial__next_state_in: trivial__type;
+    let    
+        trivial__restart_in, trivial__state_in = (if __triangle_6 then (false,One) else (__triangle_7,__triangle_8));
+        __triangle_7, __triangle_8 = pre (trivial__next_restart_in,trivial__next_state_in);
+        __triangle_6 = (true -> false);
+        trivial__next_restart_in, trivial__next_state_in, o = merge trivial__state_act (One -> (__triangle_3,__triangle_4,__triangle_5));
+        __triangle_3, __triangle_4, __triangle_5 = trivial__One_handler_until (trivial__restart_act when One(trivial__state_act)) every (trivial__restart_act);
+        trivial__restart_act, trivial__state_act = merge trivial__state_in (One -> (__triangle_1,__triangle_2));
+        __triangle_1, __triangle_2 = trivial__One_unless (trivial__restart_in when One(trivial__state_in),r when One(trivial__state_in),o when One(trivial__state_in)) every (trivial__restart_in);
+    tel
+ 
+    The use of a stateful trivial__One_unless function leads to a scheduling
+    error, hence a possible algebraic loop: o, __triangle_1, trivial__state_act,
+    __triangle_5, trivial__restart_act, node trivial__One_handler_until_50_2,
+    __triangle_2, node trivial__One_unless_52_1.
+
+    In practice, if one inlines (manually) the function trivial__One_unless, we
+    obtain the following valid code (for our compiler):
+    
+    __triangle_1, __triangle_2 = (if (r or (pre o = 100)) then (true, One) else (trivial__restart_in, One)) when One(trivial__state_in);
+
+
+** Scade automata [SQRC]
+
+Scade automata are different:
+- initial and final states
+- signals (events emit)
+- synchro transition that seems to rely on final states 
+
+With only [SQRC], it is difficult to elaborate more:
+- can we encode signals?
+- what is the specific syntax of conditions? The examples cover if-then-else and
+  emits. Is it allowed to define more?
+- how do you read or react to signals?
+
+In terms of syntax, 
+- both unless and until are defined at the beginning of the state
+- the automaton prototype explicitely declares the assigned flows
+
+In terms of semantics:
+- all assigned flows of the automaton should not need to be defined as in [CP]
+  or our approach. By default an undefined flow preserves its value: x = pre x;
+- without performing inlining as in [CP], it seems that Scade enables a
+  different scheduling btw different states.
+
+
+* References
+
+[CP] Colaco, Pouzet and co
+[SQRC] Scade Quick Reference Card
+
+* Garbage
+
+** Cex of pre in unless
+
+    
+    automaton bar
+      state Run:
+      unless true -> (pre a < 0) restart Error
+      let
+         a = input -> pre a + 1;
+      tel
+      state Error:
+      let 
+         a = -1;
+      tel
+    
+    In this model, the intended semantics is the following, if the input is non
+    negative, the state remains Run and the a flow is increased at each
+    step. However if the previous state was negative than the automaton jumps to
+    a Stop state and remains there.
+
+    When compiled into Lustre v4 flows with clocked expressions, we have the
+    following definitions:
+
+    type bar__type = enum {Run, Error };
+    
+    node test (input: _a) returns (o: _b)
+    var bar__next_restart_in: _c;
+        bar__restart_in: _d;
+        bar__restart_act: _e;
+        bar__next_state_in: _f;
+        bar__state_in: _g;
+        bar__state_act: _h;
+        a: _i;
+   let
+       o = a;
+       bar__restart_act, bar__state_act = merge bar__state_in (Run -> bar__Run_unless (bar__restart_in when Run(bar__state_in),a when Run(bar__state_in)) every (bar__restart_in)) (Error -> bar__Error_unless (bar__restart_in when Error(bar__state_in)) every (bar__restart_in));
+       bar__next_restart_in, bar__next_state_in, a = merge bar__state_act (Run -> bar__Run_handler_until (bar__restart_act when Run(bar__state_act),input when Run(bar__state_act)) every (bar__restart_act)) (Error -> bar__Error_handler_until (bar__restart_act when Error(bar__state_act)) every (bar__restart_act));
+       bar__restart_in, bar__state_in = ((false,Run) -> pre (bar__next_restart_in,bar__next_state_in));  
+   tel
+ 
+   node bar__Run_unless (bar__restart_in: _j; a: _k) returns (bar__restart_act: _l; bar__state_act: _m)
+   let
+      bar__restart_act, bar__state_act = (if (true -> (pre a < 0)) then (true,Error) else (bar__restart_in,Run));
+   tel
+ 
+   node bar__Error_unless (bar__restart_in: _n) returns (bar__restart_act: _o; bar__state_act: _p)
+   let    
+     bar__restart_act, bar__state_act = (bar__restart_in,Error);   
+   tel
+ 
+   node bar__Run_handler_until (bar__restart_act: _q; input: _r) returns (bar__restart_in: _s; bar__state_in: _t; a_out: _u)
+   var a: _v;
+   let    
+      a = (input -> (pre a + 1));
+      a_out = a;
+      bar__restart_in, bar__state_in = (false,Run);
+   tel
+ 
+   node bar__Error_handler_until (bar__restart_act: _w) returns (bar__restart_in: _x; bar__state_in: _y; a_out: _z)
+   var a: _a1;
+   let 
+     a = (- (1));
+     a_out = a;
+     bar__restart_in, bar__state_in = (false,Error);
+   tel
+
+** Scade
+
+According to [] the syntax is the following
+
+automaton SM1 returns ...;
+(initial | final | ) state Id
+let
+
+tel
+
+They have a notion of initial and final states. In our case the initial one is
+the first defined. 

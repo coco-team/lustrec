@@ -10,16 +10,13 @@
 (********************************************************************)
 
 let version = Version.number
-let include_path = Version.include_path
-
-let print_version () =
-  Format.printf "Lustrec compiler, version %s (dev)@." version;
-  Format.printf "Include directory: %s@." include_path
+let codename = Version.codename
+let include_dirs = ref ["."]
 
 let main_node = ref ""
 let static_mem = ref true
-let print_types = ref true
-let print_clocks = ref true
+let print_types = ref false
+let print_clocks = ref false
 let delay_calculus = ref true
 let track_exceptions = ref true
 let ansi = ref false
@@ -35,67 +32,30 @@ let lusi = ref false
 let print_reuse = ref false
 let const_unfold = ref false
 let mpfr = ref false
-let mpfr_prec = ref 0
+let mpfr_prec = ref 100
+let print_dec_types = ref false
 
-let horntraces = ref false
+let traces = ref false
 let horn_cex = ref false
-let horn_queries = ref false
+let horn_query = ref true
 
+let cpp       = ref false
+let int_type  = ref "int"
+let real_type = ref "double"
+let print_prec_double = ref 15
+let print_prec_float = ref 10
 
-let set_mpfr prec =
-  if prec > 1 then (
-    mpfr := true;
-    mpfr_prec := prec;
-    (* salsa_enabled := false; (* We deactivate salsa *) TODO *)
-  )
-  else
-    failwith "mpfr requires an integer > 1"
-			
-let options =
-  [ "-d", Arg.Set_string dest_dir,
-    "uses the specified \x1b[4mdirectory\x1b[0m as root for generated/imported object and C files <default: .>";
-    "-node", Arg.Set_string main_node, "specifies the \x1b[4mmain\x1b[0m node";
-    "-init", Arg.Set delay_calculus, "performs an initialisation analysis for Lustre nodes <default: no analysis>";
-    "-dynamic", Arg.Clear static_mem, "specifies a dynamic allocation scheme for main Lustre node <default: static>";
-    "-check-access", Arg.Set check, "checks at runtime that array accesses always lie within bounds <default: no check>";
-    "-mpfr", Arg.Int set_mpfr, "replaces FP numbers by the MPFR library multiple precision numbers using \x1b[4mprecision\x1b[0m bits <default: keep FP numbers>";
-    "-lusi", Arg.Set lusi, "only generates a .lusi interface source file from a Lustre source <default: no generation>";
-    "-no-spec", Arg.Unit (fun () -> spec := "no"), "do not generate any specification";
-    "-acsl-spec", Arg.Unit (fun () -> spec := "acsl"), "generates an ACSL encoding of the specification. Only meaningful for the C backend <default>";
-    "-c-spec", Arg.Unit (fun () -> spec := "c"), "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
-    "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C";
-    "-horn", Arg.Unit (fun () -> output := "horn"), "generates Horn clauses encoding output instead of C";
-    "-horn-traces", Arg.Unit (fun () -> output := "horn"; horntraces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
-    "-horn-cex", Arg.Unit (fun () -> output := "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
-    "-horn-queries", Arg.Unit (fun () -> output := "horn"; horn_queries:=true), "generate queries in generated Horn file. Enable the horn backend (work in progress)";
-    "-print_reuse", Arg.Set print_reuse, "prints variable reuse policy";
-    "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";
-    "-inline", Arg.Unit (fun () -> global_inline := true; const_unfold := true), "inline all node calls (require a main node). Implies constant unfolding";
-    "-witnesses", Arg.Set witnesses, "enable production of witnesses during compilation";
-    "-print_types", Arg.Set print_types, "prints node types";
-    "-print_clocks", Arg.Set print_clocks, "prints node clocks";
-    "-O", Arg.Set_int optimization, "changes optimization \x1b[4mlevel\x1b[0m <default: 2>";
-    "-verbose", Arg.Set_int verbose_level, "changes verbose \x1b[4mlevel\x1b[0m <default: 1>";
-    "-version", Arg.Unit print_version, "displays the version";]
+let sfunction = ref ""
 
+let mauve = ref ""
+(* test generation options *)
+let nb_mutants = ref 1000
+let gen_mcdc = ref false
+let no_mutation_suffix = ref false
 
-let plugin_opt (name, activate, options) =
-  ( "-" ^ name , Arg.Unit activate, "activate plugin " ^ name ) ::
-    (List.map (fun (opt, act, desc) -> "-" ^ name ^ opt, act, desc) options)
- 
-
-let get_witness_dir filename =
-  (* Make sure the directory exists *)
-  let dir = !dest_dir ^ "/" ^ (Filename.basename filename) ^ "_witnesses" in
-  let _ = try
-	    if not (Sys.is_directory dir) then (
-	      Format.eprintf "File of name %s exists. It should be a directory.@." dir;
-	      exit 1
-	    )
-    with Sys_error _ -> Unix.mkdir dir 0o750
-  in
-  dir
-
+let solve_al = ref false
+let al_nb_max = ref 15
+  
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

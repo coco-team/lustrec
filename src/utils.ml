@@ -33,7 +33,7 @@ struct (* Node module *)
 end
 
 module IMap = Map.Make(IdentModule)
-
+    
 module ISet = Set.Make(IdentModule)
 
 exception DeSome
@@ -298,6 +298,13 @@ let pp_iset fmt t =
     Format.fprintf fmt "}@."
   end
 
+let pp_imap pp_val fmt m =
+  begin
+    Format.fprintf fmt "@[{@ ";
+    IMap.iter (fun key v -> Format.fprintf fmt "%s -> %a@ " key pp_val v) m;
+    Format.fprintf fmt "}@ @]"
+  end
+    
 let pp_hashtbl t pp_fun beg_str end_str sep_str =
   if (beg_str="\n") then
     print_newline ()
@@ -340,12 +347,6 @@ let var_id_cpt = ref 0
 let get_new_id () = incr var_id_cpt;!var_id_cpt
 
 
-let track_exception () =
- if !Options.track_exceptions
- then (Printexc.print_backtrace stdout; flush stdout)
- else ()
-
-
 (* for lexing purposes *)
 
 (* Update line number for location info *)
@@ -361,6 +362,27 @@ let last_tag = ref (-1)
 let new_tag () =
   incr last_tag; !last_tag
 
+
+module List =
+struct
+  include List 
+  let iteri2 f l1 l2 =
+    if List.length l1 <> List.length l2 then
+      raise (Invalid_argument "iteri2: lists have different lengths")
+    else
+      let rec run idx l1 l2 =
+	match l1, l2 with
+	| [], [] -> ()
+	| hd1::tl1, hd2::tl2 -> (
+	  f idx hd1 hd2;
+	  run (idx+1) tl1 tl2
+	)
+	| _ -> assert false
+      in
+      run 0 l1 l2
+end
+
+  
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

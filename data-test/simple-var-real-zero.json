@@ -1,0 +1,15 @@
+{
+    "data": [
+        {
+            "datatype": "real",
+            "initial_value": "0.0",
+            "name": "my_real_var_zero",
+            "scope": "Output"
+        }
+    ],
+    "junctions": [],
+    "name": "simple_var_real_zero",
+    "origin_path": "simple_var_real_zero",
+    "sffunctions": [],
+    "states": []
+}

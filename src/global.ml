@@ -1,8 +1,9 @@
+module Types = Types.Main
+
 let type_env : (Types.type_expr Env.t) ref = ref Env.initial
 let clock_env : (Clocks.clock_expr Env.t) ref = ref Env.initial
 let basename = ref ""
 let main_node = ref ""
-
 
 module TypeEnv =
 struct

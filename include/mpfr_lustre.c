@@ -1,7 +1,13 @@
 #include <mpfr.h>
 #include "mpfr_lustre.h"
 
-const int MPFR_PREC = 15;
+void MPFR_LUSTRE_INIT () {
+  return;
+}
+
+void MPFR_LUSTRE_CLEAR () {
+  return;
+}
 
 void MPFRNeq_step (mpfr_t i1, mpfr_t i2, 
                           _Bool (*out)

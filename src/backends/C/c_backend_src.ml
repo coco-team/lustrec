@@ -30,6 +30,7 @@ struct
 (*                    Instruction Printing functions                                        *)
 (********************************************************************************************)
 
+
 (* Computes the depth to which multi-dimension array assignments should be expanded.
    It equals the maximum number of nested static array constructions accessible from root [v].
 *)
@@ -116,26 +117,72 @@ let pp_loop_var fmt lv =
  match snd lv with
  | LVar v -> fprintf fmt "[%s]" v
  | LInt r -> fprintf fmt "[%d]" !r
- | LAcc i -> fprintf fmt "[%a]" pp_c_dimension (dimension_of_value i)
+ | LAcc i -> fprintf fmt "[%a]" pp_val i
 
 (* Prints a suffix of loop variables for arrays *)
 let pp_suffix fmt loop_vars =
  Utils.fprintf_list ~sep:"" pp_loop_var fmt loop_vars
 
-(* Prints a [value] indexed by the suffix list [loop_vars] *)
-let rec pp_value_suffix self loop_vars pp_value fmt value =
- match loop_vars, value.value_desc with
- | (_, LInt r) :: q, Array vl      ->
-   pp_value_suffix self q pp_value fmt (List.nth vl !r)
- | _           :: q, Power (v, n)  ->
-   pp_value_suffix self q pp_value fmt v
- | _               , Fun (n, vl)   ->
-   Basic_library.pp_c n (pp_value_suffix self loop_vars pp_value) fmt vl
- | _               , Access (v, i) ->
-   pp_value_suffix self ((Dimension.mkdim_var (), LAcc i) :: loop_vars) pp_value fmt v
- | _               , _             ->
-   let pp_var_suffix fmt v = fprintf fmt "%a%a" pp_value v pp_suffix loop_vars in
-   pp_c_val self pp_var_suffix fmt value
+(* Prints a value expression [v], with internal function calls only.
+   [pp_var] is a printer for variables (typically [pp_c_var_read]),
+   but an offset suffix may be added for array variables
+*)
+(* Prints a constant value before a suffix (needs casting) *)
+let rec pp_c_const_suffix var_type fmt c =
+  match c with
+    | Const_int i          -> pp_print_int fmt i
+    | Const_real (_, _, s) -> pp_print_string fmt s
+    | Const_tag t          -> pp_c_tag fmt t
+    | Const_array ca       -> let var_type = Types.array_element_type var_type in
+                              fprintf fmt "(%a[]){%a }" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_c_const_suffix var_type)) ca
+    | Const_struct fl       -> fprintf fmt "{%a }" (Utils.fprintf_list ~sep:", " (fun fmt (f, c) -> (pp_c_const_suffix (Types.struct_field_type var_type f)) fmt c)) fl
+    | Const_string _        -> assert false (* string occurs in annotations not in C *)
+
+
+(* Prints a [value] of type [var_type] indexed by the suffix list [loop_vars] *)
+let rec pp_value_suffix self var_type loop_vars pp_value fmt value =
+  (*Format.eprintf "pp_value_suffix: %a %a %a@." Types.print_ty var_type Machine_code.pp_val value pp_suffix loop_vars;*)
+  (
+    match loop_vars, value.value_desc with
+    | (x, LAcc i) :: q, _ when is_const_index i ->
+       let r = ref (Dimension.size_const_dimension (Machine_code.dimension_of_value i)) in
+       pp_value_suffix self var_type ((x, LInt r)::q) pp_value fmt value
+    | (_, LInt r) :: q, Cst (Const_array cl) ->
+       let var_type = Types.array_element_type var_type in
+       pp_value_suffix self var_type q pp_value fmt (mk_val (Cst (List.nth cl !r)) Type_predef.type_int)
+    | (_, LInt r) :: q, Array vl      ->
+       let var_type = Types.array_element_type var_type in
+       pp_value_suffix self var_type q pp_value fmt (List.nth vl !r)
+    | loop_var    :: q, Array vl      ->
+       let var_type = Types.array_element_type var_type in
+       Format.fprintf fmt "(%a[]){%a }%a" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_value_suffix self var_type q pp_value)) vl pp_suffix [loop_var]
+    | []              , Array vl      ->
+       let var_type = Types.array_element_type var_type in
+       Format.fprintf fmt "(%a[]){%a }" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_value_suffix self var_type [] pp_value)) vl
+    | _           :: q, Power (v, n)  ->
+       pp_value_suffix self var_type q pp_value fmt v
+    | _               , Fun (n, vl)   ->
+       Basic_library.pp_c n (pp_value_suffix self var_type loop_vars pp_value) fmt vl
+    | _               , Access (v, i) ->
+       let var_type = Type_predef.type_array (Dimension.mkdim_var ()) var_type in
+       pp_value_suffix self var_type ((Dimension.mkdim_var (), LAcc i) :: loop_vars) pp_value fmt v
+    | _               , LocalVar v    -> Format.fprintf fmt "%a%a" pp_value v pp_suffix loop_vars
+    | _               , StateVar v    ->
+       (* array memory vars are represented by an indirection to a local var with the right type,
+	  in order to avoid casting everywhere. *)
+       if Types.is_array_type v.var_type
+       then Format.fprintf fmt "%a%a" pp_value v pp_suffix loop_vars
+       else Format.fprintf fmt "%s->_reg.%a%a" self pp_value v pp_suffix loop_vars
+    | _               , Cst cst       -> pp_c_const_suffix var_type fmt cst
+    | _               , _             -> (Format.eprintf "internal error: C_backend_src.pp_value_suffix %a %a %a@." Types.print_ty var_type Machine_code.pp_val value pp_suffix loop_vars; assert false)
+  )
+   
+(* Subsumes C_backend_common.pp_c_val to cope with aggressive substitution
+   which may yield constant arrays in expressions.
+   Type is needed to correctly print constant arrays.
+ *)
+let pp_c_val self pp_var fmt v =
+  pp_value_suffix self v.value_type [] pp_var fmt v
 
 let pp_basic_assign pp_var fmt typ var_name value =
   if Types.is_real_type typ && !Options.mpfr
@@ -154,21 +201,21 @@ let pp_basic_assign pp_var fmt typ var_name value =
 *)
 let pp_assign m self pp_var fmt var_type var_name value =
   let depth = expansion_depth value in
-(*eprintf "pp_assign %a %a %d@." Types.print_ty var_type pp_val var_name depth;*)
+  (*Format.eprintf "pp_assign %a %a %a %d@." Types.print_ty var_type pp_val var_name pp_val value depth;*)
   let loop_vars = mk_loop_variables m var_type depth in
   let reordered_loop_vars = reorder_loop_variables loop_vars in
   let rec aux typ fmt vars =
     match vars with
     | [] ->
-       pp_basic_assign (pp_value_suffix self loop_vars pp_var) fmt typ var_name value
+       pp_basic_assign (pp_value_suffix self var_type loop_vars pp_var) fmt typ var_name value
     | (d, LVar i) :: q ->
        let typ' = Types.array_element_type typ in
-(*eprintf "pp_aux %a %s@." Dimension.pp_dimension d i;*)
+      (*eprintf "pp_aux %a %s@." Dimension.pp_dimension d i;*)
       fprintf fmt "@[<v 2>{@,int %s;@,for(%s=0;%s<%a;%s++)@,%a @]@,}"
 	i i i pp_c_dimension d i
 	(aux typ') q
     | (d, LInt r) :: q ->
-(*eprintf "pp_aux %a %d@." Dimension.pp_dimension d (!r);*)
+       (*eprintf "pp_aux %a %d@." Dimension.pp_dimension d (!r);*)
        let typ' = Types.array_element_type typ in
        let szl = Utils.enumerate (Dimension.size_const_dimension d) in
        fprintf fmt "@[<v 2>{@,%a@]@,}"
@@ -178,7 +225,8 @@ let pp_assign m self pp_var fmt var_type var_name value =
   begin
     reset_loop_counter ();
     (*reset_addr_counter ();*)
-    aux var_type fmt reordered_loop_vars
+    aux var_type fmt reordered_loop_vars;
+    (*Format.eprintf "end pp_assign@.";*)
   end
 
 let pp_machine_reset (m: machine_t) self fmt inst =
@@ -238,7 +286,38 @@ let has_c_prototype funname dependencies =
     match imported_node_opt with
     | None -> false
     | Some nd -> (match nd.nodei_prototype with Some "C" -> true | _ -> false)
-
+(*
+let pp_instance_call dependencies m self fmt i (inputs: value_t list) (outputs: var_decl list) =
+  try (* stateful node instance *)
+    let (n,_) = List.assoc i m.minstances in
+    let (input_types, _) = Typing.get_type_of_call n in
+    let inputs = List.combine input_types inputs in
+    fprintf fmt "%a (%a%t%a%t%s->%s);"
+      pp_machine_step_name (node_name n)
+      (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
+      (Utils.pp_final_char_if_non_empty ", " inputs) 
+      (Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs
+      (Utils.pp_final_char_if_non_empty ", " outputs)
+      self
+      i
+  with Not_found -> (* stateless node instance *)
+    let (n,_) = List.assoc i m.mcalls in
+    let (input_types, output_types) = Typing.get_type_of_call n in
+    let inputs = List.combine input_types inputs in
+    if has_c_prototype i dependencies
+    then (* external C function *)
+      let outputs = List.map2 (fun t v -> t, LocalVar v) output_types outputs in
+      fprintf fmt "%a = %s(%a);"
+	(Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) outputs
+	i
+	(Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
+    else
+      fprintf fmt "%a (%a%t%a);"
+	pp_machine_step_name (node_name n)
+	(Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
+	(Utils.pp_final_char_if_non_empty ", " inputs) 
+	(Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs 
+*)
 let rec pp_conditional dependencies (m: machine_t) self fmt c tl el =
   fprintf fmt "@[<v 2>if (%a) {%t%a@]@,@[<v 2>} else {%t%a@]@,}"
     (pp_c_val self (pp_c_var_read m)) c
@@ -248,7 +327,8 @@ let rec pp_conditional dependencies (m: machine_t) self fmt c tl el =
     (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) el
 
 and pp_machine_instr dependencies (m: machine_t) self fmt instr =
-  match instr with 
+  match get_instr_desc instr with 
+  | MNoReset _ -> ()
   | MReset i ->
     pp_machine_reset m self fmt i
   | MLocalAssign (i,v) ->
@@ -261,7 +341,7 @@ and pp_machine_instr dependencies (m: machine_t) self fmt instr =
       i.var_type (mk_val (StateVar i) i.var_type) v
   | MStep ([i0], i, vl) when Basic_library.is_value_internal_fun (mk_val (Fun (i, vl)) i0.var_type)  ->
     pp_machine_instr dependencies m self fmt 
-      (MLocalAssign (i0, mk_val (Fun (i, vl)) i0.var_type))
+      (update_instr_desc instr (MLocalAssign (i0, mk_val (Fun (i, vl)) i0.var_type)))
   | MStep ([i0], i, vl) when has_c_prototype i dependencies -> 
     fprintf fmt "%a = %s(%a);" 
       (pp_c_val self (pp_c_var_read m)) (mk_val (LocalVar i0) i0.var_type)
@@ -271,24 +351,26 @@ and pp_machine_instr dependencies (m: machine_t) self fmt instr =
     pp_instance_call m self fmt i vl il
   | MStep (il, i, vl) ->
     pp_basic_instance_call m self fmt i vl il
-  | MBranch (g,hl) ->
-    if hl <> [] && let t = fst (List.hd hl) in t = tag_true || t = tag_false
+  | MBranch (_, []) -> (Format.eprintf "internal error: C_backend_src.pp_machine_instr %a@." pp_instr instr; assert false)
+  | MBranch (g, hl) ->
+    if let t = fst (List.hd hl) in t = tag_true || t = tag_false
     then (* boolean case, needs special treatment in C because truth value is not unique *)
-      (* may disappear if we optimize code by replacing last branch test with default *)
+	 (* may disappear if we optimize code by replacing last branch test with default *)
       let tl = try List.assoc tag_true  hl with Not_found -> [] in
       let el = try List.assoc tag_false hl with Not_found -> [] in
       pp_conditional dependencies m self fmt g tl el
     else (* enum type case *)
+      (*let g_typ = Typing.type_const Location.dummy_loc (Const_tag (fst (List.hd hl))) in*)
       fprintf fmt "@[<v 2>switch(%a) {@,%a@,}@]"
 	(pp_c_val self (pp_c_var_read m)) g
 	(Utils.fprintf_list ~sep:"@," (pp_machine_branch dependencies m self)) hl
   | MComment s  -> 
-      fprintf fmt "//%s@ " s
+      fprintf fmt "/*%s*/@ " s
 
 
 and pp_machine_branch dependencies m self fmt (t, h) =
-  fprintf fmt "@[<v 2>case %a:@,%a@,break;@]" 
-    pp_c_tag t 
+  fprintf fmt "@[<v 2>case %a:@,%a@,break;@]"
+    pp_c_tag t
     (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) h
 
 
@@ -297,9 +379,14 @@ and pp_machine_branch dependencies m self fmt (t, h) =
 (********************************************************************************************)
 
 let print_const_def fmt cdecl =
-  fprintf fmt "%a = %a;@." 
-    (pp_c_type cdecl.const_id) cdecl.const_type
-    pp_c_const cdecl.const_value 
+  if !Options.mpfr && Types.is_real_type (Types.array_base_type cdecl.const_type)
+  then
+    fprintf fmt "%a;@." 
+      (pp_c_type cdecl.const_id) (Types.dynamic_type cdecl.const_type) 
+  else
+    fprintf fmt "%a = %a;@." 
+      (pp_c_type cdecl.const_id) cdecl.const_type
+      pp_c_const cdecl.const_value 
 
 
 let print_alloc_instance fmt (i, (m, static)) =
@@ -307,6 +394,11 @@ let print_alloc_instance fmt (i, (m, static)) =
     i
     pp_machine_alloc_name (node_name m)
     (Utils.fprintf_list ~sep:", " Dimension.pp_dimension) static
+
+let print_dealloc_instance fmt (i, (m, _)) =
+  fprintf fmt "%a (_alloc->%s);@,"
+    pp_machine_dealloc_name (node_name m)
+    i
 
 let print_alloc_const fmt m =
   let const_locals = List.filter (fun vdecl -> vdecl.var_dec_const) m.mstep.step_locals in
@@ -325,6 +417,10 @@ let print_alloc_array fmt vdecl =
     (pp_c_type "") base_type
     vdecl.var_id
 
+let print_dealloc_array fmt vdecl =
+  fprintf fmt "free (_alloc->_reg.%s);@,"
+    vdecl.var_id
+
 let print_alloc_code fmt m =
   let array_mem = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
   fprintf fmt "%a *_alloc;@,_alloc = (%a *) malloc(sizeof(%a));@,assert(_alloc);@,%a%areturn _alloc;"
@@ -333,6 +429,42 @@ let print_alloc_code fmt m =
     pp_machine_memtype_name m.mname.node_id
     (Utils.fprintf_list ~sep:"" print_alloc_array) array_mem
     (Utils.fprintf_list ~sep:"" print_alloc_instance) m.minstances
+
+let print_dealloc_code fmt m =
+  let array_mem = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
+  fprintf fmt "%a%afree (_alloc);@,return;"
+    (Utils.fprintf_list ~sep:"" print_dealloc_array) array_mem
+    (Utils.fprintf_list ~sep:"" print_dealloc_instance) m.minstances
+
+let print_stateless_init_code dependencies fmt m self =
+  let minit = List.map (fun i -> match get_instr_desc i with MReset i -> i | _ -> assert false) m.minit in
+  let array_mems = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
+  fprintf fmt "@[<v 2>%a {@,%a%t%a%t%a%treturn;@]@,}@.@."
+    (print_init_prototype self) (m.mname.node_id, m.mstatic)
+    (* array mems *) 
+    (Utils.fprintf_list ~sep:";@," (pp_c_decl_array_mem self)) array_mems
+    (Utils.pp_final_char_if_non_empty ";@," array_mems)
+    (* memory initialization *)
+    (Utils.fprintf_list ~sep:"@," (pp_initialize m self (pp_c_var_read m))) m.mmemory
+    (Utils.pp_newline_if_non_empty m.mmemory)
+    (* sub-machines initialization *)
+    (Utils.fprintf_list ~sep:"@," (pp_machine_init m self)) minit
+    (Utils.pp_newline_if_non_empty m.minit)
+
+let print_stateless_clear_code dependencies fmt m self =
+  let minit = List.map (fun i -> match get_instr_desc i with MReset i -> i | _ -> assert false) m.minit in
+  let array_mems = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
+  fprintf fmt "@[<v 2>%a {@,%a%t%a%t%a%treturn;@]@,}@.@."
+    (print_clear_prototype self) (m.mname.node_id, m.mstatic)
+    (* array mems *)
+    (Utils.fprintf_list ~sep:";@," (pp_c_decl_array_mem self)) array_mems
+    (Utils.pp_final_char_if_non_empty ";@," array_mems)
+    (* memory clear *)
+    (Utils.fprintf_list ~sep:"@," (pp_clear m self (pp_c_var_read m))) m.mmemory
+    (Utils.pp_newline_if_non_empty m.mmemory)
+    (* sub-machines clear*)
+    (Utils.fprintf_list ~sep:"@," (pp_machine_clear m self)) minit
+    (Utils.pp_newline_if_non_empty m.minit)
 
 let print_stateless_code dependencies fmt m =
   let self = "__ERROR__" in
@@ -390,7 +522,7 @@ let print_reset_code dependencies fmt m self =
     (Utils.pp_newline_if_non_empty m.minit)
 
 let print_init_code dependencies fmt m self =
-  let minit = List.map (function MReset i -> i | _ -> assert false) m.minit in
+  let minit = List.map (fun i -> match get_instr_desc i with MReset i -> i | _ -> assert false) m.minit in
   let array_mems = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
   fprintf fmt "@[<v 2>%a {@,%a%t%a%t%a%treturn;@]@,}@.@."
     (print_init_prototype self) (m.mname.node_id, m.mstatic)
@@ -405,7 +537,7 @@ let print_init_code dependencies fmt m self =
     (Utils.pp_newline_if_non_empty m.minit)
 
 let print_clear_code dependencies fmt m self =
-  let minit = List.map (function MReset i -> i | _ -> assert false) m.minit in
+  let minit = List.map (fun i -> match get_instr_desc i with MReset i -> i | _ -> assert false) m.minit in
   let array_mems = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
   fprintf fmt "@[<v 2>%a {@,%a%t%a%t%a%treturn;@]@,}@.@."
     (print_clear_prototype self) (m.mname.node_id, m.mstatic)
@@ -426,7 +558,7 @@ let print_step_code dependencies fmt m self =
     let array_mems = List.filter (fun v -> Types.is_array_type v.var_type) m.mmemory in
     fprintf fmt "@[<v 2>%a {@,%a%t%a%t%a%t@,%a%a%t%a%t%t@]@,}@.@."
       (print_step_prototype self) (m.mname.node_id, m.mstep.step_inputs, m.mstep.step_outputs)
-      (* locals declaration *)
+      (* locals *)
       (Utils.fprintf_list ~sep:";@," (pp_c_decl_local_var m)) m.mstep.step_locals
       (Utils.pp_final_char_if_non_empty ";@," m.mstep.step_locals)
       (* array mems *)
@@ -450,7 +582,7 @@ let print_step_code dependencies fmt m self =
     let gen_calls = List.map (fun e -> let (id, _, _) = call_of_expr e in mk_call_var_decl e.expr_loc id) m.mname.node_gencalls in
     fprintf fmt "@[<v 2>%a {@,%a%t%a%t@,%a%a%t%a%t%t@]@,}@.@."
       (print_step_prototype self) (m.mname.node_id, (m.mstep.step_inputs@gen_locals@gen_calls), m.mstep.step_outputs)
-      (* locals declaration *)
+      (* locals *)
       (Utils.fprintf_list ~sep:";@," (pp_c_decl_local_var m)) base_locals
       (Utils.pp_final_char_if_non_empty ";" base_locals)
       (* locals initialization *)
@@ -471,6 +603,30 @@ let print_step_code dependencies fmt m self =
 (*                     MAIN C file Printing functions                                       *)
 (********************************************************************************************)
 
+let print_global_init_code fmt basename prog dependencies =
+  let baseNAME = file_to_module_name basename in
+  let constants = List.map const_of_top (get_consts prog) in
+  fprintf fmt "@[<v 2>%a {@,static %s init = 0;@,@[<v 2>if (!init) { @,init = 1;@,%a%t%a@]@,}@,return;@]@,}@.@."
+    print_global_init_prototype baseNAME
+    (pp_c_basic_type_desc Type_predef.type_bool)
+    (* constants *) 
+    (Utils.fprintf_list ~sep:"@," (pp_const_initialize (pp_c_var_read Machine_code.empty_machine))) constants
+    (Utils.pp_final_char_if_non_empty "@," dependencies)
+    (* dependencies initialization *)
+    (Utils.fprintf_list ~sep:"@," print_import_init) dependencies
+
+let print_global_clear_code  fmt basename prog dependencies =
+  let baseNAME = file_to_module_name basename in
+  let constants = List.map const_of_top (get_consts prog) in
+  fprintf fmt "@[<v 2>%a {@,static %s clear = 0;@,@[<v 2>if (!clear) { @,clear = 1;@,%a%t%a@]@,}@,return;@]@,}@.@."
+    print_global_clear_prototype baseNAME
+    (pp_c_basic_type_desc Type_predef.type_bool)
+    (* constants *) 
+    (Utils.fprintf_list ~sep:"@," (pp_const_clear (pp_c_var_read Machine_code.empty_machine))) constants
+    (Utils.pp_final_char_if_non_empty "@," dependencies)
+    (* dependencies initialization *)
+    (Utils.fprintf_list ~sep:"@," print_import_clear) dependencies
+
 let print_machine dependencies fmt m =
   if fst (get_stateless_status m) then
     begin
@@ -479,28 +635,41 @@ let print_machine dependencies fmt m =
     end
   else
     begin
-      (* Alloc function, only if non static mode *)
+      (* Alloc functions, only if non static mode *)
       if (not !Options.static_mem) then  
 	begin
 	  fprintf fmt "@[<v 2>%a {@,%a%a@]@,}@.@."
 	    print_alloc_prototype (m.mname.node_id, m.mstatic)
 	    print_alloc_const m
 	    print_alloc_code m;
+
+	  fprintf fmt "@[<v 2>%a {@,%a%a@]@,}@.@."
+	    print_dealloc_prototype m.mname.node_id
+	    print_alloc_const m
+	    print_dealloc_code m;
 	end;
       let self = mk_self m in
       (* Reset function *)
       print_reset_code dependencies fmt m self;
-      (* Init function *)
-      print_init_code dependencies fmt m self;
-      (* Clear function *)
-      print_clear_code dependencies fmt m self;
       (* Step function *)
-      print_step_code dependencies fmt m self
+      print_step_code dependencies fmt m self;
+      
+      if !Options.mpfr then
+	begin
+          (* Init function *)
+	  print_init_code dependencies fmt m self;
+          (* Clear function *)
+	  print_clear_code dependencies fmt m self;
+	end
     end
 
 let print_import_standard source_fmt =
   begin
     fprintf source_fmt "#include <assert.h>@.";
+    if Machine_types.has_machine_type () then
+      begin
+	fprintf source_fmt "#include <stdint.h>@."
+      end;
     if not !Options.static_mem then
       begin
 	fprintf source_fmt "#include <stdlib.h>@.";
@@ -527,7 +696,13 @@ let print_lib_c source_fmt basename prog machines dependencies =
   fprintf source_fmt "@[<v>";
   List.iter (fun c -> print_const_def source_fmt (const_of_top c)) (get_consts prog);
   fprintf source_fmt "@]@.";
-
+  if !Options.mpfr then
+    begin
+      fprintf source_fmt "/* Global constants initialization */@.";
+      print_global_init_code source_fmt basename prog dependencies;
+      fprintf source_fmt "/* Global constants clearing */@.";
+      print_global_clear_code source_fmt basename prog dependencies;
+    end;
   if not !Options.static_mem then
     begin
       fprintf source_fmt "/* External allocation function prototypes */@.";
@@ -536,7 +711,12 @@ let print_lib_c source_fmt basename prog machines dependencies =
       fprintf source_fmt "@]@.";
       fprintf source_fmt "/* Node allocation function prototypes */@.";
       fprintf source_fmt "@[<v>";
-      List.iter (fun m -> fprintf source_fmt "%a;@." print_alloc_prototype (m.mname.node_id, m.mstatic)) machines;
+      List.iter
+	(fun m -> fprintf source_fmt "%a;@.@.%a;@.@."
+	  print_alloc_prototype (m.mname.node_id, m.mstatic)
+	  print_dealloc_prototype m.mname.node_id
+	)
+	machines;
       fprintf source_fmt "@]@.";
     end;
 

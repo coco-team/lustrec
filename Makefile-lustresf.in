@@ -1,0 +1,7 @@
+lustresf:
+	@echo Compiling binary lustresf
+	@make -C src lustresf
+
+json-parser:
+	@echo Compiling binary json-parser
+	@make -C src json-parser

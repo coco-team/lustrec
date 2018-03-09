@@ -52,7 +52,7 @@
 %token PRE ARROW
 %token EOF
 %token REQUIRES ENSURES OBSERVER
-%token INVARIANT BEHAVIOR ASSUMES
+%token INVARIANT BEHAVIOR ASSUMES CCODE MATLAB
 %token EXISTS FORALL
 
 %nonassoc prec_exists prec_forall
@@ -123,9 +123,12 @@ dim_list:
 
 expr:
 /* constants */
-  INT {mkexpr (Expr_const (Const_int $1))}
+| INT {mkexpr (Expr_const (Const_int $1))}
 | REAL {mkexpr (Expr_const (Const_real $1))}
 | FLOAT {mkexpr (Expr_const (Const_float $1))}
+| TRUE {mkexpr (Expr_const (Const_bool true))}
+| FALSE {mkexpr (Expr_const (Const_bool false))}
+| STRING {mkexpr (Expr_const (Const_string $1))}
 /* Idents or type enum tags */
 | IDENT {
   if Hashtbl.mem tag_table $1
@@ -295,6 +298,8 @@ lustre_annot_list:
 | IDENT COL expr SCOL lustre_annot_list { ([$1],$3)::$5 }
 | INVARIANT COL expr SCOL lustre_annot_list{ (["invariant"],$3)::$5 }
 | OBSERVER COL expr SCOL lustre_annot_list { (["observer"],$3)::$5 }
+| CCODE COL const lustre_annot_list{ (["c_code"],$3)::$5 }
+| MATLAB COL const lustre_annot_list{ (["matlab"],$3)::$5 }
 
 kwd:
 DIV { [] }

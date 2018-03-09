@@ -68,19 +68,39 @@ let expr_of_exit loc restart state conds tag =
   mkexpr loc (Expr_when (List.fold_right add_branch conds (mkidentpair loc restart state), state, tag))
 
 let rec unless_read reads handler =
-  List.fold_left (fun read (_, c, _, _) -> get_expr_vars read c) reads handler.hand_unless
+  let res =
+  List.fold_left (fun read (_, c, _, _) -> Utils.ISet.union read (get_expr_vars c)) reads handler.hand_unless
+  in
+(
+(*
+Format.eprintf "unless_reads %s = %a@." handler.hand_state (fprintf_list ~sep:" , " (fun fmt v -> Format.fprintf fmt "%s" v)) (ISet.elements reads);
+Format.eprintf "unless_reads' %s = %a@." handler.hand_state (fprintf_list ~sep:" , " (fun fmt v -> Format.fprintf fmt "%s" v)) (ISet.elements res);
+*)
+res
+)
 
 let rec until_read reads handler =
-  List.fold_left (fun read (_, c, _, _) -> get_expr_vars read c) reads handler.hand_until
+  List.fold_left (fun read (_, c, _, _) -> Utils.ISet.union read (get_expr_vars c)) reads handler.hand_until
 
 let rec handler_read reads handler =
   let locals = List.fold_left (fun locals v -> ISet.add v.var_id locals) ISet.empty handler.hand_locals in
   let allvars =
     List.fold_left (fun read stmt ->
       match stmt with
-      | Eq eq -> get_expr_vars read eq.eq_rhs
-      | Aut aut -> List.fold_left handler_read read aut.aut_handlers ) reads handler.hand_stmts
-  in ISet.diff allvars locals
+      | Eq eq -> Utils.ISet.union read (get_expr_vars eq.eq_rhs)
+      | Aut aut -> automata_read read aut) reads handler.hand_stmts
+  in let res = ISet.diff allvars locals
+     in
+(
+(*
+Format.eprintf "handler_allvars %s = %a@." handler.hand_state (fprintf_list ~sep:" , " (fun fmt v -> Format.fprintf fmt "%s" v)) (ISet.elements allvars);
+Format.eprintf "handler_read %s = %a@." handler.hand_state (fprintf_list ~sep:" , " (fun fmt v -> Format.fprintf fmt "%s" v)) (ISet.elements res);
+*)
+res
+)
+
+and automata_read reads aut =
+  List.fold_left (fun read handler -> until_read (handler_read (unless_read read handler) handler) handler) reads aut.aut_handlers
 
 let rec handler_write writes handler =
   let locals = List.fold_left (fun locals v -> ISet.add v.var_id locals) ISet.empty handler.hand_locals in
@@ -94,7 +114,7 @@ let rec handler_write writes handler =
 let node_vars_of_idents node iset =
   List.fold_right (fun v res -> if ISet.mem v.var_id iset then v :: res else res) (get_node_vars node) []
 
-let mkautomata_state used typedef loc id =
+let mkautomata_state nodeid used typedef loc id =
   let tydec_bool = { ty_dec_desc = Tydec_bool; ty_dec_loc = loc } in
   let tydec_state id = { ty_dec_desc = Tydec_const id; ty_dec_loc = loc } in
   let ckdec_any = { ck_dec_desc = Ckdec_any; ck_dec_loc = loc } in
@@ -105,22 +125,25 @@ let mkautomata_state used typedef loc id =
   let actual_r = mk_new_name used (id ^ "__restart_act") in
   let actual_s = mk_new_name used (id ^ "__state_act") in
   {
-    incoming_r' = mkvar_decl loc (incoming_r', tydec_bool, ckdec_any, false, None);
-    incoming_s' = mkvar_decl loc (incoming_s', tydec_state typedef.tydef_id, ckdec_any, false, None);
-    incoming_r = mkvar_decl loc (incoming_r, tydec_bool, ckdec_any, false, None);
-    incoming_s = mkvar_decl loc (incoming_s, tydec_state typedef.tydef_id, ckdec_any, false, None);
-    actual_r = mkvar_decl loc (actual_r  , tydec_bool, ckdec_any, false, None);
-    actual_s = mkvar_decl loc (actual_s  , tydec_state typedef.tydef_id, ckdec_any, false, None)
+    incoming_r' = mkvar_decl loc (incoming_r', tydec_bool, ckdec_any, false, None, Some nodeid);
+    incoming_s' = mkvar_decl loc (incoming_s', tydec_state typedef.tydef_id, ckdec_any, false, None, Some nodeid);
+    incoming_r = mkvar_decl loc (incoming_r, tydec_bool, ckdec_any, false, None, Some nodeid);
+    incoming_s = mkvar_decl loc (incoming_s, tydec_state typedef.tydef_id, ckdec_any, false, None, Some nodeid);
+    actual_r = mkvar_decl loc (actual_r  , tydec_bool, ckdec_any, false, None, Some nodeid);
+    actual_s = mkvar_decl loc (actual_s  , tydec_state typedef.tydef_id, ckdec_any, false, None, Some nodeid)
   }
 
 let vars_of_aut_state aut_state =
   [aut_state.incoming_r'; aut_state.incoming_r; aut_state.actual_r; aut_state.incoming_s'; as_clock aut_state.incoming_s; as_clock aut_state.actual_s]
 
 let node_of_unless nused used node aut_id aut_state handler =
+(*Format.eprintf "node_of_unless %s@." node.node_id;*)
   let inputs = unless_read ISet.empty handler in
-  let var_inputs = aut_state.incoming_r :: aut_state.incoming_s :: (node_vars_of_idents node inputs) in
+  let var_inputs = aut_state.incoming_r (*:: aut_state.incoming_s*) :: (node_vars_of_idents node inputs) in
   let var_outputs = aut_state.actual_r :: aut_state.actual_s :: [] in
-  let expr_outputs = List.fold_right add_branch handler.hand_unless (mkidentpair handler.hand_loc aut_state.incoming_r.var_id aut_state.incoming_s.var_id) in
+  let init_expr = mkpair handler.hand_loc (mkident handler.hand_loc aut_state.incoming_r.var_id) (mkconst handler.hand_loc handler.hand_state) in
+(*  let init_expr = mkidentpair handler.hand_loc aut_state.incoming_r.var_id aut_state.incoming_s.var_id in *)
+  let expr_outputs = List.fold_right add_branch handler.hand_unless init_expr in
   let eq_outputs = Eq (mkeq handler.hand_loc ([aut_state.actual_r.var_id; aut_state.actual_s.var_id], expr_outputs)) in
   let node_id = mk_new_name nused (Format.sprintf "%s__%s_unless" aut_id handler.hand_state) in
   let args = List.map (fun v -> mkexpr handler.hand_loc (Expr_when (mkident handler.hand_loc v.var_id, aut_state.incoming_s.var_id, handler.hand_state))) var_inputs in
@@ -160,18 +183,19 @@ let mk_frename used outputs =
   (fun name -> try IMap.find name table with Not_found -> name)
 
 let node_of_assign_until nused used node aut_id aut_state handler =
+(*Format.eprintf "node_of_assign_until %s@." node.node_id;*)
   let writes = handler_write ISet.empty handler in
   let inputs = ISet.diff (handler_read (until_read ISet.empty handler) handler) writes in
   let frename = mk_frename used writes in
-  let var_inputs = node_vars_of_idents node inputs in
+  let var_inputs = aut_state.actual_r (*:: aut_state.actual_s*) :: node_vars_of_idents node inputs in
   let new_var_locals = node_vars_of_idents node writes in
-  let var_outputs = node_vars_of_idents node writes in
+  let var_outputs = List.sort IdentModule.compare (node_vars_of_idents node writes) in
   let new_var_outputs = List.map (fun vdecl -> { vdecl with var_id = frename vdecl.var_id }) var_outputs in
   let new_output_eqs = List.map2 (fun o o' -> Eq (mkeq handler.hand_loc ([o'.var_id], mkident handler.hand_loc o.var_id))) var_outputs new_var_outputs in
-  let until_expr = List.fold_right add_branch handler.hand_until (mkidentpair handler.hand_loc aut_state.actual_r.var_id aut_state.actual_s.var_id) in
+  let init_until = mkpair handler.hand_loc (mkconst handler.hand_loc tag_false) (mkconst handler.hand_loc handler.hand_state) in
+  let until_expr = List.fold_right add_branch handler.hand_until init_until in
   let until_eq = Eq (mkeq handler.hand_loc ([aut_state.incoming_r.var_id; aut_state.incoming_s.var_id], until_expr)) in
   let node_id = mk_new_name nused (Format.sprintf "%s__%s_handler_until" aut_id handler.hand_state) in
-  let var_inputs = aut_state.actual_r :: aut_state.actual_s :: var_inputs in
   let args = List.map (fun v -> mkexpr handler.hand_loc (Expr_when (mkident handler.hand_loc v.var_id, aut_state.actual_s.var_id, handler.hand_state))) var_inputs in
   let reset = Some (mkident handler.hand_loc aut_state.actual_r.var_id) in
   List.fold_left (fun res v -> ISet.add v.var_id res) ISet.empty var_outputs,
@@ -201,7 +225,7 @@ let typedef_of_automata aut =
 
 let expand_automata nused used owner typedef node aut =
   let initial = (List.hd aut.aut_handlers).hand_state in
-  let aut_state = mkautomata_state used typedef aut.aut_loc aut.aut_id in
+  let aut_state = mkautomata_state node.node_id used typedef aut.aut_loc aut.aut_id in
   let unodes = List.map (fun h -> node_of_unless nused used node aut.aut_id aut_state h) aut.aut_handlers in
   let aunodes = List.map (fun h -> node_of_assign_until nused used node aut.aut_id aut_state h) aut.aut_handlers in
   let all_outputs = List.fold_left (fun all (outputs, _, _) -> ISet.union outputs all) ISet.empty aunodes in

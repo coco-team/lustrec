@@ -8,9 +8,7 @@
 (*  version 2.1.                                                    *)
 (*                                                                  *)
 (********************************************************************)
-
-open Format
-
+  
 type ident = Utils.ident
 type rat = Utils.rat
 type tag = Utils.tag
@@ -45,13 +43,12 @@ type clock_dec =
 
 and clock_dec_desc =
   | Ckdec_any
-  | Ckdec_bool of (ident * ident) list 
-  | Ckdec_pclock of int * rat
+  | Ckdec_bool of (ident * ident) list
+
 
 type constant =
   | Const_int of int
-  | Const_real of Num.num * int * string (* (a,b, c) means a * 10^-b. c is the original string *)
-  (* | Const_float of float *)
+  | Const_real of Num.num * int * string (* (a, b, c) means a * 10^-b. c is the original string *)
   | Const_array of constant list
   | Const_tag of label
   | Const_string of string (* used only for annotations *)
@@ -59,13 +56,14 @@ type constant =
 
 type quantifier_type = Exists | Forall
 
-type var_decl = 
+type var_decl =
     {var_id: ident;
      var_orig:bool;
      var_dec_type: type_dec;
      var_dec_clock: clock_dec;
      var_dec_const: bool;
      var_dec_value: expr option;
+     mutable var_parent_nodeid: ident option;
      mutable var_type: Types.type_expr;
      mutable var_clock: Clocks.clock_expr;
      var_loc: Location.t}
@@ -74,6 +72,8 @@ type var_decl =
     location in the program text. The type and clock of an ast element
     is mutable (and initialized to dummy values). This avoids to have to
     duplicate ast structures (e.g. ast, typed_ast, clocked_ast). *)
+
+
 
 (* The tag of an expression is a unique identifier used to distinguish
    different instances of the same node *)
@@ -101,7 +101,7 @@ and expr_desc =
   | Expr_merge of ident * (label * expr) list
   | Expr_appl of call_t
 
-and call_t = ident * expr * expr option 
+and call_t = ident * expr * expr option
      (* The third part denotes the boolean condition for resetting *)
 
 and eq =
@@ -135,7 +135,7 @@ type offset =
 | Index of Dimension.dim_expr
 | Field of label
 
-type assert_t = 
+type assert_t =
     {
       assert_expr: expr;
       assert_loc: Location.t;
@@ -169,7 +169,7 @@ type node_desc =
      node_locals: var_decl list;
      mutable node_gencalls: expr list;
      mutable node_checks: Dimension.dim_expr list;
-     node_asserts: assert_t list; 
+     node_asserts: assert_t list;
      node_stmts: statement list;
      mutable node_dec_stateless: bool;
      mutable node_stateless: bool option;
@@ -185,14 +185,15 @@ type imported_node_desc =
      nodei_outputs: var_decl list;
      nodei_stateless: bool;
      nodei_spec: node_annot option;
+     (* nodei_annot: expr_annot list; *)
      nodei_prototype: string option;
      nodei_in_lib: string list;
     }
 
-type const_desc = 
-    {const_id: ident; 
-     const_loc: Location.t; 
-     const_value: constant;      
+type const_desc =
+    {const_id: ident;
+     const_loc: Location.t;
+     const_value: constant;
      mutable const_type: Types.type_expr;
     }
 
@@ -200,7 +201,7 @@ type top_decl_desc =
 | Node of node_desc
 | Const of const_desc
 | ImportedNode of imported_node_desc
-| Open of bool * string (* the boolean set to true denotes a local 
+| Open of bool * string (* the boolean set to true denotes a local
 			   lusi vs a lusi installed at system level *)
 | TypeDef of typedef_desc
 
@@ -212,16 +213,16 @@ type top_decl =
 
 type program = top_decl list
 
-type dep_t = Dep of 
-    bool 
+type dep_t = Dep of
+    bool
   * ident
-  * (top_decl list) 
+  * (top_decl list)
   * bool (* is stateful *)
 
 
 (************ Machine code types *************)
 
-type value_t = 
+type value_t =
   {
     value_desc: value_t_desc;
     value_type: Types.type_expr;
@@ -231,28 +232,26 @@ and value_t_desc =
   | Cst of constant
   | LocalVar of var_decl
   | StateVar of var_decl
-  | Fun of ident * value_t list 
+  | Fun of ident * value_t list
   | Array of value_t list
   | Access of value_t * value_t
   | Power of value_t * value_t
 
 type instr_t =
+  {
+    instr_desc: instr_t_desc; (* main data: the content *)
+    (* lustre_expr: expr option; (* possible representation as a lustre expression *) *)
+    lustre_eq: eq option;     (* possible representation as a lustre flow equation *)
+  }
+and instr_t_desc =
   | MLocalAssign of var_decl * value_t
   | MStateAssign of var_decl * value_t
   | MReset of ident
+  | MNoReset of ident
   | MStep of var_decl list * ident * value_t list
   | MBranch of value_t * (label * instr_t list) list
   | MComment of string
 
-
-type error =
-    Main_not_found
-  | Main_wrong_kind
-  | No_main_specified
-  | Unbound_symbol of ident
-  | Already_bound_symbol of ident
-  | Unknown_library of ident
-  | Wrong_number of ident
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

@@ -1,0 +1,15 @@
+{
+    "data": [
+        {
+            "datatype": "real",
+            "initial_value": "2500",
+            "name": "my_real_var_wo_dec",
+            "scope": "Output"
+        }
+    ],
+    "junctions": [],
+    "name": "simple_var_real_wo_dec",
+    "origin_path": "simple_var_real_wo_dec",
+    "sffunctions": [],
+    "states": []
+}

@@ -61,34 +61,56 @@ end: MODIFIERS_MKF)
 module Main = functor (Mod: MODIFIERS_MKF) -> 
 struct
 
+(* TODO: BEWARE OF THE BUG !!  in case of very long nodename or maybe even
+   basename, the string basename_nodename exceed a limit length for files on linux
+   and prevent gcc to generate the binary of that name.
 
-let print_makefile basename nodename (dependencies:  dep_t list) fmt =
-  fprintf fmt "GCC=gcc -O0@.";
-  fprintf fmt "LUSTREC=%s@." Sys.executable_name;
-  fprintf fmt "LUSTREC_BASE=%s@." (Filename.dirname (Filename.dirname Sys.executable_name));
-  fprintf fmt "INC=${LUSTREC_BASE}/include/lustrec@.";
-  fprintf fmt "@.";
+To be solved (later) with
+- either the default name if it short
+- a shorter version if it is long (md5?)
+- a provided name given when calling the makefile so the user can control the 
+  expected name of the binary
 
-  (* Main binary *)
-  fprintf fmt "%s_%s:@." basename nodename;
-  fprintf fmt "\t${GCC} -I${INC} -I. -c %s.c@." basename;  
-  fprintf fmt "\t${GCC} -I${INC} -I. -c %s_main.c@." basename;   
-  fprintf_dependencies fmt dependencies;    
-  fprintf fmt "\t${GCC} -o %s_%s io_frontend.o %a %s.o %s_main.o %a@." basename nodename 
-    (Utils.fprintf_list ~sep:" " (fun fmt (Dep (_, s, _, _)) -> Format.fprintf fmt "%s.o" s)) 
-    (compiled_dependencies dependencies)
-    basename (* library .o *)
-    basename (* main function . o *) 
-    (Utils.fprintf_list ~sep:" " (fun fmt lib -> fprintf fmt "-l%s" lib)) (lib_dependencies dependencies)
+*)
+
+  let print_makefile basename nodename (dependencies:  dep_t list) fmt =
+    let binname =
+      let s = basename ^ "_" ^ nodename in
+      if String.length s > 100 (* seems that GCC fails from 144 characters and
+				  on: File name too long collect2 ld error. *)
+      then
+	if String.length nodename > 100 then
+	  basename ^ "_run" (* shorter version *)
+	else
+	  nodename ^ "run"
+      else
+	s
+    in
+    fprintf fmt "BINNAME?=%s@." binname;
+    fprintf fmt "GCC=gcc -O0@.";
+    fprintf fmt "LUSTREC=%s@." Sys.executable_name;
+    fprintf fmt "LUSTREC_BASE=%s@." (Filename.dirname (Filename.dirname Sys.executable_name));
+    fprintf fmt "INC=${LUSTREC_BASE}/include/lustrec@.";
+    fprintf fmt "@.";
+
+    (* Main binary *)
+    fprintf fmt "%s_%s: %s.c %s_main.c@." basename "run"(*nodename*) basename basename;
+    fprintf fmt "\t${GCC} -I${INC} -I. -c %s.c@." basename;  
+    fprintf fmt "\t${GCC} -I${INC} -I. -c %s_main.c@." basename;   
+    fprintf_dependencies fmt dependencies;    
+    fprintf fmt "\t${GCC} -o ${BINNAME} io_frontend.o %a %s.o %s_main.o %a@." 
+      (Utils.fprintf_list ~sep:" " (fun fmt (Dep (_, s, _, _)) -> Format.fprintf fmt "%s.o" s)) 
+      (compiled_dependencies dependencies)
+      basename (* library .o *)
+      basename (* main function . o *) 
+      (Utils.fprintf_list ~sep:" " (fun fmt lib -> fprintf fmt "-l%s" lib)) (lib_dependencies dependencies)
     ;
- fprintf fmt "@.";
- fprintf fmt "clean:@.";
- fprintf fmt "\t\\rm -f *.o %s_%s@." basename nodename;
- fprintf fmt "@.";
- fprintf fmt ".PHONY: %s_%s@." basename nodename;
- fprintf fmt "@.";
- Mod.other_targets fmt basename nodename dependencies;
- fprintf fmt "@.";
+    fprintf fmt "@.";
+    fprintf fmt "clean:@.";
+    fprintf fmt "\t\\rm -f *.o ${BINNAME}@.";
+    fprintf fmt "@.";
+    Mod.other_targets fmt basename nodename dependencies;
+    fprintf fmt "@.";
 
 end
 

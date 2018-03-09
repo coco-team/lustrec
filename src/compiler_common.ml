@@ -17,15 +17,15 @@ open Corelang
 let check_main () =
   if !Options.main_node = "" then
     begin
-      eprintf "Code generation error: %a@." pp_error No_main_specified;
-      raise (Error (Location.dummy_loc, No_main_specified))
+      eprintf "Code generation error: %a@." Error.pp_error_msg Error.No_main_specified;
+      raise (Error (Location.dummy_loc, Error.No_main_specified))
     end
 
 let create_dest_dir () =
   begin
     if not (Sys.file_exists !Options.dest_dir) then
       begin
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. creating destination directory@,");
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. creating destination directory@ ");
 	Unix.mkdir !Options.dest_dir (Unix.stat ".").Unix.st_perm
       end;
     if (Unix.stat !Options.dest_dir).Unix.st_kind <> Unix.S_DIR then
@@ -50,12 +50,12 @@ let parse_header own filename =
       close_in h_in;
       header
     with
-    | (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
+    | (Parse.Error err) as exc -> 
       Parse.report_error err;
       raise exc
     | Corelang.Error (loc, err) as exc -> (
       eprintf "Parsing error: %a%a@."
-	Corelang.pp_error err
+	Error.pp_error_msg err
 	Location.pp_loc loc;
       raise exc
     )
@@ -69,19 +69,29 @@ let parse_source source_name =
 
   (* Parsing *)
   Log.report ~level:1 
-    (fun fmt -> fprintf fmt ".. parsing source file %s@," source_name);
+    (fun fmt -> fprintf fmt ".. parsing source file %s@ " source_name);
   try
     let prog = Parse.prog Parser_lustre.prog Lexer_lustre.token lexbuf in
     (*ignore (Modules.load_program ISet.empty prog);*)
     close_in s_in;
     prog
   with
-  | (Lexer_lustre.Error err) | (Parse.Syntax_err err) as exc -> 
+  | (Parse.Error err) as exc -> 
     Parse.report_error err;
     raise exc
   | Corelang.Error (loc, err) as exc ->
     eprintf "Parsing error: %a%a@."
-      Corelang.pp_error err
+      Error.pp_error_msg err
+      Location.pp_loc loc;
+    raise exc
+
+let expand_automata decls =
+  Log.report ~level:1 (fun fmt -> fprintf fmt ".. expanding automata@ ");
+  try
+    Automata.expand_decls decls
+  with (Corelang.Error (loc, err)) as exc ->
+    eprintf "Automata error: %a%a@."
+      Error.pp_error_msg err
       Location.pp_loc loc;
     raise exc
 
@@ -118,7 +128,7 @@ let type_decls env decls =
 	raise exc
     end 
   in
-  if !Options.print_types then
+  if !Options.print_types || !Options.verbose_level > 2 then
     Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>  %a@]@ " Corelang.pp_prog_type decls);
   new_env
       
@@ -133,7 +143,7 @@ let clock_decls env decls =
 	raise exc
     end
   in
-  if !Options.print_clocks then
+  if !Options.print_clocks  || !Options.verbose_level > 2 then
     Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>  %a@]@ " Corelang.pp_prog_clock decls);
   new_env
 
@@ -178,6 +188,13 @@ let get_envs_from_top_decls header =
    (Env.initial, Env.initial)
  *)
 
+let generate_lusic_header destname lusic_ext =	
+  match !Options.output with
+  | "C" -> C_backend_lusic.print_lusic_to_h destname lusic_ext
+  | _ -> ()
+	 
+
+    
 let check_compatibility (prog, computed_types_env, computed_clocks_env) (header, declared_types_env, declared_clocks_env) =
   try
     (* checking defined types are compatible with declared types*)
@@ -216,14 +233,14 @@ let is_stateful topdecl =
 
 
 let import_dependencies prog =
-  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 0>.. extracting dependencies@ ");
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 4>.. extracting dependencies");
   let dependencies = Corelang.get_dependencies prog in
   let deps =
   List.fold_left
     (fun (compilation_dep, type_env, clock_env) dep ->
       let (local, s) = Corelang.dependency_of_top dep in
-      let basename = Modules.name_dependency (local, s) in
-      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "  Library %s@ " basename);
+      let basename = Options_management.name_dependency (local, s) in
+      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@ Library %s" basename);
       let lusic = Modules.import_dependency dep.top_decl_loc (local, s) in
       (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "");*)
       let (lusi_type_env, lusi_clock_env) = get_envs_from_top_decls lusic.Lusic.contents in
@@ -239,3 +256,25 @@ let import_dependencies prog =
     deps
   end
 
+let track_exception () =
+  if !Options.track_exceptions
+  then (Printexc.print_backtrace stdout; flush stdout)
+  else ()
+
+
+let update_vdecl_parents_prog prog =
+  let update_vdecl_parents parent v =
+    v.var_parent_nodeid <- Some parent
+  in
+  List.iter (
+    fun top -> match top.top_decl_desc with
+    | Node nd ->
+       List.iter
+	 (update_vdecl_parents nd.node_id)
+	 (nd.node_inputs @ nd.node_outputs @ nd.node_locals )  
+    | ImportedNode ind -> 
+       List.iter
+	 (update_vdecl_parents ind.nodei_id)
+	 (ind.nodei_inputs @ ind.nodei_outputs )  
+    | _ -> ()
+  ) prog

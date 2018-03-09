@@ -1,76 +1,136 @@
-dnl define([svnversion], esyscmd([sh -c "svnversion|sed "s/:.*//"|tr -d '\n'"]))
-AC_INIT([lustrec], [1.1-svnversion], [ploc@garoche.net])
-
-
-AC_DEFINE(SVN_REVISION, "svnversion", [SVN Revision])
-AC_SUBST(SVN_REVISION)
-
+define([gitversion], esyscmd([sh -c "git log --oneline | wc -l | tr -d '\n'"]))
+define([gitbranch], esyscmd([sh -c "git branch | grep \* | cut -d ' ' -f2"]))
+AC_INIT([lustrec], 1.5-gitversion, [ploc@garoche.net])
+AC_SUBST(VERSION_CODENAME, "Xia/Shao Kang-dev")
+AC_SUBST(GITBRANCH, gitbranch)
+# Next release will be
+#AC_INIT([lustrec], [1.6], [ploc@garoche.net])
+#AC_SUBST(VERSION_CODENAME, "Xia/Zhu")
+AC_MSG_NOTICE(Git branch: ${GITBRANCH})
 AC_CONFIG_SRCDIR([src/main_lustre_compiler.ml])
+AC_CONFIG_SRCDIR([src/main_lustre_testgen.ml])
 
 AC_PATH_PROG([OCAMLC],[ocamlc],[:])
 AC_MSG_CHECKING(OCaml version)
 ocamlc_version=`$OCAMLC -v | grep version | rev| cut -d \  -f 1 | rev`
 major=`echo $ocamlc_version | cut -d . -f 1`
 minor=`echo $ocamlc_version | cut -d . -f 2`
-if (test "$major" -lt 3 -a "$minor" -lt 12 ); then
-  AC_MSG_ERROR([Ocaml version must be at least 3.12. You have version $ocamlc_version])
+if (test "$major" -lt 3 -a "$minor" -lt 11 ); then
+  AC_MSG_ERROR([Ocaml version must be at least 3.11. You have version $ocamlc_version])
 fi
 AC_MSG_RESULT(valid ocaml version detected: $ocamlc_version)
 
 AC_PATH_PROG([OCAMLBUILD],[ocamlbuild],[:])
 
+# Handle a mismatch in available function btw 4.02 and 4.04
+if (test $"$major" -eq 4 -a "$minor" -gt 2); then
+   AC_SUBST(UPPERCASEFUN, "String.uppercase_ascii")
+else
+   AC_SUBST(UPPERCASEFUN, "String.uppercase")
+fi
 
 # default prefix is /usr/local
 AC_PREFIX_DEFAULT(/usr/local)
 
+dnl AC_ARG_WITH([ocamlgraph-path],
+dnl         [AS_HELP_STRING([--ocamlgraph-path],
+dnl               [specify the path of ocamlgraph library. graph.cmxa should be in ocamlgraph-path @<:@default=$(ocamlfind query ocamlgraph)@:>@])],
+dnl         [AS_IF([test "x$ocamlgraph_path" = xno],
+dnl                 [AC_MSG_ERROR([ocamlgraph library is needed])],
+dnl                 [test "x$ocamlgraph_path" = xyes],
+dnl                 [OCAMLGRAPH_PATH=$(ocamlfind query ocamlgraph)],
+dnl                 [OCAMLGRAPH_PATH=$ocamlgraph_path]
+dnl         )],
+dnl         [OCAMLGRAPH_PATH=$(ocamlfind query ocamlgraph)]
+dnl )
+dnl AC_SUBST(OCAMLGRAPH_PATH)
+
+
 # Checking libs
+AC_CHECK_PROG(FINDLIB_CHECK,ocamlfind,yes)
+if test x"$FINDLIB_CHECK" != x"yes" ; then
+   AC_MSG_ERROR(ocamlfind required!)
+fi
+dnl AC_MSG_RESULT(Hourrah: ocamlfind found!)
 
-AC_ARG_WITH([ocamlgraph-path],
-        [AS_HELP_STRING([--ocamlgraph-path],
-              [specify the path of ocamlgraph library. graph.cmxa should be in ocamlgraph-path @<:@default=$(ocamlfind query ocamlgraph)@:>@])],
-        [AS_IF([test "x$ocamlgraph_path" = xno],
-                [AC_MSG_ERROR([ocamlgraph library is needed])],
-                [test "x$ocamlgraph_path" = xyes],
-                [OCAMLGRAPH_PATH=$(ocamlfind query ocamlgraph)],
-                [OCAMLGRAPH_PATH=$ocamlgraph_path]
-        )],
-        [OCAMLGRAPH_PATH=$(ocamlfind query ocamlgraph)]
+# Checks for libraries.
+# OCamlgraph
+AC_MSG_CHECKING(ocaml libraries required)
+AS_IF([ocamlfind query ocamlgraph cmdliner fmt logs num >/dev/null 2>&1],
+    [],[AC_MSG_ERROR(A few ocaml library required. opam install ocamlgraph cmdliner fmt logs num should solve the issue)],
 )
-AC_SUBST(OCAMLGRAPH_PATH)
+AC_MSG_RESULT(yes)
 
-AC_MSG_CHECKING(ocamlgraph library)
-   ocamlgraph_lib=`find $OCAMLGRAPH_PATH -iname graph.cmxa -nowarn | grep -m 1 -o "graph.cmxa"`
-   if (test "x$ocamlgraph_lib" = xgraph.cmxa ); then
-	ocamlgraph_lib_full=`find $OCAMLGRAPH_PATH -iname graph.cmxa -nowarn | grep -m 1 "graph.cmxa"`
-      AC_MSG_RESULT($ocamlgraph_lib_full )
-   else 
-      AC_MSG_ERROR([ocamlgraph library not installed in $OCAMLGRAPH_PATH])
-   fi
+#Yojson
+AC_MSG_CHECKING(yojson library (optional))
+AS_IF([ocamlfind query yojson >/dev/null 2>&1],
+    [yojson=yes; AC_MSG_RESULT(yes)],[yojson=no; AC_MSG_WARN(Yojson required for lustresf. opam install yojson should solve the issue)],
+)
 
-AC_CHECK_LIB(gmp, __gmpz_init, 
+# Salsa
+AC_ARG_ENABLE(salsa, [AS_HELP_STRING([--disable-salsa],
+              [disable Salsa plugin. Enabled by default if available.])])
+
+AC_MSG_CHECKING(salsa library)
+AS_IF([ocamlfind query salsa >/dev/null 2>&1],
+    [salsa=yes; AC_MSG_RESULT(yes)],[salsa=no; AC_MSG_WARN(no)]
+)
+
+
+AS_IF([test "x$enable_salsa" != "xno"], [
+  if (test "x$salsa" = xyes ); then
+   AC_SUBST(SALSA, "(module Salsa_plugin.Plugin : PluginType.PluginType);")
+   AC_SUBST(SALSA_TAG, "<**/*.native> or <plugins/salsa/*.cm?> : package(salsa)")
+  fi
+])
+
+# GMP
+AC_CHECK_LIB(gmp, __gmpz_init,
       [gmp=yes],
       [AC_MSG_RESULT([GNU MP not found])
       gmp=no])
 
-AC_CHECK_LIB(mpfr, mpfr_add, [mpfr=yes], 
+AC_CHECK_LIB(mpfr, mpfr_add, [mpfr=yes],
 		   [AC_MSG_RESULT(
 [MPFR not found])
 mpfr=no])
 
+# lustresf
+AC_ARG_ENABLE(lustresf, [AS_HELP_STRING([--disable-lustresf],
+              [disable lustresf compilation. Enabled by default.])])
 
-# Workaround to solve an issue with ocamlbuild and C libraries.
-# oCFLAGS="$CFLAGS"
-# CFLAGS="$FLAGS -Wl,--no-as-needed"
-# AC_MSG_CHECKING([whether we need to add --no-as-needed linking option])
-# AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]],
-#                                      [[
-#                                         int main(){ return 0; }
-#                                     ]])],
-#                   [AC_MSG_RESULT([yes]); CC_NOASNEEDED="true"],
-#                   [AC_MSG_RESULT([no]); CC_NOASNEEDED="false"])
-# CFLAGS=$oCFLAGS
-# AC_SUBST(CC_NOASNEEDED)
+AC_SUBST_FILE(lustresf)
+AC_SUBST_FILE(lustresf_src)
+lustresf=/dev/null
+lustresf_src=/dev/null
 
+AS_IF([test "x$enable_lustresf" != "xno" -a "x$yojson" = "xyes"], [
+  lustresf=Makefile-lustresf.in
+  lustresf_src=src/Makefile-lustresf.in
+  AC_SUBST(lustresf_target, "lustresf")
+])
+
+# Checking availability of path to regression tests
+tests_path="../lustrec-tests/regression_tests"
+
+AC_ARG_WITH([tests-path],
+            [AS_HELP_STRING([--with-tests-path],
+               [provides path to test suite (default is ../lustrec-test if available)])],
+            [tests_path="$withval";
+	     if (test "x$tests_path" = xyes); then
+	       AC_MSG_ERROR(Option --with-tests-path requires a parameter: eg. --with-tests-path=value);
+	     fi],
+            )
+AC_MSG_NOTICE($tests_path)
+AC_CHECK_FILE(${tests_path}/CMakeLists.txt,
+              [
+	      valid_test_path=true
+	      ],
+	      [
+	      valid_test_path=false
+	        AC_SUBST(PATH_TO_TESTS, $tests_path)	      ])
+AC_SUBST(PATH_TO_TESTS_DEFINED, $valid_test_path)
+AC_SUBST(PATH_TO_TESTS, $tests_path)
 
 # End of config
 
@@ -94,8 +154,11 @@ AC_DEFINE_DIR([abs_datadir], [datadir])
 # Instanciation
 AC_CONFIG_FILES([Makefile
 		 src/Makefile
-                 src/myocamlbuild.ml
-		 src/version.ml])
+		 src/version.ml
+		 src/pluginList.ml
+		 src/_tags
+		 src/ocaml_utils.ml
+		 ])
 
 AC_OUTPUT
 
@@ -107,14 +170,32 @@ AC_MSG_NOTICE(include path: $prefix/include)
 AC_MSG_NOTICE(********    Plugins    ********)
 
   if (test "x$gmp" = xyes -a "x$mpfr" = xyes ); then
-       AC_MSG_NOTICE([-mpfr option enable])
+      AC_MSG_NOTICE([MPFR option enabled])
+  else
+      AC_MSG_WARN([MPFR option cannot be activated. Requires GMP and MPFR libs])
+  fi
 
-   else 
-       AC_MSG_WARN([MPFR option cannot be activated. Requires GMP and MPFR libs])
-      
-   fi
- 
-AC_MSG_NOTICE
-AC_MSG_NOTICE(******** Configuration ********)
-AC_MSG_NOTICE(******** Configuration ********)
+  if (test "x$salsa" = xyes -a "x$enable_salsa" != xno); then
+      AC_MSG_NOTICE([Salsa plugin enabled])
+  else
+      AC_MSG_NOTICE([Salsa plugin disabled])
+  fi
 
+  if (test "x$yojson" = xyes -a "x$enable_lustresf" != "xno"); then
+      AC_MSG_NOTICE([lustresf available])
+  else
+      if (test "x$enable_lustresf" = "xno"); then
+        AC_MSG_NOTICE([lustresf not available (you explicitely disabled it)])
+      else
+        AC_MSG_NOTICE([lustresf not available])
+      fi
+  fi
+
+AC_MSG_NOTICE(****** Regression Tests  ******)
+if (test "x$valid_test_path" = xfalse); then
+  AC_MSG_NOTICE(no valid tests path provided ($tests_path))
+else
+AC_MSG_NOTICE(tests path: $tests_path)
+fi
+AC_MSG_NOTICE(******** Configuration ********)
+AC_MSG_NOTICE(Execute "make; make install" now)

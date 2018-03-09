@@ -338,17 +338,17 @@ let unify ?(semi=false) dim1 dim2 =
       | _ -> raise (Unify (dim1, dim2))
   in unif dim1 dim2
 
-let rec expr_replace_var fvar e = 
- { e with dim_desc = expr_replace_var_desc fvar e.dim_desc }
-and expr_replace_var_desc fvar e =
-  let re = expr_replace_var fvar in
+let rec rename fnode fvar e = 
+ { e with dim_desc = expr_replace_var_desc fnode fvar e.dim_desc }
+and expr_replace_var_desc fnode fvar e =
+  let re = rename fnode fvar in
   match e with
   | Dvar
   | Dunivar
   | Dbool _
   | Dint _ -> e
   | Dident v -> Dident (fvar v)
-  | Dappl (id, el) -> Dappl (id, List.map re el)
+  | Dappl (id, el) -> Dappl (fnode id, List.map re el)
   | Dite (g,t,e) -> Dite (re g, re t, re e)
   | Dlink e -> Dlink (re e)
 

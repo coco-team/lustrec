@@ -12,16 +12,24 @@
 
 open LustreSpec
 
-exception Error of Location.t * error
-
+exception Error of Location.t * Error.error_kind
+module VSet: Set.S
+  
 val dummy_type_dec: type_dec
 val dummy_clock_dec: clock_dec
 
 val mktyp: Location.t -> type_dec_desc -> type_dec
 val mkclock: Location.t -> clock_dec_desc -> clock_dec
-val mkvar_decl: Location.t -> ?orig:bool -> ident * type_dec * clock_dec * bool (* is const *) * expr option (* value *) -> var_decl
+val mkvar_decl: Location.t -> ?orig:bool ->
+  ident *
+    type_dec *
+    clock_dec *
+    bool (* is const *) *
+    expr option (* value *) *
+    string option (* parent id *)
+  -> var_decl
 
-val var_decl_of_const: const_desc -> var_decl
+val var_decl_of_const: ?parentid:LustreSpec.ident option -> const_desc -> var_decl
 val mkexpr: Location.t ->  expr_desc -> expr
 val mkeq: Location.t -> ident list * expr -> eq
 val mkassert: Location.t -> expr -> assert_t
@@ -31,7 +39,11 @@ val mk_new_name: (ident -> bool) -> ident -> ident
 val mk_new_node_name: node_desc -> ident -> ident
 val mktop: top_decl_desc -> top_decl
 
-
+(* constructor for machine types *)
+val mkinstr: ?lustre_expr:expr -> ?lustre_eq: eq -> instr_t_desc -> instr_t
+val get_instr_desc: instr_t -> instr_t_desc
+val update_instr_desc: instr_t -> instr_t_desc -> instr_t
+  
 val node_table : (ident, top_decl) Hashtbl.t
 val print_node_table:  Format.formatter -> unit -> unit
 val node_name: top_decl -> ident
@@ -70,7 +82,7 @@ val const_impl: constant -> constant -> constant
 
 val get_node_vars: node_desc -> var_decl list
 val get_node_var: ident -> node_desc -> var_decl
-val get_node_eqs: node_desc -> eq list
+val get_node_eqs: node_desc -> eq list * automata_desc list
 val get_node_eq: ident -> node_desc -> eq
 val get_node_interface: node_desc -> imported_node_desc
 
@@ -80,7 +92,7 @@ val sort_handlers : (label * 'a) list -> (label * 'a) list
 
 val is_eq_expr: expr -> expr -> bool
 
-val pp_error :  Format.formatter -> error -> unit
+(* val pp_error :  Format.formatter -> error -> unit *)
 
 (* Caution, returns an untyped, unclocked, etc, expression *)
 val is_tuple_expr : expr -> bool
@@ -93,7 +105,7 @@ val call_of_expr: expr -> (ident * expr list * expr option)
 val expr_of_dimension: Dimension.dim_expr -> expr
 val dimension_of_expr: expr -> Dimension.dim_expr
 val dimension_of_const: Location.t -> constant -> Dimension.dim_expr
-
+val expr_to_eexpr: expr -> eexpr
 (* REMOVED, pushed in utils.ml   val new_tag : unit -> tag *)
 
 val add_internal_funs: unit -> unit
@@ -118,11 +130,18 @@ val get_dependencies : program -> top_decl list
 val rename_static: (ident -> Dimension.dim_expr) -> type_dec_desc -> type_dec_desc
 val rename_carrier: (ident -> ident) -> clock_dec_desc -> clock_dec_desc
 
-val get_expr_vars: Utils.ISet.t -> expr -> Utils.ISet.t
-val expr_replace_var: (ident -> ident) -> expr -> expr
+val get_expr_vars: expr -> Utils.ISet.t
+(*val expr_replace_var: (ident -> ident) -> expr -> expr*)
+
 val eq_replace_rhs_var: (ident -> bool) -> (ident -> ident) -> eq -> eq
 
-(** rename_prog f_node f_var f_const prog *)
+(** val rename_expr f_node f_var expr *)
+val rename_expr : (ident -> ident) -> (ident -> ident) -> expr -> expr
+(** val rename_eq f_node f_var eq *)
+val rename_eq : (ident -> ident) -> (ident -> ident) -> eq -> eq
+(** val rename_aut f_node f_var aut *)
+val rename_aut : (ident -> ident) -> (ident -> ident) -> automata_desc -> automata_desc
+(** rename_prog f_node f_var prog *)
 val rename_prog: (ident -> ident) -> (ident -> ident) -> (ident -> ident) -> program -> program
 
 val substitute_expr: var_decl list -> eq list -> expr -> expr
@@ -140,6 +159,7 @@ val extend_eexpr: (quantifier_type * var_decl list) list -> eexpr -> eexpr
 val update_expr_annot: ident -> expr -> expr_annot -> expr
 (* val mkpredef_call: Location.t -> ident -> eexpr list -> eexpr*)
 
+val expr_contains_expr: tag -> expr -> bool
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

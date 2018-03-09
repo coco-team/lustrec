@@ -34,7 +34,20 @@ let init lexbuf fname =
     Lexing.pos_bol = 0;
     Lexing.pos_cnum = 0;
   }
-      
+
+let shift_pos pos1 pos2 =
+  assert (pos1.Lexing.pos_fname = pos2.Lexing.pos_fname);
+  {Lexing.pos_fname = pos1.Lexing.pos_fname;
+    Lexing.pos_lnum = pos1.Lexing.pos_lnum + pos2.Lexing.pos_lnum;
+    Lexing.pos_bol = pos1.Lexing.pos_bol + pos2.Lexing.pos_bol;
+    Lexing.pos_cnum =if pos2.Lexing.pos_lnum = 1 then pos1.Lexing.pos_cnum + pos2.Lexing.pos_cnum else pos2.Lexing.pos_cnum
+  }
+
+let shift loc1 loc2 =
+  {loc_start = shift_pos loc1.loc_start loc2.loc_start;
+    loc_end  = shift_pos loc1.loc_start loc2.loc_end
+  }
+    
 let symbol_rloc () = 
   {
     loc_start = Parsing.symbol_start_pos ();
@@ -65,11 +78,12 @@ let print loc =
   print_string ":";
   print_newline ()
 
-
+let loc_line loc = loc.loc_start.Lexing.pos_lnum 
+  
 let pp_loc fmt loc =
   if loc == dummy_loc then () else
   let filename = loc.loc_start.Lexing.pos_fname in
-  let line = loc.loc_start.Lexing.pos_lnum in
+  let line = loc_line loc in
   let start_char =
     loc.loc_start.Lexing.pos_cnum - loc.loc_start.Lexing.pos_bol
   in

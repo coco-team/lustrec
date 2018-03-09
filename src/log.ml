@@ -13,7 +13,8 @@ let report ~level:level p =
 if !Options.verbose_level >= level then
   begin
     Format.eprintf "%t" p;
-    Format.pp_print_flush Format.err_formatter ()
+  (* Removed the flush since it was breaking most open/close boxes *)
+  (* Format.pp_print_flush Format.err_formatter () *)
   end
 
 (* Local Variables: *)

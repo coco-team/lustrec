@@ -78,7 +78,7 @@ let rec fby expr n init =
 %token MINUS PLUS UMINUS
 %token PRE ARROW
 %token REQUIRES ENSURES OBSERVER
-%token INVARIANT BEHAVIOR ASSUMES
+%token INVARIANT BEHAVIOR ASSUMES CCODE MATLAB
 %token EXISTS FORALL
 %token PROTOTYPE LIB
 %token EOF
@@ -120,6 +120,14 @@ let rec fby expr n init =
 %start signed_const
 %type <LustreSpec.constant> signed_const
 
+%start expr
+%type <LustreSpec.expr> expr
+
+%start stmt_list
+%type <LustreSpec.statement list * LustreSpec.assert_t list * LustreSpec.expr_annot list > stmt_list
+
+%start vdecl_list
+%type <LustreSpec.var_decl list> vdecl_list
 %%
 
 module_ident:
@@ -210,7 +218,7 @@ top_decl:
 | CONST cdecl_list { List.rev ($2 false) }
 | nodespec_list state_annot node_ident_decl LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET stmt_list TEL 
     {
-      let stmts, asserts, annots = $16 in
+     let stmts, asserts, annots = $16 in
       (* Declaring eqs annots *)
       List.iter (fun ann -> 
 	List.iter (fun (key, _) -> 
@@ -218,23 +226,23 @@ top_decl:
 	) ann.annots
       ) annots;
      (* Building the node *)
-      let nd = mktop_decl false (Node
-				   {node_id = $3;
-				    node_type = Types.new_var ();
-				    node_clock = Clocks.new_var true;
-				    node_inputs = List.rev $5;
-				    node_outputs = List.rev $10;
-				    node_locals = List.rev $14;
-				    node_gencalls = [];
-				    node_checks = [];
-				    node_asserts = asserts; 
-				    node_stmts = stmts;
-				    node_dec_stateless = $2;
-				    node_stateless = None;
-				    node_spec = $1;
-				    node_annot = annots})
-      in
-      pop_node ();
+     let nd = mktop_decl false (Node
+				  {node_id = $3;
+				   node_type = Types.new_var ();
+				   node_clock = Clocks.new_var true;
+				   node_inputs = List.rev $5;
+				   node_outputs = List.rev $10;
+				   node_locals = List.rev $14;
+				   node_gencalls = [];
+				   node_checks = [];
+				   node_asserts = asserts; 
+				   node_stmts = stmts;
+				   node_dec_stateless = $2;
+				   node_stateless = None;
+				   node_spec = $1;
+				   node_annot = annots})
+     in
+     pop_node ();
      (*add_node $3 nd;*) [nd] }
 
 nodespec_list:
@@ -374,6 +382,8 @@ expr:
 /* constants */
   INT {mkexpr (Expr_const (Const_int $1))}
 | REAL {let c,e,s = $1 in mkexpr (Expr_const (Const_real (c,e,s)))}
+| STRING {mkexpr (Expr_const (Const_string $1))}
+
 /* | FLOAT {mkexpr (Expr_const (Const_float $1))}*/
 /* Idents or type enum tags */
 | IDENT { mkexpr (Expr_ident $1) }
@@ -413,9 +423,28 @@ expr:
 | node_ident LPAR expr RPAR EVERY expr
     {mkexpr (Expr_appl ($1, $3, Some $6))}
 | node_ident LPAR tuple_expr RPAR
-    {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), None))}
+    {
+      let id=$1 in
+      let args=List.rev $3 in
+      match id, args with
+      | "fbyn", [expr;n;init] ->
+	let n = match n.expr_desc with
+	  | Expr_const (Const_int n) -> n
+	  | _ -> assert false
+	in
+	fby expr n init
+      | _ -> mkexpr (Expr_appl ($1, mkexpr (Expr_tuple args), None))
+    }
 | node_ident LPAR tuple_expr RPAR EVERY expr
-    {mkexpr (Expr_appl ($1, mkexpr (Expr_tuple (List.rev $3)), Some $6)) }
+    {
+      let id=$1 in
+      let args=List.rev $3 in
+      let clock=$6 in
+      if id="fby" then
+	assert false (* TODO Ca veut dire quoi fby (e,n,init) every c *)
+      else
+	mkexpr (Expr_appl (id, mkexpr (Expr_tuple args), Some clock)) 
+    }
 
 /* Boolean expr */
 | expr AND expr 
@@ -552,11 +581,11 @@ vdecl_list:
 
 vdecl:
   ident_list COL typeconst clock 
-    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $3, $4, false, None) loc) $1 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $3, $4, false, None, None) loc) $1 }
 | CONST ident_list /* static parameters don't have clocks */
-    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, true, None) loc) $2 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, true, None, None) loc) $2 }
 | CONST ident_list COL typeconst /* static parameters don't have clocks */
-    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true, None) loc) $2 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true, None, None) loc) $2 }
 
 local_vdecl_list:
   local_vdecl {$1}
@@ -564,13 +593,13 @@ local_vdecl_list:
 
 local_vdecl:
 /* Useless no ?*/    ident_list
-    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, false, None) loc) $1 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, false, None, None) loc) $1 }
 | ident_list COL typeconst clock 
-    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $3, $4, false, None) loc) $1 }
+    { List.map (fun (id, loc) -> mkvar_decl (id, mktyp $3, $4, false, None, None) loc) $1 }
 | CONST vdecl_ident EQ expr /* static parameters don't have clocks */
-    { let (id, loc) = $2 in [ mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, true, Some $4) loc ] }
+    { let (id, loc) = $2 in [ mkvar_decl (id, mktyp Tydec_any, mkclock Ckdec_any, true, Some $4, None) loc] }
 | CONST vdecl_ident COL typeconst EQ expr /* static parameters don't have clocks */
-    { let (id, loc) = $2 in [ mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true, Some $6) loc ] }
+    { let (id, loc) = $2 in [ mkvar_decl (id, mktyp $4, mkclock Ckdec_any, true, Some $6, None) loc] }
 
 cdecl_list:
   cdecl SCOL { (fun itf -> [$1 itf]) }
@@ -619,6 +648,9 @@ lustre_annot_list:
 | IDENT COL qexpr SCOL lustre_annot_list { ([$1],$3)::$5 }
 | INVARIANT COL qexpr SCOL lustre_annot_list{ (["invariant"],$3)::$5 }
 | OBSERVER COL qexpr SCOL lustre_annot_list { (["observer"],$3)::$5 }
+| CCODE COL qexpr SCOL lustre_annot_list{ (["c_code"],$3)::$5 }
+| MATLAB COL qexpr SCOL lustre_annot_list{ (["matlab"],$3)::$5 }
+
 
 kwd:
 DIV { [] }
