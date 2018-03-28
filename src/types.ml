@@ -326,6 +326,12 @@ let rec is_bool_type ty =
  | Tbasic t -> BasicT.is_bool_type t
  | _     -> false
 
+let rec is_const_type ty c =
+  match (repr ty).tdesc with
+  | Tstatic (_, ty) -> is_const_type ty c
+  | Tconst c' -> c = c'
+  | _     -> false
+
 let get_clock_base_type ty =
  match (repr ty).tdesc with
  | Tclock ty -> Some ty
@@ -508,6 +514,7 @@ sig
   val is_real_type: type_expr -> bool
   val is_int_type: type_expr -> bool
   val is_bool_type: type_expr -> bool
+  val is_const_type: type_expr -> ident -> bool
   val is_static_type: type_expr -> bool
   val is_array_type: type_expr -> bool
   val is_dimension_type: type_expr -> bool

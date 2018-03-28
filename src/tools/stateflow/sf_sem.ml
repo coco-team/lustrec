@@ -63,7 +63,9 @@ let _ =
   | GenLus ->
      let module Model = (val model) in
      let state_vars = Datatype.SF.states Model.model in
-     let global_vars = Datatype.SF.global_vars Model.model in
+     let global_vars =
+       List.map (fun (v,e) -> {Basetypes.GlobalVarDef.variable = v; init_val = e;})
+	 (Datatype.SF.global_vars Model.model) in
      
      let module T = CPS_lustre_generator.LustrePrinter (struct
        let state_vars = state_vars

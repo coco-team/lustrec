@@ -39,7 +39,7 @@ type 'prog_t src_components_t =
   | Junction of junction_name_t * transitions_t
   | SFFunction of 'prog_t
 
-type prog_t = Program of state_name_t * prog_t src_components_t list * LustreSpec.var_decl list
+type prog_t = Program of state_name_t * prog_t src_components_t list * (LustreSpec.var_decl * LustreSpec.expr) list
 
 type scope_t = Constant | Input | Local | Output | Parameter
 
@@ -159,7 +159,7 @@ struct
     Format.fprintf fmt "Main node name: %s@ %a@ %a@"
       name
       (pp_src pp_sffunction) component_list
-      pp_vars vars
+      pp_vars (List.map fst vars)
 
   let pp_scope fmt src =
     Format.fprintf fmt (match src with

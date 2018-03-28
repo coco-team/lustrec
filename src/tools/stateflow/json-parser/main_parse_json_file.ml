@@ -129,25 +129,31 @@ let json_parse _ file pp =
     end) in
     let module Sem = CPS.Semantics (T) (Model) in
     let prog = Sem.code_gen modularmode in
+    let header = List.map Corelang.mktop [
+      (LustreSpec.Open (false,"lustrec_math"));
+      (LustreSpec.Open (false,"conv"));
+      (LustreSpec.Open (true,"locallib"));
+    ]
+    in
+    let prog =header@prog in
     Options.print_dec_types := true;
-    Format.printf "%a@." Printers.pp_prog prog;
+    (* Format.printf "%a@." Printers.pp_prog prog; *)
 
     let auto_file = "sf_gen_test_auto.lus" in (* Could be changed *)
     let auto_out = open_out auto_file in
     let auto_fmt = Format.formatter_of_out_channel auto_out in
     Format.fprintf auto_fmt "%a@." Printers.pp_prog prog;
-
-    let prog = (LustreSpec.Open ("math",false))::prog
+    Format.eprintf "Print initial lustre model with automaton in sf_gen_test_auto.lus@.";
+    
     let prog, deps = Compiler_stages.stage1 prog "" "" in
 
-    Format.printf "%a@." Printers.pp_prog prog;
+    (* Format.printf "%a@." Printers.pp_prog prog; *)
     let noauto_file = "sf_gen_test_noauto.lus" in (* Could be changed *)
     let noauto_out = open_out noauto_file in
     let noauto_fmt = Format.formatter_of_out_channel noauto_out in
-    Format.fprintf noauto_fmt "%a@." Printers.pp_prog prog
-
-
-      
+    Format.fprintf noauto_fmt "%a@." Printers.pp_prog prog;
+    Format.eprintf "Print expanded lustre model in sf_gen_test_noauto.lus@.";
+    ()
 
   with Parse.Error (l, err) -> Format.eprintf "Parse error at loc %a : %a@.@?" Location.pp_loc l Parse.pp_error err
 

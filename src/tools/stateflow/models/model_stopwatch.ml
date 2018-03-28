@@ -5,8 +5,12 @@ open SF
 let verbose = false
 let actionv x = no_action (*TODO if verbose then action x else no_action*)
 let action x = no_action (* TODO *)
-let condition x = condition (Corelang.mkexpr Location.dummy_loc (LustreSpec.Expr_const (Corelang.const_of_bool true)))
-
+let condition x = condition {
+  expr = Corelang.mkexpr Location.dummy_loc (LustreSpec.Expr_const (Corelang.const_of_bool true));
+  cinputs = [];
+  coutputs = [];
+  cvariables = [];
+}
 let name = "stopwatch"
 
 let model =
@@ -250,8 +254,12 @@ let model =
 	 int_typ, (* type *)
 	 Corelang.dummy_clock_dec, (* clock *)
 	 false, (* not a constant *)
-	 None (* no default value *)
-	)
+	 None, (* no default value *)
+	 None (* no parent known *)
+	),
+      (* Default value is zero *)
+      Corelang.mkexpr Location.dummy_loc (LustreSpec.Expr_const (LustreSpec.Const_int 0))
+      
     )
       ["cent";
        "sec";

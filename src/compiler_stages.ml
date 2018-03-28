@@ -87,7 +87,7 @@ let stage1 prog dirname basename =
   let computed_clocks_env = clock_decls clock_env prog in
 
   (* Registering and checking machine types *)
-  Machine_types.load prog;
+  if Machine_types.is_active then Machine_types.load prog;
   
 
   (* Generating a .lusi header file only *)

@@ -170,7 +170,7 @@ let mk_expr_alias_opt opt node (defs, vars) expr =
 	  mkeq expr.expr_loc (List.map (fun v -> v.var_id) new_aliases, expr)
 	in
 	(* Typing and Registering machine type *) 
-	let _ = Machine_types.type_def node new_aliases expr  in
+	let _ = if Machine_types.is_active then Machine_types.type_def node new_aliases expr  in
 	(new_def::defs, new_aliases@vars), replace_expr new_aliases expr
       else
 	(defs, vars), expr
@@ -468,7 +468,7 @@ let normalize_node node =
 
   let new_annots =
     List.fold_left (fun annots v ->
-      if Machine_types.is_exportable v then
+      if Machine_types.is_active && Machine_types.is_exportable v then
 	let typ = Machine_types.get_specified_type v in
   	let typ_name = Machine_types.type_name typ in
 

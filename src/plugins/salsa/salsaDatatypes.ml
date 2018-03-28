@@ -1,9 +1,9 @@
 module LT = LustreSpec
 module MC = Machine_code
-module ST = Salsa.SalsaTypes
+module ST = Salsa.Types
 module Float = Salsa.Float
 
-let debug = true
+let debug = ref false
 
 let pp_hash ~sep f fmt r = 
   Format.fprintf fmt "[@[<v>";
@@ -108,30 +108,37 @@ module FloatIntSalsa =
 struct
   type t = ST.abstractValue
 
-  let pp fmt (f,r) = 
-    match f, r with
+  let pp fmt (f,r) =
+    let fs, rs = (Salsa.Float.Domain.print (f,r)) in
+    Format.fprintf fmt "%s + %s" fs rs 
+(*    match f, r with
     | ST.I(a,b), ST.J(c,d) ->
-      Format.fprintf fmt "[%f, %f] + [%f, %f]" a b c d
+      Format.fprintf fmt "[%f, %f] + [%s, %s]" a b (Num.string_of_num c) (Num.string_of_num d)
     | ST.I(a,b), ST.JInfty ->  Format.fprintf fmt "[%f, %f] + oo" a b 
     | ST.Empty, _ -> Format.fprintf fmt "???"
 
     | _ -> assert false
-
-  let union v1 v2 = 
-    match v1, v2 with
+*)
+  let union v1 v2 = Salsa.Float.Domain.join v1 v2
+(*    match v1, v2 with
     |(ST.I(x1, x2), ST.J(y1, y2)), (ST.I(x1', x2'), ST.J(y1', y2')) ->
       ST.(I(min x1 x1', max x2 x2'), J(min y1 y1', max y2 y2'))
     | _ -> Format.eprintf "%a cup %a failed@.@?" pp v1 pp v2; assert false 
-
+*)
   let inject cst = match cst with
-    | LT.Const_int(i)  -> Salsa.Builder.mk_cst (ST.I(float_of_int i,float_of_int i),ST.J(0.0,0.0))
+    | LT.Const_int(i)  -> Salsa.Builder.mk_cst (ST.R(Num.num_of_int i, []), ST.R(Num.num_of_int i, []))
     | LT.Const_real (c,e,s) -> (* TODO: this is incorrect. We should rather
 				  compute the error associated to the float *)
-      let r = float_of_string s  in
-      if r = 0. then
-	Salsa.Builder.mk_cst (ST.I(-. min_float, min_float),Float.ulp (ST.I(-. min_float, min_float)))
-      else
-	Salsa.Builder.mk_cst (ST.I(r*.(1.-.epsilon_float),r*.(1.+.epsilon_float)),Float.ulp (ST.I(r,r)))
+       
+       let r = float_of_string s  in
+       let r = Salsa.Prelude.r_of_f_aux r in
+       Salsa.Builder.mk_cst (Float.Domain.nnew r r)
+	 
+      (* let r = float_of_string s  in *)
+      (* if r = 0. then *)
+      (* 	Salsa.Builder.mk_cst (ST.R(-. min_float, min_float),Float.ulp (ST.R(-. min_float, min_float))) *)
+      (* else *)
+      (* 	Salsa.Builder.mk_cst (ST.I(r*.(1.-.epsilon_float),r*.(1.+.epsilon_float)),Float.ulp (ST.I(r,r))) *)
     | _ -> assert false
 end
 
@@ -258,18 +265,19 @@ let rec salsa_expr2value_t vars_env cst_env e  =
     MC.mk_val (LT.Fun (op, [x;y])) t
   in
   match e with
-    ST.Cst((ST.I(f1,f2),_),_)     -> (* We project ranges into constants. We
+    ST.Cst((ST.R(c,_),_),_)     -> (* We project ranges into constants. We
 					forget about errors and provide the
 					mean/middle value of the interval
 				     *)
-      let new_float = 
-	if f1 = f2 then
-	  f1
-	else
-	  (f1 +. f2) /. 2.0 
-      in
-      Log.report ~level:3
-	(fun fmt -> Format.fprintf fmt  "projecting [%.45f, %.45f] -> %.45f@ " f1 f2 new_float);
+      let  new_float = Num.float_of_num c in
+      (* let new_float =  *)
+      (* 	if f1 = f2 then *)
+      (* 	  f1 *)
+      (* 	else *)
+      (* 	  (f1 +. f2) /. 2.0  *)
+      (* in *)
+      (* Log.report ~level:3 *)
+      (* 	(fun fmt -> Format.fprintf fmt  "projecting [%.45f, %.45f] -> %.45f@ " f1 f2 new_float); *)
       let cst =  
 	let s = 
 	  if new_float = 0. then "0." else

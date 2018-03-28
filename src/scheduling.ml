@@ -186,10 +186,10 @@ let schedule_prog prog =
   List.fold_right (
     fun top_decl (accu_prog, sch_map)  ->
       match top_decl.top_decl_desc with
-	| Node nd -> 
-	  let report = schedule_node nd in
-	  {top_decl with top_decl_desc = Node report.node}::accu_prog, 
-	  IMap.add nd.node_id report sch_map
+      | Node nd ->
+	let report = schedule_node nd in
+	{top_decl with top_decl_desc = Node report.node}::accu_prog, 
+	IMap.add nd.node_id report sch_map
 	| _ -> top_decl::accu_prog, sch_map
     ) 
     prog

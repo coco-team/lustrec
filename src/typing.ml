@@ -599,10 +599,9 @@ let rec check_type_declaration loc cty =
  | Tydec_clock ty
  | Tydec_array (_, ty) -> check_type_declaration loc ty
  | Tydec_const tname   ->
-    Format.printf "TABLE: %a@." print_type_table ();
-   (* TODO REMOVE *)
-   if not (Hashtbl.mem type_table cty)
-   then raise (Error (loc, Unbound_type tname));
+    (* Format.eprintf "TABLE: %a@." print_type_table (); *)
+    if not (Hashtbl.mem type_table cty)
+    then raise (Error (loc, Unbound_type tname));
  | _                   -> ()
 
 let type_var_decl vd_env env vdecl =

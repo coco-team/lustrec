@@ -122,8 +122,8 @@ sig
 
   val pp_cond : Format.formatter -> t -> unit
 end
-
-  module Condition =
+  
+module Condition =
 struct
   type t =
     | Quote of base_condition_t
@@ -155,3 +155,8 @@ struct
 end
 
 let _ = (module Condition : ConditionType)
+
+module GlobalVarDef =
+struct
+  type t = {variable: LustreSpec.var_decl; init_val: LustreSpec.expr}
+end
