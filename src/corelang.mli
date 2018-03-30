@@ -13,7 +13,7 @@
 open Lustre_types
 
 exception Error of Location.t * Error.error_kind
-module VSet: Set.S
+module VSet: Set.S with type elt = Lustre_types.var_decl 
   
 val dummy_type_dec: type_dec
 val dummy_clock_dec: clock_dec

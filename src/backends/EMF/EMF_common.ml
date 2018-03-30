@@ -1,6 +1,6 @@
 open Lustre_types
 open Machine_code_types
-
+module VSet = Corelang.VSet
 open Format
 open Machine_code 
 

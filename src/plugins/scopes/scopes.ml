@@ -1,5 +1,6 @@
 open Lustre_types 
 open Corelang 
+open Machine_code_types
 open Machine_code
 
 (* (variable, node name, node instance) *)

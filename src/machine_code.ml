@@ -19,10 +19,6 @@ let print_statelocaltag = true
   
 exception NormalizationError
 
-module OrdVarDecl:Map.OrderedType with type t=var_decl =
-  struct type t = var_decl;; let compare = compare end
-
-module VSet = Set.Make(OrdVarDecl)
 
 let rec pp_val fmt v =
   match v.value_desc with
@@ -77,29 +73,6 @@ and pp_branch fmt (t, h) =
 and pp_instrs fmt il =
   Format.fprintf fmt "@[<v 2>%a@]" (Utils.fprintf_list ~sep:"@," pp_instr) il
 
-type step_t = {
-  step_checks: (Location.t * value_t) list;
-  step_inputs: var_decl list;
-  step_outputs: var_decl list;
-  step_locals: var_decl list;
-  step_instrs: instr_t list;
-  step_asserts: value_t list;
-}
-
-type static_call = top_decl * (Dimension.dim_expr list)
-
-type machine_t = {
-  mname: node_desc;
-  mmemory: var_decl list;
-  mcalls: (ident * static_call) list; (* map from stateful/stateless instance to node, no internals *)
-  minstances: (ident * static_call) list; (* sub-map of mcalls, from stateful instance to node *)
-  minit: instr_t list;
-  mstatic: var_decl list; (* static inputs only *)
-  mconst: instr_t list; (* assignments of node constant locals *)
-  mstep: step_t;
-  mspec: node_annot option;
-  mannot: expr_annot list;
-}
 
 (* merge log: get_node_def was in c0f8 *)
 (* Returns the node/machine associated to id in m calls *)

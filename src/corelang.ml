@@ -25,7 +25,7 @@ end
 
 module VMap = Map.Make(VDeclModule)
 
-module VSet = Set.Make(VDeclModule)
+module VSet : Set.S with type elt = var_decl = Set.Make(VDeclModule)
 
 let dummy_type_dec = {ty_dec_desc=Tydec_any; ty_dec_loc=Location.dummy_loc}
 

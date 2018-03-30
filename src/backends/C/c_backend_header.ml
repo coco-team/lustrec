@@ -12,7 +12,7 @@
 open Format 
 open Lustre_types
 open Corelang
-open Machine_code
+open Machine_code_types
 open C_backend_common
 
 (********************************************************************************************)
@@ -22,7 +22,7 @@ open C_backend_common
 
 module type MODIFIERS_HDR =
 sig
-  val print_machine_decl_prefix: Format.formatter -> Machine_code.machine_t -> unit
+  val print_machine_decl_prefix: Format.formatter -> Machine_code_types.machine_t -> unit
 end
 
 module EmptyMod =
@@ -44,9 +44,9 @@ let print_import_standard fmt =
 	fprintf fmt "#include <mpfr.h>@."
       end;
     if !Options.cpp then
-      fprintf fmt "#include \"%s/arrow.hpp\"@.@." arrow_top_decl.top_decl_owner 
+      fprintf fmt "#include \"%s/arrow.hpp\"@.@." Machine_code.arrow_top_decl.top_decl_owner 
     else
-      fprintf fmt "#include \"%s/arrow.h\"@.@." arrow_top_decl.top_decl_owner 
+      fprintf fmt "#include \"%s/arrow.h\"@.@." Machine_code.arrow_top_decl.top_decl_owner 
 	
   end
 
@@ -162,7 +162,7 @@ let print_static_alloc_macro fmt (m, attr, inst) =
 let print_machine_decl fmt m =
   begin
     Mod.print_machine_decl_prefix fmt m;
-    if fst (get_stateless_status m) then
+    if fst (Machine_code.get_stateless_status m) then
       begin
 	fprintf fmt "extern %a;@.@."
 	  print_stateless_prototype
@@ -211,7 +211,7 @@ let print_machine_decl fmt m =
 
 let print_machine_alloc_decl fmt m =
   Mod.print_machine_decl_prefix fmt m;
-  if fst (get_stateless_status m) then
+  if fst (Machine_code.get_stateless_status m) then
     begin
     end
   else

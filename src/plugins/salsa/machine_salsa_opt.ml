@@ -22,7 +22,7 @@ let fun_types node =
 let called_node_id m id = 
   let td, _ =
     try
-      List.assoc id m.MC.mcalls (* TODO Xavier: mcalls or minstances ? *)
+      List.assoc id m.MT.mcalls (* TODO Xavier: mcalls or minstances ? *)
     with Not_found -> assert false
   in
   td
@@ -350,7 +350,7 @@ let rec rewrite_instrs nodename m constEnv  vars_env m instrs ranges formalEnv p
 									 produced
 									   variables *)
 	    Format.eprintf "Requited vars: %a@." Vars.pp required_vars;
-	    let required_vars = Vars.diff required_vars (Vars.of_list m.MC.mmemory) in
+	    let required_vars = Vars.diff required_vars (Vars.of_list m.MT.mmemory) in
 	    let prefix_instr, ranges = 
 	      assign_vars printed_vars ranges formalEnv required_vars in
 
@@ -532,7 +532,7 @@ let salsaStep constEnv  m s =
 	  | ["salsa"; "ranges"; var] -> (var, range)::accu
 	  | _ -> accu
       ) accu annl.LT.annots
-  ) [] m.MC.mannot
+  ) [] m.MT.mannot
   in
   let ranges = 
     List.fold_left (fun ranges (v, value) ->
@@ -565,8 +565,8 @@ let salsaStep constEnv  m s =
     Vars.real_vars  
       (
 	Vars.union 
-	  (Vars.of_list m.MC.mmemory) 
-	  (Vars.of_list s.MC.step_outputs) 
+	  (Vars.of_list m.MT.mmemory) 
+	  (Vars.of_list s.MT.step_outputs) 
       )
   in 
   (* TODO: should be at least step output + may be memories *)
@@ -575,39 +575,39 @@ let salsaStep constEnv  m s =
   if !debug then Format.eprintf "@[<v 2>Registering node equations@ "; 
   let new_instrs, _, _, printed_vars, _ = 
     rewrite_instrs
-      m.MC.mname.LT.node_id
+      m.MT.mname.LT.node_id
       m
       constEnv 
       vars_env
       m
-      s.MC.step_instrs
+      s.MT.step_instrs
       ranges
       formal_env
-      (Vars.real_vars (Vars.of_list s.MC.step_inputs (* printed_vars : real
+      (Vars.real_vars (Vars.of_list s.MT.step_inputs (* printed_vars : real
 							inputs are considered as
 							already printed *)))
       vars_to_print 
   in
-  let all_local_vars = Vars.real_vars (Vars.of_list s.MC.step_locals) in
+  let all_local_vars = Vars.real_vars (Vars.of_list s.MT.step_locals) in
   let unused = (Vars.diff all_local_vars printed_vars) in
   let locals =
     if not (Vars.is_empty unused) then (
       Format.eprintf "Unused local vars: [%a]. Removing them.@.@?"
 	Vars.pp unused;
-      List.filter (fun v -> not (Vars.mem v unused)) s.MC.step_locals
+      List.filter (fun v -> not (Vars.mem v unused)) s.MT.step_locals
     )
     else
-      s.MC.step_locals
+      s.MT.step_locals
   in
-  { s with MC.step_instrs = new_instrs; MC.step_locals = locals } (* we have also to modify local variables to declare new vars *)
+  { s with MT.step_instrs = new_instrs; MT.step_locals = locals } (* we have also to modify local variables to declare new vars *)
 
 
 let machine_t2machine_t_optimized_by_salsa constEnv  mt =
   try
-    if !debug then Format.eprintf "@[<v 8>[salsa] Optimizing machine %s@ " mt.MC.mname.LT.node_id;
-    let new_step = salsaStep constEnv  mt mt.MC.mstep in
+    if !debug then Format.eprintf "@[<v 8>[salsa] Optimizing machine %s@ " mt.MT.mname.LT.node_id;
+    let new_step = salsaStep constEnv  mt mt.MT.mstep in
     if !debug then Format.eprintf "@]@ ";
-    { mt with MC.mstep = new_step } 
+    { mt with MT.mstep = new_step } 
     
       
   with FormalEnv.NoDefinition v as exp -> 

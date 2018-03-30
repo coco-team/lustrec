@@ -11,8 +11,8 @@
 
 open Format
 open Lustre_types
+open Machine_code_types
 open Corelang
-open Machine_code
 
 let pp_machine_reset_name fmt id = fprintf fmt "%s_reset" id
 let pp_machine_step_name fmt id = fprintf fmt "%s_step" id

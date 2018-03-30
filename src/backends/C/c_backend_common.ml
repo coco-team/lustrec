@@ -12,7 +12,7 @@
 open Format
 open Lustre_types
 open Corelang
-open Machine_code
+open Machine_code_types
 
 
 let print_version fmt =
@@ -199,7 +199,7 @@ let rec pp_c_val self pp_var fmt v =
   | Cst c         -> pp_c_const fmt c
   | Array vl      -> fprintf fmt "{%a}" (Utils.fprintf_list ~sep:", " (pp_c_val self pp_var)) vl
   | Access (t, i) -> fprintf fmt "%a[%a]" (pp_c_val self pp_var) t (pp_c_val self pp_var) i
-  | Power (v, n)  -> (Format.eprintf "internal error: C_backend_common.pp_c_val %a@." pp_val v; assert false)
+  | Power (v, n)  -> (Format.eprintf "internal error: C_backend_common.pp_c_val %a@." Machine_code.pp_val v; assert false)
   | LocalVar v    -> pp_var fmt v
   | StateVar v    ->
     (* array memory vars are represented by an indirection to a local var with the right type,
@@ -219,11 +219,11 @@ let pp_c_var_read m fmt id =
   (* mpfr_t is a static array, not treated as general arrays *)
   if Types.is_address_type id.var_type
   then
-    if is_memory m id && not (Types.is_real_type id.var_type && !Options.mpfr)
+    if Machine_code.is_memory m id && not (Types.is_real_type id.var_type && !Options.mpfr)
     then fprintf fmt "(*%s)" id.var_id
     else fprintf fmt "%s" id.var_id
   else
-    if is_output m id
+    if Machine_code.is_output m id
     then fprintf fmt "*%s" id.var_id
     else fprintf fmt "%s" id.var_id
 
@@ -237,7 +237,7 @@ let pp_c_var_write m fmt id =
   then
     fprintf fmt "%s" id.var_id
   else
-    if is_output m id
+    if Machine_code.is_output m id
     then
       fprintf fmt "%s" id.var_id
     else
@@ -274,7 +274,7 @@ let pp_c_decl_local_var m fmt id =
   then
     Format.fprintf fmt "%a = %a"
       (pp_c_type  ~var_opt:(Some id) id.var_id) id.var_type
-      (pp_c_val "" (pp_c_var_read m)) (get_const_assign m id)
+      (pp_c_val "" (pp_c_var_read m)) (Machine_code.get_const_assign m id)
   else
     Format.fprintf fmt "%a"
       (pp_c_type  ~var_opt:(Some id) id.var_id) id.var_type
@@ -322,7 +322,7 @@ let pp_registers_struct fmt m =
     ()
 
 let print_machine_struct fmt m =
-  if fst (get_stateless_status m) then
+  if fst (Machine_code.get_stateless_status m) then
     begin
     end
   else
@@ -464,7 +464,7 @@ let pp_c_main_var_output fmt id =
     fprintf fmt "&%s" id.var_id
 
 let pp_main_call mname self fmt m (inputs: Machine_code_types.value_t list) (outputs: var_decl list) =
-  if fst (get_stateless_status m)
+  if fst (Machine_code.get_stateless_status m)
   then
     fprintf fmt "%a (%a%t%a);"
       pp_machine_step_name mname
@@ -482,11 +482,11 @@ let pp_main_call mname self fmt m (inputs: Machine_code_types.value_t list) (out
 
 let pp_c_var m self pp_var fmt var =
   let open Machine_code_types in
-  if is_memory m var
+  if Machine_code.is_memory m var
   then
-    pp_c_val self pp_var fmt (mk_val (StateVar var) var.var_type)
+    pp_c_val self pp_var fmt (Machine_code.mk_val (StateVar var) var.var_type)
   else
-    pp_c_val self pp_var fmt (mk_val (LocalVar var) var.var_type)
+    pp_c_val self pp_var fmt (Machine_code.mk_val (LocalVar var) var.var_type)
   
 
 let pp_array_suffix fmt loop_vars =
@@ -519,7 +519,7 @@ let pp_initialize m self pp_var fmt var =
 
 let pp_const_initialize pp_var fmt const =
   let open Machine_code_types in
-  let var = mk_val (LocalVar (Corelang.var_decl_of_const const)) const.const_type in
+  let var = Machine_code.mk_val (LocalVar (Corelang.var_decl_of_const const)) const.const_type in
   let rec aux indices value fmt typ =
     if Types.is_array_type typ
     then

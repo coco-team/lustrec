@@ -212,14 +212,14 @@ let compute_vars_env m =
     List.fold_left 
       (fun accu v -> VarEnv.add v.LT.var_id {vdecl = v; is_local = false; } accu) 
       env 
-      m.MC.mmemory
+      m.MT.mmemory
   in
   let env = 
     List.fold_left (
       fun accu v -> VarEnv.add v.LT.var_id {vdecl = v; is_local = true; } accu
     )
       env
-      MC.(m.mstep.step_inputs@m.mstep.step_outputs@m.mstep.step_locals)
+      MC.(m.MT.mstep.MT.step_inputs@m.MT.mstep.MT.step_outputs@m.MT.mstep.MT.step_locals)
   in
 env
 

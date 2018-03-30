@@ -245,7 +245,7 @@ let merge_branches instrs =
     | _ -> assert false
   in
   let sorted_branches = List.sort sorting_branches branches in
-  instrs @ (join_guards_list sorted_branches)
+  instrs @ (Machine_code.join_guards_list sorted_branches)
     
 let rec pp_emf_instr m fmt i =
   let pp_content fmt i =
