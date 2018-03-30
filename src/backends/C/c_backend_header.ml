@@ -13,6 +13,7 @@ open Format
 open Lustre_types
 open Corelang
 open Machine_code_types
+open Machine_code_common
 open C_backend_common
 
 (********************************************************************************************)
@@ -22,7 +23,7 @@ open C_backend_common
 
 module type MODIFIERS_HDR =
 sig
-  val print_machine_decl_prefix: Format.formatter -> Machine_code_types.machine_t -> unit
+  val print_machine_decl_prefix: Format.formatter -> machine_t -> unit
 end
 
 module EmptyMod =
@@ -44,14 +45,13 @@ let print_import_standard fmt =
 	fprintf fmt "#include <mpfr.h>@."
       end;
     if !Options.cpp then
-      fprintf fmt "#include \"%s/arrow.hpp\"@.@." Machine_code.arrow_top_decl.top_decl_owner 
+      fprintf fmt "#include \"%s/arrow.hpp\"@.@." Arrow.arrow_top_decl.top_decl_owner 
     else
-      fprintf fmt "#include \"%s/arrow.h\"@.@." Machine_code.arrow_top_decl.top_decl_owner 
+      fprintf fmt "#include \"%s/arrow.h\"@.@." Arrow.arrow_top_decl.top_decl_owner 
 	
   end
 
 let rec print_static_val pp_var fmt v =
-  let open Machine_code_types in
   match v.value_desc with
   | Cst c         -> pp_c_const fmt c
   | LocalVar v    -> pp_var fmt v
@@ -62,7 +62,7 @@ let print_constant_decl (m, attr, inst) pp_var fmt v =
   Format.fprintf fmt "%s %a = %a"
     attr
     (pp_c_type (Format.sprintf "%s ## %s" inst v.var_id)) v.var_type
-    (print_static_val pp_var) (Machine_code.get_const_assign m v)
+    (print_static_val pp_var) (get_const_assign m v)
 
 let print_static_constant_decl (m, attr, inst) fmt const_locals =
   let pp_var fmt v =
@@ -82,7 +82,7 @@ let print_static_declare_instance (m, attr, inst) const_locals fmt (i, (n, stati
       Format.fprintf fmt "%s ## %s" inst v.var_id
     else 
       Format.fprintf fmt "%s" v.var_id in
-  let values = List.map (Machine_code.value_of_dimension m) static in
+  let values = List.map (value_of_dimension m) static in
   fprintf fmt "%a(%s, %a%t%s)"
     pp_machine_static_declare_name (node_name n)
     attr
@@ -162,7 +162,7 @@ let print_static_alloc_macro fmt (m, attr, inst) =
 let print_machine_decl fmt m =
   begin
     Mod.print_machine_decl_prefix fmt m;
-    if fst (Machine_code.get_stateless_status m) then
+    if fst (get_stateless_status m) then
       begin
 	fprintf fmt "extern %a;@.@."
 	  print_stateless_prototype
@@ -211,7 +211,7 @@ let print_machine_decl fmt m =
 
 let print_machine_alloc_decl fmt m =
   Mod.print_machine_decl_prefix fmt m;
-  if fst (Machine_code.get_stateless_status m) then
+  if fst (get_stateless_status m) then
     begin
     end
   else

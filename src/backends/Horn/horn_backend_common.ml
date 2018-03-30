@@ -113,7 +113,7 @@ let arrow_vars machines machine : Lustre_types.var_decl list =
     List.fold_left (fun accu (id, (n, _)) ->
       let name = node_name n in
       if name = "_arrow" then
-	let arrow_machine = Machine_code.arrow_machine in
+	let arrow_machine = Machine_code_common.arrow_machine in
 	(rename_machine_list
 	  (concat prefix (concat (if fst then id else concat m.mname.node_id id) "_arrow"))
 	  arrow_machine.mmemory

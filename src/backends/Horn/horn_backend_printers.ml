@@ -19,7 +19,7 @@ open Format
 open Lustre_types
 open Machine_code_types
 open Corelang
-open Machine_code
+open Machine_code_common
 
 open Horn_backend_common
   
@@ -406,7 +406,7 @@ let is_stateless m = m.minstances = [] && m.mmemory = []
    We first declare all variables then the two /rules/.
 *)
 let print_machine machines fmt m =
-  if m.mname.node_id = arrow_id then
+  if m.mname.node_id = Arrow.arrow_id then
     (* We don't print arrow function *)
     ()
   else
@@ -534,7 +534,7 @@ let get_sf_info() =
 
     (*a function to print the rules in case we have an s-function*)
   let print_sfunction machines fmt m =
-      if m.mname.node_id = arrow_id then
+      if m.mname.node_id = Arrow.arrow_id then
         (* We don't print arrow function *)
         ()
       else

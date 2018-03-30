@@ -1,7 +1,7 @@
 open Lustre_types 
 open Corelang 
 open Machine_code_types
-open Machine_code
+open Machine_code_common
 
 (* (variable, node name, node instance) *)
 type scope_t = (var_decl * string * string option) list * var_decl
@@ -107,7 +107,7 @@ let scope_path main_node_name prog machines all_scopes sl : scope_t =
       let instance = 
 	List.find 
 	  (fun i -> match get_instr_desc i with 
-	  | Machine_code_types.MStep(p, o, _) -> List.exists find_var p 
+	  | MStep(p, o, _) -> List.exists find_var p 
 	  | _ -> false
 	  ) 
 	  e_machine.mstep.step_instrs 
@@ -115,7 +115,7 @@ let scope_path main_node_name prog machines all_scopes sl : scope_t =
       try
 	let variable, instance_node, instance_id = 
 	  match get_instr_desc instance with 
-	  | Machine_code_types.MStep(p, o, _) -> 
+	  | MStep(p, o, _) -> 
 	    (* Format.eprintf "Looking for machine %s@.@?" o; *)
 	    let o_fun, _ = List.assoc o e_machine.mcalls in
 	    if node_name o_fun = nodename then
@@ -221,7 +221,7 @@ let pp_scopes fmt scopes =
 let update_machine machine =
   let stateassign vdecl =
     mkinstr 
-    (Machine_code_types.MStateAssign (vdecl, mk_val (Machine_code_types.LocalVar vdecl) vdecl.var_type))
+    (MStateAssign (vdecl, mk_val (LocalVar vdecl) vdecl.var_type))
   in
   let local_decls = machine.mstep.step_inputs
     (* @ machine.mstep.step_outputs   *)
@@ -232,7 +232,7 @@ let update_machine machine =
     mstep = { 
       machine.mstep with 
         step_instrs = machine.mstep.step_instrs
-        @ (mkinstr (Machine_code_types.MComment "Registering all flows"))::(List.map stateassign local_decls)
+        @ (mkinstr (MComment "Registering all flows"))::(List.map stateassign local_decls)
           
     }
   }

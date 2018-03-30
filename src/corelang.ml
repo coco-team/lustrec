@@ -55,6 +55,20 @@ let mkvar_decl loc ?(orig=false) (id, ty_dec, ck_dec, is_const, value, parentid)
     var_clock = Clocks.new_var true;
     var_loc = loc }
 
+let dummy_var_decl name typ =
+  {
+    var_id = name;
+    var_orig = false;
+    var_dec_type = dummy_type_dec;
+    var_dec_clock = dummy_clock_dec;
+    var_dec_const = false;
+    var_dec_value = None;
+    var_parent_nodeid = None;
+    var_type =  typ;
+    var_clock = Clocks.new_ck Clocks.Cvar true;
+    var_loc = Location.dummy_loc
+  }
+
 let mkexpr loc d =
   { expr_tag = Utils.new_tag ();
     expr_desc = d;
@@ -1156,6 +1170,9 @@ let rec expr_contains_expr expr_tag expr  =
 	| Expr_appl (_, e', Some e'') -> List.exists search [e'; e''] 
 	| Expr_ident _ -> false
       )
+
+
+
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

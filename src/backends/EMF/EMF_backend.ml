@@ -100,7 +100,7 @@
 
 open Lustre_types
 open Machine_code_types
-open Machine_code
+open Machine_code_common
 open Format 
 open EMF_common
 exception Unhandled of string
@@ -121,7 +121,7 @@ let is_arrow_fun m i =
   | MStep ([var], i, vl) ->
      (
        try
-	 let name = (Machine_code.get_node_def i m).node_id in
+	 let name = (get_node_def i m).node_id in
 	 match name, vl with
 	 | "_arrow", [v1; v2] -> (
 	   match v1.value_desc, v2.value_desc with
@@ -245,7 +245,7 @@ let merge_branches instrs =
     | _ -> assert false
   in
   let sorted_branches = List.sort sorting_branches branches in
-  instrs @ (Machine_code.join_guards_list sorted_branches)
+  instrs @ (join_guards_list sorted_branches)
     
 let rec pp_emf_instr m fmt i =
   let pp_content fmt i =
@@ -340,7 +340,7 @@ let rec pp_emf_instr m fmt i =
     )
 
     | MStep (outputs, f, inputs) when not (is_imported_node f m) -> (
-      let node_f = Machine_code.get_node_def f m in
+      let node_f = get_node_def f m in
       let is_stateful = List.mem_assoc f m.minstances in 
       fprintf fmt "\"kind\": \"%s\",@ \"name\": \"%a\",@ \"id\": \"%s\",@ "
 	(if is_stateful then "statefulcall" else "statelesscall")

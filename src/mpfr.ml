@@ -14,7 +14,7 @@ open Lustre_types
 open Machine_code_types
 open Corelang
 open Normalization
-open Machine_code
+open Machine_code_common
 
 let mpfr_module = mktop (Open(false, "mpfr_lustre"))
 let cpt_fresh = ref 0

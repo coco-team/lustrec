@@ -29,6 +29,8 @@ val mkvar_decl: Location.t -> ?orig:bool ->
     string option (* parent id *)
   -> var_decl
 
+val dummy_var_decl: ident -> Types.type_expr -> var_decl
+
 val var_decl_of_const: ?parentid:ident option -> const_desc -> var_decl
 val mkexpr: Location.t ->  expr_desc -> expr
 val mkeq: Location.t -> ident list * expr -> eq

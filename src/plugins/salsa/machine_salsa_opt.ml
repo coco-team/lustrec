@@ -260,7 +260,7 @@ let assign_vars nodename m constEnv vars_env printed_vars ranges formalEnv vars_
    ranges, formalEnv, printed_vars, and remaining vars to be printed) *)
 let rec rewrite_instrs nodename m constEnv  vars_env m instrs ranges formalEnv printed_vars vars_to_print =
   let formal_env_def = FormalEnv.def constEnv vars_env in
-  Format.eprintf "Rewrite intrs :%a@." Machine_code.pp_instrs instrs;
+  Format.eprintf "Rewrite intrs :%a@." MC.pp_instrs instrs;
   let assign_vars = assign_vars nodename m constEnv vars_env in
   if !debug then (
     Format.eprintf "@.------------@ ";

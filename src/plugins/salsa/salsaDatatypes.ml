@@ -1,6 +1,6 @@
 module LT = Lustre_types
 module MT = Machine_code_types
-module MC = Machine_code
+module MC = Machine_code_common
 module ST = Salsa.Types
 module Float = Salsa.Float
 
