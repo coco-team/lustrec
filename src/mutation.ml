@@ -10,7 +10,7 @@
 *)
 
 
-open LustreSpec
+open Lustre_types
 open Corelang
 open Log
 open Format

@@ -37,7 +37,7 @@ EMF: rajouter les memoires dans les caracteristiques du node
      propager les types machines aux variables fraiches creees par la normalisation
 
 *)
-open LustreSpec
+open Lustre_types
 
 let is_active = false
   

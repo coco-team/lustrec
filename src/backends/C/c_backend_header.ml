@@ -10,7 +10,7 @@
 (********************************************************************)
 
 open Format 
-open LustreSpec
+open Lustre_types
 open Corelang
 open Machine_code
 open C_backend_common
@@ -51,6 +51,7 @@ let print_import_standard fmt =
   end
 
 let rec print_static_val pp_var fmt v =
+  let open Machine_code_types in
   match v.value_desc with
   | Cst c         -> pp_c_const fmt c
   | LocalVar v    -> pp_var fmt v

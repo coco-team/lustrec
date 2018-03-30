@@ -10,7 +10,8 @@
 (********************************************************************)
 
 open Format
-open LustreSpec
+open Lustre_types
+open Machine_code_types
 (*open Dimension*)
 
 

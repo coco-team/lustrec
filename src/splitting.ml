@@ -11,7 +11,7 @@
 
 open Utils
 open Corelang
-open LustreSpec
+open Lustre_types
 open Format
 
 

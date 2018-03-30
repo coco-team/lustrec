@@ -1,4 +1,4 @@
-open LustreSpec
+open Lustre_types
 (*      TODO:
 	- verifier que les spec sont quantifiers free ou sinon mettre un warning
       - rajouter les expressions requires => ensures dans le node

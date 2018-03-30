@@ -3,7 +3,7 @@
     moment, modular compilation of multiple lustre sources as one output JSON is not
     considered. *)
 
-open LustreSpec
+open Lustre_types
 open Machine_code
 open Format
 open EMF_common

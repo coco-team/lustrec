@@ -1,4 +1,5 @@
 open Datatype
+open Basetypes
 (* open Transformer2 *)
 open SF
 
@@ -6,7 +7,7 @@ let verbose = false
 let actionv x = no_action (*TODO if verbose then action x else no_action*)
 let action x = no_action (* TODO *)
 let condition x = condition {
-  expr = Corelang.mkexpr Location.dummy_loc (LustreSpec.Expr_const (Corelang.const_of_bool true));
+  expr = Corelang.mkexpr Location.dummy_loc (Lustre_types.Expr_const (Corelang.const_of_bool true));
   cinputs = [];
   coutputs = [];
   cvariables = [];
@@ -246,7 +247,7 @@ let model =
   ]
   in
   let globals =
-    let int_typ = Corelang.mktyp Location.dummy_loc LustreSpec.Tydec_int in
+    let int_typ = Corelang.mktyp Location.dummy_loc Lustre_types.Tydec_int in
     List.map (fun k ->
       Corelang.mkvar_decl
 	Location.dummy_loc
@@ -258,7 +259,7 @@ let model =
 	 None (* no parent known *)
 	),
       (* Default value is zero *)
-      Corelang.mkexpr Location.dummy_loc (LustreSpec.Expr_const (LustreSpec.Const_int 0))
+      Corelang.mkexpr Location.dummy_loc (Lustre_types.Expr_const (Lustre_types.Const_int 0))
       
     )
       ["cent";

@@ -10,7 +10,8 @@
 (********************************************************************)
 
 open Utils
-open LustreSpec 
+open Lustre_types 
+open Machine_code_types
 open Corelang
 open Causality
 open Machine_code 

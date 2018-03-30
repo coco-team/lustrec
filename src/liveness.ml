@@ -10,7 +10,7 @@
 (********************************************************************)
 
 open Utils
-open LustreSpec
+open Lustre_types
 open Corelang
 open Graph
 open Causality

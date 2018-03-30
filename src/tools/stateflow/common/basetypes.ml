@@ -10,16 +10,16 @@ type event_t              = event_base_t option
 type user_variable_name_t = string
 
 (* Connected to lustrec types *)
-type base_action_t    = { defs : LustreSpec.statement list;
-			  ainputs: LustreSpec.var_decl list;
-			  aoutputs: LustreSpec.var_decl list;
-			  avariables: LustreSpec.var_decl list;
+type base_action_t    = { defs : Lustre_types.statement list;
+			  ainputs: Lustre_types.var_decl list;
+			  aoutputs: Lustre_types.var_decl list;
+			  avariables: Lustre_types.var_decl list;
 			  (* ident: string; *)
 			}
-type base_condition_t = { expr: LustreSpec.expr;
-			  cinputs: LustreSpec.var_decl list;
-			  coutputs: LustreSpec.var_decl list;
-			  cvariables: LustreSpec.var_decl list }
+type base_condition_t = { expr: Lustre_types.expr;
+			  cinputs: Lustre_types.var_decl list;
+			  coutputs: Lustre_types.var_decl list;
+			  cvariables: Lustre_types.var_decl list }
 
 (* P(r)etty printers *)
 let pp_state_name     = Format.pp_print_string
@@ -158,5 +158,5 @@ let _ = (module Condition : ConditionType)
 
 module GlobalVarDef =
 struct
-  type t = {variable: LustreSpec.var_decl; init_val: LustreSpec.expr}
+  type t = {variable: Lustre_types.var_decl; init_val: Lustre_types.expr}
 end

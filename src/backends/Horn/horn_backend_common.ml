@@ -10,7 +10,7 @@
 (********************************************************************)
 
 open Format
-open LustreSpec
+open Lustre_types
 open Corelang
 open Machine_code
 
@@ -108,7 +108,7 @@ let instances_memory_vars ?(without_arrow=false) machines machine =
   aux true machine.mname.node_id machine
 
 (* Extract the arrows of a given node/machine *)
-let arrow_vars machines machine : LustreSpec.var_decl list =
+let arrow_vars machines machine : Lustre_types.var_decl list =
   let rec aux fst prefix m =
     List.fold_left (fun accu (id, (n, _)) ->
       let name = node_name n in

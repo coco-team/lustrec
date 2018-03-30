@@ -11,7 +11,7 @@
 
 (* Parts of this file come from the Prelude compiler *)
 
-open LustreSpec
+(*open LustreSpec*)
 open Type_predef
 open Clock_predef
 open Delay_predef
@@ -126,11 +126,13 @@ let rec is_internal_fun x targs =
   | _                               -> List.mem x internal_funs
 
 let is_expr_internal_fun expr =
+  let open Lustre_types in
   match expr.expr_desc with
   | Expr_appl (f, e, _) -> is_internal_fun f (Types.type_list_of_type e.expr_type)
   | _                   -> assert false
 
 let is_value_internal_fun v =
+  let open Machine_code_types in
   match v.value_desc with
   | Fun (f, vl) -> is_internal_fun f (List.map (fun v -> v.value_type) vl)
   | _           -> assert false

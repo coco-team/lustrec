@@ -10,7 +10,7 @@
 (********************************************************************)
 
 open Format
-open LustreSpec
+open Lustre_types
 open Corelang
 
 let pp_dep fmt (Dep(b,id,tops,stateful)) =

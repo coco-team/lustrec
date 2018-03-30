@@ -10,7 +10,7 @@
 (********************************************************************)
 
 open Format
-open LustreSpec
+open Lustre_types
 open Corelang
 open Machine_code
 
@@ -194,6 +194,7 @@ let rec pp_c_const fmt c =
    but an offset suffix may be added for array variables
 *)
 let rec pp_c_val self pp_var fmt v =
+  let open Machine_code_types in
   match v.value_desc with
   | Cst c         -> pp_c_const fmt c
   | Array vl      -> fprintf fmt "{%a}" (Utils.fprintf_list ~sep:", " (pp_c_val self pp_var)) vl
@@ -462,7 +463,7 @@ let pp_c_main_var_output fmt id =
   else
     fprintf fmt "&%s" id.var_id
 
-let pp_main_call mname self fmt m (inputs: value_t list) (outputs: var_decl list) =
+let pp_main_call mname self fmt m (inputs: Machine_code_types.value_t list) (outputs: var_decl list) =
   if fst (get_stateless_status m)
   then
     fprintf fmt "%a (%a%t%a);"
@@ -480,6 +481,7 @@ let pp_main_call mname self fmt m (inputs: value_t list) (outputs: var_decl list
       self
 
 let pp_c_var m self pp_var fmt var =
+  let open Machine_code_types in
   if is_memory m var
   then
     pp_c_val self pp_var fmt (mk_val (StateVar var) var.var_type)
@@ -516,6 +518,7 @@ let pp_initialize m self pp_var fmt var =
     end
 
 let pp_const_initialize pp_var fmt const =
+  let open Machine_code_types in
   let var = mk_val (LocalVar (Corelang.var_decl_of_const const)) const.const_type in
   let rec aux indices value fmt typ =
     if Types.is_array_type typ
@@ -594,7 +597,7 @@ let pp_const_clear pp_var fmt const =
       aux [] fmt var.var_type
     end
 
-let pp_call m self pp_read pp_write fmt i (inputs: value_t list) (outputs: var_decl list) =
+let pp_call m self pp_read pp_write fmt i (inputs: Machine_code_types.value_t list) (outputs: var_decl list) =
  try (* stateful node instance *)
    let (n,_) = List.assoc i m.minstances in
    fprintf fmt "%a (%a%t%a%t%s->%s);"
@@ -613,7 +616,7 @@ let pp_call m self pp_read pp_write fmt i (inputs: value_t list) (outputs: var_d
      (Utils.pp_final_char_if_non_empty ", " inputs) 
      (Utils.fprintf_list ~sep:", " pp_write) outputs 
 
-let pp_basic_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list) =
+let pp_basic_instance_call m self fmt i (inputs: Machine_code_types.value_t list) (outputs: var_decl list) =
   pp_call m self (pp_c_var_read m) (pp_c_var_write m) fmt i inputs outputs
 (*
  try (* stateful node instance *)
@@ -635,7 +638,7 @@ let pp_basic_instance_call m self fmt i (inputs: value_t list) (outputs: var_dec
      (Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs 
 *)
 
-let pp_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list) =
+let pp_instance_call m self fmt i (inputs: Machine_code_types.value_t list) (outputs: var_decl list) =
   let pp_offset pp_var indices fmt var =
     match indices with
     | [] -> fprintf fmt "%a" pp_var var
@@ -655,7 +658,7 @@ let pp_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list
   in
   begin
     reset_loop_counter ();
-    aux [] fmt (List.hd inputs).value_type
+    aux [] fmt (List.hd inputs).Machine_code_types.value_type
   end
 
   (*** Common functions for main ***)

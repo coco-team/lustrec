@@ -9,7 +9,8 @@
 (*                                                                  *)
 (********************************************************************)
 
-open LustreSpec
+open Lustre_types
+open Machine_code_types
 open Corelang
 open Clocks
 open Causality
@@ -213,10 +214,11 @@ let arrow_top_decl =
     top_decl_loc = Location.dummy_loc
   }
 
-let mk_val v t = { value_desc = v; 
-		   value_type = t; 
-		   value_annot = None }
-
+let mk_val v t =
+  { value_desc = v; 
+    value_type = t; 
+    value_annot = None }
+    
 let arrow_machine =
   let state = "_first" in
   let var_state = dummy_var_decl state Type_predef.type_bool(* (Types.new_ty Types.Tbool) *) in

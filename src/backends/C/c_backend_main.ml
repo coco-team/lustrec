@@ -9,7 +9,8 @@
 (*                                                                  *)
 (********************************************************************)
 
-open LustreSpec
+open Lustre_types
+open Machine_code_types
 open Corelang
 open Machine_code
 open Format

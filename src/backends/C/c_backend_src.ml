@@ -10,7 +10,8 @@
 (********************************************************************)
 
 open Format
-open LustreSpec
+open Lustre_types
+open Machine_code_types
 open Corelang
 open Machine_code
 open C_backend_common

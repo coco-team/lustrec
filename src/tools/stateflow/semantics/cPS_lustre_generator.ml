@@ -14,7 +14,7 @@ struct
   include TransformerStub
 
   type name_t = string
-  type t_base = { statements : LustreSpec.statement list; assert_false: bool }
+  type t_base = { statements : Lustre_types.statement list; assert_false: bool }
   type t = name_t -> name_t -> (ActiveStates.Vars.t * t_base)
 
 	
@@ -54,11 +54,11 @@ struct
     let loc = Location.dummy_loc in
     Corelang.mkvar_decl
       loc
-      (name, typ, Corelang.mkclock loc LustreSpec.Ckdec_any, false, None, None (*"__no_parent__" *))
+      (name, typ, Corelang.mkclock loc Lustre_types.Ckdec_any, false, None, None (*"__no_parent__" *))
 
   let var_to_vdecl ?(prefix="") var typ = mkvar (var_to_ident prefix var) typ 
   let state_vars_to_vdecl_list ?(prefix="") vars =
-    let bool_type = Corelang.mktyp Location.dummy_loc LustreSpec.Tydec_bool in
+    let bool_type = Corelang.mktyp Location.dummy_loc Lustre_types.Tydec_bool in
     List.map 
       (fun v -> var_to_vdecl ~prefix:prefix v bool_type)
       (ActiveStates.Vars.elements vars)
@@ -72,10 +72,10 @@ struct
   let mkeq = Corelang.mkeq Location.dummy_loc
   let mkexpr = Corelang.mkexpr Location.dummy_loc
   let mkpredef_call = Corelang.mkpredef_call Location.dummy_loc
-  let expr_of_bool b = mkexpr (LustreSpec.Expr_const (Corelang.const_of_bool b))
+  let expr_of_bool b = mkexpr (Lustre_types.Expr_const (Corelang.const_of_bool b))
   let mkstmt_eq lhs_vars ?(prefix_lhs="") rhs =
     { statements = [
-      LustreSpec.Eq (
+      Lustre_types.Eq (
 	mkeq (
 	  vars_to_ident_list ~prefix:prefix_lhs lhs_vars, (* lhs *)
 	  rhs (* rhs *)
@@ -86,7 +86,7 @@ struct
     }
   let base_to_assert b =
     if b.assert_false then
-      [{LustreSpec.assert_expr = expr_of_bool false; assert_loc = Location.dummy_loc}]
+      [{Lustre_types.assert_expr = expr_of_bool false; assert_loc = Location.dummy_loc}]
     else
       []
 
@@ -105,15 +105,15 @@ struct
   let event_type_decl =
     Corelang.mktop
       (
-	LustreSpec.TypeDef {
-	  LustreSpec.tydef_id = "event_type";
-	  tydef_desc = LustreSpec.Tydec_int
+	Lustre_types.TypeDef {
+	  Lustre_types.tydef_id = "event_type";
+	  tydef_desc = Lustre_types.Tydec_int
 	}
       )
     
   let event_type = {
-    LustreSpec.ty_dec_desc = LustreSpec.Tydec_const "event_type";
-    LustreSpec.ty_dec_loc = Location.dummy_loc;
+    Lustre_types.ty_dec_desc = Lustre_types.Tydec_const "event_type";
+    Lustre_types.ty_dec_loc = Location.dummy_loc;
   }
     
   let event_var = mkvar "event" event_type 
@@ -135,7 +135,7 @@ struct
     ActiveStates.Vars.empty,
     (
       (* Nothing happen here: out_vars = in_vars *)
-      let rhs = mkexpr (LustreSpec.Expr_tuple expr_list) in 
+      let rhs = mkexpr (Lustre_types.Expr_tuple expr_list) in 
       mkstmt_eq ~prefix_lhs:sout Vars.state_vars rhs
     )
       
@@ -207,12 +207,12 @@ struct
        let eq1 = mkeq ([var_to_ident sout p] , expr_of_bool true) in
        (* eq2: sout_xx = sin_xx *)
        let expr_list = vars_to_exprl ~prefix:sin vars' in
-       let rhs = mkexpr (LustreSpec.Expr_tuple expr_list) in 
+       let rhs = mkexpr (Lustre_types.Expr_tuple expr_list) in 
        let eq2 = mkeq (vars_to_ident_list ~prefix:sout vars', rhs) in
 	 {
 	   statements = [
-	     LustreSpec.Eq (eq1);
-	     LustreSpec.Eq (eq2);
+	     Lustre_types.Eq (eq1);
+	     Lustre_types.Eq (eq2);
 	   ];
 	   assert_false = false
 	 }
@@ -223,19 +223,19 @@ struct
        let eq1 = mkeq ([var_to_ident sout p] , expr_of_bool false) in
        (* eq2: sout_xx = sin_xx *)
        let expr_list = vars_to_exprl ~prefix:sin vars' in
-       let rhs = mkexpr (LustreSpec.Expr_tuple expr_list) in 
+       let rhs = mkexpr (Lustre_types.Expr_tuple expr_list) in 
        let eq2 = mkeq (vars_to_ident_list ~prefix:sout vars', rhs) in
 	 {
 	   statements = [
-	     LustreSpec.Eq (eq1);
-	     LustreSpec.Eq (eq2);
+	     Lustre_types.Eq (eq1);
+	     Lustre_types.Eq (eq2);
 	   ];
 	   assert_false = false
 	 }
 
     | Action.Nil         ->
        let expr_list = vars_to_exprl ~prefix:sin Vars.state_vars in
-       let rhs = mkexpr (LustreSpec.Expr_tuple expr_list) in 
+       let rhs = mkexpr (Lustre_types.Expr_tuple expr_list) in 
        mkstmt_eq ~prefix_lhs:sout Vars.state_vars rhs
 	 
   let eval_act kenv (action : act_t) =
@@ -251,7 +251,7 @@ struct
     | Condition.Event e            ->
        mkpredef_call "=" [
 	 Corelang.expr_of_vdecl event_var;
-	 mkexpr (LustreSpec.Expr_const (LustreSpec.Const_int (get_event_const e)))
+	 mkexpr (Lustre_types.Expr_const (Lustre_types.Const_int (get_event_const e)))
        ]
     | Condition.Neg cond           -> mkpredef_call "not" [mkcond' sin cond]
     | Condition.And (cond1, cond2) -> mkpredef_call "&&" [mkcond' sin cond1;
@@ -259,7 +259,7 @@ struct
     | Condition.Quote c            -> c.expr (* TODO: shall we prefix with sin ? *)
 
   let rec eval_cond condition (ok:t) ko sin sout =
-    let open LustreSpec in
+    let open Lustre_types in
     let loc = Location.dummy_loc in
     (*Format.printf "----- cond = %a@." Condition.pp_cond condition;*)
     let (vars1, tr1) = ok sin sout in
@@ -321,7 +321,7 @@ struct
     in tr 
     
   let mkcomponent :
-  type c. c call_t -> c -> t -> LustreSpec.program =
+  type c. c call_t -> c -> t -> Lustre_types.program =
     fun call args ->
       fun tr ->
 	reset_loc ();
@@ -332,7 +332,7 @@ struct
 	let outputs = state_vars_to_vdecl_list ~prefix:"sout_" Vars.state_vars in
 	let node =
 	  Corelang.mktop (	
-	    LustreSpec.Node {LustreSpec.node_id = funname;
+	    Lustre_types.Node {Lustre_types.node_id = funname;
 			   node_type = Types.new_var ();
 			   node_clock = Clocks.new_var true;
 			   node_inputs = inputs;
@@ -372,14 +372,14 @@ Il faut faire les choses suivantes:
 	  List.map (fun _ -> expr_of_bool false) (ActiveStates.Vars.elements Vars.state_vars) in
 	let init_globals =
 	  List.map (fun v -> v.GlobalVarDef.init_val) Vars.global_vars in
-	mkexpr (LustreSpec.Expr_tuple (init_state_false @ init_globals))
+	mkexpr (Lustre_types.Expr_tuple (init_state_false @ init_globals))
       in
       let args = (Corelang.expr_of_vdecl event_var)::
 	(vars_to_exprl ~prefix:"sout_" Vars.state_vars)
       in
       let call_expr = mkpredef_call "thetaCallD_from_principal" args in
-      let pre_call_expr = mkexpr (LustreSpec.Expr_pre (call_expr)) in
-      let rhs = mkexpr (LustreSpec.Expr_arrow (init, pre_call_expr)) in
+      let pre_call_expr = mkexpr (Lustre_types.Expr_pre (call_expr)) in
+      let rhs = mkexpr (Lustre_types.Expr_arrow (init, pre_call_expr)) in
       mkstmt_eq Vars.state_vars ~prefix_lhs:"sout_" rhs
     in
     let inputs = List.map Corelang.copy_var_decl [event_var] in
@@ -387,7 +387,7 @@ Il faut faire les choses suivantes:
     (* TODO add the globals as sout_data_x entry values *)
     let node_principal =
       Corelang.mktop (	
-	LustreSpec.Node {LustreSpec.node_id = "principal_loop";
+	Lustre_types.Node {Lustre_types.node_id = "principal_loop";
 			 node_type = Types.new_var ();
 			 node_clock = Clocks.new_var true;
 			 node_inputs = inputs;

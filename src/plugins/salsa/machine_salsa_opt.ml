@@ -2,7 +2,7 @@
 (* We try to avoid opening modules here *)
 module ST = Salsa.Types
 module SDT = SalsaDatatypes
-module LT = LustreSpec
+module LT = Lustre_types
 module MC = Machine_code
 
 (* Datatype for Salsa: FormalEnv, Ranges, Var set ... *)
@@ -29,61 +29,65 @@ let called_node_id m id =
 (******************************************************************)    
 
 (* Returns the set of vars that appear in the expression *)
-let rec get_expr_real_vars e = 
-  match e.LT.value_desc with
-  | LT.LocalVar v | LT.StateVar v when Types.is_real_type v.LT.var_type -> Vars.singleton v
-  | LT.LocalVar _| LT.StateVar _
-  | LT.Cst _ -> Vars.empty 
-  | LT.Fun (_, args) -> 
+let rec get_expr_real_vars e =
+  let open MT in 
+  match e.value_desc with
+  | LocalVar v | StateVar v when Types.is_real_type v.LT.var_type -> Vars.singleton v
+  | LocalVar _| StateVar _
+  | Cst _ -> Vars.empty 
+  | Fun (_, args) -> 
     List.fold_left 
       (fun acc e -> Vars.union acc (get_expr_real_vars e)) 
       Vars.empty args
-  | LT.Array _
-  | LT.Access _
-  | LT.Power _ -> assert false 
+  | Array _
+  | Access _
+  | Power _ -> assert false 
 
 (* Extract the variables to appear as free variables in expressions (lhs) *)
 let rec get_read_vars instrs =
+  let open MT in
   match instrs with
     [] -> Vars.empty
   | i::tl -> (
     let vars_tl = get_read_vars tl in 
     match Corelang.get_instr_desc i with
-    | LT.MLocalAssign(_,e) 
-    | LT.MStateAssign(_,e) -> Vars.union (get_expr_real_vars e) vars_tl
-    | LT.MStep(_, _, el) -> List.fold_left (fun accu e -> Vars.union (get_expr_real_vars e) accu) vars_tl el
-    | LT.MBranch(e, branches) -> (
+    | MLocalAssign(_,e) 
+    | MStateAssign(_,e) -> Vars.union (get_expr_real_vars e) vars_tl
+    | MStep(_, _, el) -> List.fold_left (fun accu e -> Vars.union (get_expr_real_vars e) accu) vars_tl el
+    | MBranch(e, branches) -> (
       let vars = Vars.union (get_expr_real_vars e) vars_tl in
       List.fold_left (fun vars (_, b) -> Vars.union vars (get_read_vars b) ) vars branches
     )
-    | LT.MReset _ 
-    | LT.MNoReset _ 
-    | LT.MComment _ -> Vars.empty  
+    | MReset _ 
+    | MNoReset _ 
+    | MComment _ -> Vars.empty  
   )
 
 let rec get_written_vars instrs =
+  let open MT in
   match instrs with
     [] -> Vars.empty
   | i::tl -> (
     let vars_tl = get_written_vars tl in 
     match Corelang.get_instr_desc i with
-    | LT.MLocalAssign(v,_) 
-    | LT.MStateAssign(v,_) -> Vars.add v vars_tl 
-    | LT.MStep(vdl, _, _) -> List.fold_left (fun accu v -> Vars.add v accu) vars_tl vdl
-    | LT.MBranch(_, branches) -> (
+    | MLocalAssign(v,_) 
+    | MStateAssign(v,_) -> Vars.add v vars_tl 
+    | MStep(vdl, _, _) -> List.fold_left (fun accu v -> Vars.add v accu) vars_tl vdl
+    | MBranch(_, branches) -> (
       List.fold_left (fun vars (_, b) -> Vars.union vars (get_written_vars b) ) vars_tl branches
     )
-    | LT.MReset _ 
-    | LT.MNoReset _ 
-    | LT.MComment _ -> Vars.empty    
+    | MReset _ 
+    | MNoReset _ 
+    | MComment _ -> Vars.empty    
   )
 
 
 (* Optimize a given expression. It returns another expression and a computed range. *)
-let optimize_expr nodename m constEnv printed_vars vars_env ranges formalEnv e : LT.value_t * RangesInt.t option = 
+let optimize_expr nodename m constEnv printed_vars vars_env ranges formalEnv e : MT.value_t * RangesInt.t option = 
   let rec opt_expr ranges formalEnv e =
-    match e.LT.value_desc with
-    | LT.Cst cst ->
+    let open MT in
+    match e.value_desc with
+    | Cst cst ->
       (* Format.eprintf "optmizing constant expr @ "; *)
       (* the expression is a constant, we optimize it directly if it is a real
   	 constant *)
@@ -91,11 +95,11 @@ let optimize_expr nodename m constEnv printed_vars vars_env ranges formalEnv e :
       if Types.is_real_type typ then 
 	opt_num_expr ranges formalEnv e 
       else e, None
-    | LT.LocalVar v
-    | LT.StateVar v -> 
+    | LocalVar v
+    | StateVar v -> 
       if not (Vars.mem v printed_vars) && 
 	(* TODO xAvier: comment recuperer le type de l'expression? Parfois e.value_type vaut 'd *)
-	(Types.is_real_type e.LT.value_type ||  Types.is_real_type v.LT.var_type) 
+	(Types.is_real_type e.value_type ||  Types.is_real_type v.LT.var_type) 
       then
 	opt_num_expr ranges formalEnv e 
       else 
@@ -103,20 +107,20 @@ let optimize_expr nodename m constEnv printed_vars vars_env ranges formalEnv e :
     (* (\* optimize only numerical vars *\) *)
     (* if Type_predef.is_real_type v.LT.var_type then opt_num_expr ranges formalEnv e *)
     (* else e, None *)
-    | LT.Fun (fun_id, args) -> (
+    | Fun (fun_id, args) -> (
       (* necessarily, this is a basic function (ie. + - * / && || mod ... ) *)
       (* if the return type is real then optimize it, otherwise call recusrsively on arguments *)
-      if Types.is_real_type e.LT.value_type then
+      if Types.is_real_type e.value_type then
 	opt_num_expr ranges formalEnv e 
       else (
 	(* We do not care for computed local ranges. *)
   	let args' = List.map (fun arg -> let arg', _ = opt_expr ranges formalEnv arg in arg') args in
-  	{ e with LT.value_desc = LT.Fun(fun_id, args')}, None	  
+  	{ e with value_desc = Fun(fun_id, args')}, None	  
       )
     )
-    | LT.Array _
-    | LT.Access _
-    | LT.Power _ -> assert false  
+    | Array _
+    | Access _
+    | Power _ -> assert false  
   and opt_num_expr ranges formalEnv e = 
      (* if !debug then Format.eprintf "Optimizing expression %a with Salsa@ " MC.pp_val e;  *)
     let fresh_id = "toto"  in (* TODO more meaningful name *)
@@ -237,9 +241,9 @@ let assign_vars nodename m constEnv vars_env printed_vars ranges formalEnv vars_
 	let e, r = optimize_expr nodename m constEnv printed_vars vars_env ranges formalEnv v_def in
 	let instr_desc = 
 	  if try (get_var vars_env v.LT.var_id).is_local with Not_found -> assert false then
-	    LT.MLocalAssign(v, e)
+	    MT.MLocalAssign(v, e)
 	  else
-	    LT.MStateAssign(v, e)
+	    MT.MStateAssign(v, e)
 	in
 	(Corelang.mkinstr instr_desc)::accu_instr, 
 	(match r with 
@@ -283,7 +287,7 @@ let rec rewrite_instrs nodename m constEnv  vars_env m instrs ranges formalEnv p
        Format.eprintf "Hdlist@.";
        let hd_instrs, ranges, formalEnv, printed_vars, vars_to_print =
 	 match Corelang.get_instr_desc hd_instr with 
-	 | LT.MLocalAssign(vd,vt) when Types.is_real_type vd.LT.var_type  && not (Vars.mem vd vars_to_print) -> 
+	 | MT.MLocalAssign(vd,vt) when Types.is_real_type vd.LT.var_type  && not (Vars.mem vd vars_to_print) -> 
        Format.eprintf "local assign@.";
 	    (* LocalAssign are injected into formalEnv *)
 	    (* if !debug then Format.eprintf "Registering local assign %a@ " MC.pp_instr hd_instr; *)
@@ -295,7 +299,7 @@ let rec rewrite_instrs nodename m constEnv  vars_env m instrs ranges formalEnv p
 	    printed_vars,              (* no new printed vars *)
 	    vars_to_print              (* no more or less variables to print *)
 	      
-	 | LT.MLocalAssign(vd,vt) when Types.is_real_type vd.LT.var_type && Vars.mem vd vars_to_print ->
+	 | MT.MLocalAssign(vd,vt) when Types.is_real_type vd.LT.var_type && Vars.mem vd vars_to_print ->
        Format.eprintf "local assign 2@.";
 
             (* if !debug then Format.eprintf "Registering and producing state assign %a@ " MC.pp_instr hd_instr; *)
@@ -314,7 +318,7 @@ let rec rewrite_instrs nodename m constEnv  vars_env m instrs ranges formalEnv p
 	    Vars.add vd printed_vars,        (* adding vd to new printed vars *)
 	    Vars.remove vd vars_to_print     (* removed vd from variables to print *)
 
-	 | LT.MStateAssign(vd,vt) when Types.is_real_type vd.LT.var_type (* && Vars.mem vd vars_to_print  *)-> 
+	 | MT.MStateAssign(vd,vt) when Types.is_real_type vd.LT.var_type (* && Vars.mem vd vars_to_print  *)-> 
 	    Format.eprintf "state assign of real type@.";
 
 	    (* StateAssign are produced since they are required by the function. We still
@@ -335,7 +339,7 @@ let rec rewrite_instrs nodename m constEnv  vars_env m instrs ranges formalEnv p
 	    Vars.add vd printed_vars,        (* adding vd to new printed vars *)
 	    Vars.remove vd vars_to_print     (* removed vd from variables to print *)
 
-	 | (LT.MLocalAssign(vd,vt) | LT.MStateAssign(vd,vt))  ->
+	 | (MT.MLocalAssign(vd,vt) | MT.MStateAssign(vd,vt))  ->
 	    Format.eprintf "other assign %a@." MC.pp_instr hd_instr;
 
 	    (* We have to produce the instruction. But we may have to produce as
@@ -353,8 +357,8 @@ let rec rewrite_instrs nodename m constEnv  vars_env m instrs ranges formalEnv p
 	    let vt', _ = optimize_expr nodename m constEnv (Vars.union required_vars printed_vars) vars_env ranges formalEnv vt in
 	    let new_instr = 
 	      match Corelang.get_instr_desc hd_instr with
-	      | LT.MLocalAssign _ -> Corelang.update_instr_desc hd_instr (LT.MLocalAssign(vd,vt'))
-	      | _ -> Corelang.update_instr_desc hd_instr (LT.MStateAssign(vd,vt'))
+	      | MT.MLocalAssign _ -> Corelang.update_instr_desc hd_instr (MT.MLocalAssign(vd,vt'))
+	      | _ -> Corelang.update_instr_desc hd_instr (MT.MStateAssign(vd,vt'))
 	    in
 	    let written_vars = Vars.add vd required_vars in
 	    prefix_instr@[new_instr],
@@ -365,7 +369,7 @@ let rec rewrite_instrs nodename m constEnv  vars_env m instrs ranges formalEnv p
 	    Vars.diff vars_to_print written_vars (* removed vd + dependencies from
 						  variables to print *)
 
-	 | LT.MStep(vdl,id,vtl) ->
+	 | MT.MStep(vdl,id,vtl) ->
 	    Format.eprintf "step@.";
 
 	    if !debug then Format.eprintf "Call to a node %a@ " MC.pp_instr hd_instr;
@@ -417,13 +421,13 @@ let rec rewrite_instrs nodename m constEnv  vars_env m instrs ranges formalEnv p
 									 variables *)
 	      let written_vars = Vars.union required_vars (Vars.of_list vdl) in
 	      let instrs', ranges' = assign_vars (Vars.union written_vars printed_vars) ranges formalEnv required_vars in
-	      instrs' @ [Corelang.update_instr_desc hd_instr (LT.MStep(vdl,id,vtl'))], (* New instrs *)
+	      instrs' @ [Corelang.update_instr_desc hd_instr (MT.MStep(vdl,id,vtl'))], (* New instrs *)
 	      RangesInt.add_call ranges' vdl id vtl_ranges,   (* add information bounding each vdl var *) 
 	      formalEnv,
 	      Vars.union written_vars printed_vars,        (* adding vdl to new printed vars *)
 	      Vars.diff vars_to_print written_vars
 			
-	 | LT.MBranch(vt, branches) ->
+	 | MT.MBranch(vt, branches) ->
 	    
 	    (* Required variables to compute vt are introduced. 
 	     Then each branch is refactored specifically 
@@ -466,7 +470,7 @@ let rec rewrite_instrs nodename m constEnv  vars_env m instrs ranges formalEnv p
 									     
 							   ) branches ([], required_vars, ranges) in
 	    if !debug then Format.eprintf "dealing with branches done@ @]@ ";	  
-	    prefix_instr@[Corelang.update_instr_desc hd_instr (LT.MBranch(vt', branches'))],
+	    prefix_instr@[Corelang.update_instr_desc hd_instr (MT.MBranch(vt', branches'))],
 	    merged_ranges, (* Only step functions call within branches
 			    may have produced new ranges. We merge this data by
 			    computing the join per variable *)
@@ -478,7 +482,7 @@ let rec rewrite_instrs nodename m constEnv  vars_env m instrs ranges formalEnv p
 						  produced within branches *)
 
 
-	 | LT.MReset(_) | LT.MNoReset _ | LT.MComment _ ->
+	 | MT.MReset(_) | MT.MNoReset _ | MT.MComment _ ->
 			   if !debug then Format.eprintf "Untouched %a (non real)@ " MC.pp_instr hd_instr;
 
 			   (* Untouched instruction *)

@@ -1,7 +1,7 @@
 open Format
 open Utils
 open Compiler_common
-open LustreSpec
+open Lustre_types
 
 exception StopPhase1 of program
 

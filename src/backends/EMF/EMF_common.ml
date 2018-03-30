@@ -1,4 +1,6 @@
-open LustreSpec
+open Lustre_types
+open Machine_code_types
+
 open Format
 open Machine_code 
 
