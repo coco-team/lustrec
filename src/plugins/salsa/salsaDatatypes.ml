@@ -223,7 +223,7 @@ let compute_vars_env m =
 env
 
 let rec salsa_expr2value_t vars_env cst_env e  = 
-  let e =   Float.evalPartExpr e [] [] in
+  (* let e =   Float.evalPartExpr e [] [] in *)
   let salsa_expr2value_t = salsa_expr2value_t vars_env cst_env in
   let binop op e1 e2 t = 
     let x = salsa_expr2value_t e1 in
