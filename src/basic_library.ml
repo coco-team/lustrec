@@ -11,7 +11,7 @@
 
 (* Parts of this file come from the Prelude compiler *)
 
-open LustreSpec
+(*open LustreSpec*)
 open Type_predef
 open Clock_predef
 open Delay_predef
@@ -126,11 +126,13 @@ let rec is_internal_fun x targs =
   | _                               -> List.mem x internal_funs
 
 let is_expr_internal_fun expr =
+  let open Lustre_types in
   match expr.expr_desc with
   | Expr_appl (f, e, _) -> is_internal_fun f (Types.type_list_of_type e.expr_type)
   | _                   -> assert false
 
 let is_value_internal_fun v =
+  let open Machine_code_types in
   match v.value_desc with
   | Fun (f, vl) -> is_internal_fun f (List.map (fun v -> v.value_type) vl)
   | _           -> assert false
@@ -144,52 +146,20 @@ let is_homomorphic_fun x =
 let is_stateless_fun x =
   List.mem x internal_funs
 
-let pp_c i pp_val fmt vl =
-  match i, vl with
-  (*  | "ite", [v1; v2; v3] -> Format.fprintf fmt "(%a?(%a):(%a))" pp_val v1 pp_val v2 pp_val v3 *)
-    | "uminus", [v] -> Format.fprintf fmt "(- %a)" pp_val v
-    | "not", [v] -> Format.fprintf fmt "(!%a)" pp_val v
-    | "impl", [v1; v2] -> Format.fprintf fmt "(!%a || %a)" pp_val v1 pp_val v2
-    | "=", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2
-    | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
-    | "equi", [v1; v2] -> Format.fprintf fmt "(!%a == !%a)" pp_val v1 pp_val v2
-    | "xor", [v1; v2] -> Format.fprintf fmt "(!%a != !%a)" pp_val v1 pp_val v2
-    | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2
-    | _ -> (Format.eprintf "internal error: Basic_library.pp_c %s@." i; assert false)
 
-let pp_java i pp_val fmt vl =
-  match i, vl with
-  (*  | "ite", [v1; v2; v3] -> Format.fprintf fmt "(%a?(%a):(%a))" pp_val v1 pp_val v2 pp_val v3 *)
-    | "uminus", [v] -> Format.fprintf fmt "(- %a)" pp_val v
-    | "not", [v] -> Format.fprintf fmt "(!%a)" pp_val v
-    | "impl", [v1; v2] -> Format.fprintf fmt "(!%a || %a)" pp_val v1 pp_val v2
-    | "=", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2
-    | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
-    | "equi", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2
-    | "xor", [v1; v2] -> Format.fprintf fmt "(%a != %a)" pp_val v1 pp_val v2
-    | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2
-    | _ -> (Format.eprintf "internal error: Basic_library.pp_java %s@." i; assert false)
+(* let pp_java i pp_val fmt vl = *)
+(*   match i, vl with *)
+(*   (\*  | "ite", [v1; v2; v3] -> Format.fprintf fmt "(%a?(%a):(%a))" pp_val v1 pp_val v2 pp_val v3 *\) *)
+(*     | "uminus", [v] -> Format.fprintf fmt "(- %a)" pp_val v *)
+(*     | "not", [v] -> Format.fprintf fmt "(!%a)" pp_val v *)
+(*     | "impl", [v1; v2] -> Format.fprintf fmt "(!%a || %a)" pp_val v1 pp_val v2 *)
+(*     | "=", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2 *)
+(*     | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2 *)
+(*     | "equi", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2 *)
+(*     | "xor", [v1; v2] -> Format.fprintf fmt "(%a != %a)" pp_val v1 pp_val v2 *)
+(*     | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2 *)
+(*     | _ -> (Format.eprintf "internal error: Basic_library.pp_java %s@." i; assert false) *)
 
-let pp_horn i pp_val fmt vl =
-  match i, vl with
-  | "ite", [v1; v2; v3] -> Format.fprintf fmt "(@[<hov 2>ite %a@ %a@ %a@])" pp_val v1 pp_val v2 pp_val v3
-
-  | "uminus", [v] -> Format.fprintf fmt "(- %a)" pp_val v
-  | "not", [v] -> Format.fprintf fmt "(not %a)" pp_val v
-  | "=", [v1; v2] -> Format.fprintf fmt "(= %a %a)" pp_val v1 pp_val v2
-  | "&&", [v1; v2] -> Format.fprintf fmt "(and %a %a)" pp_val v1 pp_val v2
-  | "||", [v1; v2] -> Format.fprintf fmt "(or %a %a)" pp_val v1 pp_val v2
-  | "impl", [v1; v2] -> Format.fprintf fmt "(=> %a %a)" pp_val v1 pp_val v2
-  | "mod", [v1; v2] -> Format.fprintf fmt "(mod %a %a)" pp_val v1 pp_val v2
-  | "equi", [v1; v2] -> Format.fprintf fmt "(%a = %a)" pp_val v1 pp_val v2
-  | "xor", [v1; v2] -> Format.fprintf fmt "(%a xor %a)" pp_val v1 pp_val v2
-  | "!=", [v1; v2] -> Format.fprintf fmt "(not (= %a %a))" pp_val v1 pp_val v2
-  | "/", [v1; v2] -> Format.fprintf fmt "(div %a %a)" pp_val v1 pp_val v2
-  | _, [v1; v2] -> Format.fprintf fmt "(%s %a %a)" i pp_val v1 pp_val v2
-  | _ -> (Format.eprintf "internal error: Basic_library.pp_horn %s@." i; assert false)
-(*  | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
-
-*)
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

@@ -1,6 +1,8 @@
-open LustreSpec
+open Lustre_types
+open Machine_code_types
+module VSet = Corelang.VSet
 open Format
-open Machine_code 
+open Machine_code_common
 
 (* Matlab starting counting from 1.
    simple function to extract the element id in the list. Starts from 1. *)
@@ -219,7 +221,7 @@ let pp_emf_cst_or_var fmt v =
     fprintf fmt "\"datatype\": \"%a\"@ " pp_var_type v;
     fprintf fmt "@]}"
   )
-  | _ -> eprintf "Not of cst or var: %a@." Machine_code.pp_val v ; assert false (* Invalid argument *)
+  | _ -> eprintf "Not of cst or var: %a@." pp_val v ; assert false (* Invalid argument *)
 
 
 let pp_emf_cst_or_var_list =

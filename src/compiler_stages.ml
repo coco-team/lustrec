@@ -1,7 +1,7 @@
 open Format
 open Utils
 open Compiler_common
-open LustreSpec
+open Lustre_types
 
 exception StopPhase1 of program
 
@@ -233,7 +233,7 @@ let stage2 prog =
   Log.report ~level:1 (fun fmt -> fprintf fmt ".. machines generation@,");
   let machine_code = Machine_code.translate_prog prog node_schs in
 
-  Log.report ~level:3 (fun fmt -> fprintf fmt ".. generated machines (unoptimized):@ %a@ "Machine_code.pp_machines machine_code);
+  Log.report ~level:3 (fun fmt -> fprintf fmt ".. generated machines (unoptimized):@ %a@ " Machine_code_common.pp_machines machine_code);
 
   (* Optimize machine code *)
   Optimize_machine.optimize prog node_schs machine_code
@@ -267,7 +267,7 @@ let stage3 prog machine_code dependencies basename =
        let source_out = open_out source_file in
        let fmt = formatter_of_out_channel source_out in
        Log.report ~level:1 (fun fmt -> fprintf fmt ".. hornification@,");
-       Horn_backend.translate fmt basename prog (Machine_code.arrow_machine::machine_code);
+       Horn_backend.translate fmt basename prog (Machine_code_common.arrow_machine::machine_code);
        (* Tracability file if option is activated *)
        if !Options.traces then (
 	 let traces_file = destname ^ ".traces.xml" in (* Could be changed *)

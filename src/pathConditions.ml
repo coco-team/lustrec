@@ -1,4 +1,4 @@
-open LustreSpec 
+open Lustre_types 
 open Corelang
 open Log
 open Format
@@ -91,7 +91,7 @@ let mcdc_var vi_as_expr expr expr_neg_vi =
   (*   Printers.pp_expr expr (\*v*\) *)
   (*   Printers.pp_expr expr_neg_vi) *)
     
-let rec compute_neg_expr cpt_pre (expr: LustreSpec.expr) =
+let rec compute_neg_expr cpt_pre (expr: Lustre_types.expr) =
   let neg_list l = 
     List.fold_right (fun e (vl,el) -> let vl', e' = compute_neg_expr cpt_pre e in (vl'@vl), e'::el) l ([], [])
   in

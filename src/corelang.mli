@@ -10,10 +10,10 @@
 (********************************************************************)
 
 
-open LustreSpec
+open Lustre_types
 
 exception Error of Location.t * Error.error_kind
-module VSet: Set.S
+module VSet: Set.S with type elt = Lustre_types.var_decl 
   
 val dummy_type_dec: type_dec
 val dummy_clock_dec: clock_dec
@@ -29,7 +29,9 @@ val mkvar_decl: Location.t -> ?orig:bool ->
     string option (* parent id *)
   -> var_decl
 
-val var_decl_of_const: ?parentid:LustreSpec.ident option -> const_desc -> var_decl
+val dummy_var_decl: ident -> Types.type_expr -> var_decl
+
+val var_decl_of_const: ?parentid:ident option -> const_desc -> var_decl
 val mkexpr: Location.t ->  expr_desc -> expr
 val mkeq: Location.t -> ident list * expr -> eq
 val mkassert: Location.t -> expr -> assert_t
@@ -40,9 +42,9 @@ val mk_new_node_name: node_desc -> ident -> ident
 val mktop: top_decl_desc -> top_decl
 
 (* constructor for machine types *)
-val mkinstr: ?lustre_expr:expr -> ?lustre_eq: eq -> instr_t_desc -> instr_t
-val get_instr_desc: instr_t -> instr_t_desc
-val update_instr_desc: instr_t -> instr_t_desc -> instr_t
+val mkinstr: ?lustre_expr:expr -> ?lustre_eq: eq -> Machine_code_types.instr_t_desc -> Machine_code_types.instr_t
+val get_instr_desc: Machine_code_types.instr_t -> Machine_code_types.instr_t_desc
+val update_instr_desc: Machine_code_types.instr_t -> Machine_code_types.instr_t_desc -> Machine_code_types.instr_t
   
 val node_table : (ident, top_decl) Hashtbl.t
 val print_node_table:  Format.formatter -> unit -> unit

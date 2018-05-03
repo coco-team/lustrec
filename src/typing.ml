@@ -22,7 +22,7 @@ let debug fmt args = () (* Format.eprintf "%a"  *)
 open Utils
 (* Yes, opening both modules is dirty as some type names will be
    overwritten, yet this makes notations far lighter.*)
-open LustreSpec
+open Lustre_types
 open Corelang
 (* open Types *)
 open Format

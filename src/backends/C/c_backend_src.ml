@@ -10,9 +10,10 @@
 (********************************************************************)
 
 open Format
-open LustreSpec
+open Lustre_types
+open Machine_code_types
 open Corelang
-open Machine_code
+open Machine_code_common
 open C_backend_common
 
 module type MODIFIERS_SRC =
@@ -145,7 +146,7 @@ let rec pp_value_suffix self var_type loop_vars pp_value fmt value =
   (
     match loop_vars, value.value_desc with
     | (x, LAcc i) :: q, _ when is_const_index i ->
-       let r = ref (Dimension.size_const_dimension (Machine_code.dimension_of_value i)) in
+       let r = ref (Dimension.size_const_dimension (dimension_of_value i)) in
        pp_value_suffix self var_type ((x, LInt r)::q) pp_value fmt value
     | (_, LInt r) :: q, Cst (Const_array cl) ->
        let var_type = Types.array_element_type var_type in
@@ -162,7 +163,7 @@ let rec pp_value_suffix self var_type loop_vars pp_value fmt value =
     | _           :: q, Power (v, n)  ->
        pp_value_suffix self var_type q pp_value fmt v
     | _               , Fun (n, vl)   ->
-       Basic_library.pp_c n (pp_value_suffix self var_type loop_vars pp_value) fmt vl
+       pp_basic_lib_fun n (pp_value_suffix self var_type loop_vars pp_value) fmt vl
     | _               , Access (v, i) ->
        let var_type = Type_predef.type_array (Dimension.mkdim_var ()) var_type in
        pp_value_suffix self var_type ((Dimension.mkdim_var (), LAcc i) :: loop_vars) pp_value fmt v
@@ -174,7 +175,7 @@ let rec pp_value_suffix self var_type loop_vars pp_value fmt value =
        then Format.fprintf fmt "%a%a" pp_value v pp_suffix loop_vars
        else Format.fprintf fmt "%s->_reg.%a%a" self pp_value v pp_suffix loop_vars
     | _               , Cst cst       -> pp_c_const_suffix var_type fmt cst
-    | _               , _             -> (Format.eprintf "internal error: C_backend_src.pp_value_suffix %a %a %a@." Types.print_ty var_type Machine_code.pp_val value pp_suffix loop_vars; assert false)
+    | _               , _             -> (Format.eprintf "internal error: C_backend_src.pp_value_suffix %a %a %a@." Types.print_ty var_type pp_val value pp_suffix loop_vars; assert false)
   )
    
 (* Subsumes C_backend_common.pp_c_val to cope with aggressive substitution
@@ -610,7 +611,7 @@ let print_global_init_code fmt basename prog dependencies =
     print_global_init_prototype baseNAME
     (pp_c_basic_type_desc Type_predef.type_bool)
     (* constants *) 
-    (Utils.fprintf_list ~sep:"@," (pp_const_initialize (pp_c_var_read Machine_code.empty_machine))) constants
+    (Utils.fprintf_list ~sep:"@," (pp_const_initialize (pp_c_var_read empty_machine))) constants
     (Utils.pp_final_char_if_non_empty "@," dependencies)
     (* dependencies initialization *)
     (Utils.fprintf_list ~sep:"@," print_import_init) dependencies
@@ -622,7 +623,7 @@ let print_global_clear_code  fmt basename prog dependencies =
     print_global_clear_prototype baseNAME
     (pp_c_basic_type_desc Type_predef.type_bool)
     (* constants *) 
-    (Utils.fprintf_list ~sep:"@," (pp_const_clear (pp_c_var_read Machine_code.empty_machine))) constants
+    (Utils.fprintf_list ~sep:"@," (pp_const_clear (pp_c_var_read empty_machine))) constants
     (Utils.pp_final_char_if_non_empty "@," dependencies)
     (* dependencies initialization *)
     (Utils.fprintf_list ~sep:"@," print_import_clear) dependencies

@@ -11,7 +11,7 @@
 
 %{
 open Utils
-open LustreSpec
+open Lustre_types
 open Corelang
 open Dimension
 open Parse
@@ -61,8 +61,8 @@ let rec fby expr n init =
 %token <string> IDENT
 %token <string> UIDENT
 %token TRUE FALSE
-%token <LustreSpec.expr_annot> ANNOT
-%token <LustreSpec.node_annot> NODESPEC
+%token <Lustre_types.expr_annot> ANNOT
+%token <Lustre_types.node_annot> NODESPEC
 %token LBRACKET RBRACKET LCUR RCUR LPAR RPAR SCOL COL COMMA COLCOL 
 %token AMPERAMPER BARBAR NOT POWER
 %token IF THEN ELSE
@@ -106,28 +106,28 @@ let rec fby expr n init =
 %nonassoc LBRACKET
 
 %start prog
-%type <LustreSpec.top_decl list> prog
+%type <Lustre_types.top_decl list> prog
 
 %start header
-%type <LustreSpec.top_decl list> header
+%type <Lustre_types.top_decl list> header
 
 %start lustre_annot
-%type <LustreSpec.expr_annot> lustre_annot
+%type <Lustre_types.expr_annot> lustre_annot
 
 %start lustre_spec
-%type <LustreSpec.node_annot> lustre_spec
+%type <Lustre_types.node_annot> lustre_spec
 
 %start signed_const
-%type <LustreSpec.constant> signed_const
+%type <Lustre_types.constant> signed_const
 
 %start expr
-%type <LustreSpec.expr> expr
+%type <Lustre_types.expr> expr
 
 %start stmt_list
-%type <LustreSpec.statement list * LustreSpec.assert_t list * LustreSpec.expr_annot list > stmt_list
+%type <Lustre_types.statement list * Lustre_types.assert_t list * Lustre_types.expr_annot list > stmt_list
 
 %start vdecl_list
-%type <LustreSpec.var_decl list> vdecl_list
+%type <Lustre_types.var_decl list> vdecl_list
 %%
 
 module_ident:

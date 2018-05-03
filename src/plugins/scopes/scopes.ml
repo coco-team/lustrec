@@ -1,6 +1,7 @@
-open LustreSpec 
+open Lustre_types 
 open Corelang 
-open Machine_code
+open Machine_code_types
+open Machine_code_common
 
 (* (variable, node name, node instance) *)
 type scope_t = (var_decl * string * string option) list * var_decl
@@ -166,7 +167,7 @@ let option_all_scopes = ref false
 let option_mem_scopes = ref false
 let option_input_scopes = ref false
 
-let scopes_map : (LustreSpec.ident list  * scope_t) list ref  = ref []
+let scopes_map : (Lustre_types.ident list  * scope_t) list ref  = ref []
 
 let register_scopes s = 
   option_scopes := true;

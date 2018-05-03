@@ -9,7 +9,7 @@
 (*                                                                  *)
 (********************************************************************)
 
-open LustreSpec
+open Lustre_types
 open Corelang
 
 type error =

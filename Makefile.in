@@ -59,7 +59,7 @@ dist-clean: dist-src-clean
 
 %.lusic: %.lusi
 	@echo Compiling $<
-	@$(LOCAL_BINDIR)/lustrec -verbose 0 -d include $<
+	@$(LOCAL_BINDIR)/lustrec -verbose 0 -I include -d include $<
 
 clean-lusic:
 	@rm -f $(LUSI_LIBS:%.lusi=%.lusic)

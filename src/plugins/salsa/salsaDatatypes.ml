@@ -1,5 +1,6 @@
-module LT = LustreSpec
-module MC = Machine_code
+module LT = Lustre_types
+module MT = Machine_code_types
+module MC = Machine_code_common
 module ST = Salsa.Types
 module Float = Salsa.Float
 
@@ -136,7 +137,7 @@ end
 let rec value_t2salsa_expr constEnv vt = 
   let value_t2salsa_expr = value_t2salsa_expr constEnv in
   let res = 
-    match vt.LT.value_desc with
+    match vt.MT.value_desc with
     (* | LT.Cst(LT.Const_tag(t) as c)   ->  *)
     (*   Format.eprintf "v2s: cst tag@."; *)
     (*   if List.mem_assoc t constEnv then ( *)
@@ -147,9 +148,9 @@ let rec value_t2salsa_expr constEnv vt =
     (* 	Format.eprintf "Const tag %s unhandled@.@?" t ; *)
     (* 	raise (Salsa.Prelude.Error ("Entschuldigung6, constant tag not yet implemented")) *)
     (*   ) *)
-    | LT.Cst(cst)                ->        (* Format.eprintf "v2s: cst tag 2: %a@." Printers.pp_const cst;  *)FloatIntSalsa.inject cst
-    | LT.LocalVar(v)            
-    | LT.StateVar(v)            ->       (* Format.eprintf "v2s: var %s@." v.LT.var_id; *) 
+    | MT.Cst(cst)                ->        (* Format.eprintf "v2s: cst tag 2: %a@." Printers.pp_const cst;  *)FloatIntSalsa.inject cst
+    | MT.LocalVar(v)            
+    | MT.StateVar(v)            ->       (* Format.eprintf "v2s: var %s@." v.LT.var_id; *) 
       let sel_fun = (fun (vname, _) -> v.LT.var_id = vname) in
       if List.exists sel_fun  constEnv then
 	let _, cst = List.find sel_fun constEnv in
@@ -157,7 +158,7 @@ let rec value_t2salsa_expr constEnv vt =
       else
 	let id = v.LT.var_id in
 				   Salsa.Builder.mk_id id
-    | LT.Fun(binop, [x;y])      -> let salsaX = value_t2salsa_expr x in
+    | MT.Fun(binop, [x;y])      -> let salsaX = value_t2salsa_expr x in
 				   let salsaY = value_t2salsa_expr y in
 				   let op = (
 				     let pred f x y = Salsa.Builder.mk_int_of_bool (f x y) in
@@ -175,15 +176,15 @@ let rec value_t2salsa_expr constEnv vt =
 				   )
 				   in
 				   op salsaX salsaY 
-    | LT.Fun(unop, [x])         -> let salsaX = value_t2salsa_expr x in
+    | MT.Fun(unop, [x])         -> let salsaX = value_t2salsa_expr x in
 				   Salsa.Builder.mk_uminus salsaX
 
-    | LT.Fun(f,_)   -> raise (Salsa.Prelude.Error 
+    | MT.Fun(f,_)   -> raise (Salsa.Prelude.Error 
 				("Unhandled function "^f^" in conversion to salsa expression"))
     
-    | LT.Array(_) 
-    | LT.Access(_)
-    | LT.Power(_)   -> raise (Salsa.Prelude.Error ("Unhandled construct in conversion to salsa expression"))
+    | MT.Array(_) 
+    | MT.Access(_)
+    | MT.Power(_)   -> raise (Salsa.Prelude.Error ("Unhandled construct in conversion to salsa expression"))
   in
   (* if debug then *)
   (*   Format.eprintf "value_t2salsa_expr: %a -> %a@ " *)
@@ -210,14 +211,14 @@ let compute_vars_env m =
     List.fold_left 
       (fun accu v -> VarEnv.add v.LT.var_id {vdecl = v; is_local = false; } accu) 
       env 
-      m.MC.mmemory
+      m.MT.mmemory
   in
   let env = 
     List.fold_left (
       fun accu v -> VarEnv.add v.LT.var_id {vdecl = v; is_local = true; } accu
     )
       env
-      MC.(m.mstep.step_inputs@m.mstep.step_outputs@m.mstep.step_locals)
+      MC.(m.MT.mstep.MT.step_inputs@m.MT.mstep.MT.step_outputs@m.MT.mstep.MT.step_locals)
   in
 env
 
@@ -227,7 +228,7 @@ let rec salsa_expr2value_t vars_env cst_env e  =
   let binop op e1 e2 t = 
     let x = salsa_expr2value_t e1 in
     let y = salsa_expr2value_t e2 in                    
-    MC.mk_val (LT.Fun (op, [x;y])) t
+    MC.mk_val (MT.Fun (op, [x;y])) t
   in
   match e with
     ST.Cst((ST.R(c,_),_),_)     -> (* We project ranges into constants. We
@@ -254,13 +255,13 @@ let rec salsa_expr2value_t vars_env cst_env e  =
 	in
 	Parser_lustre.signed_const Lexer_lustre.token (Lexing.from_string s) 
       in
-      MC.mk_val (LT.Cst(cst)) Type_predef.type_real
+      MC.mk_val (MT.Cst(cst)) Type_predef.type_real
   | ST.Id(id, _)          -> 
     (* Format.eprintf "Looking for id=%s@.@?" id; *)
      if List.mem_assoc id cst_env then (
        let cst = List.assoc id cst_env in
       (* Format.eprintf "Found cst = %a@.@?" Printers.pp_const cst; *)
-       MC.mk_val (LT.Cst cst) Type_predef.type_real
+       MC.mk_val (MT.Cst cst) Type_predef.type_real
      )
      else
       (* if is_const salsa_label then *)
@@ -268,15 +269,15 @@ let rec salsa_expr2value_t vars_env cst_env e  =
       (* else *) 
        let var_id = try get_var vars_env id with Not_found -> assert false in
        if var_id.is_local then
-	 MC.mk_val (LT.LocalVar(var_id.vdecl)) var_id.vdecl.LT.var_type
+	 MC.mk_val (MT.LocalVar(var_id.vdecl)) var_id.vdecl.LT.var_type
        else
-	 MC.mk_val (LT.StateVar(var_id.vdecl)) var_id.vdecl.LT.var_type
+	 MC.mk_val (MT.StateVar(var_id.vdecl)) var_id.vdecl.LT.var_type
   | ST.Plus(x, y, _)               -> binop "+" x y Type_predef.type_real
   | ST.Minus(x, y, _)              -> binop "-" x y Type_predef.type_real
   | ST.Times(x, y, _)              -> binop "*" x y Type_predef.type_real
   | ST.Div(x, y, _)                -> binop "/" x y Type_predef.type_real
   | ST.Uminus(x,_)                 -> let x = salsa_expr2value_t x in
-				      MC.mk_val (LT.Fun("uminus",[x])) Type_predef.type_real
+				      MC.mk_val (MT.Fun("uminus",[x])) Type_predef.type_real
   | ST.IntOfBool(ST.Eq(x, y, _),_) -> binop "=" x y Type_predef.type_bool
   | ST.IntOfBool(ST.Lt(x,y,_),_)   -> binop "<" x y Type_predef.type_bool
   | ST.IntOfBool(ST.Gt(x,y,_),_)   -> binop ">" x y Type_predef.type_bool
@@ -311,7 +312,7 @@ let rec get_salsa_free_vars vars_env constEnv absenv e =
 
 module FormalEnv =
 struct
-  type fe_t = (LT.ident, (int * LT.value_t)) Hashtbl.t
+  type fe_t = (LT.ident, (int * MT.value_t)) Hashtbl.t
   let cpt = ref 0
 
   exception NoDefinition of LT.var_decl

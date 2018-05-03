@@ -1,4 +1,4 @@
-open LustreSpec
+open Lustre_types
 
 open PluginList
 

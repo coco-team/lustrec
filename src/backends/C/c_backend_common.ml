@@ -10,9 +10,10 @@
 (********************************************************************)
 
 open Format
-open LustreSpec
+open Lustre_types
 open Corelang
-open Machine_code
+open Machine_code_types
+open Machine_code_common
 
 
 let print_version fmt =
@@ -107,22 +108,36 @@ let pp_machine_init_name fmt id = fprintf fmt "%s_init" id
 let pp_machine_clear_name fmt id = fprintf fmt "%s_clear" id
 let pp_machine_step_name fmt id = fprintf fmt "%s_step" id
 
+let pp_basic_lib_fun i pp_val fmt vl =
+  match i, vl with
+  (*  | "ite", [v1; v2; v3] -> Format.fprintf fmt "(%a?(%a):(%a))" pp_val v1 pp_val v2 pp_val v3 *)
+  | "uminus", [v] -> Format.fprintf fmt "(- %a)" pp_val v
+  | "not", [v] -> Format.fprintf fmt "(!%a)" pp_val v
+  | "impl", [v1; v2] -> Format.fprintf fmt "(!%a || %a)" pp_val v1 pp_val v2
+  | "=", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2
+  | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
+  | "equi", [v1; v2] -> Format.fprintf fmt "(!%a == !%a)" pp_val v1 pp_val v2
+  | "xor", [v1; v2] -> Format.fprintf fmt "(!%a != !%a)" pp_val v1 pp_val v2
+  | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2
+  | _ -> (Format.eprintf "internal error: Basic_library.pp_c %s@." i; assert false)
+
+
 let rec pp_c_dimension fmt dim =
   match dim.Dimension.dim_desc with
   | Dimension.Dident id       ->
-    fprintf fmt "%s" id
+     fprintf fmt "%s" id
   | Dimension.Dint i          ->
-    fprintf fmt "%d" i
+     fprintf fmt "%d" i
   | Dimension.Dbool b         ->
-    fprintf fmt "%B" b
+     fprintf fmt "%B" b
   | Dimension.Dite (i, t, e)  ->
-    fprintf fmt "((%a)?%a:%a)"
+     fprintf fmt "((%a)?%a:%a)"
        pp_c_dimension i pp_c_dimension t pp_c_dimension e
- | Dimension.Dappl (f, args) ->
-     fprintf fmt "%a" (Basic_library.pp_c f pp_c_dimension) args
- | Dimension.Dlink dim' -> fprintf fmt "%a" pp_c_dimension dim'
- | Dimension.Dvar       -> fprintf fmt "_%s" (Utils.name_of_dimension dim.Dimension.dim_id)
- | Dimension.Dunivar    -> fprintf fmt "'%s" (Utils.name_of_dimension dim.Dimension.dim_id)
+  | Dimension.Dappl (f, args) ->
+     fprintf fmt "%a" (pp_basic_lib_fun f pp_c_dimension) args
+  | Dimension.Dlink dim' -> fprintf fmt "%a" pp_c_dimension dim'
+  | Dimension.Dvar       -> fprintf fmt "_%s" (Utils.name_of_dimension dim.Dimension.dim_id)
+  | Dimension.Dunivar    -> fprintf fmt "'%s" (Utils.name_of_dimension dim.Dimension.dim_id)
 
 let is_basic_c_type t =
   Types.is_int_type t || Types.is_real_type t || Types.is_bool_type t
@@ -189,6 +204,7 @@ let rec pp_c_const fmt c =
     | Const_struct fl -> fprintf fmt "{%a }" (Utils.fprintf_list ~sep:", " (fun fmt (f, c) -> pp_c_const fmt c)) fl
     | Const_string _ -> assert false (* string occurs in annotations not in C *)
 
+       
 (* Prints a value expression [v], with internal function calls only.
    [pp_var] is a printer for variables (typically [pp_c_var_read]),
    but an offset suffix may be added for array variables
@@ -206,7 +222,7 @@ let rec pp_c_val self pp_var fmt v =
     if Types.is_array_type v.var_type && not (Types.is_real_type v.var_type && !Options.mpfr)
     then fprintf fmt "%a" pp_var v
     else fprintf fmt "%s->_reg.%a" self pp_var v
-  | Fun (n, vl)   -> Basic_library.pp_c n (pp_c_val self pp_var) fmt vl
+  | Fun (n, vl)   -> pp_basic_lib_fun n (pp_c_val self pp_var) fmt vl
 
 (* Access to the value of a variable:
    - if it's not a scalar output, then its name is enough
@@ -571,7 +587,7 @@ let pp_clear m self pp_var fmt var =
     end
 
 let pp_const_clear pp_var fmt const =
-  let m = Machine_code.empty_machine in
+  let m = empty_machine in
   let var = Corelang.var_decl_of_const const in
   let rec aux indices fmt typ =
     if Types.is_array_type typ
@@ -594,7 +610,7 @@ let pp_const_clear pp_var fmt const =
       aux [] fmt var.var_type
     end
 
-let pp_call m self pp_read pp_write fmt i (inputs: value_t list) (outputs: var_decl list) =
+let pp_call m self pp_read pp_write fmt i (inputs: Machine_code_types.value_t list) (outputs: var_decl list) =
  try (* stateful node instance *)
    let (n,_) = List.assoc i m.minstances in
    fprintf fmt "%a (%a%t%a%t%s->%s);"
@@ -613,7 +629,7 @@ let pp_call m self pp_read pp_write fmt i (inputs: value_t list) (outputs: var_d
      (Utils.pp_final_char_if_non_empty ", " inputs) 
      (Utils.fprintf_list ~sep:", " pp_write) outputs 
 
-let pp_basic_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list) =
+let pp_basic_instance_call m self fmt i (inputs: Machine_code_types.value_t list) (outputs: var_decl list) =
   pp_call m self (pp_c_var_read m) (pp_c_var_write m) fmt i inputs outputs
 (*
  try (* stateful node instance *)
@@ -635,7 +651,7 @@ let pp_basic_instance_call m self fmt i (inputs: value_t list) (outputs: var_dec
      (Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs 
 *)
 
-let pp_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list) =
+let pp_instance_call m self fmt i (inputs: Machine_code_types.value_t list) (outputs: var_decl list) =
   let pp_offset pp_var indices fmt var =
     match indices with
     | [] -> fprintf fmt "%a" pp_var var
@@ -655,7 +671,7 @@ let pp_instance_call m self fmt i (inputs: value_t list) (outputs: var_decl list
   in
   begin
     reset_loop_counter ();
-    aux [] fmt (List.hd inputs).value_type
+    aux [] fmt (List.hd inputs).Machine_code_types.value_type
   end
 
   (*** Common functions for main ***)

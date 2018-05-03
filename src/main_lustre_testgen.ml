@@ -15,7 +15,7 @@ open Format
 open Log
 
 open Utils
-open LustreSpec
+open Lustre_types
 open Compiler_common
 
 let usage = "Usage: lustret [options] \x1b[4msource file\x1b[0m"

@@ -16,9 +16,10 @@
 *)
 
 open Format
-open LustreSpec
+open Lustre_types
+open Machine_code_types
 open Corelang
-open Machine_code
+open Machine_code_common
 
 open Horn_backend_common
   
@@ -111,6 +112,28 @@ let rec pp_default_val fmt t =
   |_ -> assert false
 
 
+let pp_basic_lib_fun i pp_val fmt vl =
+  match i, vl with
+  | "ite", [v1; v2; v3] -> Format.fprintf fmt "(@[<hov 2>ite %a@ %a@ %a@])" pp_val v1 pp_val v2 pp_val v3
+
+  | "uminus", [v] -> Format.fprintf fmt "(- %a)" pp_val v
+  | "not", [v] -> Format.fprintf fmt "(not %a)" pp_val v
+  | "=", [v1; v2] -> Format.fprintf fmt "(= %a %a)" pp_val v1 pp_val v2
+  | "&&", [v1; v2] -> Format.fprintf fmt "(and %a %a)" pp_val v1 pp_val v2
+  | "||", [v1; v2] -> Format.fprintf fmt "(or %a %a)" pp_val v1 pp_val v2
+  | "impl", [v1; v2] -> Format.fprintf fmt "(=> %a %a)" pp_val v1 pp_val v2
+  | "mod", [v1; v2] -> Format.fprintf fmt "(mod %a %a)" pp_val v1 pp_val v2
+  | "equi", [v1; v2] -> Format.fprintf fmt "(%a = %a)" pp_val v1 pp_val v2
+  | "xor", [v1; v2] -> Format.fprintf fmt "(%a xor %a)" pp_val v1 pp_val v2
+  | "!=", [v1; v2] -> Format.fprintf fmt "(not (= %a %a))" pp_val v1 pp_val v2
+  | "/", [v1; v2] -> Format.fprintf fmt "(div %a %a)" pp_val v1 pp_val v2
+  | _, [v1; v2] -> Format.fprintf fmt "(%s %a %a)" i pp_val v1 pp_val v2
+  | _ -> (Format.eprintf "internal error: Basic_library.pp_horn %s@." i; assert false)
+(*  | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
+
+*)
+
+
 (* Prints a value expression [v], with internal function calls only.
    [pp_var] is a printer for variables (typically [pp_c_var_read]),
    but an offset suffix may be added for array variables
@@ -158,13 +181,13 @@ let rec pp_horn_val ?(is_lhs=false) self pp_var fmt v =
      if Types.is_array_type v.var_type
      then assert false
      else pp_var fmt (rename_machine self ((if is_lhs then rename_next else rename_current) (* self *) v))
-  | Fun (n, vl)   -> fprintf fmt "%a" (Basic_library.pp_horn n (pp_horn_val self pp_var)) vl
+  | Fun (n, vl)   -> fprintf fmt "%a" (pp_basic_lib_fun n (pp_horn_val self pp_var)) vl
 
 (* Prints a [value] indexed by the suffix list [loop_vars] *)
 let rec pp_value_suffix self pp_value fmt value =
  match value.value_desc with
  | Fun (n, vl)  ->
-   Basic_library.pp_horn n (pp_value_suffix self pp_value) fmt vl
+   pp_basic_lib_fun n (pp_value_suffix self pp_value) fmt vl
  |  _            ->
    pp_horn_val self pp_value fmt value
 
@@ -405,7 +428,7 @@ let is_stateless m = m.minstances = [] && m.mmemory = []
    We first declare all variables then the two /rules/.
 *)
 let print_machine machines fmt m =
-  if m.mname.node_id = arrow_id then
+  if m.mname.node_id = Arrow.arrow_id then
     (* We don't print arrow function *)
     ()
   else
@@ -533,7 +556,7 @@ let get_sf_info() =
 
     (*a function to print the rules in case we have an s-function*)
   let print_sfunction machines fmt m =
-      if m.mname.node_id = arrow_id then
+      if m.mname.node_id = Arrow.arrow_id then
         (* We don't print arrow function *)
         ()
       else

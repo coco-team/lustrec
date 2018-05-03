@@ -48,7 +48,7 @@ let gen_files funs basename prog machines dependencies =
   (match !Options.main_node with
   | "" ->  () (* No main node: we do not generate main *)
   | main_node -> (
-    match Machine_code.get_machine_opt main_node machines with
+    match Machine_code_common.get_machine_opt main_node machines with
     | None -> begin
       Global.main_node := main_node;
       Format.eprintf "Code generation error: %a@." Error.pp_error_msg Error.Main_not_found;
@@ -70,7 +70,7 @@ let gen_files funs basename prog machines dependencies =
   | "" ->  ()
   | mauve -> (
     (* looking for the main node *)
-    match Machine_code.get_machine_opt mauve machines with
+    match Machine_code_common.get_machine_opt mauve machines with
     | None -> begin
       Global.main_node := mauve;
       Format.eprintf "Code generation error: %a@." Error.pp_error_msg Error.Main_not_found;

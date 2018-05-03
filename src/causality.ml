@@ -15,7 +15,7 @@
 (** Simple modular syntactic causality analysis. Can reject correct
     programs, especially if the program is not flattened first. *)
 open Utils
-open LustreSpec
+open Lustre_types
 open Corelang
 open Graph
 

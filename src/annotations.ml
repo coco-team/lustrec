@@ -9,7 +9,7 @@
 (*                                                                  *)
 (********************************************************************)
 
-open LustreSpec
+open Lustre_types
 
 
 (* Associate to each annotation key the pair (node, expr tag) *)

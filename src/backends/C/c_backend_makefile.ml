@@ -10,8 +10,14 @@
 (********************************************************************)
 
 open Format
-open LustreSpec
+open Lustre_types
 open Corelang
+
+let pp_dep fmt (Dep(b,id,tops,stateful)) =
+  Format.fprintf fmt "%b, %s, {%a}, %b"
+    b id Printers.pp_prog tops stateful
+  
+let pp_deps fmt deps = Format.fprintf fmt "@[<v 0>%a@ @]" (Utils.fprintf_list ~sep:"@ ," pp_dep) deps
 
 let header_has_code header =
   List.exists 
@@ -39,8 +45,11 @@ let lib_dependencies dep =
     (fun accu (Dep (_, _, header, _)) -> Utils.list_union (header_libs header) accu) [] dep
     
 let fprintf_dependencies fmt (dep: dep_t list) =
+  (* Format.eprintf "Deps: %a@." pp_deps dep; *)
   let compiled_dep = compiled_dependencies dep in
-  List.iter (fun s -> (* Format.eprintf "Adding dependency: %s@." s;  *)
+  (* Format.eprintf "Compiled Deps: %a@." pp_deps compiled_dep; *)
+ 
+  List.iter (fun s -> Format.eprintf "Adding dependency: %s@." s;  
     fprintf fmt "\t${GCC} -I${INC} -c %s@." s)
     (("${INC}/io_frontend.c"):: (* IO functions when a main function is computed *)
 	(List.map 

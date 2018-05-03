@@ -39,7 +39,7 @@ type 'prog_t src_components_t =
   | Junction of junction_name_t * transitions_t
   | SFFunction of 'prog_t
 
-type prog_t = Program of state_name_t * prog_t src_components_t list * (LustreSpec.var_decl * LustreSpec.expr) list
+type prog_t = Program of state_name_t * prog_t src_components_t list * (Lustre_types.var_decl * Lustre_types.expr) list
 
 type scope_t = Constant | Input | Local | Output | Parameter
 

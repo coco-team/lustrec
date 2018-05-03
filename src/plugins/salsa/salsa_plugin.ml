@@ -1,5 +1,5 @@
 open Format 
-open LustreSpec
+open Lustre_types
 
 let salsa_enabled = ref false
     (* "-salsa", Arg.Set salsa_enabled, "activate Salsa optimization <default>"; *)

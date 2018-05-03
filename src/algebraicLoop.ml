@@ -11,7 +11,7 @@ When done, a report is generated.
    If the option solve_al is activated, the resulting partially inlined prog is
    propagated fur future processing Otherwise the compilation stops
 *)
-open LustreSpec
+open Lustre_types
 open Corelang
 open Utils
 

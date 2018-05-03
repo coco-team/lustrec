@@ -11,7 +11,7 @@
 
 open Utils
 open Format 
-open LustreSpec
+open Lustre_types
 open Corelang
 
 let check_main () =
@@ -232,7 +232,7 @@ let is_stateful topdecl =
   | _ -> false
 
 
-let import_dependencies prog =
+let rec import_dependencies prog =
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 4>.. extracting dependencies");
   let dependencies = Corelang.get_dependencies prog in
   let deps =
@@ -240,13 +240,16 @@ let import_dependencies prog =
     (fun (compilation_dep, type_env, clock_env) dep ->
       let (local, s) = Corelang.dependency_of_top dep in
       let basename = Options_management.name_dependency (local, s) in
-      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@ Library %s" basename);
+      Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@ Library %s@ " basename);
       let lusic = Modules.import_dependency dep.top_decl_loc (local, s) in
       (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "");*)
+      let lusic_deps, type_env', clock_env' = import_dependencies lusic.Lusic.contents in
+      let type_env = Env.overwrite type_env type_env' in
+      let clock_env = Env.overwrite clock_env clock_env' in
       let (lusi_type_env, lusi_clock_env) = get_envs_from_top_decls lusic.Lusic.contents in
       let is_stateful = List.exists is_stateful lusic.Lusic.contents in
       let new_dep = Dep (local, s, lusic.Lusic.contents, is_stateful ) in
-      new_dep::compilation_dep,
+      new_dep::lusic_deps@compilation_dep,
       Env.overwrite type_env lusi_type_env,
       Env.overwrite clock_env lusi_clock_env)
     ([], Basic_library.type_env, Basic_library.clock_env)
