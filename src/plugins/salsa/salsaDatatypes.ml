@@ -6,7 +6,7 @@ module Float = Salsa.Float
 
 let debug = ref false
 
-(* let _ = Salsa.Prelude.sliceSize := 1000 *)
+let _ = Salsa.Prelude.sliceSize := 5 
   
 let pp_hash ~sep f fmt r = 
   Format.fprintf fmt "[@[<v>";
@@ -70,6 +70,12 @@ struct
     (* Format.eprintf "Merge result %a@." pp ranges; *)
     ranges
 
+
+  let to_abstract_env ranges =
+    Hashtbl.fold 
+      (fun id value accu -> (id,value)::accu) 
+      ranges
+      [] 
 end
 
 module FloatIntSalsa = 
