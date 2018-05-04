@@ -6,6 +6,8 @@ module Float = Salsa.Float
 
 let debug = ref false
 
+(* let _ = Salsa.Prelude.sliceSize := 1000 *)
+  
 let pp_hash ~sep f fmt r = 
   Format.fprintf fmt "[@[<v>";
   Hashtbl.iter (fun k v -> Format.fprintf fmt "%t%s@ " (f k v) sep) r;
@@ -91,8 +93,8 @@ struct
       ST.(I(min x1 x1', max x2 x2'), J(min y1 y1', max y2 y2'))
     | _ -> Format.eprintf "%a cup %a failed@.@?" pp v1 pp v2; assert false 
 *)
-  let inject cst = match cst with (* ATTENTION ATTENTION !!!!! Remettre les Num !!!! *) 
-    | LT.Const_int(i)  -> Salsa.Builder.mk_cst (ST.R(float_of_int i (*Num.num_of_int i*), []), ST.R(float_of_int i (*Num.num_of_int i*), []))
+  let inject cst = match cst with  
+    | LT.Const_int(i)  -> Salsa.Builder.mk_cst (ST.R(Salsa.NumMartel.of_int i, []), ST.R(Salsa.NumMartel.of_int i , []))
     | LT.Const_real (c,e,s) -> (* TODO: this is incorrect. We should rather
 				  compute the error associated to the float *)
        let r = float_of_string s  in
@@ -203,7 +205,9 @@ module VarEnv = Map.Make (struct type t = LT.ident let compare = compare end )
 let get_var vars_env v =
 try
   VarEnv.find v vars_env
-  with Not_found -> Format.eprintf "Impossible to find var %s@.@?" v; assert false
+with Not_found -> Format.eprintf "Impossible to find var %s in var env %a@.@?" v
+  (Utils.fprintf_list ~sep:", " (fun fmt (id, _) -> Format.pp_print_string fmt id)) (VarEnv.bindings vars_env) 
+  ; assert false
 
 let compute_vars_env m =
   let env = VarEnv.empty in
