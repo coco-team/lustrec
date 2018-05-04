@@ -162,6 +162,9 @@ val update_expr_annot: ident -> expr -> expr_annot -> expr
 (* val mkpredef_call: Location.t -> ident -> eexpr list -> eexpr*)
 
 val expr_contains_expr: tag -> expr -> bool
+
+val reset_cpt_fresh: unit -> unit
+val mk_fresh_var: node_desc -> Location.t -> Types.type_expr ->  Clocks.clock_expr -> var_decl
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

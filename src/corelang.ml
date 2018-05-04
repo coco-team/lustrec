@@ -1173,6 +1173,31 @@ let rec expr_contains_expr expr_tag expr  =
 
 
 
+(* Generate a new local [node] variable *)
+let cpt_fresh = ref 0
+
+let reset_cpt_fresh () =
+    cpt_fresh := 0
+    
+let mk_fresh_var node loc ty ck =
+  let vars = get_node_vars node in
+  let rec aux () =
+  incr cpt_fresh;
+  let s = Printf.sprintf "__%s_%d" node.node_id !cpt_fresh in
+  if List.exists (fun v -> v.var_id = s) vars then aux () else
+  {
+    var_id = s;
+    var_orig = false;
+    var_dec_type = dummy_type_dec;
+    var_dec_clock = dummy_clock_dec;
+    var_dec_const = false;
+    var_dec_value = None;
+    var_parent_nodeid = Some node.node_id;
+    var_type = ty;
+    var_clock = ck;
+    var_loc = loc
+  }
+  in aux ()
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
