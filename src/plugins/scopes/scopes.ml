@@ -215,7 +215,7 @@ let pp_scopes fmt scopes =
   let scopes_vars = extract_scopes_defs scopes in
   List.iteri (fun idx (id, (var, typ)) ->
     Format.fprintf fmt "@ %t;" 
-      (fun fmt -> C_backend_common.print_put_var fmt ("_scopes_" ^ string_of_int (idx+1)) var typ var)
+      (fun fmt -> C_backend_common.print_put_var fmt ("_scopes_" ^ string_of_int (idx+1)) id (*var*) typ var)
   ) scopes_vars
 
 let update_machine machine =
