@@ -13,6 +13,7 @@ module Plugin =
   
   let options = [
         "-debug", Arg.Set SalsaDatatypes.debug, "debug salsa plugin";
+        "-slice-depth", Arg.Set_int Salsa.Prelude.sliceSize, "salsa slice depth (default is 5)";
       ]
 
   let activate () = salsa_enabled := true

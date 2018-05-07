@@ -634,10 +634,10 @@ let salsaStep constEnv  m s =
 	      Printers.pp_expr value.LT.eexpr_qfexpr; 
 	    assert false 
 	in
-	let minv:Salsa.NumMartel.num = Salsa.NumMartel.of_num (get_cst minv) and
-	    maxv = Salsa.NumMartel.of_num (get_cst maxv) in
+	(* let minv = Salsa.Float.Domain.of_num (get_cst minv) and *)
+	(*     maxv = Salsa.Float.Domain.of_num (get_cst maxv) in *)
 	(* if !debug then Format.eprintf "variable %s in [%s, %s]@ " v (Num.string_of_num minv) (Num.string_of_num maxv); *)
-	RangesInt.enlarge ranges v (Salsa.Float.Domain.nnew minv maxv)
+	RangesInt.enlarge ranges v (Salsa.Float.Domain.inject_nums (get_cst minv) (get_cst maxv))
       )
       | _ -> 
 	Format.eprintf 

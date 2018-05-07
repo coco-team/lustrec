@@ -2,7 +2,6 @@ module LT = Lustre_types
 module MT = Machine_code_types
 module MC = Machine_code_common
 module ST = Salsa.Types
-module Float = Salsa.Float
 
 let debug = ref false
 
@@ -82,7 +81,7 @@ module FloatIntSalsa =
 struct
   type t = ST.abstractValue
 
-  let pp fmt (f,r) =
+  let pp fmt ((f,r):t) =
     let fs, rs = (Salsa.Float.Domain.print (f,r)) in
     Format.fprintf fmt "%s + %s" fs rs 
 (*    match f, r with
@@ -100,12 +99,14 @@ struct
     | _ -> Format.eprintf "%a cup %a failed@.@?" pp v1 pp v2; assert false 
 *)
   let inject cst = match cst with  
-    | LT.Const_int(i)  -> Salsa.Builder.mk_cst (ST.R(Salsa.NumMartel.of_int i, []), ST.R(Salsa.NumMartel.of_int i , []))
+    | LT.Const_int(i)  -> Salsa.Builder.mk_cst (Salsa.Float.Domain.inject_float (float_of_int i))
     | LT.Const_real (c,e,s) -> (* TODO: this is incorrect. We should rather
 				  compute the error associated to the float *)
-       let r = float_of_string s  in
-       let r = Salsa.Prelude.r_of_f_aux r in
-       Salsa.Builder.mk_cst (Float.Domain.nnew r r)
+       let f = float_of_string s  in
+       Salsa.Builder.mk_cst (Salsa.Float.Domain.inject_float f)
+       
+       (* let r = Salsa.Prelude.r_of_f_aux r in *)
+       (* Salsa.Builder.mk_cst (Float.Domain.nnew r r) *)
 	 
       (* let r = float_of_string s  in *)
       (* if r = 0. then *)
@@ -241,11 +242,12 @@ let rec salsa_expr2value_t vars_env cst_env e  =
     MC.mk_val (MT.Fun (op, [x;y])) t
   in
   match e with
-    ST.Cst((ST.R(c,_),_),_)     -> (* We project ranges into constants. We
+    ST.Cst(abs_val,_)     -> (* We project ranges into constants. We
 					forget about errors and provide the
 					mean/middle value of the interval
-				     *)
-      let  new_float = Salsa.NumMartel.float_of_num c in
+			      *)
+    let new_float = Salsa.Float.Domain.to_float abs_val in
+      (* let  new_float = Salsa.NumMartel.float_of_num c in *)
       (* let new_float =  *)
       (* 	if f1 = f2 then *)
       (* 	  f1 *)
