@@ -236,7 +236,7 @@ let stage2 prog =
   Log.report ~level:3 (fun fmt -> fprintf fmt ".. generated machines (unoptimized):@ %a@ " Machine_code_common.pp_machines machine_code);
 
   (* Optimize machine code *)
-  Optimize_machine.optimize prog node_schs machine_code
+  Optimize_machine.optimize prog node_schs machine_code   
 
 
 (* printing code *)

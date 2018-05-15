@@ -22,7 +22,7 @@ module Plugin =
     if !salsa_enabled then
       begin
 	Compiler_common.check_main ();
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. salsa machines optimization (phase 3)@ ");
+	Log.report ~level:1 (fun fmt -> fprintf fmt ".. @[<v 0>salsa machines optimization@ ");
 	(* Selecting float constants for Salsa *)
 	let constEnv = List.fold_left (
 	  fun accu c_topdecl ->
@@ -32,9 +32,13 @@ module Plugin =
 	    | _ -> accu
 	) [] (Corelang.get_consts prog) 
 	in
-	List.map 
-	  (Machine_salsa_opt.machine_t2machine_t_optimized_by_salsa constEnv) 
-	  machine_code 
+	let res =
+	  List.map 
+	    (Machine_salsa_opt.machine_t2machine_t_optimized_by_salsa constEnv) 
+	    machine_code
+	in
+	Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
+	res
       end
     else
       machine_code

@@ -13,9 +13,18 @@ let pp_hash ~sep f fmt r =
   Format.fprintf fmt "]@]";
 
 
+module type VALUE =
+sig
+  type t
+  val union: t -> t -> t
+  val pp: Format.formatter -> t -> unit
+    val leq: t -> t -> bool
+end
+  
 module Ranges = 
-  functor (Value: sig type t val union: t -> t -> t val pp: Format.formatter -> t -> unit end)  ->
+  functor (Value: VALUE)  ->
 struct
+  module Value = Value
   type t = Value.t
   type r_t = (LT.ident, Value.t) Hashtbl.t
 
@@ -30,7 +39,11 @@ struct
   						    pour chaque noeud *)
 
 
-  let pp = pp_hash ~sep:";" (fun k v fmt -> Format.fprintf fmt "%s -> %a" k Value.pp v) 
+  let pp fmt r =
+    if Hashtbl.length r = 0 then
+      Format.fprintf fmt "empty"
+    else
+      pp_hash ~sep:";" (fun k v fmt -> Format.fprintf fmt "%s -> %a" k Value.pp v) fmt r
   let pp_val = Value.pp
 
   let add_def ranges name r = 
@@ -114,6 +127,8 @@ struct
       (* else *)
       (* 	Salsa.Builder.mk_cst (ST.I(r*.(1.-.epsilon_float),r*.(1.+.epsilon_float)),Float.ulp (ST.I(r,r))) *)
     | _ -> assert false
+
+  let leq = Salsa.Float.feSseq
 end
 
 module RangesInt = Ranges (FloatIntSalsa)
@@ -212,7 +227,7 @@ module VarEnv = Map.Make (struct type t = LT.ident let compare = compare end )
 let get_var vars_env v =
 try
   VarEnv.find v vars_env
-with Not_found -> Format.eprintf "Impossible to find var %s in var env %a@.@?" v
+with Not_found -> Format.eprintf "Impossible to find var %s in var env %a@ " v
   (Utils.fprintf_list ~sep:", " (fun fmt (id, _) -> Format.pp_print_string fmt id)) (VarEnv.bindings vars_env) 
   ; assert false
 
@@ -353,7 +368,7 @@ struct
 
   let empty (): fe_t = Hashtbl.create 13
 
-  let pp fmt env = pp_hash ~sep:";" (fun k (_,v) fmt -> Format.fprintf fmt "%s -> %a" k MC.pp_val v) fmt env
+  let pp fmt env = pp_hash ~sep:";@ " (fun k (_,v) fmt -> Format.fprintf fmt "%s -> %a" k MC.pp_val v) fmt env
 
 
   let get_sort_fun env =

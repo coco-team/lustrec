@@ -49,7 +49,7 @@ let fprintf_dependencies fmt (dep: dep_t list) =
   let compiled_dep = compiled_dependencies dep in
   (* Format.eprintf "Compiled Deps: %a@." pp_deps compiled_dep; *)
  
-  List.iter (fun s -> Format.eprintf "Adding dependency: %s@." s;  
+  List.iter (fun s -> Log.report ~level:1 (fun fmt -> fprintf fmt "Adding dependency: %s@." s);  
     fprintf fmt "\t${GCC} -I${INC} -c %s@." s)
     (("${INC}/io_frontend.c"):: (* IO functions when a main function is computed *)
 	(List.map 

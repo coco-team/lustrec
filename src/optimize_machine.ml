@@ -612,34 +612,6 @@ let optimize prog node_schs machine_code =
       machine_code
   in
   
-  (* Salsa optimize machine code *)
-  (*
-  let machine_code = 
-    if !Options.salsa_enabled then
-      begin
-	check_main ();
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. salsa machines optimization: optimizing floating-point accuracy with Salsa@,");
-	(* Selecting float constants for Salsa *)
-	let constEnv = List.fold_left (
-	  fun accu c_topdecl ->
-	    match c_topdecl.top_decl_desc with
-	    | Const c when Types.is_real_type c.const_type  ->
-	      (c.const_id, c.const_value) :: accu
-	    | _ -> accu
-	) [] (Corelang.get_consts prog) 
-	in
-	List.map 
-	  (Machine_salsa_opt.machine_t2machine_t_optimized_by_salsa constEnv) 
-	  machine_code 
-      end
-    else
-      machine_code
-  in
-  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@ "
-    (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
-    machine_code);
-  *)
-
 
     machine_code  
     
