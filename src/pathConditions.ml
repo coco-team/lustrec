@@ -153,23 +153,26 @@ and gen_mcdc_cond_var v expr =
       v
       Printers.pp_expr expr);
   let vl, leafs_n_neg_expr = compute_neg_expr 0 expr in
-  if List.length leafs_n_neg_expr > 1 then (
+  if List.length leafs_n_neg_expr >= 1 then (
     List.fold_left (fun accu ((vi, nb_pre), expr_neg_vi) ->
       (mcdc_var  (mk_pre nb_pre vi) expr expr_neg_vi)::accu
     ) vl leafs_n_neg_expr
   )
-  else vl
+  else
+    (* TODO: deal with the case length xxx = 1 with a simpler condition  *)
+    vl
 
 and gen_mcdc_cond_guard expr =
   report ~level:1 (fun fmt ->
     Format.fprintf fmt".. Generating MC/DC cond for guard %a@."
       Printers.pp_expr expr);
   let vl, leafs_n_neg_expr = compute_neg_expr 0 expr in
-  if List.length leafs_n_neg_expr > 1 then (
+  if List.length leafs_n_neg_expr >= 1 then (
     List.fold_left (fun accu ((vi, nb_pre), expr_neg_vi) ->
       (mcdc_var  (mk_pre nb_pre vi) expr expr_neg_vi)::accu
     ) vl leafs_n_neg_expr)
   else
+    (* TODO: deal with the case length xxx = 1 with a simpler condition  *)
     vl
   
 
