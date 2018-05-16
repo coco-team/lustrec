@@ -137,7 +137,7 @@ and pp_call fmt id e =
   | "<=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a <= %a)" pp_expr e1 pp_expr e2
   | ">", Expr_tuple([e1;e2]) -> fprintf fmt "(%a > %a)" pp_expr e1 pp_expr e2
   | ">=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a >= %a)" pp_expr e1 pp_expr e2
-  | "!=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a != %a)" pp_expr e1 pp_expr e2
+  | "!=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a <> %a)" pp_expr e1 pp_expr e2
   | "=", Expr_tuple([e1;e2]) -> fprintf fmt "(%a = %a)" pp_expr e1 pp_expr e2
   | "not", _ -> fprintf fmt "(not %a)" pp_expr e
   | _, Expr_tuple _ -> fprintf fmt "%s %a" id pp_expr e
