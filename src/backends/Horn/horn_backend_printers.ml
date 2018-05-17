@@ -67,22 +67,26 @@ let rec pp_default_val fmt t =
 
 let pp_mod pp_val v1 v2 fmt =
   if Types.is_int_type v1.value_type &&  not !Options.integer_div_euclidean then
-    (* C semantics: converting it to Euclidian operators
-       (a mod_M b) - (a < 0 ? abs(b) : 0)            
+    (* C semantics: converting it from Euclidean operators
+       (a mod_M b) - ((a mod_M b > 0 && a < 0) ? abs(b) : 0)            
     *)
-    Format.fprintf fmt "(- (mod %a %a) (ite (< %a 0) (abs %a) 0))"
-      pp_val v1 pp_val v2 pp_val v1 pp_val v2
+    Format.fprintf fmt "(- (mod %a %a) (ite (and (> (mod %a %a) 0) (< %a 0)) (abs %a) 0))"
+      pp_val v1 pp_val v2
+      pp_val v1 pp_val v2
+      pp_val v1
+      pp_val v2
   else
     Format.fprintf fmt "(mod %a %a)" pp_val v1 pp_val v2
 
 let pp_div pp_val v1 v2 fmt =
   if Types.is_int_type v1.value_type &&  not !Options.integer_div_euclidean then
-    (* C semantics: converting it to Euclidian operators
-       (a - ((a mod_M b) - (a < 0 ? abs(b) : 0))) div_M b
+    (* C semantics: converting it from Euclidean operators
+       (a - (a mod_C b)) div_M b
     *)
-    Format.fprintf fmt "(div (- %a (- (mod %a %a) (ite (< %a 0) (abs %a) 0))) %a)"
-      pp_val v1 pp_val v1 pp_val v2
-      pp_val v1 pp_val v2 pp_val v2
+    Format.fprintf fmt "(div (- %a %t) %a)"
+      pp_val v1
+      (pp_mod pp_val v1 v2)
+      pp_val v2
   else
     Format.fprintf fmt "(div %a %a)" pp_val v1 pp_val v2
 
