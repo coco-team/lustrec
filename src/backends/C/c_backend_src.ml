@@ -163,7 +163,7 @@ let rec pp_value_suffix self var_type loop_vars pp_value fmt value =
     | _           :: q, Power (v, n)  ->
        pp_value_suffix self var_type q pp_value fmt v
     | _               , Fun (n, vl)   ->
-       pp_basic_lib_fun n (pp_value_suffix self var_type loop_vars pp_value) fmt vl
+       pp_basic_lib_fun (Types.is_int_type value.value_type) n (pp_value_suffix self var_type loop_vars pp_value) fmt vl
     | _               , Access (v, i) ->
        let var_type = Type_predef.type_array (Dimension.mkdim_var ()) var_type in
        pp_value_suffix self var_type ((Dimension.mkdim_var (), LAcc i) :: loop_vars) pp_value fmt v

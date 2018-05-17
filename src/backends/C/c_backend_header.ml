@@ -55,7 +55,7 @@ let rec print_static_val pp_var fmt v =
   match v.value_desc with
   | Cst c         -> pp_c_const fmt c
   | LocalVar v    -> pp_var fmt v
-  | Fun (n, vl)   -> pp_basic_lib_fun n (print_static_val pp_var) fmt vl
+  | Fun (n, vl)   -> pp_basic_lib_fun (Types.is_int_type v.value_type) n (print_static_val pp_var) fmt vl
   | _             -> (Format.eprintf "Internal error: C_backend_header.print_static_val"; assert false)
 
 let print_constant_decl (m, attr, inst) pp_var fmt v =
