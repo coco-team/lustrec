@@ -35,6 +35,10 @@ let mpfr = ref false
 let mpfr_prec = ref 100
 let print_dec_types = ref false
 
+(* Option to select the expected behavior of integer division: Euclidian or
+   C. Default C !!! *)
+let integer_div_euclidean = ref false
+  
 let traces = ref false
 let horn_cex = ref false
 let horn_query = ref true

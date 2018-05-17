@@ -97,33 +97,35 @@ let common_options =
   ]
 
 let lustrec_options =
-   common_options @
-  [ 
-    "-init", Arg.Set delay_calculus, "performs an initialisation analysis for Lustre nodes <default: no analysis>";
-    "-dynamic", Arg.Clear static_mem, "specifies a dynamic allocation scheme for main Lustre node <default: static>";
-    "-check-access", Arg.Set check, "checks at runtime that array accesses always lie within bounds <default: no check>";
-    "-mpfr", Arg.Int set_mpfr, "replaces FP numbers by the MPFR library multiple precision numbers with a precision of \x1b[4mprec\x1b[0m bits <default: keep FP numbers>";
-    "-lusi", Arg.Set lusi, "only generates a .lusi interface source file from a Lustre source <default: no generation>";
-    "-no-spec", Arg.Unit (fun () -> spec := "no"), "do not generate any specification";
-    "-acsl-spec", Arg.Unit (fun () -> spec := "acsl"), "generates an ACSL encoding of the specification. Only meaningful for the C backend <default>";
-    "-c-spec", Arg.Unit (fun () -> spec := "c"), "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
-    (* "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C"; *)
-    "-horn", Arg.Unit (fun () -> set_backend "horn"), "generates Horn clauses encoding output instead of C";
-    "-horn-traces", Arg.Unit (fun () -> set_backend "horn"; traces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
-    "-horn-cex", Arg.Unit (fun () -> set_backend "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
-    "-horn-query", Arg.Unit (fun () -> set_backend "horn"; horn_query:=true), "generate queries in generated Horn file. Enable the horn backend (work in progress)";
-    "-horn-sfunction", Arg.Set_string sfunction, "Gets the endpoint predicate of the \x1b[4msfunction\x1b[0m";
-    "-print-reuse", Arg.Set print_reuse, "prints variable reuse policy";
-    "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";
-   "-emf", Arg.Unit (fun () -> set_backend "emf"), "generates EMF output, to be used by CocoSim";
-   "-inline", Arg.Unit (fun () -> global_inline := true; const_unfold := true), "inlines all node calls (require a main node). Implies constant unfolding";
-    "-witnesses", Arg.Set witnesses, "enables production of witnesses during compilation";
-    "-O", Arg.Set_int optimization, "changes optimization \x1b[4mlevel\x1b[0m <default: 2>";
-    
-    "-c++" , Arg.Set        cpp      , "c++ backend";
-    "-int" , Arg.Set_string int_type , "specifies the integer type (default=\"int\")";
-    "-real", Arg.String set_real_type, "specifies the real type (default=\"double\" without mpfr option)";
-    "-real-print-prec", Arg.Set_int print_prec_double, "specifies the number of digits to be printed for real values (default=15)";
+  common_options @
+    [ 
+      "-init", Arg.Set delay_calculus, "performs an initialisation analysis for Lustre nodes <default: no analysis>";
+      "-dynamic", Arg.Clear static_mem, "specifies a dynamic allocation scheme for main Lustre node <default: static>";
+      "-check-access", Arg.Set check, "checks at runtime that array accesses always lie within bounds <default: no check>";
+      "-mpfr", Arg.Int set_mpfr, "replaces FP numbers by the MPFR library multiple precision numbers with a precision of \x1b[4mprec\x1b[0m bits <default: keep FP numbers>";
+      "-lusi", Arg.Set lusi, "only generates a .lusi interface source file from a Lustre source <default: no generation>";
+      "-no-spec", Arg.Unit (fun () -> spec := "no"), "do not generate any specification";
+      "-acsl-spec", Arg.Unit (fun () -> spec := "acsl"), "generates an ACSL encoding of the specification. Only meaningful for the C backend <default>";
+      "-c-spec", Arg.Unit (fun () -> spec := "c"), "generates a C encoding of the specification instead of ACSL contracts and annotations. Only meaningful for the C backend";
+      (* "-java", Arg.Unit (fun () -> output := "java"), "generates Java output instead of C"; *)
+      "-horn", Arg.Unit (fun () -> set_backend "horn"), "generates Horn clauses encoding output instead of C";
+      "-horn-traces", Arg.Unit (fun () -> set_backend "horn"; traces:=true), "produce traceability file for Horn backend. Enable the horn backend.";
+      "-horn-cex", Arg.Unit (fun () -> set_backend "horn"; horn_cex:=true), "generate cex enumeration. Enable the horn backend (work in progress)";
+      "-horn-query", Arg.Unit (fun () -> set_backend "horn"; horn_query:=true), "generate queries in generated Horn file. Enable the horn backend (work in progress)";
+      "-horn-sfunction", Arg.Set_string sfunction, "Gets the endpoint predicate of the \x1b[4msfunction\x1b[0m";
+      "-print-reuse", Arg.Set print_reuse, "prints variable reuse policy";
+      "-lustre", Arg.Unit (fun () -> output := "lustre"), "generates Lustre output, performing all active optimizations";
+      "-emf", Arg.Unit (fun () -> set_backend "emf"), "generates EMF output, to be used by CocoSim";
+      "-inline", Arg.Unit (fun () -> global_inline := true; const_unfold := true), "inlines all node calls (require a main node). Implies constant unfolding";
+      "-witnesses", Arg.Set witnesses, "enables production of witnesses during compilation";
+      "-O", Arg.Set_int optimization, "changes optimization \x1b[4mlevel\x1b[0m <default: 2>";
+      
+      "-c++" , Arg.Set        cpp      , "c++ backend";
+      "-int" , Arg.Set_string int_type , "specifies the integer type (default=\"int\")";
+      "-real", Arg.String set_real_type, "specifies the real type (default=\"double\" without mpfr option)";
+      "-real-print-prec", Arg.Set_int print_prec_double, "specifies the number of digits to be printed for real values (default=15)";
+      "-int_div_euclidean", Arg.Set integer_div_euclidean, "interprets integer division as Euclidean (default : C division semantics)";
+      "-int_div_C", Arg.Clear integer_div_euclidean, "interprets integer division as C division (default)";
 
     "-mauve", Arg.String (fun node -> mauve := node; cpp := true; static_mem := false), "generates the mauve code";
 ]
