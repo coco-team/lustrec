@@ -1,5 +1,6 @@
 # general config
 true: bin_annot, color(always)
+true: use_menhir
 
 # paths to sources
 "backends": include
@@ -15,6 +16,7 @@ true: bin_annot, color(always)
 "tools/stateflow/semantics": include
 "tools/stateflow/models": include
 "tools/stateflow/json-parser": include
+"cocospec": include
 
 # svn
 <**/.svn>: -traverse
@@ -27,8 +29,8 @@ true: bin_annot, color(always)
 <**/main_lustre_testgen.native> : use_unix
 <**/sf_sem.native>              : use_unix
 <**/*.native>                   : package(num)
-<**/*.ml>                       : package(logs)
-<**/*.native>                   : package(logs)
+#<**/*.ml>                       : package(logs)
+#<**/*.native>                   : package(logs)
 <**/json_parser.ml>             : package(yojson)
 <**/main_parse_json_file.*>     : package(cmdliner)
 <**/main_parse_json_file.*>     : package(fmt.tty)
