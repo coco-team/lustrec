@@ -29,8 +29,8 @@ true: use_menhir
 <**/main_lustre_testgen.native> : use_unix
 <**/sf_sem.native>              : use_unix
 <**/*.native>                   : package(num)
-#<**/*.ml>                       : package(logs)
-#<**/*.native>                   : package(logs)
+<**/*.ml>                       : package(logs)
+<**/*.native>                   : package(logs)
 <**/json_parser.ml>             : package(yojson)
 <**/main_parse_json_file.*>     : package(cmdliner)
 <**/main_parse_json_file.*>     : package(fmt.tty)

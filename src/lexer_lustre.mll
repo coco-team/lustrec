@@ -90,7 +90,7 @@ let make_kind_spec lexbuf s =
     let dummy_ns = { Lustre_types.requires = []; ensures = []; behaviors = []; spec_loc = Location.dummy_loc} in
     NODESPEC dummy_ns
 
-let make_spec = make_kind_spec
+(*let make_spec = make_kind_spec*)
 }
 
 let newline = ('\010' | '\013' | "\013\010")
