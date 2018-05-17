@@ -108,16 +108,43 @@ let pp_machine_init_name fmt id = fprintf fmt "%s_init" id
 let pp_machine_clear_name fmt id = fprintf fmt "%s_clear" id
 let pp_machine_step_name fmt id = fprintf fmt "%s_step" id
 
-let pp_basic_lib_fun i pp_val fmt vl =
+let pp_mod pp_val v1 v2 fmt =
+  if !Options.integer_div_euclidean then
+    (* (a mod_C b) + (a < 0 ? abs(b) : 0) *)
+    Format.fprintf fmt "((%a %% %a) + (%a < 0?(abs(%a)):0))"
+      pp_val v1 pp_val v2
+      pp_val v1 pp_val v2
+  else (* Regular behavior: printing a % *)
+    Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
+
+let pp_div pp_val v1 v2 fmt =
+  if !Options.integer_div_euclidean then
+    (* (a - ((a mod_C b) + (a < 0 ? abs(b) : 0))) div_C b *)
+    Format.fprintf fmt "(%a - ((%a %% %a) + (%a < 0 ? abs(%a) : 0))) / %a"
+      pp_val v1 pp_val v1 pp_val v2
+      pp_val v1 pp_val v2 pp_val v2
+  else (* Regular behavior: printing a / *)
+    Format.fprintf fmt "(%a / %a)" pp_val v1 pp_val v2
+  
+let pp_basic_lib_fun is_int i pp_val fmt vl =
   match i, vl with
   (*  | "ite", [v1; v2; v3] -> Format.fprintf fmt "(%a?(%a):(%a))" pp_val v1 pp_val v2 pp_val v3 *)
   | "uminus", [v] -> Format.fprintf fmt "(- %a)" pp_val v
   | "not", [v] -> Format.fprintf fmt "(!%a)" pp_val v
   | "impl", [v1; v2] -> Format.fprintf fmt "(!%a || %a)" pp_val v1 pp_val v2
   | "=", [v1; v2] -> Format.fprintf fmt "(%a == %a)" pp_val v1 pp_val v2
-  | "mod", [v1; v2] -> Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
+  | "mod", [v1; v2] ->
+     if is_int then
+       pp_mod pp_val v1 v2 fmt 
+     else
+       Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
   | "equi", [v1; v2] -> Format.fprintf fmt "(!%a == !%a)" pp_val v1 pp_val v2
   | "xor", [v1; v2] -> Format.fprintf fmt "(!%a != !%a)" pp_val v1 pp_val v2
+  | "/", [v1; v2] ->
+     if is_int then
+       pp_div pp_val v1 v2 fmt
+     else
+       Format.fprintf fmt "(%a / %a)" pp_val v1 pp_val v2
   | _, [v1; v2] -> Format.fprintf fmt "(%a %s %a)" pp_val v1 i pp_val v2
   | _ -> (Format.eprintf "internal error: Basic_library.pp_c %s@." i; assert false)
 
@@ -134,7 +161,7 @@ let rec pp_c_dimension fmt dim =
      fprintf fmt "((%a)?%a:%a)"
        pp_c_dimension i pp_c_dimension t pp_c_dimension e
   | Dimension.Dappl (f, args) ->
-     fprintf fmt "%a" (pp_basic_lib_fun f pp_c_dimension) args
+     fprintf fmt "%a" (pp_basic_lib_fun (Basic_library.is_numeric_operator f) f pp_c_dimension) args
   | Dimension.Dlink dim' -> fprintf fmt "%a" pp_c_dimension dim'
   | Dimension.Dvar       -> fprintf fmt "_%s" (Utils.name_of_dimension dim.Dimension.dim_id)
   | Dimension.Dunivar    -> fprintf fmt "'%s" (Utils.name_of_dimension dim.Dimension.dim_id)
@@ -222,7 +249,7 @@ let rec pp_c_val self pp_var fmt v =
     if Types.is_array_type v.var_type && not (Types.is_real_type v.var_type && !Options.mpfr)
     then fprintf fmt "%a" pp_var v
     else fprintf fmt "%s->_reg.%a" self pp_var v
-  | Fun (n, vl)   -> pp_basic_lib_fun n (pp_c_val self pp_var) fmt vl
+  | Fun (n, vl)   -> pp_basic_lib_fun (Types.is_int_type v.value_type) n (pp_c_val self pp_var) fmt vl
 
 (* Access to the value of a variable:
    - if it's not a scalar output, then its name is enough
