@@ -214,7 +214,7 @@ let merge_branches transitions =
 (* Start token *)
 %start <KindLustreAst.t> main
 %start <KindLustreAst.expr> one_expr
-%start <KindLustreAst.contract> contract_in_block
+%start <KindLustreAst.contract> contract_in_block_main
 %%
 (** Parser for lustre systems. *)
 
@@ -450,12 +450,15 @@ contract_import:
 
 
 contract_item:
-  | v = contract_ghost_var { v } 
-  | c = contract_ghost_const { c }
-  | a = contract_assume { a }
-  | g = contract_guarantee { g }
+  | v = contract_ghost_var { (*Format.printf "CONTRACT_ITEM (v)@.";*) v } 
+  | c = contract_ghost_const { (*Format.printf "CONTRACT_ITEM (c)@.";*) c }
+  | a = contract_assume { (*Format.printf "CONTRACT_ITEM (a)@.";*) a }
+  | g = contract_guarantee { (*Format.printf "CONTRACT_ITEM (g)@.";*) g }
   | m = mode_equation { m }
   | i = contract_import { i }
+
+contract_in_block_main:
+  | c = contract_in_block ; EOF { c }
 
 contract_in_block:
   | c = nonempty_list(contract_item) { c }

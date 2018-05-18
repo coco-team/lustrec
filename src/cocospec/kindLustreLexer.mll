@@ -485,6 +485,7 @@ rule token = parse
 
   (* Keyword *)
   | id as p {
+    (*Format.printf "seeking symbol '%s' @." p;*)
     try Hashtbl.find keyword_table p with Not_found -> (SYM p)
   }
 
