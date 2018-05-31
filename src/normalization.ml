@@ -78,7 +78,7 @@ let unfold_arrow expr =
 
 (* Get the equation in [defs] with [expr] as rhs, if any *)
 let get_expr_alias defs expr =
- try Some (List.find (fun eq -> is_eq_expr eq.eq_rhs expr) defs)
+ try Some (List.find (fun eq -> Clocks.eq_clock expr.expr_clock eq.eq_rhs.expr_clock && is_eq_expr eq.eq_rhs expr) defs)
  with
  | Not_found -> None
   
