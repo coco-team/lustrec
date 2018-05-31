@@ -78,7 +78,7 @@ let mk_fresh_var node loc ty ck =
 
 (* Get the equation in [defs] with [expr] as rhs, if any *)
 let get_expr_alias defs expr =
- try Some (List.find (fun eq -> is_eq_expr eq.eq_rhs expr) defs)
+ try Some (List.find (fun eq -> Clocks.eq_clock eq.eq_rhs.expr_clock expr.expr_clock && is_eq_expr eq.eq_rhs expr) defs)
  with
  | Not_found -> None
   
