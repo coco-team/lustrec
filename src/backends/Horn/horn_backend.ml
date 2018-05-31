@@ -88,7 +88,7 @@ let print_dep fmt prog =
       let basename = (Options_management.name_dependency (local, s)) ^ ".smt2" in
       Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@[<v 0> Horn Library %s@," basename);
       let horn = load_file basename in
-      fprintf fmt "@.%s@." horn;
+      fprintf fmt "@.%s@." (Bytes.to_string horn);
     )
     dependencies
 
