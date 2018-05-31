@@ -1,6 +1,6 @@
 open Format
 
-type ident = LustreSpec.ident
+type ident = Lustre_types.ident
 type error_kind =
     Main_not_found
   | Main_wrong_kind

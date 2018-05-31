@@ -1,10 +1,11 @@
 open Datatype
+open Basetypes
 open SF
 
 let name = "simple"
 
 let condition x = condition {
-  expr = Corelang.mkexpr Location.dummy_loc (LustreSpec.Expr_const (Corelang.const_of_bool true));
+  expr = Corelang.mkexpr Location.dummy_loc (Lustre_types.Expr_const (Corelang.const_of_bool true));
   cinputs = [];
   coutputs = [];
   cvariables = [];

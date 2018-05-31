@@ -1,4 +1,4 @@
-open LustreSpec 
+open Lustre_types 
 open Corelang
 open Log
 open Format
@@ -78,7 +78,10 @@ let mcdc_var vi_as_expr expr expr_neg_vi =
   let not_vi_as_expr = mkpredef_call loc "not" [vi_as_expr] in
   let expr1 = mkpredef_call loc "&&" [vi_as_expr; changed_expr] in
   let expr2 = mkpredef_call loc "&&" [not_vi_as_expr; changed_expr] in
-  ((expr,vi_as_expr),[expr1;expr2])
+  ((expr,vi_as_expr),[(true,expr1);(false,expr2)]) (* expr1 corresponds to atom
+                                                     true while expr2
+                                                     corresponds to atom
+                                                     false *)
 
   (* Format.printf "%a@." Printers.pp_expr expr1;  *)
   (* print_path (fun fmt -> Format.fprintf fmt "%a and (%a != %a)" *)
@@ -91,7 +94,7 @@ let mcdc_var vi_as_expr expr expr_neg_vi =
   (*   Printers.pp_expr expr (\*v*\) *)
   (*   Printers.pp_expr expr_neg_vi) *)
     
-let rec compute_neg_expr cpt_pre (expr: LustreSpec.expr) =
+let rec compute_neg_expr cpt_pre (expr: Lustre_types.expr) =
   let neg_list l = 
     List.fold_right (fun e (vl,el) -> let vl', e' = compute_neg_expr cpt_pre e in (vl'@vl), e'::el) l ([], [])
   in
@@ -150,23 +153,26 @@ and gen_mcdc_cond_var v expr =
       v
       Printers.pp_expr expr);
   let vl, leafs_n_neg_expr = compute_neg_expr 0 expr in
-  if List.length leafs_n_neg_expr > 1 then (
+  if List.length leafs_n_neg_expr >= 1 then (
     List.fold_left (fun accu ((vi, nb_pre), expr_neg_vi) ->
       (mcdc_var  (mk_pre nb_pre vi) expr expr_neg_vi)::accu
     ) vl leafs_n_neg_expr
   )
-  else vl
+  else
+    (* TODO: deal with the case length xxx = 1 with a simpler condition  *)
+    vl
 
 and gen_mcdc_cond_guard expr =
   report ~level:1 (fun fmt ->
     Format.fprintf fmt".. Generating MC/DC cond for guard %a@."
       Printers.pp_expr expr);
   let vl, leafs_n_neg_expr = compute_neg_expr 0 expr in
-  if List.length leafs_n_neg_expr > 1 then (
+  if List.length leafs_n_neg_expr >= 1 then (
     List.fold_left (fun accu ((vi, nb_pre), expr_neg_vi) ->
       (mcdc_var  (mk_pre nb_pre vi) expr expr_neg_vi)::accu
     ) vl leafs_n_neg_expr)
   else
+    (* TODO: deal with the case length xxx = 1 with a simpler condition  *)
     vl
   
 
@@ -209,7 +215,7 @@ let mcdc_var_def v expr =
 let mcdc_node_eq eq =
   let vl =
     match eq.eq_lhs, Types.is_bool_type eq.eq_rhs.expr_type, (Types.repr eq.eq_rhs.expr_type).Types.tdesc, eq.eq_rhs.expr_desc with
-    | [lhs], true, _, _ ->  gen_mcdc_cond_var lhs eq.eq_rhs 
+    | [lhs], true, _, _ -> gen_mcdc_cond_var lhs eq.eq_rhs 
     | _::_, false, Types.Ttuple tl, Expr_tuple rhs ->
        (* We iterate trough pairs, but accumulate variables aside. The resulting
 	  expression shall remain a tuple defintion *)
@@ -235,27 +241,27 @@ let mcdc_top_decl td =
   | Node nd ->
      let new_coverage_exprs =
        List.fold_right (
-	 fun s accu_v ->
+	   fun s accu_v ->
 	   let vl' = mcdc_node_stmt s in
 	   vl'@accu_v
-       ) nd.node_stmts []
+	 ) nd.node_stmts []
      in
-     (* We add coverage vars as boolean internal flows. TODO *)
-     let fresh_cov_defs = List.flatten (List.map snd new_coverage_exprs) in
+     (* We add coverage vars as boolean internal flows. *)
+     let fresh_cov_defs = List.flatten (List.map (fun ((_, atom), expr_l) -> List.map (fun (atom_valid, case) -> atom, atom_valid, case) expr_l) new_coverage_exprs) in
      let nb_total = List.length fresh_cov_defs in
-     let fresh_cov_vars = List.mapi (fun i cov_expr ->
-       let loc = cov_expr.expr_loc in
-       Format.fprintf Format.str_formatter "__cov_%i_%i" i nb_total;
-       let cov_id = Format.flush_str_formatter () in
-       let cov_var = mkvar_decl loc
-	 (cov_id, mktyp loc Tydec_bool, mkclock loc Ckdec_any, false, None, None) in
-       let cov_def = Eq (mkeq loc ([cov_id], cov_expr)) in
-       cov_var, cov_def, cov_expr
-     ) fresh_cov_defs
+     let fresh_cov_vars = List.mapi (fun i (atom, atom_valid, cov_expr) ->
+				     let loc = cov_expr.expr_loc in
+				     Format.fprintf Format.str_formatter "__cov_%i_%i" i nb_total;
+				     let cov_id = Format.flush_str_formatter () in
+				     let cov_var = mkvar_decl loc
+							      (cov_id, mktyp loc Tydec_bool, mkclock loc Ckdec_any, false, None, None) in
+				     let cov_def = Eq (mkeq loc ([cov_id], cov_expr)) in
+				     cov_var, cov_def, atom, atom_valid
+				    ) fresh_cov_defs
      in
      let fresh_vars, fresh_eqs =
        List.fold_right
-	 (fun (v,eq,_) (accuv, accueq)-> v::accuv, eq::accueq )
+	 (fun (v,eq,_,_) (accuv, accueq)-> v::accuv, eq::accueq )
 	 fresh_cov_vars
 	 ([], [])
      in
@@ -263,20 +269,28 @@ let mcdc_top_decl td =
 			   kind2, and regular ones to keep track of the nature
 			   of the annotations. *)
        List.map
-	 (fun v -> let ee = expr_to_eexpr (expr_of_vdecl v) in
-		   {annots =  [["PROPERTY"], ee;
-			       ["coverage";"mcdc"], ee
-			      ];
-		    annot_loc = v.var_loc})
-	 fresh_vars
+	 (fun (v, _, atom, atom_valid) ->
+	  let e = expr_of_vdecl v in
+	  let ee = expr_to_eexpr e in
+	  let neg_ee = expr_to_eexpr (mkpredef_call e.expr_loc "not" [e]) in
+	  {annots =  [["PROPERTY"], neg_ee; (* Using negated property to force
+                                               model-checker to produce a
+                                               suitable covering trace *)
+		      let _ = Printers.pp_expr Format.str_formatter atom in
+		      let atom_as_string = Format.flush_str_formatter () in
+		      let valid = if atom_valid then "true" else "false" in
+		      ["coverage";"mcdc";atom_as_string;valid], ee
+		     ];
+	   annot_loc = v.var_loc})
+	 fresh_cov_vars
      in
      Format.printf "%i coverage criteria generated for node %s@ " nb_total nd.node_id;
      (* And add them as annotations --%PROPERTY: var TODO *)
      {td with top_decl_desc = Node {nd with
-       node_locals = nd.node_locals@fresh_vars;
-       node_stmts = nd.node_stmts@fresh_eqs;
-       node_annot = nd.node_annot@fresh_annots
-     }}
+				     node_locals = nd.node_locals@fresh_vars;
+				     node_stmts = nd.node_stmts@fresh_eqs;
+				     node_annot = nd.node_annot@fresh_annots
+				   }}
   | _ -> td
 
 

@@ -10,10 +10,11 @@
 (********************************************************************)
 
 open Utils
-open LustreSpec 
+open Lustre_types 
+open Machine_code_types
 open Corelang
 open Causality
-open Machine_code 
+open Machine_code_common
 open Dimension
 
 
@@ -227,7 +228,7 @@ and instr_unfold fanin instrs elim instr =
 let static_call_unfold elim (inst, (n, args)) =
   let replace v =
     try
-      Machine_code.dimension_of_value (IMap.find v elim)
+      dimension_of_value (IMap.find v elim)
     with Not_found -> Dimension.mkdim_ident Location.dummy_loc v
   in (inst, (n, List.map (Dimension.expr_replace_expr replace) args))
 
@@ -577,7 +578,7 @@ let optimize prog node_schs machine_code =
 	Log.report ~level:1 
 	  (fun fmt -> Format.fprintf fmt ".. machines optimization: sub-expression elimination@,");
 	let machine_code = machines_cse machine_code in
-	Log.report ~level:3 (fun fmt -> Format.fprintf fmt ".. generated machines (sub-expr elim):@ %a@ "Machine_code.pp_machines machine_code);
+	Log.report ~level:3 (fun fmt -> Format.fprintf fmt ".. generated machines (sub-expr elim):@ %a@ "pp_machines machine_code);
 	machine_code
       end
     else
@@ -592,7 +593,7 @@ let optimize prog node_schs machine_code =
 	let machine_code, removed_table = machines_unfold (Corelang.get_consts prog) node_schs machine_code in
 	Log.report ~level:3 (fun fmt -> Format.fprintf fmt "\t@[Eliminated constants: @[%a@]@]@ "
 	  (pp_imap pp_elim) removed_table);
-	Log.report ~level:3 (fun fmt -> Format.fprintf fmt ".. generated machines (const inlining):@ %a@ "Machine_code.pp_machines machine_code);	
+	Log.report ~level:3 (fun fmt -> Format.fprintf fmt ".. generated machines (const inlining):@ %a@ "pp_machines machine_code);	
 	machine_code, removed_table
       end
     else
@@ -611,34 +612,6 @@ let optimize prog node_schs machine_code =
       machine_code
   in
   
-  (* Salsa optimize machine code *)
-  (*
-  let machine_code = 
-    if !Options.salsa_enabled then
-      begin
-	check_main ();
-	Log.report ~level:1 (fun fmt -> fprintf fmt ".. salsa machines optimization: optimizing floating-point accuracy with Salsa@,");
-	(* Selecting float constants for Salsa *)
-	let constEnv = List.fold_left (
-	  fun accu c_topdecl ->
-	    match c_topdecl.top_decl_desc with
-	    | Const c when Types.is_real_type c.const_type  ->
-	      (c.const_id, c.const_value) :: accu
-	    | _ -> accu
-	) [] (Corelang.get_consts prog) 
-	in
-	List.map 
-	  (Machine_salsa_opt.machine_t2machine_t_optimized_by_salsa constEnv) 
-	  machine_code 
-      end
-    else
-      machine_code
-  in
-  Log.report ~level:3 (fun fmt -> fprintf fmt "@[<v 2>@ %a@]@ "
-    (Utils.fprintf_list ~sep:"@ " Machine_code.pp_machine)
-    machine_code);
-  *)
-
 
     machine_code  
     

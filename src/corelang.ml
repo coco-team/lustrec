@@ -10,7 +10,8 @@
 (********************************************************************)
 
 open Format
-open LustreSpec
+open Lustre_types
+open Machine_code_types
 (*open Dimension*)
 
 
@@ -24,7 +25,7 @@ end
 
 module VMap = Map.Make(VDeclModule)
 
-module VSet = Set.Make(VDeclModule)
+module VSet : Set.S with type elt = var_decl = Set.Make(VDeclModule)
 
 let dummy_type_dec = {ty_dec_desc=Tydec_any; ty_dec_loc=Location.dummy_loc}
 
@@ -53,6 +54,20 @@ let mkvar_decl loc ?(orig=false) (id, ty_dec, ck_dec, is_const, value, parentid)
     var_type = Types.new_var ();
     var_clock = Clocks.new_var true;
     var_loc = loc }
+
+let dummy_var_decl name typ =
+  {
+    var_id = name;
+    var_orig = false;
+    var_dec_type = dummy_type_dec;
+    var_dec_clock = dummy_clock_dec;
+    var_dec_const = false;
+    var_dec_value = None;
+    var_parent_nodeid = None;
+    var_type =  typ;
+    var_clock = Clocks.new_ck Clocks.Cvar true;
+    var_loc = Location.dummy_loc
+  }
 
 let mkexpr loc d =
   { expr_tag = Utils.new_tag ();
@@ -1155,6 +1170,34 @@ let rec expr_contains_expr expr_tag expr  =
 	| Expr_appl (_, e', Some e'') -> List.exists search [e'; e''] 
 	| Expr_ident _ -> false
       )
+
+
+
+(* Generate a new local [node] variable *)
+let cpt_fresh = ref 0
+
+let reset_cpt_fresh () =
+    cpt_fresh := 0
+    
+let mk_fresh_var node loc ty ck =
+  let vars = get_node_vars node in
+  let rec aux () =
+  incr cpt_fresh;
+  let s = Printf.sprintf "__%s_%d" node.node_id !cpt_fresh in
+  if List.exists (fun v -> v.var_id = s) vars then aux () else
+  {
+    var_id = s;
+    var_orig = false;
+    var_dec_type = dummy_type_dec;
+    var_dec_clock = dummy_clock_dec;
+    var_dec_const = false;
+    var_dec_value = None;
+    var_parent_nodeid = Some node.node_id;
+    var_type = ty;
+    var_clock = ck;
+    var_loc = loc
+  }
+  in aux ()
 
 (* Local Variables: *)
 (* compile-command:"make -C .." *)

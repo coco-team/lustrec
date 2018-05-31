@@ -16,9 +16,9 @@
 *)
 
 open Format
-open LustreSpec
+open Lustre_types
 open Corelang
-open Machine_code
+open Machine_code_types
 
 open Horn_backend_common
 open Horn_backend_printers

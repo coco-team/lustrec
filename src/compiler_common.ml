@@ -11,7 +11,7 @@
 
 open Utils
 open Format 
-open LustreSpec
+open Lustre_types
 open Corelang
 
 let check_main () =

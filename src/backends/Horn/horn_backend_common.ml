@@ -10,9 +10,9 @@
 (********************************************************************)
 
 open Format
-open LustreSpec
+open Lustre_types
+open Machine_code_types
 open Corelang
-open Machine_code
 
 let pp_machine_reset_name fmt id = fprintf fmt "%s_reset" id
 let pp_machine_step_name fmt id = fprintf fmt "%s_step" id
@@ -108,12 +108,12 @@ let instances_memory_vars ?(without_arrow=false) machines machine =
   aux true machine.mname.node_id machine
 
 (* Extract the arrows of a given node/machine *)
-let arrow_vars machines machine : LustreSpec.var_decl list =
+let arrow_vars machines machine : Lustre_types.var_decl list =
   let rec aux fst prefix m =
     List.fold_left (fun accu (id, (n, _)) ->
       let name = node_name n in
       if name = "_arrow" then
-	let arrow_machine = Machine_code.arrow_machine in
+	let arrow_machine = Machine_code_common.arrow_machine in
 	(rename_machine_list
 	  (concat prefix (concat (if fst then id else concat m.mname.node_id id) "_arrow"))
 	  arrow_machine.mmemory

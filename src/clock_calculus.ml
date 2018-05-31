@@ -19,7 +19,7 @@
     is shared.  Simple environments, very limited identifier scoping, no
     identifier redefinition allowed. *)
 open Utils
-open LustreSpec
+open Lustre_types
 open Corelang
 open Clocks
 open Format

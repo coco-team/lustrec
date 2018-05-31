@@ -10,7 +10,7 @@
 (********************************************************************)
 
 open Utils
-open LustreSpec
+open Lustre_types
 open Corelang
 open Format
 
@@ -74,28 +74,7 @@ let unfold_arrow expr =
     { expr with expr_desc = Expr_ite (expr_once loc ck, e1, e2) }
  | _                   -> assert false
 
-let cpt_fresh = ref 0
 
-(* Generate a new local [node] variable *)
-let mk_fresh_var node loc ty ck =
-  let vars = get_node_vars node in
-  let rec aux () =
-  incr cpt_fresh;
-  let s = Printf.sprintf "__%s_%d" node.node_id !cpt_fresh in
-  if List.exists (fun v -> v.var_id = s) vars then aux () else
-  {
-    var_id = s;
-    var_orig = false;
-    var_dec_type = dummy_type_dec;
-    var_dec_clock = dummy_clock_dec;
-    var_dec_const = false;
-    var_dec_value = None;
-    var_parent_nodeid = Some node.node_id;
-    var_type = ty;
-    var_clock = ck;
-    var_loc = loc
-  }
-  in aux ()
 
 (* Get the equation in [defs] with [expr] as rhs, if any *)
 let get_expr_alias defs expr =
@@ -397,7 +376,7 @@ let rec normalize_eq node defvars eq =
     -
 *)
 let normalize_node node =
-  cpt_fresh := 0;
+  reset_cpt_fresh ();
   let inputs_outputs = node.node_inputs@node.node_outputs in
   let orig_vars = inputs_outputs@node.node_locals in
   let not_is_orig_var v =

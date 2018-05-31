@@ -82,7 +82,15 @@ let make_spec lexbuf s =
     let ns = LexerLustreSpec.spec s in
     NODESPEC ns
   with LexerLustreSpec.Error loc -> raise (Parse.Error (Location.shift (Location.curr lexbuf) loc, Parse.Node_spec_error s))
-   
+
+
+let make_kind_spec lexbuf s =
+    let s_lexbuf = Lexing.from_string s in
+    let _ = KindLustreParser.contract_in_block KindLustreLexer.token s_lexbuf in
+    let dummy_ns = { Lustre_types.requires = []; ensures = []; behaviors = []; spec_loc = Location.dummy_loc} in
+    NODESPEC dummy_ns
+
+(*let make_spec = make_kind_spec*)
 }
 
 let newline = ('\010' | '\013' | "\013\010")

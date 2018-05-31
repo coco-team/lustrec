@@ -78,8 +78,8 @@ sig
   val eval_act : (module ThetaType with type t = t) -> act_t -> t
   val eval_cond : cond_t -> t -> t -> t
   (* val mktransformer : t -> unit *)
-  val mkprincipal : t -> LustreSpec.program
-  val mkcomponent : 'c call_t -> 'c -> t -> LustreSpec.program
+  val mkprincipal : t -> Lustre_types.program
+  val mkcomponent : 'c call_t -> 'c -> t -> Lustre_types.program
 end
 
 module type ComparableTransformerType =

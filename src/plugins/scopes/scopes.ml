@@ -1,6 +1,7 @@
-open LustreSpec 
+open Lustre_types 
 open Corelang 
-open Machine_code
+open Machine_code_types
+open Machine_code_common
 
 (* (variable, node name, node instance) *)
 type scope_t = (var_decl * string * string option) list * var_decl
@@ -166,7 +167,7 @@ let option_all_scopes = ref false
 let option_mem_scopes = ref false
 let option_input_scopes = ref false
 
-let scopes_map : (LustreSpec.ident list  * scope_t) list ref  = ref []
+let scopes_map : (Lustre_types.ident list  * scope_t) list ref  = ref []
 
 let register_scopes s = 
   option_scopes := true;
@@ -214,7 +215,7 @@ let pp_scopes fmt scopes =
   let scopes_vars = extract_scopes_defs scopes in
   List.iteri (fun idx (id, (var, typ)) ->
     Format.fprintf fmt "@ %t;" 
-      (fun fmt -> C_backend_common.print_put_var fmt ("_scopes_" ^ string_of_int (idx+1)) var typ var)
+      (fun fmt -> C_backend_common.print_put_var fmt ("_scopes_" ^ string_of_int (idx+1)) id (*var*) typ var)
   ) scopes_vars
 
 let update_machine machine =

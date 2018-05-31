@@ -14,7 +14,7 @@ open Log
 open Compiler_common
 
 open Utils
-open LustreSpec
+open Lustre_types
  
 
 let usage = "Usage: lustrec [options] \x1b[4msource file\x1b[0m"
@@ -88,8 +88,8 @@ let rec compile_source dirname basename extension =
         assert false
     )
   in
-  Log.report ~level:1 (fun fmt -> fprintf fmt "@]@,");
   Log.report ~level:3 (fun fmt -> fprintf fmt ".. Normalized program:@ %a@ "Printers.pp_prog prog);
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@]@,");
 
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>.. Phase 2 : Machines generation@,");
 
@@ -97,8 +97,7 @@ let rec compile_source dirname basename extension =
     Compiler_stages.stage2 prog 
   in
 
-  Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
-  Log.report ~level:3 (fun fmt -> fprintf fmt ".. Generated machines:@ %a@ "Machine_code.pp_machines machine_code);
+  Log.report ~level:3 (fun fmt -> fprintf fmt ".. Generated machines:@ %a@ " Machine_code_common.pp_machines machine_code);
 
   if Scopes.Plugin.show_scopes () then
     begin
@@ -110,8 +109,8 @@ let rec compile_source dirname basename extension =
       exit 0
 	
     end;
-
   let machine_code = Plugins.refine_machine_code prog machine_code in
+  Log.report ~level:1 (fun fmt -> fprintf fmt "xxx@]@ yyy@ ");
   
   Compiler_stages.stage3 prog machine_code dependencies basename;
   begin

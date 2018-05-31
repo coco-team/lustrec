@@ -1,0 +1,39 @@
+Integer division in LustreC
+
+* Issue
+
+Integer division / and associated modulo mod
+
+a = (a / b) * b + (a mod b)
+
+Division between two integers can be interpreted in different ways
+- a C like division where sign(a mod b) = sign a
+- a euclidean division where 0 <= a mod b < |b|
+In both cases they satisfy the above equation.
+
+Kind model-checker or Horn encoding assumes the mathematical definition, ie. the
+euclidean division, while lustreC or the Verimag compiler rely on the C
+definition.
+
+In the following we deonote by div_C/mod_C and div_M/mod_M the functions in C
+and math, respectively.
+
+As an example -4 div_C 3 = -1 while -4 div_M 3 = 2
+
+Some properties:
+- we have a div_M b = a div_C b when a = b * k 
+- we have a mod_C b = 0 \equiv a mod_M b = 0. 
+
+* From C to Euclidian
+
+a mod_M b = (a mod_C b) + (a mod_C b < 0 ? abs(b) : 0) 
+
+a div_M b = (a - (a mod_M b)) div_C b
+          = (a - ((a mod_C b) + (a mod_C b < 0 ? abs(b) : 0))) div_C b
+
+* From Euclidian to C
+
+a mod_C b = a mod_M b - ((a mod_M b <> 0 && a <= 0) ? abs(b) : 0)
+
+a div_C b = (a - (a mod_C b)) div_M b
+          = (a mod_M b <> 0 && a <= 0)?((a - a mod_M b + abs(b)) div_M b) :((a - a mod_M b) div_M b)

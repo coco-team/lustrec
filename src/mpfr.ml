@@ -10,13 +10,15 @@
 (********************************************************************)
 
 open Utils
-open LustreSpec
+open Lustre_types
+open Machine_code_types
 open Corelang
 open Normalization
-open Machine_code
+open Machine_code_common
 
 let mpfr_module = mktop (Open(false, "mpfr_lustre"))
-
+let cpt_fresh = ref 0
+  
 let mpfr_rnd () = "MPFR_RNDN"
 
 let mpfr_prec () = !Options.mpfr_prec
@@ -139,7 +141,7 @@ let rec inject_list alias node inject_element defvars elist =
     ) elist (defvars, [])
 
 let rec inject_expr ?(alias=true) node defvars expr =
-let res=
+let res =
   match expr.expr_desc with
   | Expr_const (Const_real _)  -> mk_expr_alias_opt alias node defvars expr
   | Expr_const (Const_array _) -> inject_expr ~alias:alias node defvars (expr_of_const_array expr)
