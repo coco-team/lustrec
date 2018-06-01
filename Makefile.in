@@ -23,6 +23,10 @@ lustret:
 	@echo Compiling binary lustret
 	@make -C src lustret
 
+lustrei:
+	@echo Compiling binary lustrei
+	@make -C src lustrei
+
 @lustresf@
 
 configure: configure.ac

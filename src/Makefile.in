@@ -24,6 +24,12 @@ lustret:
 	@mkdir -p $(LOCAL_BINDIR)
 	@mv _build/main_lustre_testgen.native $(LOCAL_BINDIR)/lustret
 
+lustrei:
+	@echo Compiling binary lustrei
+	@$(OCAMLBUILD) tools/importer/main_lustre_importer.native
+	@mkdir -p $(LOCAL_BINDIR)
+	@mv _build/tools/importer/main_lustre_importer.native $(LOCAL_BINDIR)/lustrei
+
 @lustresf_src@
 
 doc:

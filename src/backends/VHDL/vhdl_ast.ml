@@ -15,12 +15,13 @@ let pp_vhdl_type fmt t =
   | Natural -> Format.fprintf fmt "natural"
   | Positive -> Format.fprintf fmt "positive"
   | Real -> Format.fprintf fmt "real"
-  | Range(n,m,base) -> Format.fprintf fmt "%trange %i to %i" (fun fmt -> match base with Some s -> Format.fprintf fmt "%s " s ) n m
+  | Range(base, n, m) -> Format.fprintf fmt "%trange %i to %i" (fun fmt -> match base with Some s -> Format.fprintf fmt "%s " s | None -> ()) n m
   | Byte -> Format.fprintf fmt "byte"
   | Bit_vector (n,m) -> Format.fprintf fmt "bit_vector(%i downto %i)" n m
   | Enumerated sl -> Format.fprintf fmt "(%a)" (Utils.fprintf_list ~sep:", " Format.pp_print_string) sl
 
 type vhdl_definition_t =
+  | Type of {name : string ; definition: vhdl_type_t}
   | Subtype of {name : string ; definition: vhdl_type_t}
 					
 let pp_vhdl_definition fmt def =
@@ -146,7 +147,7 @@ let typ_att_stringarg = ["value"]
 let pp_type_attribute pp_val fmt tatt =
   match tatt with
   | TAttNoArg a -> Format.fprintf fmt "'%s" a.id
-  | TAttINtArg a -> Format.fprintf fmt "'%s(%i)" a.id a.arg
+  | TAttIntArg a -> Format.fprintf fmt "'%s(%i)" a.id a.arg
   | TAttValArg a -> Format.fprintf fmt "'%s(%a)" a.id pp_val a.arg
   | TAttStringArg a -> Format.fprintf fmt "'%s(%s)" a.id a.arg
 
@@ -158,12 +159,12 @@ let pp_array_attribute fmt aatt =
 let array_att_intarg = ["left"; "right"; "high"; "low"; "range"; "reverse_range"; "length"]  
 
 type vhdl_signal_attributes_t = SigAtt of string
-let pp_signal_attribute fnt sa = match sa with
+let pp_signal_attribute fmt sa = match sa with
   | SigAtt s -> Format.fprintf fmt "'%s" s
 let signal_att = [ "event"; "stable"; "last_value" ]
 
 type vhdl_string_attributes_t = StringAtt of string
-let pp_signal_attribute fnt sa = match sa with
+let pp_signal_attribute fmt sa = match sa with
   | StringAtt s -> Format.fprintf fmt "'%s" s
 let signal_att = [ "simple_name"; "path_name"; "instance_name" ]
 
@@ -181,14 +182,14 @@ let rel_funs   = ["<";">";"<=";">=";"/=";"="]
 			   
 
 
-type vhdl_sequential_stmt_t =
-  | VarAssign of { lhs: string; rhs: vhdl_expr_t }
+type vhdl_sequential_stmt_t = unit 
+(*  | VarAssign of { lhs: string; rhs: vhdl_expr_t }
   | Case of { guard: vhdl_expr_t; branches: { case: }
 	    | Case of { guard: vhdl_expr_t; branches 
-
+ *)
 type vhdl_concurrent_stmt_t =
   | SigAssign of { lhs: string; rhs: vhdl_expr_t }
-  | Process of { active_sigs: string list; body: vhdl_sequential_t list }
+  | Process of { active_sigs: string list; body: vhdl_sequential_stmt_t list }
   
 type vhdl_statement_t =
   
@@ -197,8 +198,8 @@ type vhdl_statement_t =
   | SequentialStmt of vhdl_sequential_stmt_t
 			
 
-let rec pp_vhdl_statement fmt stmt =
-  match stmt with
+let rec pp_vhdl_statement fmt stmt = ()
+(*  match stmt with
   | VarAssign va -> Format.fprintf fmt "%s := %a;" va.lhs pp_vhdl_expr va.rhs
   | SigAssign va -> Format.fprintf fmt "%s <= %a;" va.lhs pp_vhdl_expr va.rhs
   | Process p ->
@@ -213,7 +214,7 @@ let rec pp_vhdl_statement fmt stmt =
 	    (Utils.fprintf_list ~sep:",@ " Format.pp_print_string) asigs)
        p.active_sigs
        (Utils.fprintf_list ~sep:"@ " pp_vhdl_statement) p.body
-       
+ *)     
 
 type vhdl_architecture_t =
   {

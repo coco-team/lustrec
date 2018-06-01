@@ -7,6 +7,7 @@ true: use_menhir
 "backends/C": include
 "backends/Horn": include
 "backends/EMF": include
+"backends/VHDL": include
 "plugins/salsa": include
 "plugins/scopes": include
 "plugins/mpfr": include
@@ -16,6 +17,7 @@ true: use_menhir
 "tools/stateflow/semantics": include
 "tools/stateflow/models": include
 "tools/stateflow/json-parser": include
+"tools/importer": include
 "cocospec": include
 
 # svn
@@ -25,9 +27,7 @@ true: use_menhir
 # packages
 <**/*.native>                   : package(ocamlgraph)
 <**/*.native>                   : use_str
-<**/main_lustre_compiler.native>: use_unix
-<**/main_lustre_testgen.native> : use_unix
-<**/sf_sem.native>              : use_unix
+<**/*.native>                   : use_unix
 <**/*.native>                   : package(num)
 <**/*.ml>                       : package(logs)
 <**/*.native>                   : package(logs)
