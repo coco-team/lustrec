@@ -32,7 +32,9 @@ let design1 = {
 			    Process {
 				id = None;
 				active_sigs = ["clk"; "rst"];
-				body = [];
+				body = [
+				    
+				  ];
 			      };
 			    SigAssign {
 				lhs = "q";
