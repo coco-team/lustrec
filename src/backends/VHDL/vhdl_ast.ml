@@ -39,19 +39,21 @@ let rec pp_vhdl_type fmt t =
 let std_logic_cst = ["U"; "X"; "0"; "1"; "Z"; "W"; "L"; "H"; "-" ]
 
 (* TODO: do we need more constructors ? *)
-type cst_val_t = CstInt of int | CstStdLogic of string
+type cst_val_t = CstInt of int | CstStdLogic of string | CstBV of string * string
 
 let pp_cst_val fmt c =
   match c with
   | CstInt i -> Format.fprintf fmt "%i" i
   | CstStdLogic s -> if List.mem s std_logic_cst then Format.fprintf fmt "%s" s else assert false
+  | CstBV (pref,suff) -> Format.fprintf fmt "%s\"%s\"" pref suff
 
 (************************************************************************************)		   
 (*                     Declarations                                                 *)
 (************************************************************************************)		   
 
 
-(* TODO ? Shall we merge definition / declaration  *)
+(* TODO ? Shall we merge definition / declaration ? Do they appear at the same
+place or at different ones ? *)
 type vhdl_definition_t =
   | Type of {name : string ; definition: vhdl_type_t}
   | Subtype of {name : string ; definition: vhdl_type_t}
@@ -123,7 +125,7 @@ let pp_signal_attribute fmt sa = match sa with
 let signal_att = [ "event"; "stable"; "last_value" ]
 
 type vhdl_string_attributes_t = StringAtt of string
-let pp_signal_attribute fmt sa = match sa with
+let pp_string_attribute fmt sa = match sa with
   | StringAtt s -> Format.fprintf fmt "'%s" s
 let signal_att = [ "simple_name"; "path_name"; "instance_name" ]
 
@@ -132,37 +134,100 @@ let signal_att = [ "simple_name"; "path_name"; "instance_name" ]
 (************************************************************************************)		   
 
 			      
-(* TODO: call to functions? procedures? *)  
+(* TODO: call to functions? procedures? component instanciations ? *)
+
+type suffix_selection_t = Idx of int | Range of int * int
+let pp_suffix_selection fmt sel =
+  match sel with
+  | Idx n -> Format.fprintf fmt "(%i)" n
+  | Range(n,m) -> Format.fprintf fmt "(%i downto %i)" n m
+							
 type vhdl_expr_t =
+  | Cst of cst_val_t 
   | Var of string (* a signal or a variable *)
+  | Sig of { name: string; att: vhdl_signal_attributes_t option }
+  | SuffixMod of { expr : vhdl_expr_t; selection : suffix_selection_t }
   | Op of { id: string; args: vhdl_expr_t list } 
 					     
 let rec pp_vhdl_expr fmt e =
   match e with
+  | Cst c ->  pp_cst_val fmt c
   | Var s -> Format.fprintf fmt "%s" s
+  | Sig s -> Format.fprintf
+	       fmt
+	       "%s%t"
+	       s.name
+	       (fun fmt -> match s.att with None -> () | Some att -> pp_signal_attribute fmt att)
+  | SuffixMod s ->
+     Format.fprintf fmt "%a %a"
+		    pp_vhdl_expr s.expr
+		    pp_suffix_selection s.selection
   | Op op -> (
     match op.args with
     | [] -> assert false
-    | _ -> Format.fprintf fmt "%s (%a)" op.id (Utils.fprintf_list ~sep:",@ " pp_vhdl_expr) op.args
+    | [ e1; e2] -> Format.fprintf fmt "@[<hov 3>%a %s %a@]" pp_vhdl_expr e1 op.id pp_vhdl_expr e2
+    | _ -> assert false (* all ops are binary up to now *)
+    (* | _ -> Format.fprintf fmt "@[<hov 3>%s (%a)@]" op.id (Utils.fprintf_list ~sep:",@ " pp_vhdl_expr) op.args *)
   )
 
+(* Available operators in the standard library. There are some restrictions on
+types. See reference doc. *)
 let arith_funs = ["+";"-";"*";"/";"mod"; "rem";"abs";"**"]
 let bool_funs  = ["and"; "or"; "nand"; "nor"; "xor"; "not"]
 let rel_funs   = ["<";">";"<=";">=";"/=";"="]
-  
-		   
 
+			  
+type vhdl_if_case_t = {
+    if_cond: vhdl_expr_t;
+    if_block: vhdl_sequential_stmt_t list;
+  }	   
+ and vhdl_sequential_stmt_t = 
+   | VarAssign of { lhs: string; rhs: vhdl_expr_t }
+   | SigSeqAssign of { lhs: string; rhs: vhdl_expr_t }
+   | If of { if_cases: vhdl_if_case_t list;
+	    default: (vhdl_sequential_stmt_t list) option; }
+   | Case of { guard: vhdl_expr_t; branches: vhdl_case_item_t list }
+and vhdl_case_item_t = {
+    when_cond: vhdl_expr_t;
+    when_stmt: vhdl_sequential_stmt_t;
+  }
 
-type vhdl_sequential_stmt_t = 
-  | VarAssign of { lhs: string; rhs: vhdl_expr_t }
-(*  | Case of { guard: vhdl_expr_t; branches: { case: }
-	    | Case of { guard: vhdl_expr_t; branches 
- *)
-
-let pp_vhdl_sequential_stmt fmt stmt =
+					    
+		 
+let rec pp_vhdl_sequential_stmt fmt stmt =
   match stmt with
   | VarAssign va -> Format.fprintf fmt "%s := %a;" va.lhs pp_vhdl_expr va.rhs
-				    
+  | SigSeqAssign va -> Format.fprintf fmt "%s <= %a;" va.lhs pp_vhdl_expr va.rhs
+  | If ifva -> (
+     List.iteri (fun idx ifcase ->
+		 if idx = 0 then
+		   Format.fprintf fmt "@[<v 3>if"
+		 else
+		   Format.fprintf fmt "@ @[<v 3>elsif";
+		 Format.fprintf fmt " %a then@ %a@]"
+				pp_vhdl_expr ifcase.if_cond
+				pp_vhdl_sequential_stmts ifcase.if_block
+		) ifva.if_cases;
+     let _ =
+       match ifva.default with
+       | None -> ()
+       | Some bl -> Format.fprintf fmt "@ @[<v 3>else@ %a@]" pp_vhdl_sequential_stmts bl
+     in
+     Format.fprintf fmt "@ end if;"
+  )
+  | Case caseva -> (
+    Format.fprintf fmt "@[<v 3>case %a is@ %a@]@ end case;"
+		   pp_vhdl_expr caseva.guard
+		   (Utils.fprintf_list ~sep:"@ " pp_vhdl_case) caseva.branches
+  )
+
+     
+and pp_vhdl_sequential_stmts fmt l  = Utils.fprintf_list ~sep:"@ " pp_vhdl_sequential_stmt fmt l
+and pp_vhdl_case fmt case =
+  Format.fprintf fmt "when %a => %a"
+		 pp_vhdl_expr case.when_cond
+		 pp_vhdl_sequential_stmt case.when_stmt
+						  
 type signal_condition_t =
   {                            
     expr: vhdl_expr_t;              (* when expression *)
@@ -362,7 +427,7 @@ type vhdl_architecture_t =
 let pp_vhdl_architecture fmt a =
   Format.fprintf
     fmt
-    "@[<v 3>architecture %s of %s is@ %a@]@ @[<v 3>begin@ %a@]@ end %s"
+    "@[<v 3>architecture %s of %s is@ %a@]@ @[<v 3>begin@ %a@]@ end %s;"
     a.name
     a.entity
     (Utils.fprintf_list ~sep:"@ " pp_vhdl_declaration) a.declarations

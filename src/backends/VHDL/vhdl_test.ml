@@ -33,7 +33,81 @@ let design1 = {
 				id = None;
 				active_sigs = ["clk"; "rst"];
 				body = [
-				    
+				    If {
+					if_cases = [
+					  {
+					    if_cond = Sig{ name = "rst"; att = None };
+					    if_block = [
+						SigSeqAssign { lhs = "req"; rhs = Cst (CstBV("x", "00"))};
+						SigSeqAssign { lhs = "shft"; rhs = Cst (CstBV("x", "00"))};
+					      ];
+					  };
+					  {
+					    if_cond = Op {id = "and"; args = [Sig{ name = "clk"; att = None };
+									      Sig{ name = "clk"; att = Some (SigAtt "event") }]};
+					    if_block = [
+						SigSeqAssign { lhs = "req"; rhs = Op { id = "&"; args = [
+											   Sig{ name = "s0"; att = None };
+											   Sig{ name = "s1"; att = None }
+											 ]
+										     }
+							     };
+						Case {
+						    guard = Sig{ name = "sel"; att = None };
+						    branches = [
+							{
+							  when_cond = Cst (CstBV("b", "00"));
+							  when_stmt = SigSeqAssign { lhs = "req"; rhs = Sig{ name = "d0"; att = None }};
+							};
+							{
+							  when_cond = Cst (CstBV("b", "10"));
+							  when_stmt = SigSeqAssign { lhs = "req"; rhs = Sig{ name = "d1"; att = None }};
+							};
+							{
+							  when_cond = Cst (CstBV("b", "01"));
+							  when_stmt = SigSeqAssign { lhs = "req"; rhs = Sig{ name = "d2"; att = None }};
+							};
+							{
+							  when_cond = Cst (CstBV("b", "11"));
+							  when_stmt = SigSeqAssign { lhs = "req"; rhs = Sig{ name = "d3"; att = None }};
+							};
+
+						      ]
+
+						  };
+						If {
+						    if_cases = [
+						      {
+							if_cond = Sig{ name = "s_1"; att = None };
+							if_block = [
+							    SigSeqAssign {
+								lhs = "shft";
+								rhs = Op { id = "&";
+									   args = [
+									       SuffixMod {
+										   expr = Sig{ name = "shft"; att = None };
+										   selection = Range (6,0);
+										 };
+									       SuffixMod {
+										   expr = Sig{ name = "shft"; att = None };
+										   selection = Idx 7;
+										 }
+									     ]
+									 }
+							      };
+							  ];
+						      };
+						    ];
+						    default = Some [
+								  SigSeqAssign { lhs = "shft"; rhs = Var "reg"};
+								]
+						  };
+					      ];
+					  };
+					  
+					];
+					default = None;
+				      }
 				  ];
 			      };
 			    SigAssign {
