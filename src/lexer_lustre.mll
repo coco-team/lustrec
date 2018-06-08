@@ -88,9 +88,13 @@ let make_kind_spec lexbuf s =
   try 
     let s_lexbuf = Lexing.from_string s in
     (*Format.printf "KIND SPEC \"%s\"@." s;*)
-    let _ = KindLustreParser.contract_in_block_main KindLustreLexer.token s_lexbuf in
+    let contract = KindLustreParser.contract_in_block_main KindLustreLexer.token s_lexbuf in
     let dummy_ns = { Lustre_types.requires = []; ensures = []; behaviors = []; spec_loc = Location.dummy_loc} in
-    NODESPEC dummy_ns
+    begin
+      List.iter (fun item ->
+      		Format.eprintf "CONTRACT: %a@." KindLustreAst.pp_print_contract_item item) contract;
+      NODESPEC dummy_ns
+    end
   with exn -> ((*Printexc.print_backtrace stderr; *) raise exn)
 
 let make_spec = make_kind_spec
