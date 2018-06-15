@@ -44,17 +44,26 @@ let _ =
                    to_list_content_str "DESIGN_UNIT" |>
                    to_list_content_str "INTERFACE_VARIABLE_DECLARATION" |>
                    flatten_ivd |>
-                   to_list_str "ARCHITECTURE_BODY" |>
-                   to_list_str "ARCHITECTURE_DECLARATIVE_PART" |>
-                   to_list_str "ARCHITECTURE_STATEMENT_PART" |>
+                   flatten_numeric_literal |>
                    to_list_str "ENTITY_DECLARATION" |>
+                   to_list_str "ARCHITECTURE_BODY" |>
                    to_list_str "PACKAGE_DECLARATION" in
   Format.printf "Preprocessed json:\n";
   Format.printf "%s\n\n" (pretty_to_string vhdl1_json);
-  List.iter (Format.printf "%s\n") (print_depth vhdl1_json 5 "");
+(*  List.iter (Format.printf "%s\n") (print_depth vhdl1_json 7 ""); *)
 
   to_file (Sys.argv.(1)^".out.json") vhdl1_json;
 
+(*
+  let typ = {name = "type"; definition = (Some (Range (Some "toto", 7, 0)))} in
+  Format.printf "\nModel to string\n%s\n\n" (pretty_to_string (vhdl_subtype_indication_t_to_yojson typ));
+
+  let elem = "[\"SUBTYPE_DECLARATION\", {\"name\": \"byte\", \"typ\": { \"name\": \"bit_vector\", \"definition\": [ \"RANGE_WITH_DIRECTION\", \"downto\", 7, 0 ]}}]" in
+  match vhdl_definition_t_of_yojson (from_string elem) with
+    Ok x -> Format.printf "\nString to string\n%s\n\n" (pretty_to_string (vhdl_definition_t_to_yojson x));
+  | Error e -> Format.printf "Error: %s\n" e;
+*)
+
   match vhdl_file_t_of_yojson vhdl1_json with
     Ok x -> Format.printf "Parsed VHDL: \n%s\n" (pretty_to_string (vhdl_file_t_to_yojson x))
-  | Error e -> failwith e;
+  | Error e -> Format.printf "Error: %s\n" e;

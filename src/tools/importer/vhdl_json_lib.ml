@@ -163,6 +163,14 @@ let rec map_all json f =
     `List ((map_all (f hd) f)::(map_list map_all tl f))
   | x -> x
 
+let numeric_literal_simpl json =
+  match json with
+  | `Assoc (("NUMERIC_LITERAL", `Assoc (("TOKEN", `Assoc (("text", `String(x))::[]))::[]))::[]) -> `String (x)
+  | x -> x
+
+let flatten_numeric_literal json =
+  map_all json (numeric_literal_simpl)
+
 let to_list_str str json =
   map_all json (assoc_elem_as_list str)
 
@@ -199,6 +207,7 @@ let rec print_depth json depth indent =
     | `List (hd::tl) ->
       List.append (print_depth hd depth indent)
                   (print_depth (`List (tl)) depth indent)
+    | `String (s) -> (indent^s)::[]
     | _ -> []
   else
     []

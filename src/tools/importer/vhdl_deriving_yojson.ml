@@ -2,11 +2,12 @@ let base_types = ["integer"; "character"; "bit"; "real"; "natural"; "positive"; 
 
 type vhdl_type_t =
   | Base of string
-  | Range of string option * int * int
+  | Range of string option * int * int [@name "RANGE_WITH_DIRECTION"]
   | Bit_vector of int * int
   | Array of int * int * vhdl_type_t
   | Enumerated of string list
-[@@deriving yojson {strict = false}];;
+  | Void
+[@@deriving yojson];;
   
 (************************************************************************************)		   
 (*                     Constants                                                    *)
@@ -28,16 +29,23 @@ let std_logic_cst = ["U"; "X"; "0"; "1"; "Z"; "W"; "L"; "H"; "-" ]
 type cst_val_t = CstInt of int | CstStdLogic of string
 [@@deriving yojson {strict = false}];;
 
+type vhdl_subtype_indication_t =
+  {
+    name : string;
+    definition: vhdl_type_t option [@default Some (Void)];
+  }
+[@@deriving yojson {strict = false}];;
+
 (* TODO ? Shall we merge definition / declaration  *)
 type vhdl_definition_t =
-  | Type of {name : string ; definition: vhdl_type_t} [@name "Type"]
-  | Subtype of {name : string ; definition: vhdl_type_t} [@name "Subtype"]
+  | Type of {name : string ; definition: vhdl_type_t} [@name "TYPE_DECLARATION"]
+  | Subtype of {name : string ; typ : vhdl_subtype_indication_t} [@name "SUBTYPE_DECLARATION"]
 [@@deriving yojson {strict = false}];;
 					
 type vhdl_declaration_t =
-  | VarDecl of { name : string; typ : vhdl_type_t; init_val : cst_val_t option } [@name "VarDecl"]
-  | CstDecl of { name : string; typ : vhdl_type_t; init_val : cst_val_t  } [@name "CstDecl"]
-  | SigDecl of { name : string; typ : vhdl_type_t; init_val : cst_val_t option } [@name "SigDecl"]
+  | VarDecl of { names : string list; typ : vhdl_subtype_indication_t; init_val : cst_val_t option [@default Some (CstInt (0))] } [@name "VARIABLE_DECLARATION"]
+  | CstDecl of { names : string list; typ : vhdl_subtype_indication_t; init_val : cst_val_t  } [@name "CONSTANT_DECLARATION"]
+  | SigDecl of { names : string list; typ : vhdl_subtype_indication_t; init_val : cst_val_t option [@default Some (CstInt (0))] } [@name "SIGNAL_DECLARATION"]
 [@@deriving yojson {strict = false}];;
 
 (************************************************************************************)		   
@@ -197,8 +205,8 @@ type vhdl_architecture_t =
   {
     name: string [@default ""];
     entity: string [@default ""];
- (*   declarations: vhdl_declaration_t list option [@key "ARCHITECTURE_DECLARATIVE_PART"] [@default Some []];
-    body: vhdl_concurrent_stmt_t list option [@key "ARCHITECTURE_STATEMENT_PART"] [@default Some []]; *)
+    declarations: vhdl_declaration_t list option [@key "ARCHITECTURE_DECLARATIVE_PART"] [@default Some []];
+    body: vhdl_concurrent_stmt_t list option [@key "ARCHITECTURE_STATEMENT_PART"] [@default Some []]; 
   }
 [@@deriving yojson {strict = false}];;
     
