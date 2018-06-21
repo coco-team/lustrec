@@ -78,22 +78,41 @@ type vhdl_string_attributes_t = StringAtt of string
 (************************************************************************************)		   
 (*                        Expressions  / Statements                                 *)
 (************************************************************************************)		   
+type suffix_selection_t = Idx of int | Range of int * int
+[@@deriving yojson {strict = false}];;
 
 (* TODO: call to functions? procedures? *)  
 type vhdl_expr_t =
   | Var of string (* a signal or a variable *)
-  | Op of { id: string; args: vhdl_expr_t list } 
+  | Op of { id: string; args: vhdl_expr_t list } [@name "Expression"]
+  | IsNull
+  | Time of { value: int; phy_unit: string }
+  | Sig of { name: string; att: vhdl_signal_attributes_t option }
+  | SuffixMod of { expr : vhdl_expr_t; selection : suffix_selection_t }
 [@@deriving yojson {strict = false}];;
 					     
 let arith_funs = ["+";"-";"*";"/";"mod"; "rem";"abs";"**"]
 let bool_funs  = ["and"; "or"; "nand"; "nor"; "xor"; "not"]
 let rel_funs   = ["<";">";"<=";">=";"/=";"="]
 
-type vhdl_sequential_stmt_t = 
+type vhdl_if_case_t = 
+  {
+    if_cond: vhdl_expr_t;
+    if_block: vhdl_sequential_stmt_t list;
+  }	   
+and vhdl_sequential_stmt_t = 
   | VarAssign of { lhs: string; rhs: vhdl_expr_t }
-(*  | Case of { guard: vhdl_expr_t; branches: { case: }
-	    | Case of { guard: vhdl_expr_t; branches 
- *)
+  | SigSeqAssign of { label: string option; lhs: string; rhs: vhdl_expr_t list} [@name "SIGNAL_ASSIGNMENT_STATEMENT"]
+  | If of { label: string option [@default Some ""]; if_cases: vhdl_if_case_t list;
+    default: (vhdl_sequential_stmt_t list) option; } [@name "IF_STATEMENT"]
+  | Case of { guard: vhdl_expr_t; branches: vhdl_case_item_t list }
+  | Exit of { label: string option [@default Some ""]; loop_label: string option [@default Some ""]; condition: vhdl_expr_t option [@default Some IsNull]} [@name "EXIT_STATEMENT"]
+  | Null of { label: string option [@default Some ""]} [@name "NULL_STATEMENT"]
+and vhdl_case_item_t = 
+  {
+    when_cond: vhdl_expr_t;
+    when_stmt: vhdl_sequential_stmt_t;
+  }
 [@@deriving yojson {strict = false}];;
 				    
 type signal_condition_t =
@@ -114,17 +133,18 @@ type signal_selection_t =
 
 type conditional_signal_t =
   {
-      lhs: string [@default ""];        (* assigned signal *)
-      rhs: vhdl_expr_t;                   (* expression *)
-      cond: signal_condition_t option     (* conditional signal statement *)
+    lhs: string [@default ""];        (* assigned signal = target*)
+    rhs: vhdl_expr_t;                   (* expression *)
+    cond: signal_condition_t option;     (* conditional signal statement = waveform*)
   }
 [@@deriving yojson {strict = false}];;
 
 type process_t =
   { 
     id: string option [@default None];
+    declarations: vhdl_declaration_t list option [@key "PROCESS_DECLARATIVE_PART"] [@default Some []];
     active_sigs: string list [@default []];
-    body: vhdl_sequential_stmt_t list [@default []]
+    body: vhdl_sequential_stmt_t list [@key "PROCESS_STATEMENT_PART"] [@default []]
   }
 [@@deriving yojson {strict = false}];;
 
@@ -136,8 +156,8 @@ type selected_signal_t =
 [@@deriving yojson {strict = false}];;
 			   
 type vhdl_concurrent_stmt_t =
-  | SigAssign of conditional_signal_t 
-  | Process of process_t 
+  | SigAssign of conditional_signal_t [@key "SIGNAL_ASSIGNMENT"]
+  | Process of process_t [@key "PROCESS_STATEMENT"]
   | SelectedSig of selected_signal_t
 [@@deriving yojson {strict = false}];;
   (*
