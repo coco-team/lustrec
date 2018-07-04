@@ -123,7 +123,6 @@ let vhdl_json_designfile_content_excluding json str =
   json |> member "DESIGN_FILE" |> retain_other_members "DESIGN_UNIT" 
 
 let vhdl_json_list_designunits json =
-  let design_file = json |> member "DESIGN_FILE" in
   let designunits_list = vhdl_json_designunits_content_as_list json in
   `Assoc (("DESIGN_FILE", (`Assoc (("DESIGN_UNIT", designunits_list)::[])))::[])
 
