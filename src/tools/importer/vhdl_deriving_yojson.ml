@@ -45,11 +45,23 @@ type vhdl_definition_t =
   | Type of {name : string ; definition: vhdl_type_t} [@name "TYPE_DECLARATION"]
   | Subtype of {name : string ; typ : vhdl_subtype_indication_t} [@name "SUBTYPE_DECLARATION"]
 [@@deriving yojson {strict = false}];;
-					
-type vhdl_declaration_t =
-  | VarDecl of { names : string list; typ : vhdl_subtype_indication_t; init_val : cst_val_t option [@default Some (CstInt (0))] } [@name "VARIABLE_DECLARATION"]
-  | CstDecl of { names : string list; typ : vhdl_subtype_indication_t; init_val : cst_val_t  } [@name "CONSTANT_DECLARATION"]
-  | SigDecl of { names : string list; typ : vhdl_subtype_indication_t; init_val : cst_val_t option [@default Some (CstInt (0))] } [@name "SIGNAL_DECLARATION"]
+
+type vhdl_parameter_t =
+  {
+    names: string list;
+    mode: string [@default ""];
+    typ: vhdl_subtype_indication_t;
+    init_val: cst_val_t option [@default Some (CstInt (0))];
+  }
+[@@deriving yojson {strict = false}];;
+
+type vhdl_subprogram_spec_t =
+  {
+    name: string [@default ""];
+    typeMark: string [@default ""];
+    parameters: vhdl_parameter_t list;
+    isPure: bool [@default false];
+  }
 [@@deriving yojson {strict = false}];;
 
 (************************************************************************************)		   
@@ -93,6 +105,8 @@ type vhdl_expr_t =
   | Time of { value: int; phy_unit: string [@default ""]}
   | Sig of { name: string; att: vhdl_signal_attributes_t option }
   | SuffixMod of { expr : vhdl_expr_t; selection : suffix_selection_t }
+  | Aggregate of { elems : vhdl_element_assoc_t list } [@name "AGGREGATE"]
+  | Others [@name "OTHERS"]
 [@@deriving yojson {strict = false}]
 and					     
 vhdl_name_t =
@@ -112,6 +126,12 @@ and vhdl_assoc_element_t =
     actual_designator: vhdl_name_t option [@default Some NoName];
     actual_expr: vhdl_expr_t option [@default Some IsNull];
   }
+[@@deriving yojson {strict = false}]
+and vhdl_element_assoc_t =
+  {
+    choices: vhdl_expr_t list;
+    expr: vhdl_expr_t;
+  }
 [@@deriving yojson {strict = false}];;
 
 let arith_funs = ["+";"-";"*";"/";"mod"; "rem";"abs";"**";"&"]
@@ -120,7 +140,7 @@ let rel_funs   = ["<";">";"<=";">=";"/=";"=";"?=";"?/=";"?<";"?<=";"?>";"?>=";"?
 let shift_funs = ["sll";"srl";"sla";"sra";"rol";"ror"]
 
 type vhdl_sequential_stmt_t = 
-  | VarAssign of { lhs: vhdl_name_t; rhs: vhdl_expr_t }
+  | VarAssign of { label: string [@default ""]; lhs: vhdl_name_t; rhs: vhdl_expr_t } [@name "VARIABLE_ASSIGNMENT_STATEMENT"]
   | SigSeqAssign of { label: string [@default ""]; lhs: vhdl_name_t; rhs: vhdl_expr_t list} [@name "SIGNAL_ASSIGNMENT_STATEMENT"]
   | If of { label: string [@default ""]; if_cases: vhdl_if_case_t list;
     default: vhdl_sequential_stmt_t list [@default []]; } [@name "IF_STATEMENT"]
@@ -140,7 +160,14 @@ and vhdl_case_item_t =
     when_stmt: vhdl_sequential_stmt_t list;
   }
 [@@deriving yojson {strict = false}];;
-				    
+
+type vhdl_declaration_t =
+  | VarDecl of { names : string list; typ : vhdl_subtype_indication_t; init_val : cst_val_t option [@default Some (CstInt (0))] } [@name "VARIABLE_DECLARATION"]
+  | CstDecl of { names : string list; typ : vhdl_subtype_indication_t; init_val : cst_val_t  } [@name "CONSTANT_DECLARATION"]
+  | SigDecl of { names : string list; typ : vhdl_subtype_indication_t; init_val : cst_val_t option [@default Some (CstInt (0))] } [@name "SIGNAL_DECLARATION"]
+  | Subprogram of {name: string; kind: string; spec: vhdl_subprogram_spec_t ; decl_part: vhdl_declaration_t list; stmts: vhdl_sequential_stmt_t list} [@name "SUBPROGRAM_BODY"]
+[@@deriving yojson {strict = false}];;
+		    
 type signal_condition_t =
   {                            
     expr: vhdl_expr_t list;              (* when expression *)
