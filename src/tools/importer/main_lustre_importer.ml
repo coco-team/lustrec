@@ -14,7 +14,10 @@ open Vhdl_ast
 open Vhdl_test
   *)
 open Yojson.Safe
+open Vhdl_ast_utils
+open Vhdl_ast_map
 open Vhdl_ast
+open Ppxlib_traverse_builtins
 open Printf
 
 let _ =
@@ -24,7 +27,11 @@ let _ =
   (* Create VHDL values *)
   let vhdl = vhdl_file_t_of_yojson vhdl_json in
 
+  (* Simplify VHDL values *)
   match vhdl with
     Ok x ->
-      Format.printf "Parsed VHDL: \n%s\n" (pretty_to_string (vhdl_file_t_to_yojson x))
+      Format.printf "Parsed VHDL: \n%s\n" (pretty_to_string (vhdl_file_t_to_yojson x));
+      let folded = replace_op_expr#vhdl_file_t x in
+      Format.printf "PP VHDL: \n%s\n" (show_vhdl_file_t folded);
   | Error e -> Format.printf "Error: %s\n" e;
+

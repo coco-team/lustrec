@@ -22,7 +22,15 @@ type cst_val_t =
     CstInt of int 
   | CstStdLogic of string
   | CstLiteral of string [@name "CST_LITERAL"]
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
+
+(*
+let pp_cst_val fmt c =
+  match c with
+  | CstInt i -> Format.fprintf fmt "%i" i
+  | CstStdLogic s -> if List.mem s std_logic_cst then Format.fprintf fmt "%s" s else assert false
+  | CstLiteral s -> Format.fprintf fmt "%s" s
+*)
 
 type vhdl_type_t =
   | Base of string
@@ -58,7 +66,7 @@ and vhdl_expr_t =
   | IsNull [@name "IsNull"]
   | Time of { value: int; phy_unit: string [@default ""]}
   | Sig of { name: vhdl_name_t; att: vhdl_signal_attributes_t option }
-  | SuffixMod of { expr : vhdl_expr_t; selection : suffix_selection_t }
+  | SuffixMod of { expr : vhdl_expr_t; selection : vhdl_suffix_selection_t }
   | Aggregate of { elems : vhdl_element_assoc_t list } [@name "AGGREGATE"]
   | Others [@name "OTHERS"]
 and vhdl_name_t =
@@ -88,8 +96,19 @@ and vhdl_array_attributes_t =
   | AAttAscending
 and vhdl_signal_attributes_t = SigAtt of string
 and vhdl_string_attributes_t = StringAtt of string
-and suffix_selection_t = Idx of int | SuffixRange of int * int
-[@@deriving yojson {strict = false}];;
+and vhdl_suffix_selection_t = Idx of int | SuffixRange of int * int
+[@@deriving show { with_path = false }, yojson {strict = false}];;
+
+(*
+let rec pp_vhdl_type fmt t =
+  match t with
+  | Base s -> Format.fprintf fmt "%s" s 
+  | Range(base, n, m) -> Format.fprintf fmt "%trange %i to %i" (fun fmt -> match base with Some s -> Format.fprintf fmt "%s " s | None -> ()) n m
+  | Bit_vector (n,m) -> Format.fprintf fmt "bit_vector(%i downto %i)" n m
+  | Array (n, m, base) -> Format.fprintf fmt "array (%i to %i) of %a" n m pp_vhdl_type base
+  | Enumerated sl -> Format.fprintf fmt "(%a)" (Utils.fprintf_list ~sep:", " Format.pp_print_string) sl
+  | Void -> Format.fprintf fmt ""
+*)
 
 (************************************************************************************)		   
 (*            Attributes for types, arrays, signals and strings                     *)
@@ -100,7 +119,7 @@ type 'basetype vhdl_type_attributes_t =
   | TAttIntArg of { id: string; arg: int }
   | TAttValArg of { id: string; arg: 'basetype }
   | TAttStringArg of { id: string; arg: string }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 let typ_att_noarg = ["base"; "left"; "right"; "high"; "low"]
 let typ_att_intarg = ["pos"; "val"; "succ"; "pred"; "leftof"; "rightof"]
@@ -116,7 +135,7 @@ type vhdl_parameter_t =
     typ: vhdl_subtype_indication_t;
     init_val: cst_val_t option [@default Some (CstInt (0))];
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 type vhdl_subprogram_spec_t =
   {
@@ -125,7 +144,7 @@ type vhdl_subprogram_spec_t =
     parameters: vhdl_parameter_t list;
     isPure: bool [@default false];
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 (************************************************************************************)		   
 (*                        Expressions  / Statements                                 *)
@@ -157,7 +176,7 @@ and vhdl_case_item_t =
     when_cond: vhdl_expr_t list;
     when_stmt: vhdl_sequential_stmt_t list;
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 type vhdl_declaration_t =
   | VarDecl of {
@@ -182,59 +201,59 @@ type vhdl_declaration_t =
       decl_part: vhdl_declaration_t list [@default []]; 
       stmts: vhdl_sequential_stmt_t list [@default []]
     } [@name "SUBPROGRAM_BODY"]
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-type signal_condition_t =
+type vhdl_signal_condition_t =
   {                            
     expr: vhdl_expr_t list;              (* when expression *)
     cond: vhdl_expr_t [@default IsNull];  (* optional else case expression. 
                                              If None, could be a latch  *)
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-type signal_selection_t =
+type vhdl_signal_selection_t =
   {
     expr : vhdl_expr_t;
     when_sel: vhdl_expr_t list [@default []];
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-type conditional_signal_t =
+type vhdl_conditional_signal_t =
   {
     postponed: bool [@default false];
     label: vhdl_name_t [@default NoName];
     lhs: vhdl_name_t;        (* assigned signal = target*)
-    rhs: signal_condition_t list;                   (* expression *)
+    rhs: vhdl_signal_condition_t list;                   (* expression *)
     cond: vhdl_expr_t [@default IsNull];
     delay: vhdl_expr_t [@default IsNull];
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-type process_t =
+type vhdl_process_t =
   { 
     id: vhdl_name_t [@default NoName];
     declarations: vhdl_declaration_t list option [@key "PROCESS_DECLARATIVE_PART"] [@default Some []];
     active_sigs: vhdl_name_t list [@default []];
     body: vhdl_sequential_stmt_t list [@key "PROCESS_STATEMENT_PART"] [@default []]
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-type selected_signal_t = 
+type vhdl_selected_signal_t = 
   { 
     postponed: bool [@default false];
     label: vhdl_name_t [@default NoName];
     lhs: vhdl_name_t;      (* assigned signal = target *)
     sel: vhdl_expr_t;  
-    branches: signal_selection_t list [@default []];
+    branches: vhdl_signal_selection_t list [@default []];
     delay: vhdl_expr_t option;
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 			   
 type vhdl_concurrent_stmt_t =
-  | SigAssign of conditional_signal_t [@name "CONDITIONAL_SIGNAL_ASSIGNMENT"]
-  | Process of process_t [@name "PROCESS_STATEMENT"]
-  | SelectedSig of selected_signal_t [@name "SELECTED_SIGNAL_ASSIGNMENT"]
-[@@deriving yojson {strict = false}];;
+  | SigAssign of vhdl_conditional_signal_t [@name "CONDITIONAL_SIGNAL_ASSIGNMENT"]
+  | Process of vhdl_process_t [@name "PROCESS_STATEMENT"]
+  | SelectedSig of vhdl_selected_signal_t [@name "SELECTED_SIGNAL_ASSIGNMENT"]
+[@@deriving show { with_path = false }, yojson {strict = false}];;
   (*
 type vhdl_statement_t =
   
@@ -252,7 +271,7 @@ type vhdl_port_mode_t =
   | OutPort    [@name "out"]
   | InoutPort  [@name "inout"]
   | BufferPort [@name "buffer"]
-[@@deriving yojson];;
+[@@deriving show { with_path = false }, yojson];;
 	     
 type vhdl_port_t =
   {
@@ -261,7 +280,7 @@ type vhdl_port_t =
     typ: vhdl_subtype_indication_t;
     expr: vhdl_expr_t [@default IsNull];
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 type vhdl_entity_t =
   {
@@ -271,7 +290,7 @@ type vhdl_entity_t =
     declaration: vhdl_declaration_t list [@key "ENTITY_DECLARATIVE_PART"] [@default []];
     stmts: vhdl_concurrent_stmt_t list [@key "ENTITY_STATEMENT_PART"] [@default []]; 
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 (************************************************************************************)		   
 (*                    Packages / Library loading                                    *)
@@ -283,12 +302,12 @@ type vhdl_package_t =
     name: vhdl_name_t [@default NoName];
     shared_defs: vhdl_definition_t list [@default []];
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 type vhdl_load_t = 
     Library of vhdl_name_t list [@name "LIBRARY_CLAUSE"] [@default []]
   | Use of vhdl_name_t list [@name "USE_CLAUSE"] [@default []]
-[@@deriving yojson];;
+[@@deriving show { with_path = false }, yojson];;
 
 (************************************************************************************)		   
 (*                        Architecture / VHDL Design                                *)
@@ -301,34 +320,34 @@ type vhdl_architecture_t =
     declarations: vhdl_declaration_t list [@key "ARCHITECTURE_DECLARATIVE_PART"] [@default []];
     body: vhdl_concurrent_stmt_t list [@key "ARCHITECTURE_STATEMENT_PART"] [@default []]; 
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
     
 (* TODO. Configuration is optional *)
 type vhdl_configuration_t = unit
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 type vhdl_library_unit_t = (* TODO: PACKAGE_BODY *)
     Package of vhdl_package_t [@name "PACKAGE_DECLARATION"]
   | Entities of vhdl_entity_t [@name "ENTITY_DECLARATION"]
   | Architecture of vhdl_architecture_t [@name "ARCHITECTURE_BODY"]
   | Configuration of vhdl_configuration_t [@name "CONFIGURATION_DECLARATION"]
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 type vhdl_design_unit_t =
   {
     contexts: vhdl_load_t list [@default []];
     library: vhdl_library_unit_t;
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 type vhdl_design_file_t =
   {
     design_units: vhdl_design_unit_t list [@default []];
   }
-[@@deriving yojson {strict = false}];;
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 type vhdl_file_t = 
   {
     design_file: vhdl_design_file_t [@default {design_units=[]}] [@key "DESIGN_FILE"];
   }
-[@@deriving yojson];;
+[@@deriving show { with_path = false }, yojson];;
