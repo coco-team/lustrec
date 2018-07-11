@@ -1,6 +1,6 @@
 open Vhdl_ast
 
-let _ = fun (_ : cst_val_t)  -> () 
+let _ = fun (_ : vhdl_cst_val_t)  -> () 
 let _ = fun (_ : vhdl_type_t)  -> () 
 let _ = fun (_ : vhdl_subtype_indication_t)  -> () 
 let _ = fun (_ : vhdl_discrete_range_t)  -> () 
@@ -61,7 +61,7 @@ class virtual vhdl_map =
     method virtual  vhdl_declaration_t : vhdl_declaration_t -> vhdl_declaration_t
     method virtual  vhdl_sequential_stmt_t : vhdl_sequential_stmt_t -> vhdl_sequential_stmt_t
     method virtual  vhdl_signal_condition_t : vhdl_signal_condition_t -> vhdl_signal_condition_t
-    method virtual  cst_val_t : cst_val_t -> cst_val_t
+    method virtual  vhdl_cst_val_t : vhdl_cst_val_t -> vhdl_cst_val_t
     method virtual  vhdl_subprogram_spec_t : vhdl_subprogram_spec_t -> vhdl_subprogram_spec_t
     method virtual  vhdl_discrete_range_t : vhdl_discrete_range_t -> vhdl_discrete_range_t
     method virtual  vhdl_parameter_t : vhdl_parameter_t -> vhdl_parameter_t
@@ -76,7 +76,7 @@ class virtual vhdl_map =
     method virtual  vhdl_design_unit_t : vhdl_design_unit_t -> vhdl_design_unit_t
     method virtual  vhdl_design_file_t : vhdl_design_file_t -> vhdl_design_file_t
 
-    method cst_val_t : cst_val_t -> cst_val_t=
+    method vhdl_cst_val_t : vhdl_cst_val_t -> vhdl_cst_val_t=
       fun x  ->
         match x with
         | CstInt a -> let a = self#int a  in CstInt a
@@ -152,7 +152,7 @@ class virtual vhdl_map =
       fun x  ->
         match x with
         | Call a -> let a = self#vhdl_name_t a  in Call a
-        | Cst a -> let a = self#cst_val_t a  in Cst a
+        | Cst a -> let a = self#vhdl_cst_val_t a  in Cst a
         | Op { id; args } ->
             let id = self#string id  in
             let args = self#list self#vhdl_expr_t args  in Op { id; args }
@@ -265,7 +265,7 @@ class virtual vhdl_map =
         let names = self#list self#vhdl_name_t names  in
         let mode = self#list self#string mode  in
         let typ = self#vhdl_subtype_indication_t typ  in
-        let init_val = self#option self#cst_val_t init_val  in
+        let init_val = self#option self#vhdl_cst_val_t init_val  in
         { names; mode; typ; init_val }
 
     method vhdl_subprogram_spec_t :
@@ -333,17 +333,17 @@ class virtual vhdl_map =
         | VarDecl { names; typ; init_val } ->
             let names = self#list self#vhdl_name_t names  in
             let typ = self#vhdl_subtype_indication_t typ  in
-            let init_val = self#option self#cst_val_t init_val  in
+            let init_val = self#option self#vhdl_cst_val_t init_val  in
             VarDecl { names; typ; init_val }
         | CstDecl { names; typ; init_val } ->
             let names = self#list self#vhdl_name_t names  in
             let typ = self#vhdl_subtype_indication_t typ  in
-            let init_val = self#cst_val_t init_val  in
+            let init_val = self#vhdl_cst_val_t init_val  in
             CstDecl { names; typ; init_val }
         | SigDecl { names; typ; init_val } ->
             let names = self#list self#vhdl_name_t names  in
             let typ = self#vhdl_subtype_indication_t typ  in
-            let init_val = self#option self#cst_val_t init_val  in
+            let init_val = self#option self#vhdl_cst_val_t init_val  in
             SigDecl { names; typ; init_val }
         | Subprogram { name; kind; spec; decl_part; stmts } ->
             let name = self#vhdl_name_t name  in

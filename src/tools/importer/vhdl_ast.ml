@@ -18,7 +18,7 @@ let std_logic_cst = ["U"; "X"; "0"; "1"; "Z"; "W"; "L"; "H"; "-" ]
 let literal_base = ["B"; "O"; "X"; "UB"; "UO"; "UX"; "SB"; "SO"; "SX"; "D"] (* Prefix of CstLiteral *)
 
 (* TODO: do we need more constructors ? *)
-type cst_val_t = 
+type vhdl_cst_val_t = 
     CstInt of int 
   | CstStdLogic of string
   | CstLiteral of string [@name "CST_LITERAL"]
@@ -61,7 +61,7 @@ and vhdl_definition_t =
   | Subtype of {name : vhdl_name_t ; typ : vhdl_subtype_indication_t} [@name "SUBTYPE_DECLARATION"]
 and vhdl_expr_t =
   | Call of vhdl_name_t [@name "CALL"]
-  | Cst of cst_val_t [@name "CONSTANT_VALUE"]
+  | Cst of vhdl_cst_val_t [@name "CONSTANT_VALUE"]
   | Op of { id: string [@default ""]; args: vhdl_expr_t list [@default []]} [@name "EXPRESSION"]
   | IsNull [@name "IsNull"]
   | Time of { value: int; phy_unit: string [@default ""]}
@@ -133,7 +133,7 @@ type vhdl_parameter_t =
     names: vhdl_name_t list;
     mode: string list [@default []];
     typ: vhdl_subtype_indication_t;
-    init_val: cst_val_t option [@default Some (CstInt (0))];
+    init_val: vhdl_cst_val_t option [@default Some (CstInt (0))];
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;
 
@@ -182,17 +182,17 @@ type vhdl_declaration_t =
   | VarDecl of {
       names : vhdl_name_t list; 
       typ : vhdl_subtype_indication_t; 
-      init_val : cst_val_t option [@default Some (CstInt (0))] 
+      init_val : vhdl_cst_val_t option [@default Some (CstInt (0))] 
     } [@name "VARIABLE_DECLARATION"]
   | CstDecl of { 
       names : vhdl_name_t list; 
       typ : vhdl_subtype_indication_t; 
-      init_val : cst_val_t 
+      init_val : vhdl_cst_val_t 
     } [@name "CONSTANT_DECLARATION"]
   | SigDecl of { 
       names : vhdl_name_t list; 
       typ : vhdl_subtype_indication_t; 
-      init_val : cst_val_t option [@default Some (CstInt (0))] 
+      init_val : vhdl_cst_val_t option [@default Some (CstInt (0))] 
     } [@name "SIGNAL_DECLARATION"]
   | Subprogram of {
       name: vhdl_name_t [@default NoName]; 
