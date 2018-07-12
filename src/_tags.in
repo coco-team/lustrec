@@ -1,6 +1,6 @@
 # general config
 true: bin_annot, color(always)
-true: use_menhir
+# true: use_menhir
 
 # paths to sources
 "backends": include

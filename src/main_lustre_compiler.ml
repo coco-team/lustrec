@@ -110,7 +110,7 @@ let rec compile_source dirname basename extension =
 	
     end;
   let machine_code = Plugins.refine_machine_code prog machine_code in
-  Log.report ~level:1 (fun fmt -> fprintf fmt "xxx@]@ yyy@ ");
+  Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ @ ");
   
   Compiler_stages.stage3 prog machine_code dependencies basename;
   begin
