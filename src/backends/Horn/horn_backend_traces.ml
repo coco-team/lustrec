@@ -23,6 +23,10 @@ open Machine_code_types
 open Horn_backend_common
 open Horn_backend_printers
 
+let pp_traces = (Utils.fprintf_list ~sep:", " (fun fmt (v,e) -> Format.fprintf fmt "%s -> %a"
+                                                         v
+                                                         Printers.pp_expr e))
+
 (* Compute memories associated to each machine *)
 let compute_mems machines m =
   let rec aux fst prefix m =
@@ -46,6 +50,7 @@ let machines_traces machines =
       let filtered =
 	List.filter (fun (kwds, _) -> kwds = ["traceability"]) all_annots
       in
+      (* List.iter (Format.eprintf "Annots: %a@." Printers.pp_expr_annot) (m.mannot); *)
       let content = List.map snd filtered in
       (* Elements are supposed to be a pair (tuple): variable, expression *)
       List.map (fun ee ->
@@ -57,7 +62,7 @@ let machines_traces machines =
 	| _ -> assert false)
 	content
     in
-
+    (* Format.eprintf "Build traces: %a@." pp_traces traces; *)
     m, traces
 
   ) machines
@@ -71,8 +76,8 @@ let memories_old machines m =
 	(* We take the expression associated to variable v in the trace
 	   info *)
 
-	(* eprintf "Found variable %a in traces: %a@."  pp_var v
-	   Printers.pp_expr (List.assoc v.var_id traces); *)
+	 (* eprintf "Found variable %a in traces: %a@."  Printers.pp_var v
+	  *   Printers.pp_expr (List.assoc v.var_id traces);  *)
 	p, List.assoc v.var_id traces
       )
     else 
@@ -80,9 +85,8 @@ let memories_old machines m =
 
 	(* We keep the variable as is: we create an expression v *)
 
-	(* eprintf "Unable to found variable %a in traces (%a)@."  pp_var v
-	   (Utils.fprintf_list ~sep:", " pp_print_string) (List.map fst
-	   traces); *)	    
+	 (* eprintf "Unable to found variable %a in traces (%a)@."  Printers.pp_var v
+	  *   pp_traces traces;  *)
 
 	p, mkexpr Location.dummy_loc (Expr_ident v.var_id)
       end
@@ -92,15 +96,56 @@ let memories_old machines m =
 let memories_next  machines m = (* We remove the topest pre in each expression *)
   List.map
     (fun (prefix, ee) ->
+      let m = match prefix with | [] -> m | (_,m')::_ -> m' in
       match ee.expr_desc with
       | Expr_pre e -> prefix, e
-      | _ -> eprintf
-      	"Mem Failure: (prefix: %a, eexpr: %a)@.@?"
-      	(Utils.fprintf_list ~sep:","
-      	   (fun fmt (id,n) -> fprintf fmt "(%s,%s)" id n.mname.node_id ))
-      	(List.rev prefix)
-      	Printers.pp_expr ee;
-      	assert false)
+      | Expr_ident var_id -> (
+        (* This memory was not introduced through
+           normalization. It shall then be a regular x = pre y
+           expression. Otherwise it would have been rewritten. We
+           have to get its definition and extract the argument of
+           the pre *)
+        
+        let selected_def =
+          try  
+            List.find
+              (fun def ->
+                match def with
+                | Eq eq -> (match eq.eq_lhs with
+                            | [v] -> v = var_id 
+                           )
+                | _ -> false)
+              m.mname.node_stmts
+          with _ -> (Format.eprintf
+                       "Unable to find definition of %s in stmts %a@.prefix=%a@.@?"
+                       var_id
+                       Printers.pp_node_stmts m.mname.node_stmts
+                       (Utils.fprintf_list ~sep:","
+      	                  (fun fmt (id,n) -> fprintf fmt "(%s,%s)" id n.mname.node_id ))
+      	               (List.rev prefix)
+      	            
+                    ;
+                      assert false)
+        in
+        let def = match selected_def with
+          | Eq eq -> (
+            match eq.eq_lhs, eq.eq_rhs.expr_desc with
+            | [single_var], Expr_pre e -> if single_var = var_id then e else assert false
+            | _ -> assert false
+          )
+          | _ -> assert false
+        in
+        prefix, def
+      )
+                           
+      | _ ->
+         eprintf "Mem Failure: (prefix: %a, eexpr: %a)@.@?"
+      	   (Utils.fprintf_list ~sep:","
+      	      (fun fmt (id,n) -> fprintf fmt "(%s,%s)" id n.mname.node_id ))
+      	   (List.rev prefix)
+      	   Printers.pp_expr ee;
+      	 assert false
+    )
     (memories_old machines m)
       
 
