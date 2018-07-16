@@ -14,11 +14,13 @@ open Vhdl_ast
 open Vhdl_test
   *)
 open Yojson.Safe
+open Vhdl_to_lustre
 open Vhdl_ast_utils
 open Vhdl_ast_map
-open Vhdl_ast
-open Ppxlib_traverse_builtins
+open Vhdl_ast_deriving
 open Printf
+open Printers
+open Format
 
 let _ =
   (* Load model with Yojson *)
@@ -30,8 +32,16 @@ let _ =
   (* Simplify VHDL values *)
   match vhdl with
     Ok x ->
+      (* Parsed VHDL JSON value *)
       Format.printf "Parsed VHDL: \n%s\n" (pretty_to_string (vhdl_file_t_to_yojson x));
+      (* Fold Op vhdl_expr_t values *)
       let folded = replace_op_expr#vhdl_file_t x in
       Format.printf "PP VHDL: \n%s\n" (show_vhdl_file_t folded);
+      (* Translate vhdl_file_t value as lustre value *)
+      let program = to_lustre#vhdl_file_t folded in
+      Format.printf "PP VHDL: \n%s\n" (show_vhdl_file_t program);
+      (* Pretty print lustre value *)
+ (*     Printers.pp_prog std_formatter program; *)
+      
   | Error e -> Format.printf "Error: %s\n" e;
 

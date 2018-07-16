@@ -1,4 +1,4 @@
-open Vhdl_ast
+open Vhdl_ast_deriving
 
 let _ = fun (_ : vhdl_cst_val_t)  -> () 
 let _ = fun (_ : vhdl_type_t)  -> () 

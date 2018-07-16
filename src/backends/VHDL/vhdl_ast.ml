@@ -1,27 +1,5 @@
-(* source: Synario VHDL Reference Manual - March 1997 *)
-
-(************************************************************************************)		   
-(*                       Types                                                      *)
-(************************************************************************************)		   
 let base_types = ["integer"; "character"; "bit"; "real"; "natural"; "positive"; "std_logic"; "std_logic_vector" ]
-
-type vhdl_type_t =
-  | Base of string
-  | Range of string option * int * int
-  | Bit_vector of int * int			  
-  | Array of int * int * vhdl_type_t 
-  | Enumerated of string list
-  
-let rec pp_vhdl_type fmt t =
-  match t with
-  | Base s -> Format.fprintf fmt "%s" s 
-  | Bit_vector (n,m) -> Format.fprintf fmt "bit_vector(%i downto %i)" n m
-  | Range(base, n, m) -> Format.fprintf fmt "%trange %i to %i" (fun fmt -> match base with Some s -> Format.fprintf fmt "%s " s | None -> ()) n m
-  | Array (n, m, base) -> Format.fprintf fmt "array (%i to %i) of %a" n m pp_vhdl_type base
-  | Enumerated sl -> Format.fprintf fmt "(%a)" (Utils.fprintf_list ~sep:", " Format.pp_print_string) sl
-
-
-
+ 
 (************************************************************************************)		   
 (*                     Constants                                                    *)
 (************************************************************************************)		   
@@ -37,58 +15,100 @@ let rec pp_vhdl_type fmt t =
     'H': Weak signal that should probably go to 1
     '-': Don't care. *)			       
 let std_logic_cst = ["U"; "X"; "0"; "1"; "Z"; "W"; "L"; "H"; "-" ]
+let literal_base = ["B"; "O"; "X"; "UB"; "UO"; "UX"; "SB"; "SO"; "SX"; "D"] (* Prefix of CstLiteral *)
 
 (* TODO: do we need more constructors ? *)
-type cst_val_t = CstInt of int | CstStdLogic of string | CstBV of string * string
+type vhdl_cst_val_t = 
+    CstInt of int 
+  | CstStdLogic of string
+  | CstLiteral of string [@name "CST_LITERAL"]
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
+(*
 let pp_cst_val fmt c =
   match c with
   | CstInt i -> Format.fprintf fmt "%i" i
   | CstStdLogic s -> if List.mem s std_logic_cst then Format.fprintf fmt "%s" s else assert false
-  | CstBV (pref,suff) -> Format.fprintf fmt "%s\"%s\"" pref suff
+  | CstLiteral s -> Format.fprintf fmt "%s" s
+*)
 
-(************************************************************************************)		   
-(*                     Declarations                                                 *)
-(************************************************************************************)		   
+type vhdl_type_t =
+  | Base of string
+  | Range of string option * int * int
+  | Bit_vector of int * int
+  | Array of int * int * vhdl_type_t
+  | Enumerated of string list
+  | Void
+and vhdl_subtype_indication_t =
+  {
+    name : vhdl_name_t [@default NoName];
+    functionName : vhdl_name_t [@default NoName];
+    const: vhdl_constraint_t [@default NoConstraint];
+  }
+and vhdl_discrete_range_t =
+  | SubDiscreteRange of vhdl_subtype_indication_t [@name "SUB_DISCRETE_RANGE"]
+  | NamedRange of vhdl_name_t [@name "NAMED_RANGE"]
+  | DirectedRange of { direction: string; from: vhdl_expr_t; _to: vhdl_expr_t } [@name "RANGE_WITH_DIRECTION"]
+and vhdl_constraint_t =
+  | RefConstraint of { ref_name: vhdl_name_t; }
+  | RangeConstraint of { range: vhdl_discrete_range_t } [@name "RANGE_CONSTRAINT"]
+  | IndexConstraint of { ranges: vhdl_discrete_range_t list; } [@name "INDEX_CONSTRAINT"]
+  | ArrayConstraint of { ranges: vhdl_discrete_range_t list; sub: vhdl_constraint_t } [@name "ARRAY_CONSTRAINT"]
+  | RecordConstraint
+  | NoConstraint
+and vhdl_definition_t =
+  | Type of {name : vhdl_name_t ; definition: vhdl_type_t} [@name "TYPE_DECLARATION"]
+  | Subtype of {name : vhdl_name_t ; typ : vhdl_subtype_indication_t} [@name "SUBTYPE_DECLARATION"]
+and vhdl_expr_t =
+  | Call of vhdl_name_t [@name "CALL"]
+  | Cst of vhdl_cst_val_t [@name "CONSTANT_VALUE"]
+  | Op of { id: string [@default ""]; args: vhdl_expr_t list [@default []]} [@name "EXPRESSION"]
+  | IsNull [@name "IsNull"]
+  | Time of { value: int; phy_unit: string [@default ""]}
+  | Sig of { name: vhdl_name_t; att: vhdl_signal_attributes_t option }
+  | SuffixMod of { expr : vhdl_expr_t; selection : vhdl_suffix_selection_t }
+  | Aggregate of { elems : vhdl_element_assoc_t list } [@name "AGGREGATE"]
+  | Others [@name "OTHERS"]
+and vhdl_name_t =
+  | Simple of string [@name "SIMPLE_NAME"]
+  | Identifier of string [@name "IDENTIFIER"]
+  | Selected of vhdl_name_t list [@name "SELECTED_NAME"]
+  | Index of { id: vhdl_name_t; exprs: vhdl_expr_t list } [@name "INDEXED_NAME"]
+  | Slice of { id: vhdl_name_t; range: vhdl_discrete_range_t } [@name "SLICE_NAME"]
+  | Attribute of { id: vhdl_name_t; designator: vhdl_name_t; expr: vhdl_expr_t [@default IsNull]} [@name "ATTRIBUTE_NAME"]
+  | Function of { id: vhdl_name_t; assoc_list: vhdl_assoc_element_t list } [@name "FUNCTION_CALL"]
+  | NoName
+and vhdl_assoc_element_t =
+  {
+    formal_name: vhdl_name_t option [@default Some NoName];
+    formal_arg: vhdl_name_t option [@default Some NoName];
+    actual_name: vhdl_name_t option [@default Some NoName];
+    actual_designator: vhdl_name_t option [@default Some NoName];
+    actual_expr: vhdl_expr_t option [@default Some IsNull];
+  }
+and vhdl_element_assoc_t =
+  {
+    choices: vhdl_expr_t list;
+    expr: vhdl_expr_t;
+  }
+and vhdl_array_attributes_t = 
+  | AAttInt of { id: string; arg: int; } 
+  | AAttAscending
+and vhdl_signal_attributes_t = SigAtt of string
+and vhdl_string_attributes_t = StringAtt of string
+and vhdl_suffix_selection_t = Idx of int | SuffixRange of int * int
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-
-(* TODO ? Shall we merge definition / declaration ? Do they appear at the same
-place or at different ones ? *)
-type vhdl_definition_t =
-  | Type of {name : string ; definition: vhdl_type_t}
-  | Subtype of {name : string ; definition: vhdl_type_t}
-					
-let pp_vhdl_definition fmt def =
-  match def with
-  | Type s -> Format.fprintf fmt "type %s is %a;" s.name pp_vhdl_type s.definition
-  | Subtype s -> Format.fprintf fmt "subtype %s is %a;" s.name pp_vhdl_type s.definition
-		      
-type vhdl_declaration_t =
-  | VarDecl of { name : string; typ : vhdl_type_t; init_val : cst_val_t option }
-  | CstDecl of { name : string; typ : vhdl_type_t; init_val : cst_val_t  }
-  | SigDecl of { name : string; typ : vhdl_type_t; init_val : cst_val_t option }
-
-let pp_vhdl_declaration fmt decl =
-  match decl with
-  | VarDecl v -> Format.fprintf
-		   fmt
-		   "variable %s : %a%t;"
-		   v.name
-		   pp_vhdl_type v.typ
-		   (fun fmt -> match v.init_val with Some initv -> Format.fprintf fmt " := %a" pp_cst_val initv | _ -> ())
-  | CstDecl v -> Format.fprintf
-		   fmt
-		   "constant %s : %a := %a;"
-		   v.name
-		   pp_vhdl_type v.typ
-		   pp_cst_val v.init_val
-  | SigDecl v -> Format.fprintf
-		   fmt
-		   "signal %s : %a%t;"
-		   v.name
-		   pp_vhdl_type v.typ
-		   (fun fmt -> match v.init_val with Some initv -> Format.fprintf fmt " := %a" pp_cst_val initv | _ -> ())
-
+(*
+let rec pp_vhdl_type fmt t =
+  match t with
+  | Base s -> Format.fprintf fmt "%s" s 
+  | Range(base, n, m) -> Format.fprintf fmt "%trange %i to %i" (fun fmt -> match base with Some s -> Format.fprintf fmt "%s " s | None -> ()) n m
+  | Bit_vector (n,m) -> Format.fprintf fmt "bit_vector(%i downto %i)" n m
+  | Array (n, m, base) -> Format.fprintf fmt "array (%i to %i) of %a" n m pp_vhdl_type base
+  | Enumerated sl -> Format.fprintf fmt "(%a)" (Utils.fprintf_list ~sep:", " Format.pp_print_string) sl
+  | Void -> Format.fprintf fmt ""
+*)
 
 (************************************************************************************)		   
 (*            Attributes for types, arrays, signals and strings                     *)
@@ -99,165 +119,141 @@ type 'basetype vhdl_type_attributes_t =
   | TAttIntArg of { id: string; arg: int }
   | TAttValArg of { id: string; arg: 'basetype }
   | TAttStringArg of { id: string; arg: string }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 let typ_att_noarg = ["base"; "left"; "right"; "high"; "low"]
 let typ_att_intarg = ["pos"; "val"; "succ"; "pred"; "leftof"; "rightof"]
 let typ_att_valarg = ["image"]
 let typ_att_stringarg = ["value"]
   
-let pp_type_attribute pp_val fmt tatt =
-  match tatt with
-  | TAttNoArg a -> Format.fprintf fmt "'%s" a.id
-  | TAttIntArg a -> Format.fprintf fmt "'%s(%i)" a.id a.arg
-  | TAttValArg a -> Format.fprintf fmt "'%s(%a)" a.id pp_val a.arg
-  | TAttStringArg a -> Format.fprintf fmt "'%s(%s)" a.id a.arg
-
-type vhdl_array_attributes_t = AAttInt of { id: string; arg: int; } | AAttAscending
-let pp_array_attribute fmt aatt =
-  match aatt with
-  | AAttInt a -> Format.fprintf fmt "'%s(%i)" a.id a.arg
-  | AAttAscending -> Format.fprintf fmt "'ascending"
 let array_att_intarg = ["left"; "right"; "high"; "low"; "range"; "reverse_range"; "length"]  
 
-type vhdl_signal_attributes_t = SigAtt of string
-let pp_signal_attribute fmt sa = match sa with
-  | SigAtt s -> Format.fprintf fmt "'%s" s
-let signal_att = [ "event"; "stable"; "last_value" ]
+type vhdl_parameter_t =
+  {
+    names: vhdl_name_t list;
+    mode: string list [@default []];
+    typ: vhdl_subtype_indication_t;
+    init_val: vhdl_cst_val_t option [@default Some (CstInt (0))];
+  }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-type vhdl_string_attributes_t = StringAtt of string
-let pp_string_attribute fmt sa = match sa with
-  | StringAtt s -> Format.fprintf fmt "'%s" s
-let signal_att = [ "simple_name"; "path_name"; "instance_name" ]
+type vhdl_subprogram_spec_t =
+  {
+    name: string [@default ""];
+    typeMark: vhdl_name_t [@default NoName];
+    parameters: vhdl_parameter_t list;
+    isPure: bool [@default false];
+  }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 (************************************************************************************)		   
 (*                        Expressions  / Statements                                 *)
 (************************************************************************************)		   
 
-			      
-(* TODO: call to functions? procedures? component instanciations ? *)
-
-type suffix_selection_t = Idx of int | Range of int * int
-let pp_suffix_selection fmt sel =
-  match sel with
-  | Idx n -> Format.fprintf fmt "(%i)" n
-  | Range(n,m) -> Format.fprintf fmt "(%i downto %i)" n m
-							
-type vhdl_expr_t =
-  | Cst of cst_val_t 
-  | Var of string (* a signal or a variable *)
-  | Sig of { name: string; att: vhdl_signal_attributes_t option }
-  | SuffixMod of { expr : vhdl_expr_t; selection : suffix_selection_t }
-  | Op of { id: string; args: vhdl_expr_t list } 
-					     
-let rec pp_vhdl_expr fmt e =
-  match e with
-  | Cst c ->  pp_cst_val fmt c
-  | Var s -> Format.fprintf fmt "%s" s
-  | Sig s -> Format.fprintf
-	       fmt
-	       "%s%t"
-	       s.name
-	       (fun fmt -> match s.att with None -> () | Some att -> pp_signal_attribute fmt att)
-  | SuffixMod s ->
-     Format.fprintf fmt "%a %a"
-		    pp_vhdl_expr s.expr
-		    pp_suffix_selection s.selection
-  | Op op -> (
-    match op.args with
-    | [] -> assert false
-    | [ e1; e2] -> Format.fprintf fmt "@[<hov 3>%a %s %a@]" pp_vhdl_expr e1 op.id pp_vhdl_expr e2
-    | _ -> assert false (* all ops are binary up to now *)
-    (* | _ -> Format.fprintf fmt "@[<hov 3>%s (%a)@]" op.id (Utils.fprintf_list ~sep:",@ " pp_vhdl_expr) op.args *)
-  )
-
-(* Available operators in the standard library. There are some restrictions on
-types. See reference doc. *)
-let arith_funs = ["+";"-";"*";"/";"mod"; "rem";"abs";"**"]
+let arith_funs = ["+";"-";"*";"/";"mod"; "rem";"abs";"**";"&"]
 let bool_funs  = ["and"; "or"; "nand"; "nor"; "xor"; "not"]
-let rel_funs   = ["<";">";"<=";">=";"/=";"="]
+let rel_funs   = ["<";">";"<=";">=";"/=";"=";"?=";"?/=";"?<";"?<=";"?>";"?>=";"??"]
+let shift_funs = ["sll";"srl";"sla";"sra";"rol";"ror"]
 
-			  
-type vhdl_if_case_t = {
+type vhdl_sequential_stmt_t = 
+  | VarAssign of { label: vhdl_name_t [@default NoName]; lhs: vhdl_name_t; rhs: vhdl_expr_t } [@name "VARIABLE_ASSIGNMENT_STATEMENT"]
+  | SigSeqAssign of { label: vhdl_name_t [@default NoName]; lhs: vhdl_name_t; rhs: vhdl_expr_t list} [@name "SIGNAL_ASSIGNMENT_STATEMENT"]
+  | If of { label: vhdl_name_t [@default NoName]; if_cases: vhdl_if_case_t list;
+    default: vhdl_sequential_stmt_t list [@default []]; } [@name "IF_STATEMENT"]
+  | Case of { label: vhdl_name_t [@default NoName]; guard: vhdl_expr_t; branches: vhdl_case_item_t list } [@name "CASE_STATEMENT_TREE"]
+  | Exit of { label: vhdl_name_t [@default NoName]; loop_label: string option [@default Some ""]; condition: vhdl_expr_t option [@default Some IsNull]} [@name "EXIT_STATEMENT"]
+  | Assert of { label: vhdl_name_t [@default NoName]; cond: vhdl_expr_t; report: vhdl_expr_t [@default IsNull]; severity: vhdl_expr_t [@default IsNull]} [@name "ASSERTION_STATEMENT"]
+  | Wait [@name "WAIT_STATEMENT"]
+  | Null of { label: vhdl_name_t [@default NoName]} [@name "NULL_STATEMENT"]
+  | Return of { label: vhdl_name_t [@default NoName]} [@name "RETURN_STATEMENT"]
+and vhdl_if_case_t = 
+  {
     if_cond: vhdl_expr_t;
     if_block: vhdl_sequential_stmt_t list;
-  }	   
- and vhdl_sequential_stmt_t = 
-   | VarAssign of { lhs: string; rhs: vhdl_expr_t }
-   | SigSeqAssign of { lhs: string; rhs: vhdl_expr_t }
-   | If of { if_cases: vhdl_if_case_t list;
-	    default: (vhdl_sequential_stmt_t list) option; }
-   | Case of { guard: vhdl_expr_t; branches: vhdl_case_item_t list }
-and vhdl_case_item_t = {
-    when_cond: vhdl_expr_t;
-    when_stmt: vhdl_sequential_stmt_t;
   }
+and vhdl_case_item_t = 
+  {
+    when_cond: vhdl_expr_t list;
+    when_stmt: vhdl_sequential_stmt_t list;
+  }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-					    
-		 
-let rec pp_vhdl_sequential_stmt fmt stmt =
-  match stmt with
-  | VarAssign va -> Format.fprintf fmt "%s := %a;" va.lhs pp_vhdl_expr va.rhs
-  | SigSeqAssign va -> Format.fprintf fmt "%s <= %a;" va.lhs pp_vhdl_expr va.rhs
-  | If ifva -> (
-     List.iteri (fun idx ifcase ->
-		 if idx = 0 then
-		   Format.fprintf fmt "@[<v 3>if"
-		 else
-		   Format.fprintf fmt "@ @[<v 3>elsif";
-		 Format.fprintf fmt " %a then@ %a@]"
-				pp_vhdl_expr ifcase.if_cond
-				pp_vhdl_sequential_stmts ifcase.if_block
-		) ifva.if_cases;
-     let _ =
-       match ifva.default with
-       | None -> ()
-       | Some bl -> Format.fprintf fmt "@ @[<v 3>else@ %a@]" pp_vhdl_sequential_stmts bl
-     in
-     Format.fprintf fmt "@ end if;"
-  )
-  | Case caseva -> (
-    Format.fprintf fmt "@[<v 3>case %a is@ %a@]@ end case;"
-		   pp_vhdl_expr caseva.guard
-		   (Utils.fprintf_list ~sep:"@ " pp_vhdl_case) caseva.branches
-  )
+type vhdl_declaration_t =
+  | VarDecl of {
+      names : vhdl_name_t list; 
+      typ : vhdl_subtype_indication_t; 
+      init_val : vhdl_cst_val_t option [@default Some (CstInt (0))] 
+    } [@name "VARIABLE_DECLARATION"]
+  | CstDecl of { 
+      names : vhdl_name_t list; 
+      typ : vhdl_subtype_indication_t; 
+      init_val : vhdl_cst_val_t 
+    } [@name "CONSTANT_DECLARATION"]
+  | SigDecl of { 
+      names : vhdl_name_t list; 
+      typ : vhdl_subtype_indication_t; 
+      init_val : vhdl_cst_val_t option [@default Some (CstInt (0))] 
+    } [@name "SIGNAL_DECLARATION"]
+  | Subprogram of {
+      name: vhdl_name_t [@default NoName]; 
+      kind: string [@default ""]; 
+      spec: vhdl_subprogram_spec_t [@default {name="";typeMark=NoName;parameters=[];isPure=false}]; 
+      decl_part: vhdl_declaration_t list [@default []]; 
+      stmts: vhdl_sequential_stmt_t list [@default []]
+    } [@name "SUBPROGRAM_BODY"]
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-     
-and pp_vhdl_sequential_stmts fmt l  = Utils.fprintf_list ~sep:"@ " pp_vhdl_sequential_stmt fmt l
-and pp_vhdl_case fmt case =
-  Format.fprintf fmt "when %a => %a"
-		 pp_vhdl_expr case.when_cond
-		 pp_vhdl_sequential_stmt case.when_stmt
-						  
-type signal_condition_t =
+type vhdl_signal_condition_t =
   {                            
-    expr: vhdl_expr_t;              (* when expression *)
-    else_case: vhdl_expr_t option;  (* optional else case expression. 
+    expr: vhdl_expr_t list;              (* when expression *)
+    cond: vhdl_expr_t [@default IsNull];  (* optional else case expression. 
                                              If None, could be a latch  *)
   }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-type signal_selection_t =
+type vhdl_signal_selection_t =
   {
-    sel_lhs: string;
     expr : vhdl_expr_t;
-    when_sel: vhdl_expr_t option;
+    when_sel: vhdl_expr_t list [@default []];
   }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-type conditional_signal_t =
+type vhdl_conditional_signal_t =
   {
-      lhs: string;                        (* assigned signal *)
-      rhs: vhdl_expr_t;                   (* expression *)
-      cond: signal_condition_t option     (* conditional signal statement *)
+    postponed: bool [@default false];
+    label: vhdl_name_t [@default NoName];
+    lhs: vhdl_name_t;        (* assigned signal = target*)
+    rhs: vhdl_signal_condition_t list;                   (* expression *)
+    cond: vhdl_expr_t [@default IsNull];
+    delay: vhdl_expr_t [@default IsNull];
   }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-type process_t =
-  { id: string option; active_sigs: string list; body: vhdl_sequential_stmt_t list }
+type vhdl_process_t =
+  { 
+    id: vhdl_name_t [@default NoName];
+    declarations: vhdl_declaration_t list option [@key "PROCESS_DECLARATIVE_PART"] [@default Some []];
+    active_sigs: vhdl_name_t list [@default []];
+    body: vhdl_sequential_stmt_t list [@key "PROCESS_STATEMENT_PART"] [@default []]
+  }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-type selected_signal_t = { sel: vhdl_expr_t;  branches: signal_selection_t list }
+type vhdl_selected_signal_t = 
+  { 
+    postponed: bool [@default false];
+    label: vhdl_name_t [@default NoName];
+    lhs: vhdl_name_t;      (* assigned signal = target *)
+    sel: vhdl_expr_t;  
+    branches: vhdl_signal_selection_t list [@default []];
+    delay: vhdl_expr_t option;
+  }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 			   
 type vhdl_concurrent_stmt_t =
-  | SigAssign of conditional_signal_t 
-  | Process of process_t 
-  | SelectedSig of selected_signal_t
+  | SigAssign of vhdl_conditional_signal_t [@name "CONDITIONAL_SIGNAL_ASSIGNMENT"]
+  | Process of vhdl_process_t [@name "PROCESS_STATEMENT"]
+  | SelectedSig of vhdl_selected_signal_t [@name "SELECTED_SIGNAL_ASSIGNMENT"]
+[@@deriving show { with_path = false }, yojson {strict = false}];;
   (*
 type vhdl_statement_t =
   
@@ -266,199 +262,92 @@ type vhdl_statement_t =
   | SequentialStmt of vhdl_sequential_stmt_t
    *)
 		     
-let pp_vhdl_concurrent_stmt fmt stmt =
-  let pp_sig_cond fmt va = 
-    Format.fprintf
-      fmt
-      "%s <= %a%t;"
-      va.lhs
-      pp_vhdl_expr va.rhs
-      (fun fmt -> match va.cond with
-		  | None -> ()
-		  | Some cond ->
-		     Format.fprintf
-		       fmt
-		       " when %a%t"
-		       pp_vhdl_expr cond.expr
-		       (fun fmt -> match cond.else_case with
-				   | None -> ()
-				   | Some else_case ->
-				      Format.fprintf
-					fmt
-					" else %a"
-					pp_vhdl_expr else_case
-		       )
-      )
-  in
-  let pp_process fmt p =
-    Format.fprintf
-      fmt
-      "@[<v 0>%tprocess %a@ @[<v 3>begin@ %a@]@ end process;@]"
-      (fun fmt -> match p.id with Some id -> Format.fprintf fmt "%s: " id| None -> ())
-      (fun fmt asigs ->
-       if asigs <> [] then
-	 Format.fprintf
-	   fmt
-	   "(@[<hov 0>%a)@]"
-	   (Utils.fprintf_list ~sep:",@ " Format.pp_print_string) asigs)
-      p.active_sigs
-      (Utils.fprintf_list ~sep:"@ " pp_vhdl_sequential_stmt) p.body
-  in
-  let pp_sig_sel fmt va =
-    Format.fprintf fmt "@[<v 3>with %a select@ %a;@]"
-		   pp_vhdl_expr va.sel
-		   (Utils.fprintf_list
-		      ~sep:"@ "
-		      (fun fmt b ->
-		       Format.fprintf
-			 fmt
-			 "%s <= %a when %t"
-			 b.sel_lhs
-			 pp_vhdl_expr b.expr
-			 (fun fmt -> match b.when_sel with
-				     | None -> Format.fprintf fmt "others"
-				     | Some w -> pp_vhdl_expr fmt w
-			 ))
-		   ) va.branches  in
-  match stmt with
-  | SigAssign va -> pp_sig_cond fmt va       
-  | Process p -> pp_process fmt p
-  | SelectedSig va -> pp_sig_sel fmt va
- 
-
-  
-       
-
-
-
 (************************************************************************************)		   
 (*                     Entities                                                     *)
 (************************************************************************************)		   
 			     
-(* TODO? Seems to appear optionally in entities *)
-type vhdl_generic_t = unit
-let pp_vhdl_generic fmt g = ()
-
-			      
-type vhdl_port_kind_t = InPort | OutPort | InoutPort | BufferPort
-let pp_vhdl_port_kind fmt p =
-  match p with
-  | InPort -> Format.fprintf fmt "in"
-  | OutPort -> Format.fprintf fmt "in"
-  | InoutPort -> Format.fprintf fmt "inout"
-  | BufferPort -> Format.fprintf fmt "buffer"
-
-		     
+type vhdl_port_mode_t = 
+    InPort     [@name "in"]
+  | OutPort    [@name "out"]
+  | InoutPort  [@name "inout"]
+  | BufferPort [@name "buffer"]
+[@@deriving show { with_path = false }, yojson];;
+	     
 type vhdl_port_t =
   {
-    name: string;
-    kind: vhdl_port_kind_t;
-    typ: vhdl_type_t;
+    names: vhdl_name_t list [@default []];
+    mode: vhdl_port_mode_t [@default InPort];
+    typ: vhdl_subtype_indication_t;
+    expr: vhdl_expr_t [@default IsNull];
   }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-let pp_vhdl_port fmt p =
-  Format.fprintf fmt "%s : %a %a"
-		 p.name
-		 pp_vhdl_port_kind p.kind
-		 pp_vhdl_type p.typ
-	 
-			     
 type vhdl_entity_t =
   {
-    name: string;
-    generics: vhdl_generic_t list;
-    ports: vhdl_port_t list;
+    name: vhdl_name_t [@default NoName];
+    generics: vhdl_port_t list [@default []];
+    ports: vhdl_port_t list [@default []];
+    declaration: vhdl_declaration_t list [@key "ENTITY_DECLARATIVE_PART"] [@default []];
+    stmts: vhdl_concurrent_stmt_t list [@key "ENTITY_STATEMENT_PART"] [@default []]; 
   }
-let pp_vhdl_entity fmt e =
-  Format.fprintf
-    fmt
-    "@[<v 3>entity %s is@ %t%t@]@ end %s;@ "
-    e.name
-    (fun fmt -> List.iter (fun g -> Format.fprintf fmt "generic %a;@ " pp_vhdl_generic g) e.generics)
-    (fun fmt ->
-     if e.ports = [] then () else
-       Format.fprintf fmt "port (@[<hov 0>%a@]);" (Utils.fprintf_list ~sep:",@ " pp_vhdl_port) e.ports)
-    e.name
-
-
-
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
 (************************************************************************************)		   
 (*                    Packages / Library loading                                    *)
 (************************************************************************************)		   
-
-				
 				
 (* Optional. Describes shared definitions *)
 type vhdl_package_t =
   {
-    name: string;
-    shared_defs: vhdl_definition_t list;
+    name: vhdl_name_t [@default NoName];
+    shared_defs: vhdl_definition_t list [@default []];
   }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-let pp_vhdl_package fmt p =
-  Format.fprintf
-    fmt
-    "@[<v 3>package %s is@ %a@]@ end %s;@ "
-    p.name
-    (Utils.fprintf_list  ~sep:"@ " pp_vhdl_definition) p.shared_defs
-    p.name
-
-type vhdl_load_t = Library of string | Use of string list
-let pp_vhdl_load fmt l =
-  match l with
-  | Library s -> Format.fprintf fmt "library %s;@ " s
-  | Use sl -> Format.fprintf fmt "use %a;@ " (Utils.fprintf_list ~sep:"." Format.pp_print_string) sl
-
+type vhdl_load_t = 
+    Library of vhdl_name_t list [@name "LIBRARY_CLAUSE"] [@default []]
+  | Use of vhdl_name_t list [@name "USE_CLAUSE"] [@default []]
+[@@deriving show { with_path = false }, yojson];;
 
 (************************************************************************************)		   
 (*                        Architecture / VHDL Design                                *)
 (************************************************************************************)		   
 				       
-				       
 type vhdl_architecture_t =
   {
-    name: string;
-    entity: string;
-    declarations: vhdl_declaration_t list;
-    body: vhdl_concurrent_stmt_t list;
+    name: vhdl_name_t [@default NoName];
+    entity: vhdl_name_t [@default NoName];
+    declarations: vhdl_declaration_t list [@key "ARCHITECTURE_DECLARATIVE_PART"] [@default []];
+    body: vhdl_concurrent_stmt_t list [@key "ARCHITECTURE_STATEMENT_PART"] [@default []]; 
   }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
     
-let pp_vhdl_architecture fmt a =
-  Format.fprintf
-    fmt
-    "@[<v 3>architecture %s of %s is@ %a@]@ @[<v 3>begin@ %a@]@ end %s;"
-    a.name
-    a.entity
-    (Utils.fprintf_list ~sep:"@ " pp_vhdl_declaration) a.declarations
-    (Utils.fprintf_list ~sep:"@ " pp_vhdl_concurrent_stmt) a.body
-    a.name
-    
-
-(* TODO. Configuraiton is optional *)
+(* TODO. Configuration is optional *)
 type vhdl_configuration_t = unit
-let pp_vhdl_configuration fmt c = ()
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
+type vhdl_library_unit_t = (* TODO: PACKAGE_BODY *)
+    Package of vhdl_package_t [@name "PACKAGE_DECLARATION"]
+  | Entities of vhdl_entity_t [@name "ENTITY_DECLARATION"]
+  | Architecture of vhdl_architecture_t [@name "ARCHITECTURE_BODY"]
+  | Configuration of vhdl_configuration_t [@name "CONFIGURATION_DECLARATION"]
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-
-type vhdl_design_t =
+type vhdl_design_unit_t =
   {
-    packages: vhdl_package_t list;
-    libraries: vhdl_load_t list;
-    entities: vhdl_entity_t list;
-    architectures: vhdl_architecture_t list;
-    configuration: vhdl_configuration_t option;
+    contexts: vhdl_load_t list [@default []];
+    library: vhdl_library_unit_t;
   }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
 
-let pp_vhdl_design fmt d =
-  Format.fprintf
-    fmt
-    "@[<v 0>%a%t%a%t%a%t%a%t@]"
-    (Utils.fprintf_list ~sep:"@ " pp_vhdl_package) d.packages
-    (fun fmt -> if d.packages <> [] then Format.fprintf fmt "@ ")
-    (Utils.fprintf_list ~sep:"@ " pp_vhdl_load) d.libraries
-    (fun fmt -> if d.libraries <> [] then Format.fprintf fmt "@ ")
-    (Utils.fprintf_list ~sep:"@ " pp_vhdl_entity) d.entities
-    (fun fmt -> if d.entities <> [] then Format.fprintf fmt "@ ")
-    (Utils.fprintf_list ~sep:"@ " pp_vhdl_architecture) d.architectures
-    (fun fmt -> if d.architectures <> [] then Format.fprintf fmt "@ ")
+type vhdl_design_file_t =
+  {
+    design_units: vhdl_design_unit_t list [@default []];
+  }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
+
+type vhdl_file_t = 
+  {
+    design_file: vhdl_design_file_t [@default {design_units=[]}] [@key "DESIGN_FILE"];
+  }
+[@@deriving show { with_path = false }, yojson];;
