@@ -5332,31 +5332,27 @@ let rec pp_vhdl_load_t :
       fun fmt  ->
         function
         | Library a0 ->
-            (Format.fprintf fmt "@[<2>library@ ";
+            (Format.fprintf fmt "library ";
              ((fun x  ->
-                 Format.fprintf fmt "@[<2>";
                  ignore
                    (List.fold_left
                       (fun sep  ->
                          fun x  ->
                            if sep then Format.fprintf fmt ".";
                            ((__0 ()) fmt) x;
-                           true) false x);
-                 Format.fprintf fmt "@,@]")) a0;
-             Format.fprintf fmt "@]:")
+                           true) false x))) a0;
+             Format.fprintf fmt ":")
         | Use a0 ->
-            (Format.fprintf fmt "@[<2>use@ ";
+            (Format.fprintf fmt "use ";
              ((fun x  ->
-                 Format.fprintf fmt "@[<2>";
                  ignore
                    (List.fold_left
                       (fun sep  ->
                          fun x  ->
                            if sep then Format.fprintf fmt ".";
                            ((__1 ()) fmt) x;
-                           true) false x);
-                 Format.fprintf fmt "@,@]")) a0;
-             Format.fprintf fmt "@];"))
+                           true) false x))) a0;
+             Format.fprintf fmt ";"))
     [@ocaml.warning "-A"])
 
 and show_vhdl_load_t : vhdl_load_t -> Ppx_deriving_runtime.string =
@@ -5684,24 +5680,20 @@ let rec pp_vhdl_design_unit_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          ((
-            Format.fprintf fmt "@[<v>";
+           (match x.contexts with
+           | [] -> Format.fprintf fmt "";
+           | _ -> 
             ((fun x  ->
                 ignore
                   (List.fold_left
                      (fun sep  ->
                         fun x  ->
-                                if sep then Format.fprintf fmt "@ ";
+                          if sep then Format.fprintf fmt "@.";
                           ((__0 ()) fmt) x;
                           true) false x);
                 )) x.contexts;
-           Format.fprintf fmt "@ ";
-           Format.fprintf fmt "@[";
-           ((__1 ()) fmt) x.library;
-           Format.fprintf fmt "@]";
-           Format.fprintf fmt "@]";
-           ))
-    )
+           Format.fprintf fmt "@.";);
+           ((__1 ()) fmt) x.library;)
     [@ocaml.warning "-A"])
 
 and show_vhdl_design_unit_t :
@@ -5780,11 +5772,10 @@ let rec pp_vhdl_design_file_t :
                  (List.fold_left
                     (fun sep  ->
                        fun x  ->
-                         if sep then Format.fprintf fmt "@ ";
+                         if sep then Format.fprintf fmt "@.";
                          ((__0 ()) fmt) x;
                          true) false x);
-             )) x.design_units;
-    )
+             )) x.design_units)
     [@ocaml.warning "-A"])
 
 and show_vhdl_design_file_t :
