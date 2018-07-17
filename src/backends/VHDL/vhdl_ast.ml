@@ -80,11 +80,11 @@ and vhdl_name_t =
   | NoName
 and vhdl_assoc_element_t =
   {
-    formal_name: vhdl_name_t option [@default Some NoName];
-    formal_arg: vhdl_name_t option [@default Some NoName];
-    actual_name: vhdl_name_t option [@default Some NoName];
-    actual_designator: vhdl_name_t option [@default Some NoName];
-    actual_expr: vhdl_expr_t option [@default Some IsNull];
+    formal_name: vhdl_name_t option [@default None];
+    formal_arg: vhdl_name_t option [@default None];
+    actual_name: vhdl_name_t option [@default None];
+    actual_designator: vhdl_name_t option [@default None];
+    actual_expr: vhdl_expr_t option [@default None];
   }
 and vhdl_element_assoc_t =
   {
@@ -133,7 +133,7 @@ type vhdl_parameter_t =
     names: vhdl_name_t list;
     mode: string list [@default []];
     typ: vhdl_subtype_indication_t;
-    init_val: vhdl_cst_val_t option [@default Some (CstInt (0))];
+    init_val: vhdl_cst_val_t option [@default None];
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;
 
@@ -182,7 +182,7 @@ type vhdl_declaration_t =
   | VarDecl of {
       names : vhdl_name_t list; 
       typ : vhdl_subtype_indication_t; 
-      init_val : vhdl_cst_val_t option [@default Some (CstInt (0))] 
+      init_val : vhdl_cst_val_t option [@default None] 
     } [@name "VARIABLE_DECLARATION"]
   | CstDecl of { 
       names : vhdl_name_t list; 
@@ -192,7 +192,7 @@ type vhdl_declaration_t =
   | SigDecl of { 
       names : vhdl_name_t list; 
       typ : vhdl_subtype_indication_t; 
-      init_val : vhdl_cst_val_t option [@default Some (CstInt (0))] 
+      init_val : vhdl_cst_val_t option [@default None] 
     } [@name "SIGNAL_DECLARATION"]
   | Subprogram of {
       name: vhdl_name_t [@default NoName]; 
