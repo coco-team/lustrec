@@ -182,17 +182,17 @@ type vhdl_declaration_t =
   | VarDecl of {
       names : vhdl_name_t list; 
       typ : vhdl_subtype_indication_t; 
-      init_val : vhdl_cst_val_t option [@default None] 
+      init_val : vhdl_expr_t [@default IsNull] 
     } [@name "VARIABLE_DECLARATION"]
   | CstDecl of { 
       names : vhdl_name_t list; 
       typ : vhdl_subtype_indication_t; 
-      init_val : vhdl_cst_val_t 
+      init_val : vhdl_expr_t
     } [@name "CONSTANT_DECLARATION"]
   | SigDecl of { 
       names : vhdl_name_t list; 
       typ : vhdl_subtype_indication_t; 
-      init_val : vhdl_cst_val_t option [@default None] 
+      init_val : vhdl_expr_t [@default IsNull]
     } [@name "SIGNAL_DECLARATION"]
   | Subprogram of {
       name: vhdl_name_t [@default NoName]; 

@@ -335,17 +335,17 @@ class virtual vhdl_to_lustre_map =
         | VarDecl { names; typ; init_val } ->
             let names = self#list self#vhdl_name_t names  in
             let typ = self#vhdl_subtype_indication_t typ  in
-            let init_val = self#option self#vhdl_cst_val_t init_val  in
+            let init_val = self#vhdl_expr_t init_val  in
             VarDecl { names; typ; init_val }
         | CstDecl { names; typ; init_val } ->
             let names = self#list self#vhdl_name_t names  in
             let typ = self#vhdl_subtype_indication_t typ  in
-            let init_val = self#vhdl_cst_val_t init_val  in
+            let init_val = self#vhdl_expr_t init_val  in
             CstDecl { names; typ; init_val }
         | SigDecl { names; typ; init_val } ->
             let names = self#list self#vhdl_name_t names  in
             let typ = self#vhdl_subtype_indication_t typ  in
-            let init_val = self#option self#vhdl_cst_val_t init_val  in
+            let init_val = self#vhdl_expr_t init_val  in
             SigDecl { names; typ; init_val }
         | Subprogram { name; kind; spec; decl_part; stmts } ->
             let name = self#vhdl_name_t name  in

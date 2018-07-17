@@ -228,9 +228,10 @@ and pp_vhdl_subtype_indication_t :
         fun x  ->
           ((__0 ()) fmt) x.name;
           ((__1 ()) fmt) x.functionName;
-          Format.fprintf fmt " ";
-          ((__2 ()) fmt) x.const;
-    )
+          (match x.const with
+            | NoConstraint -> Format.fprintf fmt "";
+            | _ -> Format.fprintf fmt " ";
+                   ((__2 ()) fmt) x.const))
     [@ocaml.warning "-A"])
 
 and show_vhdl_subtype_indication_t :
@@ -3519,19 +3520,17 @@ type vhdl_declaration_t =
   {
   names: vhdl_name_t list ;
   typ: vhdl_subtype_indication_t ;
-  init_val: vhdl_cst_val_t option [@default None]}
-  [@name "VARIABLE_DECLARATION"]
+  init_val: vhdl_expr_t [@default IsNull]} [@name "VARIABLE_DECLARATION"]
   | CstDecl of
   {
   names: vhdl_name_t list ;
   typ: vhdl_subtype_indication_t ;
-  init_val: vhdl_cst_val_t } [@name "CONSTANT_DECLARATION"]
+  init_val: vhdl_expr_t } [@name "CONSTANT_DECLARATION"]
   | SigDecl of
   {
   names: vhdl_name_t list ;
   typ: vhdl_subtype_indication_t ;
-  init_val: vhdl_cst_val_t option [@default None]}
-  [@name "SIGNAL_DECLARATION"]
+  init_val: vhdl_expr_t [@default IsNull]} [@name "SIGNAL_DECLARATION"]
   | Subprogram of
   {
   name: vhdl_name_t [@default NoName];
@@ -3553,19 +3552,19 @@ let rec pp_vhdl_declaration_t :
   
   and __9 () = pp_vhdl_name_t
   
-  and __8 () = pp_vhdl_cst_val_t
+  and __8 () = pp_vhdl_expr_t
   
   and __7 () = pp_vhdl_subtype_indication_t
   
   and __6 () = pp_vhdl_name_t
   
-  and __5 () = pp_vhdl_cst_val_t
+  and __5 () = pp_vhdl_expr_t
   
   and __4 () = pp_vhdl_subtype_indication_t
   
   and __3 () = pp_vhdl_name_t
   
-  and __2 () = pp_vhdl_cst_val_t
+  and __2 () = pp_vhdl_expr_t
   
   and __1 () = pp_vhdl_subtype_indication_t
   
@@ -3586,12 +3585,11 @@ let rec pp_vhdl_declaration_t :
                               true) false x);)) anames;
                Format.fprintf fmt " : ";
                ((__1 ()) fmt) atyp;
-              ((function
-                | None  -> Format.pp_print_string fmt ""
-                | Some x ->
+               (match ainit_val with
+                | IsNull  -> Format.pp_print_string fmt ""
+                | _ ->
                     (Format.fprintf fmt ":=";
-                     ((__2 ()) fmt) x;))) ainit_val);
-            ))
+                     ((__2 ()) fmt) ainit_val;))));)
         | CstDecl { names = anames; typ = atyp; init_val = ainit_val } ->
             (Format.fprintf fmt "constant ";
              ((((fun x  ->
@@ -3619,12 +3617,11 @@ let rec pp_vhdl_declaration_t :
               )) anames;
             Format.fprintf fmt " : ";
             ((__7 ()) fmt) atyp;
-            (function
-              | None  -> Format.pp_print_string fmt ""
-              | Some x ->
+            (match ainit_val with
+              | IsNull  -> Format.pp_print_string fmt ""
+              | _ ->
                   (Format.fprintf fmt ":=";
-                  ((__8 ()) fmt) x;)
-            ) ainit_val)
+                  ((__8 ()) fmt) ainit_val;)))
         | Subprogram
             { name = aname; kind = akind; spec = aspec;
               decl_part = adecl_part; stmts = astmts }
@@ -3684,14 +3681,11 @@ let rec (vhdl_declaration_t_to_yojson :
             [`String "VARIABLE_DECLARATION";
             (let fields = []  in
              let fields =
-               if arg0.init_val = None
+               if arg0.init_val = IsNull
                then fields
                else
                  ("init_val",
-                   (((function
-                      | None  -> `Null
-                      | Some x -> ((fun x  -> vhdl_cst_val_t_to_yojson x)) x))
-                      arg0.init_val))
+                   (((fun x  -> vhdl_expr_t_to_yojson x)) arg0.init_val))
                  :: fields
                 in
              let fields =
@@ -3711,7 +3705,7 @@ let rec (vhdl_declaration_t_to_yojson :
             (let fields = []  in
              let fields =
                ("init_val",
-                 ((fun x  -> vhdl_cst_val_t_to_yojson x) arg0.init_val))
+                 ((fun x  -> vhdl_expr_t_to_yojson x) arg0.init_val))
                :: fields  in
              let fields =
                ("typ",
@@ -3729,14 +3723,11 @@ let rec (vhdl_declaration_t_to_yojson :
             [`String "SIGNAL_DECLARATION";
             (let fields = []  in
              let fields =
-               if arg0.init_val = None
+               if arg0.init_val = IsNull
                then fields
                else
                  ("init_val",
-                   (((function
-                      | None  -> `Null
-                      | Some x -> ((fun x  -> vhdl_cst_val_t_to_yojson x)) x))
-                      arg0.init_val))
+                   (((fun x  -> vhdl_expr_t_to_yojson x)) arg0.init_val))
                  :: fields
                 in
              let fields =
@@ -3841,12 +3832,7 @@ and (vhdl_declaration_t_of_yojson :
                              x), arg2)
                   | ("init_val",x)::xs ->
                       loop xs
-                        (arg0, arg1,
-                          ((function
-                            | `Null -> Result.Ok None
-                            | x ->
-                                ((fun x  -> vhdl_cst_val_t_of_yojson x) x)
-                                  >>= ((fun x  -> Result.Ok (Some x)))) x))
+                        (arg0, arg1, ((fun x  -> vhdl_expr_t_of_yojson x) x))
                   | [] ->
                       arg2 >>=
                         ((fun arg2  ->
@@ -3865,7 +3851,7 @@ and (vhdl_declaration_t_of_yojson :
                 loop xs
                   ((Result.Error "Vhdl_ast.vhdl_declaration_t.names"),
                     (Result.Error "Vhdl_ast.vhdl_declaration_t.typ"),
-                    (Result.Ok (Some (CstInt 0))))
+                    (Result.Ok IsNull))
             | _ -> Result.Error "Vhdl_ast.vhdl_declaration_t")) arg0
       | `List ((`String "CONSTANT_DECLARATION")::arg0::[]) ->
           ((function
@@ -3889,8 +3875,7 @@ and (vhdl_declaration_t_of_yojson :
                              x), arg2)
                   | ("init_val",x)::xs ->
                       loop xs
-                        (arg0, arg1,
-                          ((fun x  -> vhdl_cst_val_t_of_yojson x) x))
+                        (arg0, arg1, ((fun x  -> vhdl_expr_t_of_yojson x) x))
                   | [] ->
                       arg2 >>=
                         ((fun arg2  ->
@@ -3933,12 +3918,7 @@ and (vhdl_declaration_t_of_yojson :
                              x), arg2)
                   | ("init_val",x)::xs ->
                       loop xs
-                        (arg0, arg1,
-                          ((function
-                            | `Null -> Result.Ok None
-                            | x ->
-                                ((fun x  -> vhdl_cst_val_t_of_yojson x) x)
-                                  >>= ((fun x  -> Result.Ok (Some x)))) x))
+                        (arg0, arg1, ((fun x  -> vhdl_expr_t_of_yojson x) x))
                   | [] ->
                       arg2 >>=
                         ((fun arg2  ->
@@ -3957,7 +3937,7 @@ and (vhdl_declaration_t_of_yojson :
                 loop xs
                   ((Result.Error "Vhdl_ast.vhdl_declaration_t.names"),
                     (Result.Error "Vhdl_ast.vhdl_declaration_t.typ"),
-                    (Result.Ok (Some (CstInt 0))))
+                    (Result.Ok IsNull))
             | _ -> Result.Error "Vhdl_ast.vhdl_declaration_t")) arg0
       | `List ((`String "SUBPROGRAM_BODY")::arg0::[]) ->
           ((function
@@ -4921,15 +4901,15 @@ let rec pp_vhdl_port_t :
                             true) false x);
                   Format.fprintf fmt "@,@]")) x.names;
               );
-             Format.fprintf fmt ":@ ";
+             Format.fprintf fmt ": ";
              ((__1 ()) fmt) x.mode;
              );
-             Format.fprintf fmt "@ ";
+             Format.fprintf fmt " ";
             ((__2 ()) fmt) x.typ;
             );
           (match x.expr with
            | IsNull -> Format.fprintf fmt "";
-           | _ -> (Format.fprintf fmt "@[:=@ ";
+           | _ -> (Format.fprintf fmt "@[:= ";
                    ((__3 ()) fmt) x.expr;
                    Format.fprintf fmt "@]"));
           Format.fprintf fmt "@]"))
@@ -5051,27 +5031,23 @@ let rec pp_vhdl_entity_t :
                Format.fprintf fmt " is@ ");
               Format.fprintf fmt "@[<v>";
               ((fun x  ->
-                  Format.fprintf fmt "@[";
                   ignore
                     (List.fold_left
                        (fun sep  ->
                           fun x  ->
-                            if sep then Format.fprintf fmt ";@ ";
+                            if sep then Format.fprintf fmt ";@;";
                             ((__1 ()) fmt) x;
-                            true) false x);
-                  Format.fprintf fmt "@]")) x.generics;
+                            true) false x))) x.generics;
               Format.fprintf fmt "@]");
              Format.fprintf fmt "port (@[<v>";
              ((fun x  ->
-                 Format.fprintf fmt "@[";
                  ignore
                    (List.fold_left
                       (fun sep  ->
                          fun x  ->
-                           if sep then Format.fprintf fmt ";@ ";
+                           if sep then Format.fprintf fmt ";@;";
                            ((__2 ()) fmt) x;
-                           true) false x);
-                 Format.fprintf fmt "@]")) x.ports;
+                           true) false x))) x.ports;
              Format.fprintf fmt "@]);");
             Format.fprintf fmt "@[<v>";
             ((fun x  ->
