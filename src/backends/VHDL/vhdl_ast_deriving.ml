@@ -2789,29 +2789,20 @@ let rec pp_vhdl_sequential_stmt_t :
             { label = alabel; loop_label = aloop_label;
               condition = acondition }
             ->
-            (Format.fprintf fmt "@[<2>Exit {@,";
-             (((Format.fprintf fmt "@[%s =@ " "label";
-                ((__12 ()) fmt) alabel;
-                Format.fprintf fmt "@]");
-               Format.fprintf fmt ";@ ";
-               Format.fprintf fmt "@[%s =@ " "loop_label";
-               ((function
-                 | None  -> Format.pp_print_string fmt "None"
-                 | Some x ->
-                     (Format.pp_print_string fmt "(Some ";
-                      (Format.fprintf fmt "%S") x;
-                      Format.pp_print_string fmt ")"))) aloop_label;
-               Format.fprintf fmt "@]");
-              Format.fprintf fmt ";@ ";
-              Format.fprintf fmt "@[%s =@ " "condition";
-              ((function
-                | None  -> Format.pp_print_string fmt "None"
-                | Some x ->
-                    (Format.pp_print_string fmt "(Some ";
-                     ((__13 ()) fmt) x;
-                     Format.pp_print_string fmt ")"))) acondition;
-              Format.fprintf fmt "@]");
-             Format.fprintf fmt "@]}")
+            (match alabel with
+              | NoName -> Format.fprintf fmt "";
+              | _ -> (((__12 ()) fmt) alabel;
+                     Format.fprintf fmt ":@ ")
+            );
+            Format.fprintf fmt "exit";
+            (match aloop_label with
+               | None  -> Format.pp_print_string fmt ""
+               | Some x -> (Format.fprintf fmt "@ %s@ ") x);
+            ((function
+               | None  -> Format.pp_print_string fmt ""
+               | Some x ->
+                   (Format.pp_print_string fmt "when@ ";
+                    ((__13 ()) fmt) x;))) acondition;
         | Assert
             { label = alabel; cond = acond; report = areport;
               severity = aseverity }
@@ -2833,19 +2824,21 @@ let rec pp_vhdl_sequential_stmt_t :
               ((__17 ()) fmt) aseverity;
               Format.fprintf fmt "@]");
              Format.fprintf fmt "@]}")
-        | Wait  -> Format.pp_print_string fmt "Wait"
+        | Wait  -> Format.pp_print_string fmt "wait"
         | Null { label = alabel } ->
-            (Format.fprintf fmt "@[<2>Null {@,";
-             (Format.fprintf fmt "@[%s =@ " "label";
-              ((__18 ()) fmt) alabel;
-              Format.fprintf fmt "@]");
-             Format.fprintf fmt "@]}")
+            (match alabel with
+              | NoName -> Format.fprintf fmt "";
+              | _ -> (((__18 ()) fmt) alabel;
+                     Format.fprintf fmt ":@ ")
+            );
+            Format.fprintf fmt "null";
         | Return { label = alabel } ->
-            (Format.fprintf fmt "@[<2>Return {@,";
-             (Format.fprintf fmt "@[%s =@ " "label";
-              ((__19 ()) fmt) alabel;
-              Format.fprintf fmt "@]");
-             Format.fprintf fmt "@]}"))
+            (match alabel with
+              | NoName -> Format.fprintf fmt "";
+              | _ -> (((__19 ()) fmt) alabel;
+                     Format.fprintf fmt ":@ ")
+            );
+            Format.fprintf fmt "return";)
     [@ocaml.warning "-A"])
 
 and show_vhdl_sequential_stmt_t :
