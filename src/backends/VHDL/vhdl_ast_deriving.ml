@@ -267,7 +267,7 @@ and show_vhdl_discrete_range_t :
   vhdl_discrete_range_t -> Ppx_deriving_runtime.string =
   fun x  -> Format.asprintf "%a" pp_vhdl_discrete_range_t x
 
-(* Requires adaptation for: ArrayConstraint, RecordConstraint *)
+(* TODO Adapt for: ArrayConstraint, RecordConstraint *)
 and pp_vhdl_constraint_t :
   Format.formatter -> vhdl_constraint_t -> Ppx_deriving_runtime.unit =
   let __4 () = pp_vhdl_constraint_t
@@ -328,6 +328,7 @@ and pp_vhdl_constraint_t :
 and show_vhdl_constraint_t : vhdl_constraint_t -> Ppx_deriving_runtime.string
   = fun x  -> Format.asprintf "%a" pp_vhdl_constraint_t x
 
+(* TODO Adapt for Type *)
 and pp_vhdl_definition_t :
   Format.formatter -> vhdl_definition_t -> Ppx_deriving_runtime.unit =
   let __3 () = pp_vhdl_subtype_indication_t
@@ -342,17 +343,15 @@ and pp_vhdl_definition_t :
       fun fmt  ->
         function
         | Type { name = aname; definition = adefinition } ->
-            Format.fprintf fmt "@[<2>type ";
+            Format.fprintf fmt "type ";
             ((__0 ()) fmt) aname;
             Format.fprintf fmt " is ";
             ((__1 ()) fmt) adefinition;
-            Format.fprintf fmt "@]}";
         | Subtype { name = aname; typ = atyp } ->
-            Format.fprintf fmt "@[<2>subtype ";
+            Format.fprintf fmt "subtype ";
             ((__2 ()) fmt) aname;
             Format.fprintf fmt " is ";
             ((__3 ()) fmt) atyp;
-            Format.fprintf fmt "@]";
    )
     [@ocaml.warning "-A"])
 
@@ -2647,6 +2646,7 @@ and vhdl_case_item_t =
   when_cond: vhdl_expr_t list ;
   when_stmt: vhdl_sequential_stmt_t list }
 
+(* Needs adaptation for: Assert *)
 let rec pp_vhdl_sequential_stmt_t :
   Format.formatter -> vhdl_sequential_stmt_t -> Ppx_deriving_runtime.unit =
   let __19 () = pp_vhdl_name_t
@@ -2872,6 +2872,7 @@ and pp_vhdl_if_case_t :
 and show_vhdl_if_case_t : vhdl_if_case_t -> Ppx_deriving_runtime.string =
   fun x  -> Format.asprintf "%a" pp_vhdl_if_case_t x
 
+(* Adapted *)
 and pp_vhdl_case_item_t :
   Format.formatter -> vhdl_case_item_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_sequential_stmt_t
@@ -3574,7 +3575,7 @@ let rec pp_vhdl_declaration_t :
       fun fmt  ->
         function
         | VarDecl { names = anames; typ = atyp; init_val = ainit_val } ->
-            (Format.fprintf fmt "@[<2>variable@ ";
+            (Format.fprintf fmt "variable ";
              ((((fun x  ->
                     ignore
                       (List.fold_left
@@ -3583,17 +3584,16 @@ let rec pp_vhdl_declaration_t :
                               if sep then Format.fprintf fmt ",";
                               ((__0 ()) fmt) x;
                               true) false x);)) anames;
-               Format.fprintf fmt "@ :@ ";
+               Format.fprintf fmt " : ";
                ((__1 ()) fmt) atyp;
               ((function
                 | None  -> Format.pp_print_string fmt ""
                 | Some x ->
                     (Format.fprintf fmt ":=";
-                     ((__2 ()) fmt) x;))) ainit_val;
-              Format.fprintf fmt "@]");
+                     ((__2 ()) fmt) x;))) ainit_val);
             ))
         | CstDecl { names = anames; typ = atyp; init_val = ainit_val } ->
-            (Format.fprintf fmt "@[<2>constant@ ";
+            (Format.fprintf fmt "constant ";
              ((((fun x  ->
                     ignore
                       (List.fold_left
@@ -3602,14 +3602,12 @@ let rec pp_vhdl_declaration_t :
                               if sep then Format.fprintf fmt ",";
                               ((__3 ()) fmt) x;
                               true) false x);)) anames;
-               Format.fprintf fmt "@ :@ ";
+               Format.fprintf fmt " : ";
                ((__4 ()) fmt) atyp;
               Format.fprintf fmt ":=";
-              ((__5 ()) fmt) ainit_val;
-              Format.fprintf fmt "@]");
-             ))
+              ((__5 ()) fmt) ainit_val)))
         | SigDecl { names = anames; typ = atyp; init_val = ainit_val } ->
-            (Format.fprintf fmt "@[<2>signal@ ";
+            (Format.fprintf fmt "signal ";
             ((fun x  ->
               ignore
               (List.fold_left
@@ -3619,16 +3617,14 @@ let rec pp_vhdl_declaration_t :
                                 ((__6 ()) fmt) x;
                                 true) false x);
               )) anames;
-            Format.fprintf fmt "@ :@ ";
+            Format.fprintf fmt " : ";
             ((__7 ()) fmt) atyp;
             (function
               | None  -> Format.pp_print_string fmt ""
               | Some x ->
                   (Format.fprintf fmt ":=";
                   ((__8 ()) fmt) x;)
-            ) ainit_val;
-            Format.fprintf fmt "@]";
-            )
+            ) ainit_val)
         | Subprogram
             { name = aname; kind = akind; spec = aspec;
               decl_part = adecl_part; stmts = astmts }
@@ -4049,6 +4045,7 @@ type vhdl_signal_condition_t =
   expr: vhdl_expr_t list ;
   cond: vhdl_expr_t [@default IsNull]}
 
+(* Adapted *)
 let rec pp_vhdl_signal_condition_t :
   Format.formatter -> vhdl_signal_condition_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_expr_t
@@ -4058,24 +4055,18 @@ let rec pp_vhdl_signal_condition_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          Format.fprintf fmt "@[<2>{ ";
-          ((Format.fprintf fmt "@[%s =@ " "expr";
-            ((fun x  ->
-                Format.fprintf fmt "@[<2>[";
-                ignore
-                  (List.fold_left
-                     (fun sep  ->
-                        fun x  ->
-                          if sep then Format.fprintf fmt ";@ ";
-                          ((__0 ()) fmt) x;
-                          true) false x);
-                Format.fprintf fmt "@,]@]")) x.expr;
-            Format.fprintf fmt "@]");
-           Format.fprintf fmt ";@ ";
-           Format.fprintf fmt "@[%s =@ " "cond";
-           ((__1 ()) fmt) x.cond;
-           Format.fprintf fmt "@]");
-          Format.fprintf fmt "@ }@]")
+          ((fun x  ->
+              ignore
+                (List.fold_left
+                   (fun sep  ->
+                      fun x  ->
+                        if sep then Format.fprintf fmt ";@ ";
+                        ((__0 ()) fmt) x;
+                        true) false x))) x.expr;
+          (match x.cond with
+          | IsNull -> Format.fprintf fmt "";
+          | _ -> Format.fprintf fmt "when ";
+                 ((__1 ()) fmt) x.cond);)
     [@ocaml.warning "-A"])
 
 and show_vhdl_signal_condition_t :
@@ -4235,6 +4226,7 @@ type vhdl_conditional_signal_t =
   cond: vhdl_expr_t [@default IsNull];
   delay: vhdl_expr_t [@default IsNull]}
 
+(* Adapted *)
 let rec pp_vhdl_conditional_signal_t :
   Format.formatter -> vhdl_conditional_signal_t -> Ppx_deriving_runtime.unit
   =
@@ -4251,41 +4243,35 @@ let rec pp_vhdl_conditional_signal_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          Format.fprintf fmt "@[<2>{ ";
-          ((((((Format.fprintf fmt "@[%s =@ " "postponed";
-                (Format.fprintf fmt "%B") x.postponed;
-                Format.fprintf fmt "@]");
-               Format.fprintf fmt ";@ ";
-               Format.fprintf fmt "@[%s =@ " "label";
-               ((__0 ()) fmt) x.label;
-               Format.fprintf fmt "@]");
-              Format.fprintf fmt ";@ ";
-              Format.fprintf fmt "@[%s =@ " "lhs";
-              ((__1 ()) fmt) x.lhs;
-              Format.fprintf fmt "@]");
-             Format.fprintf fmt ";@ ";
-             Format.fprintf fmt "@[%s =@ " "rhs";
-             ((fun x  ->
-                 Format.fprintf fmt "@[<2>[";
-                 ignore
-                   (List.fold_left
-                      (fun sep  ->
-                         fun x  ->
-                           if sep then Format.fprintf fmt ";@ ";
-                           ((__2 ()) fmt) x;
-                           true) false x);
-                 Format.fprintf fmt "@,]@]")) x.rhs;
-             Format.fprintf fmt "@]");
-            Format.fprintf fmt ";@ ";
-            Format.fprintf fmt "@[%s =@ " "cond";
-            ((__3 ()) fmt) x.cond;
-            Format.fprintf fmt "@]");
-           Format.fprintf fmt ";@ ";
-           Format.fprintf fmt "@[%s =@ " "delay";
-           ((__4 ()) fmt) x.delay;
-           Format.fprintf fmt "@]");
-          Format.fprintf fmt "@ }@]")
-    [@ocaml.warning "-A"])
+          (match x.label with
+            | NoName -> Format.fprintf fmt "";
+            | _ -> (((__0 ()) fmt) x.label;
+                   Format.fprintf fmt ":@ ")
+          );
+          if (x.postponed) then Format.fprintf fmt "postponed@ ";
+          ((__1 ()) fmt) x.lhs;
+          Format.fprintf fmt " <= ";
+          (match x.delay with
+            | IsNull -> Format.fprintf fmt "";
+            | _ -> ((__4 ()) fmt) x.delay;
+                   Format.fprintf fmt " ");
+          ((fun x  ->
+             Format.fprintf fmt "@[";
+             ignore
+               (List.fold_left
+                 (fun sep  ->
+                   fun x  ->
+                     if sep then Format.fprintf fmt "";
+                      ((__2 ()) fmt) x;
+                      Format.fprintf fmt ";";
+                      true) false x);
+          Format.fprintf fmt "@]")) x.rhs;
+          (match x.cond with
+            | IsNull -> Format.fprintf fmt "";
+            | _ -> Format.fprintf fmt "when (";
+                   ((__3 ()) fmt) x.cond;
+                   Format.fprintf fmt ")"))
+   [@ocaml.warning "-A"])
 
 and show_vhdl_conditional_signal_t :
   vhdl_conditional_signal_t -> Ppx_deriving_runtime.string =
@@ -4421,6 +4407,7 @@ type vhdl_process_t =
   body: vhdl_sequential_stmt_t list
     [@key "PROCESS_STATEMENT_PART"][@default []]}
 
+(* Adapted *)
 let rec pp_vhdl_process_t :
   Format.formatter -> vhdl_process_t -> Ppx_deriving_runtime.unit =
   let __3 () = pp_vhdl_sequential_stmt_t
@@ -4434,55 +4421,43 @@ let rec pp_vhdl_process_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          Format.fprintf fmt "@[<2>{ ";
-          ((((Format.fprintf fmt "@[%s =@ " "id";
-              ((__0 ()) fmt) x.id;
-              Format.fprintf fmt "@]");
-             Format.fprintf fmt ";@ ";
-             Format.fprintf fmt "@[%s =@ " "declarations";
-             ((function
-               | None  -> Format.pp_print_string fmt "None"
-               | Some x ->
-                   (Format.pp_print_string fmt "(Some ";
-                    ((fun x  ->
-                        Format.fprintf fmt "@[<2>[";
-                        ignore
-                          (List.fold_left
-                             (fun sep  ->
-                                fun x  ->
-                                  if sep then Format.fprintf fmt ";@ ";
-                                  ((__1 ()) fmt) x;
-                                  true) false x);
-                        Format.fprintf fmt "@,]@]")) x;
-                    Format.pp_print_string fmt ")"))) x.declarations;
-             Format.fprintf fmt "@]");
-            Format.fprintf fmt ";@ ";
-            Format.fprintf fmt "@[%s =@ " "active_sigs";
-            ((fun x  ->
-                Format.fprintf fmt "@[<2>[";
-                ignore
-                  (List.fold_left
-                     (fun sep  ->
-                        fun x  ->
-                          if sep then Format.fprintf fmt ";@ ";
-                          ((__2 ()) fmt) x;
-                          true) false x);
-                Format.fprintf fmt "@,]@]")) x.active_sigs;
-            Format.fprintf fmt "@]");
-           Format.fprintf fmt ";@ ";
-           Format.fprintf fmt "@[%s =@ " "body";
-           ((fun x  ->
-               Format.fprintf fmt "@[<2>[";
+          Format.fprintf fmt "@[<v>process ";
+          (match x.active_sigs with
+          | [] -> Format.fprintf fmt "";
+          | _ -> Format.fprintf fmt "(";
+                 ((fun x  ->
+                    ignore
+                      (List.fold_left
+                         (fun sep  ->
+                            fun x  ->
+                              if sep then Format.fprintf fmt ",";
+                              ((__2 ()) fmt) x;
+                              true) false x))) x.active_sigs;
+                 Format.fprintf fmt ")");
+          ((function
+             | None  -> Format.pp_print_string fmt ""
+             | Some x ->
+                  ((fun x  ->
+                      Format.fprintf fmt "@[<2>";
+                      ignore
+                        (List.fold_left
+                           (fun sep  ->
+                              fun x  ->
+                                if sep then Format.fprintf fmt "@;";
+                                ((__1 ()) fmt) x;
+                                true) false x);
+                      Format.fprintf fmt "@]")) x;)) x.declarations;
+          Format.fprintf fmt "@;@[<v 2>begin@;";
+          ((fun x  ->
                ignore
                  (List.fold_left
                     (fun sep  ->
                        fun x  ->
-                         if sep then Format.fprintf fmt ";@ ";
+                         if sep then Format.fprintf fmt "@;";
                          ((__3 ()) fmt) x;
-                         true) false x);
-               Format.fprintf fmt "@,]@]")) x.body;
-           Format.fprintf fmt "@]");
-          Format.fprintf fmt "@ }@]")
+                         true) false x);)) x.body;
+          Format.fprintf fmt "@]@;end process;@;";
+          Format.fprintf fmt "@]";)
     [@ocaml.warning "-A"])
 
 and show_vhdl_process_t : vhdl_process_t -> Ppx_deriving_runtime.string =
@@ -5261,7 +5236,7 @@ type vhdl_package_t =
   name: vhdl_name_t [@default NoName];
   shared_defs: vhdl_definition_t list [@default []]}
 
-(* Adapted -- TODO: indentation of package content is not correct *)
+(* Adapted *)
 let rec pp_vhdl_package_t :
   Format.formatter -> vhdl_package_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_definition_t
@@ -5271,22 +5246,17 @@ let rec pp_vhdl_package_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          ((Format.fprintf fmt "@[";
-            ((__0 ()) fmt) x.name;
-            Format.fprintf fmt " is@.");
-           Format.fprintf fmt "@[<v 2>";
-           ((fun x  ->
-               Format.fprintf fmt "@[";
-               ignore
-                 (List.fold_left
-                    (fun sep  ->
-                       fun x  ->
-                         if sep then Format.fprintf fmt ";@ ";
-                         ((__1 ()) fmt) x;
-                         true) false x);
-               Format.fprintf fmt "@,@]")) x.shared_defs;
-           Format.fprintf fmt "@]");
-          Format.fprintf fmt "@]")
+          ((__0 ()) fmt) x.name;
+          Format.fprintf fmt " is@;";
+          ((fun x  ->
+             ignore
+               (List.fold_left
+                  (fun sep  ->
+                     fun x  ->
+                       if sep then Format.fprintf fmt "";
+                       ((__1 ()) fmt) x;
+                       Format.fprintf fmt ";";
+                       true) false x))) x.shared_defs;)
     [@ocaml.warning "-A"])
 
 and show_vhdl_package_t : vhdl_package_t -> Ppx_deriving_runtime.string =
@@ -5351,7 +5321,7 @@ type vhdl_load_t =
   | Library of vhdl_name_t list [@name "LIBRARY_CLAUSE"][@default []]
   | Use of vhdl_name_t list [@name "USE_CLAUSE"][@default []]
 
-(* Adapted *)
+(* Adapted. TODO: check indentation *)
 let rec pp_vhdl_load_t :
   Format.formatter -> vhdl_load_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_name_t
@@ -5448,44 +5418,32 @@ let rec pp_vhdl_architecture_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          ((((
-              ((__0 ()) fmt) x.name;
-             );
-             Format.fprintf fmt " of ";
-             ((__1 ()) fmt) x.entity;
-            );
-            Format.fprintf fmt " is @ ";
-            Format.fprintf fmt "@[<v>";
-            ((fun x  ->
-                Format.fprintf fmt "@[";
-                ignore
-                  (List.fold_left
-                     (fun sep  ->
-                        fun x  ->
-                          if sep then Format.fprintf fmt "@ ";
-                          ((__2 ()) fmt) x;
-                          Format.fprintf fmt ";";
-                          true) false x);
-                Format.fprintf fmt "@]")) x.declarations;
-            Format.fprintf fmt "@]");
-           Format.fprintf fmt "@ ";
-           Format.fprintf fmt "@[<v>";
-           (match x.body with
-             | [] -> Format.fprintf fmt "";
-             | _ -> Format.fprintf fmt "begin@ @[<2>";
-           ((fun x  ->
-               Format.fprintf fmt "@[";
+          ((__0 ()) fmt) x.name;
+          Format.fprintf fmt " of ";
+          ((__1 ()) fmt) x.entity;
+          Format.fprintf fmt " is@;";
+          ((fun x  ->
+             ignore
+               (List.fold_left
+                  (fun sep  ->
+                     fun x  ->
+                       if sep then Format.fprintf fmt "@;";
+                       ((__2 ()) fmt) x;
+                       Format.fprintf fmt ";";
+                       true) false x))) x.declarations;
+          Format.fprintf fmt "@;";
+          (match x.body with
+            | [] -> Format.fprintf fmt "";
+            | _ -> Format.fprintf fmt "@[<v 2>begin@;";
+          ((fun x  ->
                ignore
                  (List.fold_left
                     (fun sep  ->
                        fun x  ->
-                         if sep then Format.fprintf fmt "@ ";
+                         if sep then Format.fprintf fmt "";
                          ((__3 ()) fmt) x;
-                         true) false x);
-               Format.fprintf fmt "@]")) x.body;
-           Format.fprintf fmt "@]");
-           Format.fprintf fmt "@]");
-          Format.fprintf fmt "@ ")
+                         true) false x))) x.body;
+          Format.fprintf fmt "@]@;end;"))
     [@ocaml.warning "-A"])
 
 and show_vhdl_architecture_t :
@@ -5646,21 +5604,21 @@ let rec pp_vhdl_library_unit_t :
       fun fmt  ->
         function
         | Package a0 ->
-            (Format.fprintf fmt "@[<2>package ";
+            (Format.fprintf fmt "@[<v 2>package ";
              ((__0 ()) fmt) a0;
-             Format.fprintf fmt "@.end;")
+             Format.fprintf fmt "@.end;@]")
         | Entities a0 ->
-            (Format.fprintf fmt "@[<2>entity ";
+            (Format.fprintf fmt "@[<v 2>entity ";
              ((__1 ()) fmt) a0;
-             Format.fprintf fmt "@.end;")
+             Format.fprintf fmt "@.end;@]")
         | Architecture a0 ->
-            (Format.fprintf fmt "@[<2>architecture ";
+            (Format.fprintf fmt "@[<v 2>architecture ";
              ((__2 ()) fmt) a0;
-             Format.fprintf fmt "@.end;")
+             Format.fprintf fmt "@.end;@]")
         | Configuration a0 ->
-            (Format.fprintf fmt "@[<2>configuration ";
+            (Format.fprintf fmt "@[<v 2>configuration ";
              ((__3 ()) fmt) a0;
-             Format.fprintf fmt "@.end;"))
+             Format.fprintf fmt "@.end;@]"))
     [@ocaml.warning "-A"])
 
 and show_vhdl_library_unit_t :
