@@ -36,7 +36,6 @@ let _ =
       Format.printf "Parsed VHDL: \n%s\n" (pretty_to_string (vhdl_file_t_to_yojson x));
       (* Fold Op vhdl_expr_t values *)
       let folded = replace_op_expr#vhdl_file_t x in
-      Format.printf "PP VHDL: \n%s\n" (show_vhdl_file_t folded);
       (* Translate vhdl_file_t value as lustre value *)
       let program = to_lustre#vhdl_file_t folded in
       Format.printf "PP VHDL: \n%s\n" (show_vhdl_file_t program);
