@@ -14,7 +14,6 @@ type vhdl_cst_val_t =
   | CstStdLogic of string 
   | CstLiteral of string [@name "CST_LITERAL"]
 
-(* Adapted *)
 let rec (pp_vhdl_cst_val_t :
           Format.formatter -> vhdl_cst_val_t -> Ppx_deriving_runtime.unit)
   =
@@ -186,34 +185,33 @@ let rec pp_vhdl_type_t :
              ((
                (Format.fprintf fmt "%d") a1);
                ((function
-                 | None  -> Format.pp_print_string fmt "None"
+                 | None  -> Format.pp_print_string fmt ""
                  | Some x ->
-                      (Format.fprintf fmt "%S") x;
+                      (Format.fprintf fmt "%s") x;
                       )) a0;
               (Format.fprintf fmt "%d") a2);
         | Bit_vector (a0,a1) ->
-             (Format.fprintf fmt "%d .. %d") a0 a1;
+             (Format.fprintf fmt "array (%d,%d) of bit") a0 a1;
         | Array (a0,a1,a2) ->
-             (((__0 ()) fmt) a2;
-              (Format.fprintf fmt "[%d,%d]") a0 a1);
+             (Format.fprintf fmt "array ";
+             (Format.fprintf fmt "(%d,%d)") a0 a1;
+             Format.fprintf fmt " of ";
+             ((__0 ()) fmt) a2)
         | Enumerated a0 ->
              ((fun x  ->
-                 Format.fprintf fmt "@[<2>[";
                  ignore
                    (List.fold_left
                       (fun sep  ->
                          fun x  ->
-                           if sep then Format.fprintf fmt ";@ ";
-                           (Format.fprintf fmt "%S") x;
-                           true) false x);
-                 Format.fprintf fmt "@,]@]")) a0;
-        | Void  -> Format.pp_print_string fmt "Void")
+                           if sep then Format.fprintf fmt ",@ ";
+                           (Format.fprintf fmt "%s") x;
+                           true) false x))) a0;
+        | Void  -> Format.pp_print_string fmt "")
     [@ocaml.warning "-A"])
 
 and show_vhdl_type_t : vhdl_type_t -> Ppx_deriving_runtime.string =
   fun x  -> Format.asprintf "%a" pp_vhdl_type_t x
 
-(* Adapted *)
 and pp_vhdl_subtype_indication_t :
   Format.formatter -> vhdl_subtype_indication_t -> Ppx_deriving_runtime.unit
   =
@@ -238,7 +236,6 @@ and show_vhdl_subtype_indication_t :
   vhdl_subtype_indication_t -> Ppx_deriving_runtime.string =
   fun x  -> Format.asprintf "%a" pp_vhdl_subtype_indication_t x
 
-(* Adapted *)
 and pp_vhdl_discrete_range_t :
   Format.formatter -> vhdl_discrete_range_t -> Ppx_deriving_runtime.unit =
   let __3 () = pp_vhdl_expr_t
@@ -329,7 +326,6 @@ and pp_vhdl_constraint_t :
 and show_vhdl_constraint_t : vhdl_constraint_t -> Ppx_deriving_runtime.string
   = fun x  -> Format.asprintf "%a" pp_vhdl_constraint_t x
 
-(* TODO Adapt for Type *)
 and pp_vhdl_definition_t :
   Format.formatter -> vhdl_definition_t -> Ppx_deriving_runtime.unit =
   let __3 () = pp_vhdl_subtype_indication_t
@@ -359,7 +355,7 @@ and pp_vhdl_definition_t :
 and show_vhdl_definition_t : vhdl_definition_t -> Ppx_deriving_runtime.string
   = fun x  -> Format.asprintf "%a" pp_vhdl_definition_t x
 
-(* adaptation to be provided for Op, Time, Sig, suffixMod, Aggregate,  *)
+(* TODO adapt for Op, Time, Sig, suffixMod, Aggregate *)
 and pp_vhdl_expr_t :
   Format.formatter -> vhdl_expr_t -> Ppx_deriving_runtime.unit =
   let __7 () = pp_vhdl_element_assoc_t
@@ -426,7 +422,7 @@ and pp_vhdl_expr_t :
               Format.fprintf fmt "@]");
              Format.fprintf fmt "@]}")
         | Sig { name = aname; att = aatt } ->
-            (Format.fprintf fmt "@[<2>Sig {@,";
+            (Format.fprintf fmt "--@[<2>Sig {@,";
              ((Format.fprintf fmt "@[%s =@ " "name";
                ((__3 ()) fmt) aname;
                Format.fprintf fmt "@]");
@@ -441,7 +437,7 @@ and pp_vhdl_expr_t :
               Format.fprintf fmt "@]");
              Format.fprintf fmt "@]}")
         | SuffixMod { expr = aexpr; selection = aselection } ->
-            (Format.fprintf fmt "@[<2>SuffixMod {@,";
+            (Format.fprintf fmt "--@[<2>SuffixMod {@,";
              ((Format.fprintf fmt "@[%s =@ " "expr";
                ((__5 ()) fmt) aexpr;
                Format.fprintf fmt "@]");
@@ -451,7 +447,7 @@ and pp_vhdl_expr_t :
               Format.fprintf fmt "@]");
              Format.fprintf fmt "@]}")
         | Aggregate { elems = aelems } ->
-            (Format.fprintf fmt "@[<2>Aggregate {@,";
+            (Format.fprintf fmt "--@[<2>Aggregate {@,";
              (Format.fprintf fmt "@[%s =@ " "elems";
               ((fun x  ->
                   Format.fprintf fmt "@[<2>[";
@@ -471,7 +467,6 @@ and pp_vhdl_expr_t :
 and show_vhdl_expr_t : vhdl_expr_t -> Ppx_deriving_runtime.string =
   fun x  -> Format.asprintf "%a" pp_vhdl_expr_t x
 
-(* Adapted *)
 and pp_vhdl_name_t :
   Format.formatter -> vhdl_name_t -> Ppx_deriving_runtime.unit =
   let __9 () = pp_vhdl_assoc_element_t
@@ -559,7 +554,6 @@ and pp_vhdl_name_t :
 and show_vhdl_name_t : vhdl_name_t -> Ppx_deriving_runtime.string =
   fun x  -> Format.asprintf "%a" pp_vhdl_name_t x
 
-(* Adapted *)
 and pp_vhdl_assoc_element_t :
   Format.formatter -> vhdl_assoc_element_t -> Ppx_deriving_runtime.unit =
   let __4 () = pp_vhdl_expr_t
@@ -617,30 +611,27 @@ and pp_vhdl_element_assoc_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          Format.fprintf fmt "@[<2>{ ";
-          ((Format.fprintf fmt "@[%s =@ " "choices";
-            ((fun x  ->
+            (match x.choices with
+            | [] -> Format.fprintf fmt "";
+            | _ -> 
+              (((fun x  ->
                 Format.fprintf fmt "@[<2>[";
                 ignore
                   (List.fold_left
                      (fun sep  ->
                         fun x  ->
-                          if sep then Format.fprintf fmt ";@ ";
+                          if sep then Format.fprintf fmt "|@ ";
                           ((__0 ()) fmt) x;
-                          true) false x);
-                Format.fprintf fmt "@,]@]")) x.choices;
-            Format.fprintf fmt "@]");
-           Format.fprintf fmt ";@ ";
-           Format.fprintf fmt "@[%s =@ " "expr";
-           ((__1 ()) fmt) x.expr;
-           Format.fprintf fmt "@]");
-          Format.fprintf fmt "@ }@]")
+                          true) false x))) x.choices;
+              Format.fprintf fmt " => ";));
+           ((__1 ()) fmt) x.expr)
     [@ocaml.warning "-A"])
 
 and show_vhdl_element_assoc_t :
   vhdl_element_assoc_t -> Ppx_deriving_runtime.string =
   fun x  -> Format.asprintf "%a" pp_vhdl_element_assoc_t x
 
+(* TODO *)
 and (pp_vhdl_array_attributes_t :
       Format.formatter ->
         vhdl_array_attributes_t -> Ppx_deriving_runtime.unit)
@@ -665,6 +656,7 @@ and show_vhdl_array_attributes_t :
   vhdl_array_attributes_t -> Ppx_deriving_runtime.string =
   fun x  -> Format.asprintf "%a" pp_vhdl_array_attributes_t x
 
+(* TODO *)
 and (pp_vhdl_signal_attributes_t :
       Format.formatter ->
         vhdl_signal_attributes_t -> Ppx_deriving_runtime.unit)
@@ -682,6 +674,7 @@ and show_vhdl_signal_attributes_t :
   vhdl_signal_attributes_t -> Ppx_deriving_runtime.string =
   fun x  -> Format.asprintf "%a" pp_vhdl_signal_attributes_t x
 
+(* TODO *)
 and (pp_vhdl_string_attributes_t :
       Format.formatter ->
         vhdl_string_attributes_t -> Ppx_deriving_runtime.unit)
@@ -699,6 +692,7 @@ and show_vhdl_string_attributes_t :
   vhdl_string_attributes_t -> Ppx_deriving_runtime.string =
   fun x  -> Format.asprintf "%a" pp_vhdl_string_attributes_t x
 
+(* TODO *)
 and (pp_vhdl_suffix_selection_t :
       Format.formatter ->
         vhdl_suffix_selection_t -> Ppx_deriving_runtime.unit)
@@ -2024,6 +2018,7 @@ type 'basetype vhdl_type_attributes_t =
   id: string ;
   arg: string } 
 
+(* TODO *)
 let rec pp_vhdl_type_attributes_t
   =
   ((let open! Ppx_deriving_runtime in
@@ -2274,6 +2269,7 @@ type vhdl_parameter_t =
   typ: vhdl_subtype_indication_t ;
   init_val: vhdl_cst_val_t option [@default None]}
 
+(* TODO *)
 let rec pp_vhdl_parameter_t :
   Format.formatter -> vhdl_parameter_t -> Ppx_deriving_runtime.unit =
   let __2 () = pp_vhdl_cst_val_t
@@ -2442,6 +2438,7 @@ type vhdl_subprogram_spec_t =
   parameters: vhdl_parameter_t list ;
   isPure: bool [@default false]}
 
+(* TODO *)
 let rec pp_vhdl_subprogram_spec_t :
   Format.formatter -> vhdl_subprogram_spec_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_parameter_t
@@ -2647,7 +2644,7 @@ and vhdl_case_item_t =
   when_cond: vhdl_expr_t list ;
   when_stmt: vhdl_sequential_stmt_t list }
 
-(* Needs adaptation for: Assert *)
+(* TODO Adapt for: Assert *)
 let rec pp_vhdl_sequential_stmt_t :
   Format.formatter -> vhdl_sequential_stmt_t -> Ppx_deriving_runtime.unit =
   let __19 () = pp_vhdl_name_t
@@ -2699,11 +2696,9 @@ let rec pp_vhdl_sequential_stmt_t :
               | _ -> (((__0 ()) fmt) alabel;
                      Format.fprintf fmt ":@ ")
             );
-            Format.fprintf fmt "@[<2>";
             ((__1 ()) fmt) alhs;
             Format.fprintf fmt "@ :=@ ";
             ((__2 ()) fmt) arhs;
-            Format.fprintf fmt "@]";
 (* TODO: Check
             (Format.fprintf fmt "@[<2>VarAssign {@,";
              (((Format.fprintf fmt "@[%s =@ " "label";
@@ -2846,7 +2841,6 @@ and show_vhdl_sequential_stmt_t :
   vhdl_sequential_stmt_t -> Ppx_deriving_runtime.string =
   fun x  -> Format.asprintf "%a" pp_vhdl_sequential_stmt_t x
 
-(* Adapted *)
 and pp_vhdl_if_case_t :
   Format.formatter -> vhdl_if_case_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_sequential_stmt_t
@@ -2873,7 +2867,6 @@ and pp_vhdl_if_case_t :
 and show_vhdl_if_case_t : vhdl_if_case_t -> Ppx_deriving_runtime.string =
   fun x  -> Format.asprintf "%a" pp_vhdl_if_case_t x
 
-(* Adapted *)
 and pp_vhdl_case_item_t :
   Format.formatter -> vhdl_case_item_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_sequential_stmt_t
@@ -4025,7 +4018,6 @@ type vhdl_signal_condition_t =
   expr: vhdl_expr_t list ;
   cond: vhdl_expr_t [@default IsNull]}
 
-(* Adapted *)
 let rec pp_vhdl_signal_condition_t :
   Format.formatter -> vhdl_signal_condition_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_expr_t
@@ -4110,6 +4102,7 @@ type vhdl_signal_selection_t =
   expr: vhdl_expr_t ;
   when_sel: vhdl_expr_t list [@default []]}
 
+(* TODO *)
 let rec pp_vhdl_signal_selection_t :
   Format.formatter -> vhdl_signal_selection_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_expr_t
@@ -4206,7 +4199,6 @@ type vhdl_conditional_signal_t =
   cond: vhdl_expr_t [@default IsNull];
   delay: vhdl_expr_t [@default IsNull]}
 
-(* Adapted *)
 let rec pp_vhdl_conditional_signal_t :
   Format.formatter -> vhdl_conditional_signal_t -> Ppx_deriving_runtime.unit
   =
@@ -4387,7 +4379,6 @@ type vhdl_process_t =
   body: vhdl_sequential_stmt_t list
     [@key "PROCESS_STATEMENT_PART"][@default []]}
 
-(* Adapted *)
 let rec pp_vhdl_process_t :
   Format.formatter -> vhdl_process_t -> Ppx_deriving_runtime.unit =
   let __3 () = pp_vhdl_sequential_stmt_t
@@ -4568,6 +4559,7 @@ type vhdl_selected_signal_t =
   branches: vhdl_signal_selection_t list [@default []];
   delay: vhdl_expr_t option }
 
+(* TODO *)
 let rec pp_vhdl_selected_signal_t :
   Format.formatter -> vhdl_selected_signal_t -> Ppx_deriving_runtime.unit =
   let __4 () = pp_vhdl_expr_t
@@ -4762,7 +4754,6 @@ type vhdl_concurrent_stmt_t =
   | SelectedSig of vhdl_selected_signal_t
   [@name "SELECTED_SIGNAL_ASSIGNMENT"]
 
-(* Adapted *)
 let rec pp_vhdl_concurrent_stmt_t :
   Format.formatter -> vhdl_concurrent_stmt_t -> Ppx_deriving_runtime.unit =
   let __2 () = pp_vhdl_selected_signal_t
@@ -4874,7 +4865,6 @@ type vhdl_port_t =
   typ: vhdl_subtype_indication_t ;
   expr: vhdl_expr_t [@default IsNull]}
 
-(* Adapted *)
 let rec pp_vhdl_port_t :
   Format.formatter -> vhdl_port_t -> Ppx_deriving_runtime.unit =
   let __3 () = pp_vhdl_expr_t
@@ -5010,7 +5000,6 @@ type vhdl_entity_t =
   stmts: vhdl_concurrent_stmt_t list
     [@key "ENTITY_STATEMENT_PART"][@default []]}
 
-(* Adapted *)
 let rec pp_vhdl_entity_t :
   Format.formatter -> vhdl_entity_t -> Ppx_deriving_runtime.unit =
   let __4 () = pp_vhdl_concurrent_stmt_t
@@ -5212,7 +5201,6 @@ type vhdl_package_t =
   name: vhdl_name_t [@default NoName];
   shared_defs: vhdl_definition_t list [@default []]}
 
-(* Adapted *)
 let rec pp_vhdl_package_t :
   Format.formatter -> vhdl_package_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_definition_t
@@ -5376,7 +5364,6 @@ type vhdl_architecture_t =
   body: vhdl_concurrent_stmt_t list
     [@key "ARCHITECTURE_STATEMENT_PART"][@default []]}
 
-(* Adapted *)
 let rec pp_vhdl_architecture_t :
   Format.formatter -> vhdl_architecture_t -> Ppx_deriving_runtime.unit =
   let __3 () = pp_vhdl_concurrent_stmt_t
@@ -5561,7 +5548,6 @@ type vhdl_library_unit_t =
   | Architecture of vhdl_architecture_t [@name "ARCHITECTURE_BODY"]
   | Configuration of vhdl_configuration_t [@name "CONFIGURATION_DECLARATION"]
 
-(* Adapted *)
 let rec pp_vhdl_library_unit_t :
   Format.formatter -> vhdl_library_unit_t -> Ppx_deriving_runtime.unit =
   let __3 () = pp_vhdl_configuration_t
@@ -5646,7 +5632,6 @@ type vhdl_design_unit_t =
   contexts: vhdl_load_t list [@default []];
   library: vhdl_library_unit_t }
 
-(* Adapted *)
 let rec pp_vhdl_design_unit_t :
   Format.formatter -> vhdl_design_unit_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_library_unit_t
@@ -5736,7 +5721,6 @@ type vhdl_design_file_t =
   {
   design_units: vhdl_design_unit_t list [@default []]}
 
-(* Adapted *)
 let rec pp_vhdl_design_file_t :
   Format.formatter -> vhdl_design_file_t -> Ppx_deriving_runtime.unit =
   let __0 () = pp_vhdl_design_unit_t  in
@@ -5808,7 +5792,6 @@ type vhdl_file_t =
   design_file: vhdl_design_file_t
     [@default { design_units = [] }][@key "DESIGN_FILE"]}
 
-(* Adapted *)
 let rec pp_vhdl_file_t :
   Format.formatter -> vhdl_file_t -> Ppx_deriving_runtime.unit =
   let __0 () = pp_vhdl_design_file_t  in
