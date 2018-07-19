@@ -248,11 +248,21 @@ type vhdl_selected_signal_t =
     delay: vhdl_expr_t option;
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;
-			   
+
+type vhdl_component_instantiation_t =
+  {
+    name: vhdl_name_t;
+    inst_unit: vhdl_name_t;
+    generic_map: vhdl_assoc_element_t option [@default None];
+    port_map: vhdl_assoc_element_t option [@default None];
+  }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
+
 type vhdl_concurrent_stmt_t =
   | SigAssign of vhdl_conditional_signal_t [@name "CONDITIONAL_SIGNAL_ASSIGNMENT"]
   | Process of vhdl_process_t [@name "PROCESS_STATEMENT"]
   | SelectedSig of vhdl_selected_signal_t [@name "SELECTED_SIGNAL_ASSIGNMENT"]
+  | ComponentInst of vhdl_component_instantiation_t [@name "COMPONENT_INSTANTIATION_STATEMENT"]
 [@@deriving show { with_path = false }, yojson {strict = false}];;
   (*
 type vhdl_statement_t =

@@ -29,6 +29,7 @@ let _ = fun (_ : vhdl_conditional_signal_t)  -> ()
 let _ = fun (_ : vhdl_process_t)  -> () 
 let _ = fun (_ : vhdl_selected_signal_t)  -> () 
 let _ = fun (_ : vhdl_port_mode_t)  -> () 
+let _ = fun (_ : vhdl_component_instantiation_t)  -> ()
 let _ = fun (_ : vhdl_concurrent_stmt_t)  -> () 
 let _ = fun (_ : vhdl_port_t)  -> () 
 let _ = fun (_ : vhdl_entity_t)  -> () 
@@ -67,6 +68,7 @@ class virtual vhdl_to_lustre_map =
     method virtual  vhdl_subprogram_spec_t : vhdl_subprogram_spec_t -> vhdl_subprogram_spec_t
     method virtual  vhdl_discrete_range_t : vhdl_discrete_range_t -> vhdl_discrete_range_t
     method virtual  vhdl_parameter_t : vhdl_parameter_t -> vhdl_parameter_t
+    method virtual  vhdl_component_instantiation_t : vhdl_component_instantiation_t -> vhdl_component_instantiation_t
     method virtual  vhdl_concurrent_stmt_t : vhdl_concurrent_stmt_t -> vhdl_concurrent_stmt_t
     method virtual  vhdl_declaration_t : vhdl_declaration_t -> vhdl_declaration_t
     method virtual  vhdl_architecture_t : vhdl_architecture_t -> vhdl_architecture_t
@@ -400,6 +402,16 @@ class virtual vhdl_to_lustre_map =
     method vhdl_port_mode_t : vhdl_port_mode_t -> vhdl_port_mode_t=
       fun x  -> x
 
+    method vhdl_component_instantiation_t :
+      vhdl_component_instantiation_t -> vhdl_component_instantiation_t=
+      fun { name; inst_unit; generic_map; port_map }  ->
+        let name = self#vhdl_name_t name  in
+        let inst_unit = self#vhdl_name_t inst_unit  in
+        let generic_map = self#option self#vhdl_assoc_element_t generic_map
+           in
+        let port_map = self#option self#vhdl_assoc_element_t port_map  in
+        { name; inst_unit; generic_map; port_map }
+
     method vhdl_concurrent_stmt_t :
       vhdl_concurrent_stmt_t -> vhdl_concurrent_stmt_t=
       fun x  ->
@@ -407,6 +419,7 @@ class virtual vhdl_to_lustre_map =
         | SigAssign a -> let a = self#vhdl_conditional_signal_t a  in SigAssign a
         | Process a -> let a = self#vhdl_process_t a  in Process a
         | SelectedSig a -> let a = self#vhdl_selected_signal_t a  in SelectedSig a
+        | ComponentInst a -> let a = self#vhdl_component_instantiation_t a  in ComponentInst a 
 
     method vhdl_port_t : vhdl_port_t -> vhdl_port_t=
       fun { names; mode; typ; expr }  ->

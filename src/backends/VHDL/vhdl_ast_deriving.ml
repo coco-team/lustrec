@@ -4747,16 +4747,176 @@ and (vhdl_selected_signal_t_of_yojson :
       | _ -> Result.Error "Vhdl_ast.vhdl_selected_signal_t")
   [@ocaml.warning "-A"])
 
+type vhdl_component_instantiation_t =
+  {
+  name: vhdl_name_t ;
+  inst_unit: vhdl_name_t ;
+  generic_map: vhdl_assoc_element_t option [@default None];
+  port_map: vhdl_assoc_element_t option [@default None]}[@@deriving
+                                                          ((show
+                                                              {
+                                                                with_path =
+                                                                  false
+                                                              }),
+                                                            (yojson
+                                                               {
+                                                                 strict =
+                                                                   false
+                                                               }))]
+(* TODO *)
+let rec pp_vhdl_component_instantiation_t :
+  Format.formatter ->
+    vhdl_component_instantiation_t -> Ppx_deriving_runtime.unit
+  =
+  let __3 () = pp_vhdl_assoc_element_t
+  
+  and __2 () = pp_vhdl_assoc_element_t
+  
+  and __1 () = pp_vhdl_name_t
+  
+  and __0 () = pp_vhdl_name_t
+   in
+  ((let open! Ppx_deriving_runtime in
+      fun fmt  ->
+        fun x  ->
+          Format.fprintf fmt "@[<2>{ ";
+          ((((Format.fprintf fmt "@[%s =@ " "name";
+              ((__0 ()) fmt) x.name;
+              Format.fprintf fmt "@]");
+             Format.fprintf fmt ";@ ";
+             Format.fprintf fmt "@[%s =@ " "inst_unit";
+             ((__1 ()) fmt) x.inst_unit;
+             Format.fprintf fmt "@]");
+            Format.fprintf fmt ";@ ";
+            Format.fprintf fmt "@[%s =@ " "generic_map";
+            ((function
+              | None  -> Format.pp_print_string fmt "None"
+              | Some x ->
+                  (Format.pp_print_string fmt "(Some ";
+                   ((__2 ()) fmt) x;
+                   Format.pp_print_string fmt ")"))) x.generic_map;
+            Format.fprintf fmt "@]");
+           Format.fprintf fmt ";@ ";
+           Format.fprintf fmt "@[%s =@ " "port_map";
+           ((function
+             | None  -> Format.pp_print_string fmt "None"
+             | Some x ->
+                 (Format.pp_print_string fmt "(Some ";
+                  ((__3 ()) fmt) x;
+                  Format.pp_print_string fmt ")"))) x.port_map;
+           Format.fprintf fmt "@]");
+          Format.fprintf fmt "@ }@]")
+    [@ocaml.warning "-A"])
+
+and show_vhdl_component_instantiation_t :
+  vhdl_component_instantiation_t -> Ppx_deriving_runtime.string =
+  fun x  -> Format.asprintf "%a" pp_vhdl_component_instantiation_t x
+
+let rec (vhdl_component_instantiation_t_to_yojson :
+          vhdl_component_instantiation_t -> Yojson.Safe.json)
+  =
+  ((let open! Ppx_deriving_yojson_runtime in
+      fun x  ->
+        let fields = []  in
+        let fields =
+          if x.port_map = None
+          then fields
+          else
+            ("port_map",
+              (((function
+                 | None  -> `Null
+                 | Some x -> ((fun x  -> vhdl_assoc_element_t_to_yojson x)) x))
+                 x.port_map))
+            :: fields
+           in
+        let fields =
+          if x.generic_map = None
+          then fields
+          else
+            ("generic_map",
+              (((function
+                 | None  -> `Null
+                 | Some x -> ((fun x  -> vhdl_assoc_element_t_to_yojson x)) x))
+                 x.generic_map))
+            :: fields
+           in
+        let fields =
+          ("inst_unit", ((fun x  -> vhdl_name_t_to_yojson x) x.inst_unit)) ::
+          fields  in
+        let fields = ("name", ((fun x  -> vhdl_name_t_to_yojson x) x.name))
+          :: fields  in
+        `Assoc fields)
+  [@ocaml.warning "-A"])
+
+and (vhdl_component_instantiation_t_of_yojson :
+      Yojson.Safe.json ->
+        vhdl_component_instantiation_t Ppx_deriving_yojson_runtime.error_or)
+  =
+  ((let open! Ppx_deriving_yojson_runtime in
+      function
+      | `Assoc xs ->
+          let rec loop xs ((arg0,arg1,arg2,arg3) as _state) =
+            match xs with
+            | ("name",x)::xs ->
+                loop xs
+                  (((fun x  -> vhdl_name_t_of_yojson x) x), arg1, arg2, arg3)
+            | ("inst_unit",x)::xs ->
+                loop xs
+                  (arg0, ((fun x  -> vhdl_name_t_of_yojson x) x), arg2, arg3)
+            | ("generic_map",x)::xs ->
+                loop xs
+                  (arg0, arg1,
+                    ((function
+                      | `Null -> Result.Ok None
+                      | x ->
+                          ((fun x  -> vhdl_assoc_element_t_of_yojson x) x)
+                            >>= ((fun x  -> Result.Ok (Some x)))) x), arg3)
+            | ("port_map",x)::xs ->
+                loop xs
+                  (arg0, arg1, arg2,
+                    ((function
+                      | `Null -> Result.Ok None
+                      | x ->
+                          ((fun x  -> vhdl_assoc_element_t_of_yojson x) x)
+                            >>= ((fun x  -> Result.Ok (Some x)))) x))
+            | [] ->
+                arg3 >>=
+                  ((fun arg3  ->
+                      arg2 >>=
+                        (fun arg2  ->
+                           arg1 >>=
+                             (fun arg1  ->
+                                arg0 >>=
+                                  (fun arg0  ->
+                                     Result.Ok
+                                       {
+                                         name = arg0;
+                                         inst_unit = arg1;
+                                         generic_map = arg2;
+                                         port_map = arg3
+                                       })))))
+            | _::xs -> loop xs _state  in
+          loop xs
+            ((Result.Error "Vhdl_ast.vhdl_component_instantiation_t.name"),
+              (Result.Error
+                 "Vhdl_ast.vhdl_component_instantiation_t.inst_unit"),
+              (Result.Ok None), (Result.Ok None))
+      | _ -> Result.Error "Vhdl_ast.vhdl_component_instantiation_t")
+  [@ocaml.warning "-A"])
 type vhdl_concurrent_stmt_t =
   | SigAssign of vhdl_conditional_signal_t
   [@name "CONDITIONAL_SIGNAL_ASSIGNMENT"]
   | Process of vhdl_process_t [@name "PROCESS_STATEMENT"]
   | SelectedSig of vhdl_selected_signal_t
   [@name "SELECTED_SIGNAL_ASSIGNMENT"]
+  | ComponentInst of vhdl_component_instantiation_t
+  [@name "COMPONENT_INSTANTIATION_STATEMENT"]
 
 let rec pp_vhdl_concurrent_stmt_t :
   Format.formatter -> vhdl_concurrent_stmt_t -> Ppx_deriving_runtime.unit =
-  let __2 () = pp_vhdl_selected_signal_t
+  let __3 () = pp_vhdl_component_instantiation_t
+  
+  and __2 () = pp_vhdl_selected_signal_t
   
   and __1 () = pp_vhdl_process_t
   
@@ -4771,6 +4931,8 @@ let rec pp_vhdl_concurrent_stmt_t :
              ((__1 ()) fmt) a0;
         | SelectedSig a0 ->
              ((__2 ()) fmt) a0;
+        | ComponentInst a0 ->
+             ((__3 ()) fmt) a0;
     )
     [@ocaml.warning "-A"])
 
@@ -4794,7 +4956,11 @@ let rec (vhdl_concurrent_stmt_t_to_yojson :
       | SelectedSig arg0 ->
           `List
             [`String "SELECTED_SIGNAL_ASSIGNMENT";
-            ((fun x  -> vhdl_selected_signal_t_to_yojson x)) arg0])
+            ((fun x  -> vhdl_selected_signal_t_to_yojson x)) arg0]
+      | ComponentInst arg0 ->
+          `List
+            [`String "COMPONENT_INSTANTIATION_STATEMENT";
+            ((fun x  -> vhdl_component_instantiation_t_to_yojson x)) arg0])
   [@ocaml.warning "-A"])
 
 and (vhdl_concurrent_stmt_t_of_yojson :
@@ -4812,6 +4978,9 @@ and (vhdl_concurrent_stmt_t_of_yojson :
       | `List ((`String "SELECTED_SIGNAL_ASSIGNMENT")::arg0::[]) ->
           ((fun x  -> vhdl_selected_signal_t_of_yojson x) arg0) >>=
             ((fun arg0  -> Result.Ok (SelectedSig arg0)))
+      | `List ((`String "COMPONENT_INSTANTIATION_STATEMENT")::arg0::[]) ->
+          ((fun x  -> vhdl_component_instantiation_t_of_yojson x) arg0) >>=
+            ((fun arg0  -> Result.Ok (ComponentInst arg0)))
       | _ -> Result.Error "Vhdl_ast.vhdl_concurrent_stmt_t")
   [@ocaml.warning "-A"])
 
