@@ -404,13 +404,14 @@ class virtual vhdl_to_lustre_map =
 
     method vhdl_component_instantiation_t :
       vhdl_component_instantiation_t -> vhdl_component_instantiation_t=
-      fun { name; inst_unit; generic_map; port_map }  ->
+      fun { name; inst_unit; archi_name; generic_map; port_map }  ->
         let name = self#vhdl_name_t name  in
         let inst_unit = self#vhdl_name_t inst_unit  in
+        let archi_name = self#option self#vhdl_name_t archi_name  in
         let generic_map = self#option self#vhdl_assoc_element_t generic_map
            in
         let port_map = self#option self#vhdl_assoc_element_t port_map  in
-        { name; inst_unit; generic_map; port_map }
+        { name; inst_unit; archi_name; generic_map; port_map }
 
     method vhdl_concurrent_stmt_t :
       vhdl_concurrent_stmt_t -> vhdl_concurrent_stmt_t=
