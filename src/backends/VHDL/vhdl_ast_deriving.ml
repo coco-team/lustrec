@@ -2630,6 +2630,11 @@ type vhdl_sequential_stmt_t =
   cond: vhdl_expr_t ;
   report: vhdl_expr_t [@default IsNull];
   severity: vhdl_expr_t [@default IsNull]} [@name "ASSERTION_STATEMENT"]
+  | ProcedureCall of
+  {
+  label: vhdl_name_t [@default NoName];
+  name: vhdl_name_t ;
+  assocs: vhdl_assoc_element_t list } [@name "PROCEDURE_CALL_STATEMENT"]
   | Wait [@name "WAIT_STATEMENT"]
   | Null of {
   label: vhdl_name_t [@default NoName]} [@name "NULL_STATEMENT"]
@@ -2644,10 +2649,16 @@ and vhdl_case_item_t =
   when_cond: vhdl_expr_t list ;
   when_stmt: vhdl_sequential_stmt_t list }
 
-(* TODO Adapt for: Assert *)
+(* TODO Adapt for: Assert, ProcedureCall *)
 let rec pp_vhdl_sequential_stmt_t :
   Format.formatter -> vhdl_sequential_stmt_t -> Ppx_deriving_runtime.unit =
-  let __19 () = pp_vhdl_name_t
+  let __22 () = pp_vhdl_name_t
+  
+  and __21 () = pp_vhdl_name_t
+  
+  and __20 () = pp_vhdl_assoc_element_t
+  
+  and __19 () = pp_vhdl_name_t
   
   and __18 () = pp_vhdl_name_t
   
@@ -2820,6 +2831,23 @@ let rec pp_vhdl_sequential_stmt_t :
               ((__17 ()) fmt) aseverity;
               Format.fprintf fmt "@]");
              Format.fprintf fmt "@]}")
+        | ProcedureCall { label = alabel; name = aname; assocs = aassocs } ->
+            (match alabel with
+              | NoName -> Format.fprintf fmt "";
+              | _ -> (((__18 ()) fmt) alabel;
+                     Format.fprintf fmt ":@ ")
+            );
+            ((__19 ()) fmt) aname;
+            ((fun x  ->
+                Format.fprintf fmt "(";
+                ignore
+                  (List.fold_left
+                     (fun sep  ->
+                        fun x  ->
+                          if sep then Format.fprintf fmt ",@ ";
+                          ((__20 ()) fmt) x;
+                          true) false x);
+            Format.fprintf fmt ")")) aassocs;
         | Wait  -> Format.pp_print_string fmt "wait"
         | Null { label = alabel } ->
             (match alabel with
@@ -3058,6 +3086,29 @@ let rec (vhdl_sequential_stmt_t_to_yojson :
                 in
              let fields =
                ("cond", ((fun x  -> vhdl_expr_t_to_yojson x) arg0.cond)) ::
+               fields  in
+             let fields =
+               if arg0.label = NoName
+               then fields
+               else
+                 ("label",
+                   (((fun x  -> vhdl_name_t_to_yojson x)) arg0.label))
+                 :: fields
+                in
+             `Assoc fields)]
+      | ProcedureCall arg0 ->
+          `List
+            [`String "PROCEDURE_CALL_STATEMENT";
+            (let fields = []  in
+             let fields =
+               ("assocs",
+                 ((fun x  ->
+                     `List
+                       (List.map (fun x  -> vhdl_assoc_element_t_to_yojson x)
+                          x)) arg0.assocs))
+               :: fields  in
+             let fields =
+               ("name", ((fun x  -> vhdl_name_t_to_yojson x) arg0.name)) ::
                fields  in
              let fields =
                if arg0.label = NoName
@@ -3366,6 +3417,48 @@ and (vhdl_sequential_stmt_t_of_yojson :
                   ((Result.Ok NoName),
                     (Result.Error "Vhdl_ast.vhdl_sequential_stmt_t.cond"),
                     (Result.Ok IsNull), (Result.Ok IsNull))
+            | _ -> Result.Error "Vhdl_ast.vhdl_sequential_stmt_t")) arg0
+      | `List ((`String "PROCEDURE_CALL_STATEMENT")::arg0::[]) ->
+          ((function
+            | `Assoc xs ->
+                let rec loop xs ((arg0,arg1,arg2) as _state) =
+                  match xs with
+                  | ("label",x)::xs ->
+                      loop xs
+                        (((fun x  -> vhdl_name_t_of_yojson x) x), arg1, arg2)
+                  | ("name",x)::xs ->
+                      loop xs
+                        (arg0, ((fun x  -> vhdl_name_t_of_yojson x) x), arg2)
+                  | ("assocs",x)::xs ->
+                      loop xs
+                        (arg0, arg1,
+                          ((function
+                            | `List xs ->
+                                map_bind
+                                  (fun x  -> vhdl_assoc_element_t_of_yojson x)
+                                  [] xs
+                            | _ ->
+                                Result.Error
+                                  "Vhdl_ast.vhdl_sequential_stmt_t.assocs") x))
+                  | [] ->
+                      arg2 >>=
+                        ((fun arg2  ->
+                            arg1 >>=
+                              (fun arg1  ->
+                                 arg0 >>=
+                                   (fun arg0  ->
+                                      Result.Ok
+                                        (ProcedureCall
+                                           {
+                                             label = arg0;
+                                             name = arg1;
+                                             assocs = arg2
+                                           })))))
+                  | _::xs -> loop xs _state  in
+                loop xs
+                  ((Result.Ok NoName),
+                    (Result.Error "Vhdl_ast.vhdl_sequential_stmt_t.name"),
+                    (Result.Error "Vhdl_ast.vhdl_sequential_stmt_t.assocs"))
             | _ -> Result.Error "Vhdl_ast.vhdl_sequential_stmt_t")) arg0
       | `List ((`String "WAIT_STATEMENT")::[]) -> Result.Ok Wait
       | `List ((`String "NULL_STATEMENT")::arg0::[]) ->

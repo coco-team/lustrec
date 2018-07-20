@@ -313,6 +313,11 @@ class virtual vhdl_map =
             let report = self#vhdl_expr_t report  in
             let severity = self#vhdl_expr_t severity  in
             Assert { label; cond; report; severity }
+        | ProcedureCall { label; name; assocs } ->
+            let label = self#vhdl_name_t label  in
+            let name = self#vhdl_name_t name  in
+            let assocs = self#list self#vhdl_assoc_element_t assocs  in
+            ProcedureCall { label; name; assocs }
         | Wait  -> Wait
         | Null { label } ->
             let label = self#vhdl_name_t label  in Null { label }
