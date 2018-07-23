@@ -75,7 +75,7 @@ and vhdl_expr_t =
   | SuffixMod of { expr : vhdl_expr_t; selection : vhdl_suffix_selection_t }
   | Aggregate of { elems : vhdl_element_assoc_t list } [@name "AGGREGATE"]
   | Others [@name "OTHERS"]
-and vhdl_name_t =
+and vhdl_name_t = (* Add something like TOKEN_NAME for specific keywords (open, all, ...) ? *)
   | Simple of string [@name "SIMPLE_NAME"]
   | Identifier of string [@name "IDENTIFIER"]
   | Selected of vhdl_name_t list [@name "SELECTED_NAME"]
@@ -282,8 +282,8 @@ type vhdl_component_instantiation_t =
     name: vhdl_name_t;
     inst_unit: vhdl_name_t;
     archi_name: vhdl_name_t option [@default None];
-    generic_map: vhdl_assoc_element_t option [@default None];
-    port_map: vhdl_assoc_element_t option [@default None];
+    generic_map: vhdl_assoc_element_t list [@default []];
+    port_map: vhdl_assoc_element_t list [@default []];
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;
 

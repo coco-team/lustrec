@@ -431,9 +431,8 @@ class virtual vhdl_map =
         let name = self#vhdl_name_t name  in
         let inst_unit = self#vhdl_name_t inst_unit  in
         let archi_name = self#option self#vhdl_name_t archi_name  in
-        let generic_map = self#option self#vhdl_assoc_element_t generic_map
-           in
-        let port_map = self#option self#vhdl_assoc_element_t port_map  in
+        let generic_map = self#list self#vhdl_assoc_element_t generic_map  in
+        let port_map = self#list self#vhdl_assoc_element_t port_map  in
         { name; inst_unit; archi_name; generic_map; port_map }
 
     method vhdl_concurrent_stmt_t :

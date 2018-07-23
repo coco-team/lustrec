@@ -5383,20 +5383,14 @@ type vhdl_component_instantiation_t =
   name: vhdl_name_t ;
   inst_unit: vhdl_name_t ;
   archi_name: vhdl_name_t option [@default None];
-  generic_map: vhdl_assoc_element_t option [@default None];
-  port_map: vhdl_assoc_element_t option [@default None]}[@@deriving
-                                                          ((show
-                                                              {
-                                                                with_path =
-                                                                  false
-                                                              }),
-                                                            (yojson
-                                                               {
-                                                                 strict =
-                                                                   false
-                                                               }))]
+  generic_map: vhdl_assoc_element_t list [@default []];
+  port_map: vhdl_assoc_element_t list [@default []]}[@@deriving
+                                                      ((show
+                                                          { with_path = false
+                                                          }),
+                                                        (yojson
+                                                           { strict = false }))]
 
-(* TODO *)
 let rec pp_vhdl_component_instantiation_t :
   Format.formatter ->
     vhdl_component_instantiation_t -> Ppx_deriving_runtime.unit
@@ -5423,18 +5417,26 @@ let rec pp_vhdl_component_instantiation_t :
                  (Format.pp_print_string fmt "(";
                  ((__2 ()) fmt) x;
                  Format.pp_print_string fmt ")@;"))) x.archi_name;
-          ((function
-             | None  -> Format.pp_print_string fmt ""
-             | Some x ->
-                 (Format.pp_print_string fmt "(";
-                 ((__3 ()) fmt) x;
-                 Format.pp_print_string fmt ")@;"))) x.generic_map;
-          ((function
-             | None  -> Format.pp_print_string fmt "None"
-             | Some x ->
-                 (Format.pp_print_string fmt "(";
-                 ((__4 ()) fmt) x;
-                 Format.pp_print_string fmt ")@;"))) x.port_map;)
+          ((fun x  ->
+            Format.fprintf fmt "(@[<v 2>";
+            ignore
+            (List.fold_left
+               (fun sep  ->
+                 fun x  ->
+                   if sep then Format.fprintf fmt ",@;";
+                   ((__3 ()) fmt) x;
+                   true) false x);
+            Format.fprintf fmt "@]")) x.generic_map;
+          ((fun x  ->
+            Format.fprintf fmt "(@[<v 2>";
+            ignore
+            (List.fold_left
+               (fun sep  ->
+                 fun x  ->
+                   if sep then Format.fprintf fmt ",@;";
+                   ((__4 ()) fmt) x;
+                   true) false x);
+            Format.fprintf fmt "@]")) x.port_map;)
     [@ocaml.warning "-A"])
 
 and show_vhdl_component_instantiation_t :
@@ -5448,24 +5450,24 @@ let rec (vhdl_component_instantiation_t_to_yojson :
       fun x  ->
         let fields = []  in
         let fields =
-          if x.port_map = None
+          if x.port_map = []
           then fields
           else
             ("port_map",
-              (((function
-                 | None  -> `Null
-                 | Some x -> ((fun x  -> vhdl_assoc_element_t_to_yojson x)) x))
+              (((fun x  ->
+                   `List
+                     (List.map (fun x  -> vhdl_assoc_element_t_to_yojson x) x)))
                  x.port_map))
             :: fields
            in
         let fields =
-          if x.generic_map = None
+          if x.generic_map = []
           then fields
           else
             ("generic_map",
-              (((function
-                 | None  -> `Null
-                 | Some x -> ((fun x  -> vhdl_assoc_element_t_to_yojson x)) x))
+              (((fun x  ->
+                   `List
+                     (List.map (fun x  -> vhdl_assoc_element_t_to_yojson x) x)))
                  x.generic_map))
             :: fields
            in
@@ -5517,18 +5519,26 @@ and (vhdl_component_instantiation_t_of_yojson :
                 loop xs
                   (arg0, arg1, arg2,
                     ((function
-                      | `Null -> Result.Ok None
-                      | x ->
-                          ((fun x  -> vhdl_assoc_element_t_of_yojson x) x)
-                            >>= ((fun x  -> Result.Ok (Some x)))) x), arg4)
+                      | `List xs ->
+                          map_bind
+                            (fun x  -> vhdl_assoc_element_t_of_yojson x) []
+                            xs
+                      | _ ->
+                          Result.Error
+                            "Vhdl_ast.vhdl_component_instantiation_t.generic_map")
+                       x), arg4)
             | ("port_map",x)::xs ->
                 loop xs
                   (arg0, arg1, arg2, arg3,
                     ((function
-                      | `Null -> Result.Ok None
-                      | x ->
-                          ((fun x  -> vhdl_assoc_element_t_of_yojson x) x)
-                            >>= ((fun x  -> Result.Ok (Some x)))) x))
+                      | `List xs ->
+                          map_bind
+                            (fun x  -> vhdl_assoc_element_t_of_yojson x) []
+                            xs
+                      | _ ->
+                          Result.Error
+                            "Vhdl_ast.vhdl_component_instantiation_t.port_map")
+                       x))
             | [] ->
                 arg4 >>=
                   ((fun arg4  ->
@@ -5553,7 +5563,7 @@ and (vhdl_component_instantiation_t_of_yojson :
             ((Result.Error "Vhdl_ast.vhdl_component_instantiation_t.name"),
               (Result.Error
                  "Vhdl_ast.vhdl_component_instantiation_t.inst_unit"),
-              (Result.Ok None), (Result.Ok None), (Result.Ok None))
+              (Result.Ok None), (Result.Ok []), (Result.Ok []))
       | _ -> Result.Error "Vhdl_ast.vhdl_component_instantiation_t")
   [@ocaml.warning "-A"])
 
