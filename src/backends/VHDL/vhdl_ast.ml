@@ -67,7 +67,7 @@ and vhdl_definition_t =
   | Subtype of {name : vhdl_name_t ; typ : vhdl_subtype_indication_t} [@name "SUBTYPE_DECLARATION"]
 and vhdl_expr_t =
   | Call of vhdl_name_t [@name "CALL"]
-  | Cst of vhdl_cst_val_t [@name "CONSTANT_VALUE"]
+  | Cst of { value: vhdl_cst_val_t; unit_name: vhdl_name_t option [@default None]} [@name "CONSTANT_VALUE"]
   | Op of { id: string [@default ""]; args: vhdl_expr_t list [@default []]} [@name "EXPRESSION"]
   | IsNull [@name "IsNull"]
   | Time of { value: int; phy_unit: string [@default ""]}

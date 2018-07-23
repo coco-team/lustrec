@@ -166,7 +166,10 @@ class virtual vhdl_map =
       fun x  ->
         match x with
         | Call a -> let a = self#vhdl_name_t a  in Call a
-        | Cst a -> let a = self#vhdl_cst_val_t a  in Cst a
+        | Cst { value; unit_name } ->
+            let value = self#vhdl_cst_val_t value  in
+            let unit_name = self#option self#vhdl_name_t unit_name  in
+            Cst { value; unit_name }
         | Op { id; args } ->
             let id = self#string id  in
             let args = self#list self#vhdl_expr_t args  in Op { id; args }

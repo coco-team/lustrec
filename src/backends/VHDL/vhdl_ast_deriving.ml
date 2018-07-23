@@ -124,7 +124,10 @@ and vhdl_definition_t =
   typ: vhdl_subtype_indication_t } [@name "SUBTYPE_DECLARATION"]
 and vhdl_expr_t =
   | Call of vhdl_name_t [@name "CALL"]
-  | Cst of vhdl_cst_val_t [@name "CONSTANT_VALUE"]
+  | Cst of
+  {
+  value: vhdl_cst_val_t ;
+  unit_name: vhdl_name_t option [@default None]} [@name "CONSTANT_VALUE"]
   | Op of {
   id: string [@default ""];
   args: vhdl_expr_t list [@default []]} [@name "EXPRESSION"]
@@ -432,17 +435,19 @@ and show_vhdl_definition_t : vhdl_definition_t -> Ppx_deriving_runtime.string
 (* TODO adapt for Op, Time, Sig, suffixMod, Aggregate *)
 and pp_vhdl_expr_t :
   Format.formatter -> vhdl_expr_t -> Ppx_deriving_runtime.unit =
-  let __7 () = pp_vhdl_element_assoc_t
+  let __8 () = pp_vhdl_element_assoc_t
   
-  and __6 () = pp_vhdl_suffix_selection_t
+  and __7 () = pp_vhdl_suffix_selection_t
   
-  and __5 () = pp_vhdl_expr_t
+  and __6 () = pp_vhdl_expr_t
   
-  and __4 () = pp_vhdl_signal_attributes_t
+  and __5 () = pp_vhdl_signal_attributes_t
   
-  and __3 () = pp_vhdl_name_t
+  and __4 () = pp_vhdl_name_t
   
-  and __2 () = pp_vhdl_expr_t
+  and __3 () = pp_vhdl_expr_t
+  
+  and __2 () = pp_vhdl_name_t
   
   and __1 () = pp_vhdl_cst_val_t
   
@@ -453,18 +458,22 @@ and pp_vhdl_expr_t :
         function
         | Call a0 ->
              ((__0 ()) fmt) a0;
-        | Cst a0 ->
-             ((__1 ()) fmt) a0;
+        | Cst { value = avalue; unit_name = aunit_name } ->
+             ((__1 ()) fmt) avalue;
+             ((function
+                | None  -> Format.pp_print_string fmt ""
+                | Some x ->
+                     ((__2 ()) fmt) x)) aunit_name;
         | Op { id = aid; args = aargs } ->
             (match aargs with
             | [] -> (Format.fprintf fmt "%s") aid;
             | hd::[] ->
                (Format.fprintf fmt "%s") aid;
-               ((__2 ()) fmt) hd
+               ((__3 ()) fmt) hd
             | hd::(hd2::[]) -> 
-               ((__2 ()) fmt) hd;
+               ((__3 ()) fmt) hd;
                (Format.fprintf fmt " %s ") aid;
-               ((__2 ()) fmt) hd2
+               ((__3 ()) fmt) hd2
             | _ ->
             (Format.fprintf fmt "@[<2>Op {@,";
              ((Format.fprintf fmt "@[%s =@ " "id";
@@ -479,7 +488,7 @@ and pp_vhdl_expr_t :
                        (fun sep  ->
                           fun x  ->
                             if sep then Format.fprintf fmt ";@ ";
-                            ((__2 ()) fmt) x;
+                            ((__3 ()) fmt) x;
                             true) false x);
                   Format.fprintf fmt "@,]@]")) aargs;
               Format.fprintf fmt "@]");
@@ -498,7 +507,7 @@ and pp_vhdl_expr_t :
         | Sig { name = aname; att = aatt } ->
             (Format.fprintf fmt "--@[<2>Sig {@,";
              ((Format.fprintf fmt "@[%s =@ " "name";
-               ((__3 ()) fmt) aname;
+               ((__4 ()) fmt) aname;
                Format.fprintf fmt "@]");
               Format.fprintf fmt ";@ ";
               Format.fprintf fmt "@[%s =@ " "att";
@@ -506,18 +515,18 @@ and pp_vhdl_expr_t :
                 | None  -> Format.pp_print_string fmt "None"
                 | Some x ->
                     (Format.pp_print_string fmt "(Some ";
-                     ((__4 ()) fmt) x;
+                     ((__5 ()) fmt) x;
                      Format.pp_print_string fmt ")"))) aatt;
               Format.fprintf fmt "@]");
              Format.fprintf fmt "@]}")
         | SuffixMod { expr = aexpr; selection = aselection } ->
             (Format.fprintf fmt "--@[<2>SuffixMod {@,";
              ((Format.fprintf fmt "@[%s =@ " "expr";
-               ((__5 ()) fmt) aexpr;
+               ((__6 ()) fmt) aexpr;
                Format.fprintf fmt "@]");
               Format.fprintf fmt ";@ ";
               Format.fprintf fmt "@[%s =@ " "selection";
-              ((__6 ()) fmt) aselection;
+              ((__7 ()) fmt) aselection;
               Format.fprintf fmt "@]");
              Format.fprintf fmt "@]}")
         | Aggregate { elems = aelems } ->
@@ -530,7 +539,7 @@ and pp_vhdl_expr_t :
                        (fun sep  ->
                           fun x  ->
                             if sep then Format.fprintf fmt ";@ ";
-                            ((__7 ()) fmt) x;
+                            ((__8 ()) fmt) x;
                             true) false x);
                   Format.fprintf fmt "@,]@]")) aelems;
               Format.fprintf fmt "@]");
@@ -1401,7 +1410,22 @@ and (vhdl_expr_t_to_yojson : vhdl_expr_t -> Yojson.Safe.json) =
       | Cst arg0 ->
           `List
             [`String "CONSTANT_VALUE";
-            ((fun x  -> vhdl_cst_val_t_to_yojson x)) arg0]
+            (let fields = []  in
+             let fields =
+               if arg0.unit_name = None
+               then fields
+               else
+                 ("unit_name",
+                   (((function
+                      | None  -> `Null
+                      | Some x -> ((fun x  -> vhdl_name_t_to_yojson x)) x))
+                      arg0.unit_name))
+                 :: fields
+                in
+             let fields =
+               ("value", ((fun x  -> vhdl_cst_val_t_to_yojson x) arg0.value))
+               :: fields  in
+             `Assoc fields)]
       | Op arg0 ->
           `List
             [`String "EXPRESSION";
@@ -1499,8 +1523,33 @@ and (vhdl_expr_t_of_yojson :
           ((fun x  -> vhdl_name_t_of_yojson x) arg0) >>=
             ((fun arg0  -> Result.Ok (Call arg0)))
       | `List ((`String "CONSTANT_VALUE")::arg0::[]) ->
-          ((fun x  -> vhdl_cst_val_t_of_yojson x) arg0) >>=
-            ((fun arg0  -> Result.Ok (Cst arg0)))
+          ((function
+            | `Assoc xs ->
+                let rec loop xs ((arg0,arg1) as _state) =
+                  match xs with
+                  | ("value",x)::xs ->
+                      loop xs
+                        (((fun x  -> vhdl_cst_val_t_of_yojson x) x), arg1)
+                  | ("unit_name",x)::xs ->
+                      loop xs
+                        (arg0,
+                          ((function
+                            | `Null -> Result.Ok None
+                            | x ->
+                                ((fun x  -> vhdl_name_t_of_yojson x) x) >>=
+                                  ((fun x  -> Result.Ok (Some x)))) x))
+                  | [] ->
+                      arg1 >>=
+                        ((fun arg1  ->
+                            arg0 >>=
+                              (fun arg0  ->
+                                 Result.Ok
+                                   (Cst { value = arg0; unit_name = arg1 }))))
+                  | _::xs -> loop xs _state  in
+                loop xs
+                  ((Result.Error "Vhdl_ast.vhdl_expr_t.value"),
+                    (Result.Ok None))
+            | _ -> Result.Error "Vhdl_ast.vhdl_expr_t")) arg0
       | `List ((`String "EXPRESSION")::arg0::[]) ->
           ((function
             | `Assoc xs ->
