@@ -42,4 +42,4 @@ let _ =
       (* Pretty print lustre value *)
  (*     Printers.pp_prog std_formatter program; *)
       
-  | Error e -> Format.printf "Error: %s\n" e;
+  | Error e -> failwith (Format.sprintf "Error: %s\n" e);
