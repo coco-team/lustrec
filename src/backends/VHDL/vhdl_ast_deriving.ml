@@ -75,9 +75,19 @@ type vhdl_type_t =
   | Base of string 
   | Range of string option * int * int 
   | Bit_vector of int * int 
-  | Array of int * int * vhdl_type_t 
-  | Enumerated of string list 
+  | Array of
+  {
+  indexes: vhdl_name_t list ;
+  const: vhdl_constraint_t option [@default None];
+  definition: vhdl_subtype_indication_t } [@name "ARRAY_TYPE_DEFINITION"]
+  | Record of vhdl_element_declaration_t list
+  [@name "RECORD_TYPE_DEFINITION"]
+  | Enumerated of vhdl_name_t list [@name "ENUMERATION_TYPE_DEFINITION"]
   | Void 
+and vhdl_element_declaration_t =
+  {
+  names: vhdl_name_t list ;
+  definition: vhdl_subtype_indication_t }
 and vhdl_subtype_indication_t =
   {
   name: vhdl_name_t [@default NoName];
@@ -175,7 +185,16 @@ and vhdl_suffix_selection_t =
 
 let rec pp_vhdl_type_t :
   Format.formatter -> vhdl_type_t -> Ppx_deriving_runtime.unit =
-  let __0 () = pp_vhdl_type_t  in
+  let __4 () = pp_vhdl_name_t
+  
+  and __3 () = pp_vhdl_element_declaration_t
+  
+  and __2 () = pp_vhdl_subtype_indication_t
+  
+  and __1 () = pp_vhdl_constraint_t
+  
+  and __0 () = pp_vhdl_name_t
+in
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         function
@@ -192,25 +211,80 @@ let rec pp_vhdl_type_t :
               (Format.fprintf fmt "%d") a2);
         | Bit_vector (a0,a1) ->
              (Format.fprintf fmt "array (%d,%d) of bit") a0 a1;
-        | Array (a0,a1,a2) ->
-             (Format.fprintf fmt "array ";
-             (Format.fprintf fmt "(%d,%d)") a0 a1;
-             Format.fprintf fmt " of ";
-             ((__0 ()) fmt) a2)
+        | Array
+            { indexes = aindexes; const = aconst; definition = adefinition }
+            ->
+            Format.fprintf fmt "array";
+            (match aindexes with
+            | [] -> Format.fprintf fmt "";
+            | _ ->
+              ((fun x  ->
+                ignore
+                (List.fold_left
+                  (fun sep  ->
+                    fun x  ->
+                      if sep then Format.fprintf fmt ",@ ";
+                      ((__0 ()) fmt) x;
+                      true) false x)) aindexes));
+            (function
+              | None  -> Format.pp_print_string fmt ""
+              | Some x ->
+                ((__1 ()) fmt) x) aconst;
+            Format.fprintf fmt " of ";
+            ((__2 ()) fmt) adefinition;
+        | Record a0 ->
+            Format.fprintf fmt "@[<v 2>record@;";
+            (fun x  ->
+              ignore
+                (List.fold_left
+                  (fun sep  ->
+                    fun x  ->
+                      if sep then Format.fprintf fmt ";@;";
+                        ((__3 ()) fmt) x;
+                        true) false x);
+              Format.fprintf fmt "@]@;end record") a0;
         | Enumerated a0 ->
-             ((fun x  ->
-                 ignore
-                   (List.fold_left
-                      (fun sep  ->
-                         fun x  ->
-                           if sep then Format.fprintf fmt ",@ ";
-                           (Format.fprintf fmt "%s") x;
-                           true) false x))) a0;
+            (Format.fprintf fmt "(";
+            ((fun x  ->
+              ignore
+              (List.fold_left
+                (fun sep  ->
+                  fun x  ->
+                    if sep then Format.fprintf fmt ",@ ";
+                      ((__4 ()) fmt) x;
+                    true) false x))) a0;
+             Format.fprintf fmt ")");
         | Void  -> Format.pp_print_string fmt "")
     [@ocaml.warning "-A"])
 
 and show_vhdl_type_t : vhdl_type_t -> Ppx_deriving_runtime.string =
   fun x  -> Format.asprintf "%a" pp_vhdl_type_t x
+
+and pp_vhdl_element_declaration_t :
+  Format.formatter -> vhdl_element_declaration_t -> Ppx_deriving_runtime.unit
+  =
+  let __1 () = pp_vhdl_subtype_indication_t
+  
+  and __0 () = pp_vhdl_name_t
+   in
+  ((let open! Ppx_deriving_runtime in
+      fun fmt  ->
+        fun x  ->
+            (fun x  ->
+                ignore
+                  (List.fold_left
+                     (fun sep  ->
+                        fun x  ->
+                          if sep then Format.fprintf fmt ",@ ";
+                          ((__0 ()) fmt) x;
+                          true) false x)) x.names;
+           Format.fprintf fmt ":@ ";
+           ((__1 ()) fmt) x.definition)
+    [@ocaml.warning "-A"])
+
+and show_vhdl_element_declaration_t :
+  vhdl_element_declaration_t -> Ppx_deriving_runtime.string =
+  fun x  -> Format.asprintf "%a" pp_vhdl_element_declaration_t x
 
 and pp_vhdl_subtype_indication_t :
   Format.formatter -> vhdl_subtype_indication_t -> Ppx_deriving_runtime.unit
@@ -738,20 +812,47 @@ let rec (vhdl_type_t_to_yojson : vhdl_type_t -> Yojson.Safe.json) =
             [`String "Bit_vector";
             ((fun (x : Ppx_deriving_runtime.int)  -> `Int x)) arg0;
             ((fun (x : Ppx_deriving_runtime.int)  -> `Int x)) arg1]
-      | Array (arg0,arg1,arg2) ->
+      | Array arg0 ->
           `List
-            [`String "Array";
-            ((fun (x : Ppx_deriving_runtime.int)  -> `Int x)) arg0;
-            ((fun (x : Ppx_deriving_runtime.int)  -> `Int x)) arg1;
-            ((fun x  -> vhdl_type_t_to_yojson x)) arg2]
-      | Enumerated arg0 ->
+            [`String "ARRAY_TYPE_DEFINITION";
+            (let fields = []  in
+             let fields =
+               ("definition",
+                 ((fun x  -> vhdl_subtype_indication_t_to_yojson x)
+                    arg0.definition))
+               :: fields  in
+             let fields =
+               if arg0.const = None
+               then fields
+               else
+                 ("const",
+                   (((function
+                      | None  -> `Null
+                      | Some x ->
+                          ((fun x  -> vhdl_constraint_t_to_yojson x)) x))
+                      arg0.const))
+                 :: fields
+                in
+             let fields =
+               ("indexes",
+                 ((fun x  ->
+                     `List (List.map (fun x  -> vhdl_name_t_to_yojson x) x))
+                    arg0.indexes))
+               :: fields  in
+             `Assoc fields)]
+      | Record arg0 ->
           `List
-            [`String "Enumerated";
+            [`String "RECORD_TYPE_DEFINITION";
             ((fun x  ->
                 `List
                   (List.map
-                     (fun (x : Ppx_deriving_runtime.string)  -> `String x) x)))
+                     (fun x  -> vhdl_element_declaration_t_to_yojson x) x)))
               arg0]
+      | Enumerated arg0 ->
+          `List
+            [`String "ENUMERATION_TYPE_DEFINITION";
+            ((fun x  ->
+                `List (List.map (fun x  -> vhdl_name_t_to_yojson x) x))) arg0]
       | Void  -> `List [`String "Void"])
   [@ocaml.warning "-A"])
 
@@ -792,28 +893,121 @@ and (vhdl_type_t_of_yojson :
                   | `Int x -> Result.Ok x
                   | _ -> Result.Error "Vhdl_ast.vhdl_type_t") arg0) >>=
                   (fun arg0  -> Result.Ok (Bit_vector (arg0, arg1)))))
-      | `List ((`String "Array")::arg0::arg1::arg2::[]) ->
-          ((fun x  -> vhdl_type_t_of_yojson x) arg2) >>=
-            ((fun arg2  ->
-                ((function
-                  | `Int x -> Result.Ok x
-                  | _ -> Result.Error "Vhdl_ast.vhdl_type_t") arg1) >>=
-                  (fun arg1  ->
-                     ((function
-                       | `Int x -> Result.Ok x
-                       | _ -> Result.Error "Vhdl_ast.vhdl_type_t") arg0) >>=
-                       (fun arg0  -> Result.Ok (Array (arg0, arg1, arg2))))))
-      | `List ((`String "Enumerated")::arg0::[]) ->
+      | `List ((`String "ARRAY_TYPE_DEFINITION")::arg0::[]) ->
+          ((function
+            | `Assoc xs ->
+                let rec loop xs ((arg0,arg1,arg2) as _state) =
+                  match xs with
+                  | ("indexes",x)::xs ->
+                      loop xs
+                        (((function
+                           | `List xs ->
+                               map_bind (fun x  -> vhdl_name_t_of_yojson x)
+                                 [] xs
+                           | _ -> Result.Error "Vhdl_ast.vhdl_type_t.indexes")
+                            x), arg1, arg2)
+                  | ("const",x)::xs ->
+                      loop xs
+                        (arg0,
+                          ((function
+                            | `Null -> Result.Ok None
+                            | x ->
+                                ((fun x  -> vhdl_constraint_t_of_yojson x) x)
+                                  >>= ((fun x  -> Result.Ok (Some x)))) x),
+                          arg2)
+                  | ("definition",x)::xs ->
+                      loop xs
+                        (arg0, arg1,
+                          ((fun x  -> vhdl_subtype_indication_t_of_yojson x)
+                             x))
+                  | [] ->
+                      arg2 >>=
+                        ((fun arg2  ->
+                            arg1 >>=
+                              (fun arg1  ->
+                                 arg0 >>=
+                                   (fun arg0  ->
+                                      Result.Ok
+                                        (Array
+                                           {
+                                             indexes = arg0;
+                                             const = arg1;
+                                             definition = arg2
+                                           })))))
+                  | _::xs -> loop xs _state  in
+                loop xs
+                  ((Result.Error "Vhdl_ast.vhdl_type_t.indexes"),
+                    (Result.Ok None),
+                    (Result.Error "Vhdl_ast.vhdl_type_t.definition"))
+            | _ -> Result.Error "Vhdl_ast.vhdl_type_t")) arg0
+      | `List ((`String "RECORD_TYPE_DEFINITION")::arg0::[]) ->
           ((function
             | `List xs ->
-                map_bind
-                  (function
-                   | `String x -> Result.Ok x
-                   | _ -> Result.Error "Vhdl_ast.vhdl_type_t") [] xs
+                map_bind (fun x  -> vhdl_element_declaration_t_of_yojson x)
+                  [] xs
+            | _ -> Result.Error "Vhdl_ast.vhdl_type_t") arg0) >>=
+            ((fun arg0  -> Result.Ok (Record arg0)))
+      | `List ((`String "ENUMERATION_TYPE_DEFINITION")::arg0::[]) ->
+          ((function
+            | `List xs -> map_bind (fun x  -> vhdl_name_t_of_yojson x) [] xs
             | _ -> Result.Error "Vhdl_ast.vhdl_type_t") arg0) >>=
             ((fun arg0  -> Result.Ok (Enumerated arg0)))
       | `List ((`String "Void")::[]) -> Result.Ok Void
       | _ -> Result.Error "Vhdl_ast.vhdl_type_t")
+  [@ocaml.warning "-A"])
+
+and (vhdl_element_declaration_t_to_yojson :
+      vhdl_element_declaration_t -> Yojson.Safe.json)
+  =
+  ((let open! Ppx_deriving_yojson_runtime in
+      fun x  ->
+        let fields = []  in
+        let fields =
+          ("definition",
+            ((fun x  -> vhdl_subtype_indication_t_to_yojson x) x.definition))
+          :: fields  in
+        let fields =
+          ("names",
+            ((fun x  ->
+                `List (List.map (fun x  -> vhdl_name_t_to_yojson x) x))
+               x.names))
+          :: fields  in
+        `Assoc fields)
+  [@ocaml.warning "-A"])
+
+and (vhdl_element_declaration_t_of_yojson :
+      Yojson.Safe.json ->
+        vhdl_element_declaration_t Ppx_deriving_yojson_runtime.error_or)
+  =
+  ((let open! Ppx_deriving_yojson_runtime in
+      function
+      | `Assoc xs ->
+          let rec loop xs ((arg0,arg1) as _state) =
+            match xs with
+            | ("names",x)::xs ->
+                loop xs
+                  (((function
+                     | `List xs ->
+                         map_bind (fun x  -> vhdl_name_t_of_yojson x) [] xs
+                     | _ ->
+                         Result.Error
+                           "Vhdl_ast.vhdl_element_declaration_t.names") x),
+                    arg1)
+            | ("definition",x)::xs ->
+                loop xs
+                  (arg0,
+                    ((fun x  -> vhdl_subtype_indication_t_of_yojson x) x))
+            | [] ->
+                arg1 >>=
+                  ((fun arg1  ->
+                      arg0 >>=
+                        (fun arg0  ->
+                           Result.Ok { names = arg0; definition = arg1 })))
+            | _::xs -> loop xs _state  in
+          loop xs
+            ((Result.Error "Vhdl_ast.vhdl_element_declaration_t.names"),
+              (Result.Error "Vhdl_ast.vhdl_element_declaration_t.definition"))
+      | _ -> Result.Error "Vhdl_ast.vhdl_element_declaration_t")
   [@ocaml.warning "-A"])
 
 and (vhdl_subtype_indication_t_to_yojson :
@@ -5484,11 +5678,14 @@ and (vhdl_entity_t_of_yojson :
 type vhdl_package_t =
   {
   name: vhdl_name_t [@default NoName];
-  shared_defs: vhdl_definition_t list [@default []]}
+  shared_defs: vhdl_definition_t list [@default []];
+  shared_decls: vhdl_declaration_t list [@default []]}
 
 let rec pp_vhdl_package_t :
   Format.formatter -> vhdl_package_t -> Ppx_deriving_runtime.unit =
-  let __1 () = pp_vhdl_definition_t
+  let __2 () = pp_vhdl_declaration_t
+
+  and __1 () = pp_vhdl_definition_t
   
   and __0 () = pp_vhdl_name_t
    in
@@ -5505,7 +5702,15 @@ let rec pp_vhdl_package_t :
                        if sep then Format.fprintf fmt "";
                        ((__1 ()) fmt) x;
                        Format.fprintf fmt ";";
-                       true) false x))) x.shared_defs;)
+                       true) false x))) x.shared_defs;
+          ((fun x  ->
+               ignore
+                 (List.fold_left
+                    (fun sep  ->
+                       fun x  ->
+                         if sep then Format.fprintf fmt "";
+                         ((__2 ()) fmt) x;
+                         true) false x))) x.shared_decls;)
     [@ocaml.warning "-A"])
 
 and show_vhdl_package_t : vhdl_package_t -> Ppx_deriving_runtime.string =
@@ -5515,6 +5720,17 @@ let rec (vhdl_package_t_to_yojson : vhdl_package_t -> Yojson.Safe.json) =
   ((let open! Ppx_deriving_yojson_runtime in
       fun x  ->
         let fields = []  in
+        let fields =
+          if x.shared_decls = []
+          then fields
+          else
+            ("shared_decls",
+              (((fun x  ->
+                   `List
+                     (List.map (fun x  -> vhdl_declaration_t_to_yojson x) x)))
+                 x.shared_decls))
+            :: fields
+           in
         let fields =
           if x.shared_defs = []
           then fields
@@ -5541,10 +5757,10 @@ and (vhdl_package_t_of_yojson :
   ((let open! Ppx_deriving_yojson_runtime in
       function
       | `Assoc xs ->
-          let rec loop xs ((arg0,arg1) as _state) =
+          let rec loop xs ((arg0,arg1,arg2) as _state) =
             match xs with
             | ("name",x)::xs ->
-                loop xs (((fun x  -> vhdl_name_t_of_yojson x) x), arg1)
+                loop xs (((fun x  -> vhdl_name_t_of_yojson x) x), arg1, arg2)
             | ("shared_defs",x)::xs ->
                 loop xs
                   (arg0,
@@ -5554,15 +5770,32 @@ and (vhdl_package_t_of_yojson :
                             [] xs
                       | _ ->
                           Result.Error "Vhdl_ast.vhdl_package_t.shared_defs")
+                       x), arg2)
+            | ("shared_decls",x)::xs ->
+                loop xs
+                  (arg0, arg1,
+                    ((function
+                      | `List xs ->
+                          map_bind (fun x  -> vhdl_declaration_t_of_yojson x)
+                            [] xs
+                      | _ ->
+                          Result.Error "Vhdl_ast.vhdl_package_t.shared_decls")
                        x))
             | [] ->
-                arg1 >>=
-                  ((fun arg1  ->
-                      arg0 >>=
-                        (fun arg0  ->
-                           Result.Ok { name = arg0; shared_defs = arg1 })))
+                arg2 >>=
+                  ((fun arg2  ->
+                      arg1 >>=
+                        (fun arg1  ->
+                           arg0 >>=
+                             (fun arg0  ->
+                                Result.Ok
+                                  {
+                                    name = arg0;
+                                    shared_defs = arg1;
+                                    shared_decls = arg2
+                                  }))))
             | _::xs -> loop xs _state  in
-          loop xs ((Result.Ok NoName), (Result.Ok []))
+          loop xs ((Result.Ok NoName), (Result.Ok []), (Result.Ok []))
       | _ -> Result.Error "Vhdl_ast.vhdl_package_t")
   [@ocaml.warning "-A"])
 

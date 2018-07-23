@@ -2,6 +2,7 @@ open Vhdl_ast_deriving
 
 let _ = fun (_ : vhdl_cst_val_t)  -> () 
 let _ = fun (_ : vhdl_type_t)  -> () 
+let _ = fun (_ : vhdl_element_declaration_t)  -> () 
 let _ = fun (_ : vhdl_subtype_indication_t)  -> () 
 let _ = fun (_ : vhdl_discrete_range_t)  -> () 
 let _ = fun (_ : vhdl_constraint_t)  -> () 
@@ -53,6 +54,7 @@ class virtual vhdl_map =
     method virtual  vhdl_port_t : vhdl_port_t -> vhdl_port_t
     method virtual  vhdl_expr_t : vhdl_expr_t -> vhdl_expr_t
     method virtual  vhdl_port_mode_t : vhdl_port_mode_t -> vhdl_port_mode_t
+    method virtual  vhdl_element_declaration_t : vhdl_element_declaration_t -> vhdl_element_declaration_t
     method virtual  vhdl_subtype_indication_t : vhdl_subtype_indication_t -> vhdl_subtype_indication_t
     method virtual  vhdl_conditional_signal_t : vhdl_conditional_signal_t -> vhdl_conditional_signal_t
     method virtual  vhdl_process_t : vhdl_process_t -> vhdl_process_t
@@ -94,12 +96,22 @@ class virtual vhdl_map =
             let b = self#int b  in let c = self#int c  in Range (a, b, c)
         | Bit_vector (a,b) ->
             let a = self#int a  in let b = self#int b  in Bit_vector (a, b)
-        | Array (a,b,c) ->
-            let a = self#int a  in
-            let b = self#int b  in
-            let c = self#vhdl_type_t c  in Array (a, b, c)
-        | Enumerated a -> let a = self#list self#string a  in Enumerated a
+        | Array { indexes; const; definition } ->
+            let indexes = self#list self#vhdl_name_t indexes  in
+            let const = self#option self#vhdl_constraint_t const  in
+            let definition = self#vhdl_subtype_indication_t definition  in
+            Array { indexes; const; definition }
+        | Record a ->
+            let a = self#list self#vhdl_element_declaration_t a  in Record a
+        | Enumerated a ->
+            let a = self#list self#vhdl_name_t a  in Enumerated a
         | Void  -> Void
+    method vhdl_element_declaration_t :
+      vhdl_element_declaration_t -> vhdl_element_declaration_t=
+      fun { names; definition }  ->
+        let names = self#list self#vhdl_name_t names  in
+        let definition = self#vhdl_subtype_indication_t definition  in
+        { names; definition }
     method vhdl_subtype_indication_t :
       vhdl_subtype_indication_t -> vhdl_subtype_indication_t=
       fun { name; functionName; const }  ->
@@ -442,10 +454,11 @@ class virtual vhdl_map =
         { name; generics; ports; declaration; stmts }
 
     method vhdl_package_t : vhdl_package_t -> vhdl_package_t=
-      fun { name; shared_defs }  ->
+      fun { name; shared_defs; shared_decls }  ->
         let name = self#vhdl_name_t name  in
         let shared_defs = self#list self#vhdl_definition_t shared_defs  in
-        { name; shared_defs }
+        let shared_decls = self#list self#vhdl_declaration_t shared_decls  in
+        { name; shared_defs; shared_decls }
 
     method vhdl_load_t : vhdl_load_t -> vhdl_load_t=
       fun x  ->

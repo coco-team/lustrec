@@ -36,9 +36,15 @@ type vhdl_type_t =
   | Base of string
   | Range of string option * int * int
   | Bit_vector of int * int
-  | Array of int * int * vhdl_type_t
-  | Enumerated of string list
+  | Array of { indexes: vhdl_name_t list; const: vhdl_constraint_t option [@default None]; definition: vhdl_subtype_indication_t } [@name "ARRAY_TYPE_DEFINITION"]
+  | Record of vhdl_element_declaration_t list [@name "RECORD_TYPE_DEFINITION"]
+  | Enumerated of vhdl_name_t list [@name "ENUMERATION_TYPE_DEFINITION"]
   | Void
+and vhdl_element_declaration_t =
+  { 
+    names : vhdl_name_t list; 
+    definition: vhdl_subtype_indication_t;
+  }
 and vhdl_subtype_indication_t =
   {
     name : vhdl_name_t [@default NoName];
@@ -313,6 +319,7 @@ type vhdl_package_t =
   {
     name: vhdl_name_t [@default NoName];
     shared_defs: vhdl_definition_t list [@default []];
+    shared_decls: vhdl_declaration_t list [@default []];
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;
 
