@@ -3057,23 +3057,25 @@ let rec pp_vhdl_sequential_stmt_t :
             { label = alabel; cond = acond; report = areport;
               severity = aseverity }
             ->
-            (Format.fprintf fmt "@[<2>Assert {@,";
-             ((((Format.fprintf fmt "@[%s =@ " "label";
-                 ((__14 ()) fmt) alabel;
-                 Format.fprintf fmt "@]");
-                Format.fprintf fmt ";@ ";
-                Format.fprintf fmt "@[%s =@ " "cond";
-                ((__15 ()) fmt) acond;
-                Format.fprintf fmt "@]");
-               Format.fprintf fmt ";@ ";
-               Format.fprintf fmt "@[%s =@ " "report";
-               ((__16 ()) fmt) areport;
-               Format.fprintf fmt "@]");
-              Format.fprintf fmt ";@ ";
-              Format.fprintf fmt "@[%s =@ " "severity";
-              ((__17 ()) fmt) aseverity;
-              Format.fprintf fmt "@]");
-             Format.fprintf fmt "@]}")
+            Format.fprintf fmt "@[<v 2>";
+            (match alabel with
+              | NoName -> Format.fprintf fmt "";
+              | _ -> (((__14 ()) fmt) alabel;
+                     Format.fprintf fmt ":@ ")
+            );
+            Format.fprintf fmt "assert ";
+            ((__15 ()) fmt) acond;
+            (match areport with
+            | IsNull -> Format.fprintf fmt "";
+            | _ -> 
+                Format.fprintf fmt "@;report ";
+                ((__16 ()) fmt) areport);
+            (match aseverity with
+            | IsNull -> Format.fprintf fmt "";
+            | _ -> 
+                Format.fprintf fmt "@;severity ";
+                ((__17 ()) fmt) aseverity);
+            Format.fprintf fmt "@]";
         | ProcedureCall { label = alabel; name = aname; assocs = aassocs } ->
             (match alabel with
               | NoName -> Format.fprintf fmt "";
