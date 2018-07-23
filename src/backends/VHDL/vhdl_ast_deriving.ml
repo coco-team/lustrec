@@ -460,10 +460,11 @@ and pp_vhdl_expr_t :
              ((__0 ()) fmt) a0;
         | Cst { value = avalue; unit_name = aunit_name } ->
              ((__1 ()) fmt) avalue;
-             ((function
+             (function
                 | None  -> Format.pp_print_string fmt ""
                 | Some x ->
-                     ((__2 ()) fmt) x)) aunit_name;
+                    Format.fprintf fmt " ";
+                    ((__2 ()) fmt) x) aunit_name;
         | Op { id = aid; args = aargs } ->
             (match aargs with
             | [] -> (Format.fprintf fmt "%s") aid;
@@ -2948,10 +2949,10 @@ let rec pp_vhdl_sequential_stmt_t :
             (match alabel with
               | NoName -> Format.fprintf fmt "";
               | _ -> (((__0 ()) fmt) alabel;
-                     Format.fprintf fmt ":@ ")
+                     Format.fprintf fmt ": ")
             );
             ((__1 ()) fmt) alhs;
-            Format.fprintf fmt "@ :=@ ";
+            Format.fprintf fmt " := ";
             ((__2 ()) fmt) arhs;
 (* TODO: Check
             (Format.fprintf fmt "@[<2>VarAssign {@,";
@@ -2984,7 +2985,6 @@ let rec pp_vhdl_sequential_stmt_t :
                      fun x  ->
                        if sep then Format.fprintf fmt "";
                         ((__5 ()) fmt) x;
-                        Format.fprintf fmt ";";
                         true) false x);
             Format.fprintf fmt "@]@]")) arhs;
         | If { label = alabel; if_cases = aif_cases; default = adefault } ->
@@ -3147,7 +3147,7 @@ and pp_vhdl_case_item_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-                Format.fprintf fmt "@;<0 2>when ";
+                Format.fprintf fmt "@;@[<v 2>when ";
             ((fun x  ->
                 ignore
                   (List.fold_left
@@ -3157,14 +3157,16 @@ and pp_vhdl_case_item_t :
                           ((__0 ()) fmt) x;
                           true) false x);)) x.when_cond;
            Format.fprintf fmt " => ";
-           ((fun x  ->
+           (fun x  ->
                ignore
                  (List.fold_left
                     (fun sep  ->
                        fun x  ->
-                         if sep then Format.fprintf fmt "";
+                         if sep then Format.fprintf fmt "@;";
                          ((__1 ()) fmt) x;
-                         true) false x);)) x.when_stmt)
+                         Format.fprintf fmt ";";
+                         true) ((List.length x) > 1) x);) x.when_stmt;
+           Format.fprintf fmt "@]")
     [@ocaml.warning "-A"])
 
 and show_vhdl_case_item_t : vhdl_case_item_t -> Ppx_deriving_runtime.string =
@@ -4728,7 +4730,13 @@ let rec pp_vhdl_process_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          Format.fprintf fmt "@[<v>process ";
+          Format.fprintf fmt "@[<v>@[<v 2>";
+          (match x.id with
+          | NoName -> Format.fprintf fmt "";
+          | _ -> 
+              ((__0 ()) fmt) x.id;
+              Format.fprintf fmt ": ");
+          Format.fprintf fmt "process ";
           (match x.active_sigs with
           | [] -> Format.fprintf fmt "";
           | _ -> Format.fprintf fmt "(";
@@ -4744,17 +4752,16 @@ let rec pp_vhdl_process_t :
           ((function
              | None  -> Format.pp_print_string fmt ""
              | Some x ->
+                 Format.fprintf fmt "@;";
                   ((fun x  ->
-                      Format.fprintf fmt "@[<2>";
                       ignore
                         (List.fold_left
                            (fun sep  ->
                               fun x  ->
                                 if sep then Format.fprintf fmt "@;";
                                 ((__1 ()) fmt) x;
-                                true) false x);
-                      Format.fprintf fmt "@]")) x;)) x.declarations;
-          Format.fprintf fmt "@;@[<v 2>begin@;";
+                                true) false x);)) x;)) x.declarations;
+          Format.fprintf fmt "@]@;@[<v 2>begin@;";
           ((fun x  ->
                ignore
                  (List.fold_left
