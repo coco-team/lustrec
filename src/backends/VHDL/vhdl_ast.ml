@@ -185,6 +185,22 @@ and vhdl_case_item_t =
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;
 
+type vhdl_port_mode_t = 
+    InPort     [@name "in"]
+  | OutPort    [@name "out"]
+  | InoutPort  [@name "inout"]
+  | BufferPort [@name "buffer"]
+[@@deriving show { with_path = false }, yojson];;
+	     
+type vhdl_port_t =
+  {
+    names: vhdl_name_t list [@default []];
+    mode: vhdl_port_mode_t [@default InPort];
+    typ: vhdl_subtype_indication_t;
+    expr: vhdl_expr_t [@default IsNull];
+  }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
+
 type vhdl_declaration_t =
   | VarDecl of {
       names : vhdl_name_t list; 
@@ -201,6 +217,11 @@ type vhdl_declaration_t =
       typ : vhdl_subtype_indication_t; 
       init_val : vhdl_expr_t [@default IsNull]
     } [@name "SIGNAL_DECLARATION"]
+  | ComponentDecl of {
+      name: vhdl_name_t [@default NoName];
+      generics: vhdl_port_t list [@default []];
+      ports: vhdl_port_t list [@default []];
+    } [@name "COMPONENT_DECLARATION"]
   | Subprogram of {
       name: vhdl_name_t [@default NoName]; 
       kind: string [@default ""]; 
@@ -282,23 +303,7 @@ type vhdl_statement_t =
 		     
 (************************************************************************************)		   
 (*                     Entities                                                     *)
-(************************************************************************************)		   
-			     
-type vhdl_port_mode_t = 
-    InPort     [@name "in"]
-  | OutPort    [@name "out"]
-  | InoutPort  [@name "inout"]
-  | BufferPort [@name "buffer"]
-[@@deriving show { with_path = false }, yojson];;
-	     
-type vhdl_port_t =
-  {
-    names: vhdl_name_t list [@default []];
-    mode: vhdl_port_mode_t [@default InPort];
-    typ: vhdl_subtype_indication_t;
-    expr: vhdl_expr_t [@default IsNull];
-  }
-[@@deriving show { with_path = false }, yojson {strict = false}];;
+(************************************************************************************)
 
 type vhdl_entity_t =
   {

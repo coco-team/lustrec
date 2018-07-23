@@ -2893,7 +2893,6 @@ and vhdl_case_item_t =
   when_cond: vhdl_expr_t list ;
   when_stmt: vhdl_sequential_stmt_t list }
 
-(* TODO Adapt for: Assert, ProcedureCall *)
 let rec pp_vhdl_sequential_stmt_t :
   Format.formatter -> vhdl_sequential_stmt_t -> Ppx_deriving_runtime.unit =
   let __22 () = pp_vhdl_name_t
@@ -3848,6 +3847,180 @@ and (vhdl_case_item_t_of_yojson :
       | _ -> Result.Error "Vhdl_ast.vhdl_case_item_t")
   [@ocaml.warning "-A"])
 
+type vhdl_port_mode_t =
+  | InPort [@name "in"]
+  | OutPort [@name "out"]
+  | InoutPort [@name "inout"]
+  | BufferPort [@name "buffer"]
+
+let rec (pp_vhdl_port_mode_t :
+          Format.formatter -> vhdl_port_mode_t -> Ppx_deriving_runtime.unit)
+  =
+  ((let open! Ppx_deriving_runtime in
+      fun fmt  ->
+        function
+        | InPort  -> Format.pp_print_string fmt "in"
+        | OutPort  -> Format.pp_print_string fmt "out"
+        | InoutPort  -> Format.pp_print_string fmt "inout"
+        | BufferPort  -> Format.pp_print_string fmt "buffer")
+  [@ocaml.warning "-A"])
+
+and show_vhdl_port_mode_t : vhdl_port_mode_t -> Ppx_deriving_runtime.string =
+  fun x  -> Format.asprintf "%a" pp_vhdl_port_mode_t x
+
+let rec (vhdl_port_mode_t_to_yojson : vhdl_port_mode_t -> Yojson.Safe.json) =
+  ((let open! Ppx_deriving_yojson_runtime in
+      function
+      | InPort  -> `List [`String "in"]
+      | OutPort  -> `List [`String "out"]
+      | InoutPort  -> `List [`String "inout"]
+      | BufferPort  -> `List [`String "buffer"])
+  [@ocaml.warning "-A"])
+
+and (vhdl_port_mode_t_of_yojson :
+      Yojson.Safe.json ->
+        vhdl_port_mode_t Ppx_deriving_yojson_runtime.error_or)
+  =
+  ((let open! Ppx_deriving_yojson_runtime in
+      function
+      | `List ((`String "in")::[]) -> Result.Ok InPort
+      | `List ((`String "out")::[]) -> Result.Ok OutPort
+      | `List ((`String "inout")::[]) -> Result.Ok InoutPort
+      | `List ((`String "buffer")::[]) -> Result.Ok BufferPort
+      | _ -> Result.Error "Vhdl_ast.vhdl_port_mode_t")
+  [@ocaml.warning "-A"])
+
+type vhdl_port_t =
+  {
+  names: vhdl_name_t list [@default []];
+  mode: vhdl_port_mode_t [@default InPort];
+  typ: vhdl_subtype_indication_t ;
+  expr: vhdl_expr_t [@default IsNull]}
+
+let rec pp_vhdl_port_t :
+  Format.formatter -> vhdl_port_t -> Ppx_deriving_runtime.unit =
+  let __3 () = pp_vhdl_expr_t
+  
+  and __2 () = pp_vhdl_subtype_indication_t
+  
+  and __1 () = pp_vhdl_port_mode_t
+  
+  and __0 () = pp_vhdl_name_t
+   in
+  ((let open! Ppx_deriving_runtime in
+      fun fmt  ->
+        fun x  ->
+          Format.fprintf fmt "@[";
+          ((((
+              ((fun x  ->
+                  Format.fprintf fmt "@[";
+                  ignore
+                    (List.fold_left
+                       (fun sep  ->
+                          fun x  ->
+                            if sep then Format.fprintf fmt ",@ ";
+                            ((__0 ()) fmt) x;
+                            true) false x);
+                  Format.fprintf fmt "@,@]")) x.names;
+              );
+             Format.fprintf fmt ": ";
+             ((__1 ()) fmt) x.mode;
+             );
+             Format.fprintf fmt " ";
+            ((__2 ()) fmt) x.typ;
+            );
+          (match x.expr with
+           | IsNull -> Format.fprintf fmt "";
+           | _ -> (Format.fprintf fmt "@[:= ";
+                   ((__3 ()) fmt) x.expr;
+                   Format.fprintf fmt "@]"));
+          Format.fprintf fmt "@]"))
+    [@ocaml.warning "-A"])
+
+and show_vhdl_port_t : vhdl_port_t -> Ppx_deriving_runtime.string =
+  fun x  -> Format.asprintf "%a" pp_vhdl_port_t x
+
+let rec (vhdl_port_t_to_yojson : vhdl_port_t -> Yojson.Safe.json) =
+  ((let open! Ppx_deriving_yojson_runtime in
+      fun x  ->
+        let fields = []  in
+        let fields =
+          if x.expr = IsNull
+          then fields
+          else ("expr", (((fun x  -> vhdl_expr_t_to_yojson x)) x.expr)) ::
+            fields
+           in
+        let fields =
+          ("typ", ((fun x  -> vhdl_subtype_indication_t_to_yojson x) x.typ))
+          :: fields  in
+        let fields =
+          if x.mode = InPort
+          then fields
+          else ("mode", (((fun x  -> vhdl_port_mode_t_to_yojson x)) x.mode))
+            :: fields
+           in
+        let fields =
+          if x.names = []
+          then fields
+          else
+            ("names",
+              (((fun x  ->
+                   `List (List.map (fun x  -> vhdl_name_t_to_yojson x) x)))
+                 x.names))
+            :: fields
+           in
+        `Assoc fields)
+  [@ocaml.warning "-A"])
+
+and (vhdl_port_t_of_yojson :
+      Yojson.Safe.json -> vhdl_port_t Ppx_deriving_yojson_runtime.error_or)
+  =
+  ((let open! Ppx_deriving_yojson_runtime in
+      function
+      | `Assoc xs ->
+          let rec loop xs ((arg0,arg1,arg2,arg3) as _state) =
+            match xs with
+            | ("names",x)::xs ->
+                loop xs
+                  (((function
+                     | `List xs ->
+                         map_bind (fun x  -> vhdl_name_t_of_yojson x) [] xs
+                     | _ -> Result.Error "Vhdl_ast.vhdl_port_t.names") x),
+                    arg1, arg2, arg3)
+            | ("mode",x)::xs ->
+                loop xs
+                  (arg0, ((fun x  -> vhdl_port_mode_t_of_yojson x) x), arg2,
+                    arg3)
+            | ("typ",x)::xs ->
+                loop xs
+                  (arg0, arg1,
+                    ((fun x  -> vhdl_subtype_indication_t_of_yojson x) x),
+                    arg3)
+            | ("expr",x)::xs ->
+                loop xs
+                  (arg0, arg1, arg2, ((fun x  -> vhdl_expr_t_of_yojson x) x))
+            | [] ->
+                arg3 >>=
+                  ((fun arg3  ->
+                      arg2 >>=
+                        (fun arg2  ->
+                           arg1 >>=
+                             (fun arg1  ->
+                                arg0 >>=
+                                  (fun arg0  ->
+                                     Result.Ok
+                                       {
+                                         names = arg0;
+                                         mode = arg1;
+                                         typ = arg2;
+                                         expr = arg3
+                                       })))))
+            | _::xs -> loop xs _state  in
+          loop xs
+            ((Result.Ok []), (Result.Ok InPort),
+              (Result.Error "Vhdl_ast.vhdl_port_t.typ"), (Result.Ok IsNull))
+      | _ -> Result.Error "Vhdl_ast.vhdl_port_t")
+  [@ocaml.warning "-A"])
 type vhdl_declaration_t =
   | VarDecl of
   {
@@ -3864,6 +4037,11 @@ type vhdl_declaration_t =
   names: vhdl_name_t list ;
   typ: vhdl_subtype_indication_t ;
   init_val: vhdl_expr_t [@default IsNull]} [@name "SIGNAL_DECLARATION"]
+  | ComponentDecl of
+  {
+  name: vhdl_name_t [@default NoName];
+  generics: vhdl_port_t list [@default []];
+  ports: vhdl_port_t list [@default []]} [@name "COMPONENT_DECLARATION"]
   | Subprogram of
   {
   name: vhdl_name_t [@default NoName];
@@ -3877,11 +4055,17 @@ type vhdl_declaration_t =
 (* Needs adaptation for: SubProgram *)
 let rec pp_vhdl_declaration_t :
   Format.formatter -> vhdl_declaration_t -> Ppx_deriving_runtime.unit =
-  let __12 () = pp_vhdl_sequential_stmt_t
+  let __15 () = pp_vhdl_sequential_stmt_t
   
-  and __11 () = pp_vhdl_declaration_t
+  and __14 () = pp_vhdl_declaration_t
   
-  and __10 () = pp_vhdl_subprogram_spec_t
+  and __13 () = pp_vhdl_subprogram_spec_t
+  
+  and __12 () = pp_vhdl_name_t
+  
+  and __11 () = pp_vhdl_port_t
+  
+  and __10 () = pp_vhdl_port_t
   
   and __9 () = pp_vhdl_name_t
   
@@ -3955,13 +4139,35 @@ let rec pp_vhdl_declaration_t :
               | _ ->
                   (Format.fprintf fmt ":=";
                   ((__8 ()) fmt) ainit_val;)))
+        | ComponentDecl
+            { name = aname; generics = agenerics; ports = aports } ->
+            Format.fprintf fmt "@[<v 2>component ";
+            ((__9 ()) fmt) aname;
+            Format.fprintf fmt " is@;";
+            ((fun x  ->
+              ignore
+                (List.fold_left
+                  (fun sep  ->
+                    fun x  ->
+                      if sep then Format.fprintf fmt "@;";
+                        ((__10 ()) fmt) x;
+                        true) false x))) agenerics;
+            ((fun x  ->
+              ignore
+                (List.fold_left
+                  (fun sep  ->
+                    fun x  ->
+                      if sep then Format.fprintf fmt "@;";
+                        ((__11 ()) fmt) x;
+                        true) false x))) aports;
+            Format.fprintf fmt "@]@;end component";
         | Subprogram
             { name = aname; kind = akind; spec = aspec;
               decl_part = adecl_part; stmts = astmts }
             ->
             (Format.fprintf fmt "@[<2>Subprogram {@,";
              (((((Format.fprintf fmt "@[%s =@ " "name";
-                  ((__9 ()) fmt) aname;
+                  ((__12 ()) fmt) aname;
                   Format.fprintf fmt "@]");
                  Format.fprintf fmt ";@ ";
                  Format.fprintf fmt "@[%s =@ " "kind";
@@ -3969,7 +4175,7 @@ let rec pp_vhdl_declaration_t :
                  Format.fprintf fmt "@]");
                 Format.fprintf fmt ";@ ";
                 Format.fprintf fmt "@[%s =@ " "spec";
-                ((__10 ()) fmt) aspec;
+                ((__13 ()) fmt) aspec;
                 Format.fprintf fmt "@]");
                Format.fprintf fmt ";@ ";
                Format.fprintf fmt "@[%s =@ " "decl_part";
@@ -3980,7 +4186,7 @@ let rec pp_vhdl_declaration_t :
                         (fun sep  ->
                            fun x  ->
                              if sep then Format.fprintf fmt ";@ ";
-                             ((__11 ()) fmt) x;
+                             ((__14 ()) fmt) x;
                              true) false x);
                    Format.fprintf fmt "@,]@]")) adecl_part;
                Format.fprintf fmt "@]");
@@ -3993,7 +4199,7 @@ let rec pp_vhdl_declaration_t :
                        (fun sep  ->
                           fun x  ->
                             if sep then Format.fprintf fmt ";@ ";
-                            ((__12 ()) fmt) x;
+                            ((__15 ()) fmt) x;
                             true) false x);
                   Format.fprintf fmt "@,]@]")) astmts;
               Format.fprintf fmt "@]");
@@ -4073,6 +4279,40 @@ let rec (vhdl_declaration_t_to_yojson :
                      `List (List.map (fun x  -> vhdl_name_t_to_yojson x) x))
                     arg0.names))
                :: fields  in
+             `Assoc fields)]
+      | ComponentDecl arg0 ->
+          `List
+            [`String "COMPONENT_DECLARATION";
+            (let fields = []  in
+             let fields =
+               if arg0.ports = []
+               then fields
+               else
+                 ("ports",
+                   (((fun x  ->
+                        `List
+                          (List.map (fun x  -> vhdl_port_t_to_yojson x) x)))
+                      arg0.ports))
+                 :: fields
+                in
+             let fields =
+               if arg0.generics = []
+               then fields
+               else
+                 ("generics",
+                   (((fun x  ->
+                        `List
+                          (List.map (fun x  -> vhdl_port_t_to_yojson x) x)))
+                      arg0.generics))
+                 :: fields
+                in
+             let fields =
+               if arg0.name = NoName
+               then fields
+               else
+                 ("name", (((fun x  -> vhdl_name_t_to_yojson x)) arg0.name))
+                 :: fields
+                in
              `Assoc fields)]
       | Subprogram arg0 ->
           `List
@@ -4271,6 +4511,52 @@ and (vhdl_declaration_t_of_yojson :
                   ((Result.Error "Vhdl_ast.vhdl_declaration_t.names"),
                     (Result.Error "Vhdl_ast.vhdl_declaration_t.typ"),
                     (Result.Ok IsNull))
+            | _ -> Result.Error "Vhdl_ast.vhdl_declaration_t")) arg0
+      | `List ((`String "COMPONENT_DECLARATION")::arg0::[]) ->
+          ((function
+            | `Assoc xs ->
+                let rec loop xs ((arg0,arg1,arg2) as _state) =
+                  match xs with
+                  | ("name",x)::xs ->
+                      loop xs
+                        (((fun x  -> vhdl_name_t_of_yojson x) x), arg1, arg2)
+                  | ("generics",x)::xs ->
+                      loop xs
+                        (arg0,
+                          ((function
+                            | `List xs ->
+                                map_bind (fun x  -> vhdl_port_t_of_yojson x)
+                                  [] xs
+                            | _ ->
+                                Result.Error
+                                  "Vhdl_ast.vhdl_declaration_t.generics") x),
+                          arg2)
+                  | ("ports",x)::xs ->
+                      loop xs
+                        (arg0, arg1,
+                          ((function
+                            | `List xs ->
+                                map_bind (fun x  -> vhdl_port_t_of_yojson x)
+                                  [] xs
+                            | _ ->
+                                Result.Error
+                                  "Vhdl_ast.vhdl_declaration_t.ports") x))
+                  | [] ->
+                      arg2 >>=
+                        ((fun arg2  ->
+                            arg1 >>=
+                              (fun arg1  ->
+                                 arg0 >>=
+                                   (fun arg0  ->
+                                      Result.Ok
+                                        (ComponentDecl
+                                           {
+                                             name = arg0;
+                                             generics = arg1;
+                                             ports = arg2
+                                           })))))
+                  | _::xs -> loop xs _state  in
+                loop xs ((Result.Ok NoName), (Result.Ok []), (Result.Ok []))
             | _ -> Result.Error "Vhdl_ast.vhdl_declaration_t")) arg0
       | `List ((`String "SUBPROGRAM_BODY")::arg0::[]) ->
           ((function
@@ -5352,181 +5638,6 @@ and (vhdl_concurrent_stmt_t_of_yojson :
       | _ -> Result.Error "Vhdl_ast.vhdl_concurrent_stmt_t")
   [@ocaml.warning "-A"])
 
-type vhdl_port_mode_t =
-  | InPort [@name "in"]
-  | OutPort [@name "out"]
-  | InoutPort [@name "inout"]
-  | BufferPort [@name "buffer"]
-
-let rec (pp_vhdl_port_mode_t :
-          Format.formatter -> vhdl_port_mode_t -> Ppx_deriving_runtime.unit)
-  =
-  ((let open! Ppx_deriving_runtime in
-      fun fmt  ->
-        function
-        | InPort  -> Format.pp_print_string fmt "in"
-        | OutPort  -> Format.pp_print_string fmt "out"
-        | InoutPort  -> Format.pp_print_string fmt "inout"
-        | BufferPort  -> Format.pp_print_string fmt "buffer")
-  [@ocaml.warning "-A"])
-
-and show_vhdl_port_mode_t : vhdl_port_mode_t -> Ppx_deriving_runtime.string =
-  fun x  -> Format.asprintf "%a" pp_vhdl_port_mode_t x
-
-let rec (vhdl_port_mode_t_to_yojson : vhdl_port_mode_t -> Yojson.Safe.json) =
-  ((let open! Ppx_deriving_yojson_runtime in
-      function
-      | InPort  -> `List [`String "in"]
-      | OutPort  -> `List [`String "out"]
-      | InoutPort  -> `List [`String "inout"]
-      | BufferPort  -> `List [`String "buffer"])
-  [@ocaml.warning "-A"])
-
-and (vhdl_port_mode_t_of_yojson :
-      Yojson.Safe.json ->
-        vhdl_port_mode_t Ppx_deriving_yojson_runtime.error_or)
-  =
-  ((let open! Ppx_deriving_yojson_runtime in
-      function
-      | `List ((`String "in")::[]) -> Result.Ok InPort
-      | `List ((`String "out")::[]) -> Result.Ok OutPort
-      | `List ((`String "inout")::[]) -> Result.Ok InoutPort
-      | `List ((`String "buffer")::[]) -> Result.Ok BufferPort
-      | _ -> Result.Error "Vhdl_ast.vhdl_port_mode_t")
-  [@ocaml.warning "-A"])
-
-type vhdl_port_t =
-  {
-  names: vhdl_name_t list [@default []];
-  mode: vhdl_port_mode_t [@default InPort];
-  typ: vhdl_subtype_indication_t ;
-  expr: vhdl_expr_t [@default IsNull]}
-
-let rec pp_vhdl_port_t :
-  Format.formatter -> vhdl_port_t -> Ppx_deriving_runtime.unit =
-  let __3 () = pp_vhdl_expr_t
-  
-  and __2 () = pp_vhdl_subtype_indication_t
-  
-  and __1 () = pp_vhdl_port_mode_t
-  
-  and __0 () = pp_vhdl_name_t
-   in
-  ((let open! Ppx_deriving_runtime in
-      fun fmt  ->
-        fun x  ->
-          Format.fprintf fmt "@[";
-          ((((
-              ((fun x  ->
-                  Format.fprintf fmt "@[";
-                  ignore
-                    (List.fold_left
-                       (fun sep  ->
-                          fun x  ->
-                            if sep then Format.fprintf fmt ",@ ";
-                            ((__0 ()) fmt) x;
-                            true) false x);
-                  Format.fprintf fmt "@,@]")) x.names;
-              );
-             Format.fprintf fmt ": ";
-             ((__1 ()) fmt) x.mode;
-             );
-             Format.fprintf fmt " ";
-            ((__2 ()) fmt) x.typ;
-            );
-          (match x.expr with
-           | IsNull -> Format.fprintf fmt "";
-           | _ -> (Format.fprintf fmt "@[:= ";
-                   ((__3 ()) fmt) x.expr;
-                   Format.fprintf fmt "@]"));
-          Format.fprintf fmt "@]"))
-    [@ocaml.warning "-A"])
-
-and show_vhdl_port_t : vhdl_port_t -> Ppx_deriving_runtime.string =
-  fun x  -> Format.asprintf "%a" pp_vhdl_port_t x
-
-let rec (vhdl_port_t_to_yojson : vhdl_port_t -> Yojson.Safe.json) =
-  ((let open! Ppx_deriving_yojson_runtime in
-      fun x  ->
-        let fields = []  in
-        let fields =
-          if x.expr = IsNull
-          then fields
-          else ("expr", (((fun x  -> vhdl_expr_t_to_yojson x)) x.expr)) ::
-            fields
-           in
-        let fields =
-          ("typ", ((fun x  -> vhdl_subtype_indication_t_to_yojson x) x.typ))
-          :: fields  in
-        let fields =
-          if x.mode = InPort
-          then fields
-          else ("mode", (((fun x  -> vhdl_port_mode_t_to_yojson x)) x.mode))
-            :: fields
-           in
-        let fields =
-          if x.names = []
-          then fields
-          else
-            ("names",
-              (((fun x  ->
-                   `List (List.map (fun x  -> vhdl_name_t_to_yojson x) x)))
-                 x.names))
-            :: fields
-           in
-        `Assoc fields)
-  [@ocaml.warning "-A"])
-
-and (vhdl_port_t_of_yojson :
-      Yojson.Safe.json -> vhdl_port_t Ppx_deriving_yojson_runtime.error_or)
-  =
-  ((let open! Ppx_deriving_yojson_runtime in
-      function
-      | `Assoc xs ->
-          let rec loop xs ((arg0,arg1,arg2,arg3) as _state) =
-            match xs with
-            | ("names",x)::xs ->
-                loop xs
-                  (((function
-                     | `List xs ->
-                         map_bind (fun x  -> vhdl_name_t_of_yojson x) [] xs
-                     | _ -> Result.Error "Vhdl_ast.vhdl_port_t.names") x),
-                    arg1, arg2, arg3)
-            | ("mode",x)::xs ->
-                loop xs
-                  (arg0, ((fun x  -> vhdl_port_mode_t_of_yojson x) x), arg2,
-                    arg3)
-            | ("typ",x)::xs ->
-                loop xs
-                  (arg0, arg1,
-                    ((fun x  -> vhdl_subtype_indication_t_of_yojson x) x),
-                    arg3)
-            | ("expr",x)::xs ->
-                loop xs
-                  (arg0, arg1, arg2, ((fun x  -> vhdl_expr_t_of_yojson x) x))
-            | [] ->
-                arg3 >>=
-                  ((fun arg3  ->
-                      arg2 >>=
-                        (fun arg2  ->
-                           arg1 >>=
-                             (fun arg1  ->
-                                arg0 >>=
-                                  (fun arg0  ->
-                                     Result.Ok
-                                       {
-                                         names = arg0;
-                                         mode = arg1;
-                                         typ = arg2;
-                                         expr = arg3
-                                       })))))
-            | _::xs -> loop xs _state  in
-          loop xs
-            ((Result.Ok []), (Result.Ok InPort),
-              (Result.Error "Vhdl_ast.vhdl_port_t.typ"), (Result.Ok IsNull))
-      | _ -> Result.Error "Vhdl_ast.vhdl_port_t")
-  [@ocaml.warning "-A"])
-
 type vhdl_entity_t =
   {
   name: vhdl_name_t [@default NoName];
@@ -5751,12 +5862,13 @@ let rec pp_vhdl_package_t :
       fun fmt  ->
         fun x  ->
           ((__0 ()) fmt) x.name;
-          Format.fprintf fmt " is@;";
+          Format.fprintf fmt " is";
           ((fun x  ->
              ignore
                (List.fold_left
                   (fun sep  ->
                      fun x  ->
+                       Format.fprintf fmt "@;";
                        if sep then Format.fprintf fmt "";
                        ((__1 ()) fmt) x;
                        Format.fprintf fmt ";";
@@ -5766,8 +5878,10 @@ let rec pp_vhdl_package_t :
                  (List.fold_left
                     (fun sep  ->
                        fun x  ->
+                         Format.fprintf fmt "@;";
                          if sep then Format.fprintf fmt "";
                          ((__2 ()) fmt) x;
+                         Format.fprintf fmt ";";
                          true) false x))) x.shared_decls;)
     [@ocaml.warning "-A"])
 

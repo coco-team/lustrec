@@ -367,6 +367,11 @@ class virtual vhdl_map =
             let typ = self#vhdl_subtype_indication_t typ  in
             let init_val = self#vhdl_expr_t init_val  in
             SigDecl { names; typ; init_val }
+        | ComponentDecl { name; generics; ports } ->
+            let name = self#vhdl_name_t name  in
+            let generics = self#list self#vhdl_port_t generics  in
+            let ports = self#list self#vhdl_port_t ports  in
+            ComponentDecl { name; generics; ports }
         | Subprogram { name; kind; spec; decl_part; stmts } ->
             let name = self#vhdl_name_t name  in
             let kind = self#string kind  in
