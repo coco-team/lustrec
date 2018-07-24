@@ -171,7 +171,7 @@ and vhdl_assoc_element_t =
   actual_designator: vhdl_name_t option [@default None];
   actual_expr: vhdl_expr_t option [@default None]}
 and vhdl_element_assoc_t = {
-  choices: vhdl_expr_t list ;
+  choices: vhdl_expr_t list [@default []];
   expr: vhdl_expr_t }
 and vhdl_array_attributes_t =
   | AAttInt of {
@@ -2058,11 +2058,15 @@ and (vhdl_element_assoc_t_to_yojson :
         let fields = ("expr", ((fun x  -> vhdl_expr_t_to_yojson x) x.expr))
           :: fields  in
         let fields =
-          ("choices",
-            ((fun x  ->
-                `List (List.map (fun x  -> vhdl_expr_t_to_yojson x) x))
-               x.choices))
-          :: fields  in
+          if x.choices = []
+          then fields
+          else
+            ("choices",
+              (((fun x  ->
+                   `List (List.map (fun x  -> vhdl_expr_t_to_yojson x) x)))
+                 x.choices))
+            :: fields
+           in
         `Assoc fields)
   [@ocaml.warning "-A"])
 
@@ -2093,7 +2097,7 @@ and (vhdl_element_assoc_t_of_yojson :
                            Result.Ok { choices = arg0; expr = arg1 })))
             | _::xs -> loop xs _state  in
           loop xs
-            ((Result.Error "Vhdl_ast.vhdl_element_assoc_t.choices"),
+            ((Result.Ok []),
               (Result.Error "Vhdl_ast.vhdl_element_assoc_t.expr"))
       | _ -> Result.Error "Vhdl_ast.vhdl_element_assoc_t")
   [@ocaml.warning "-A"])
@@ -4048,25 +4052,21 @@ type vhdl_declaration_t =
   ports: vhdl_port_t list [@default []]} [@name "COMPONENT_DECLARATION"]
   | Subprogram of
   {
-  name: vhdl_name_t [@default NoName];
+  name: string [@default ""];
   kind: string [@default ""];
-  spec: vhdl_subprogram_spec_t
-    [@default
-      { name = ""; typeMark = NoName; parameters = []; isPure = false }];
+  spec: vhdl_subprogram_spec_t option [@default None];
   decl_part: vhdl_declaration_t list [@default []];
   stmts: vhdl_sequential_stmt_t list [@default []]} [@name "SUBPROGRAM_BODY"]
 
 (* Needs adaptation for: SubProgram *)
 let rec pp_vhdl_declaration_t :
   Format.formatter -> vhdl_declaration_t -> Ppx_deriving_runtime.unit =
-  let __15 () = pp_vhdl_sequential_stmt_t
+  let __14 () = pp_vhdl_sequential_stmt_t
   
-  and __14 () = pp_vhdl_declaration_t
+  and __13 () = pp_vhdl_declaration_t
   
-  and __13 () = pp_vhdl_subprogram_spec_t
-  
-  and __12 () = pp_vhdl_name_t
-  
+  and __12 () = pp_vhdl_subprogram_spec_t
+
   and __11 () = pp_vhdl_port_t
   
   and __10 () = pp_vhdl_port_t
@@ -4171,7 +4171,7 @@ let rec pp_vhdl_declaration_t :
             ->
             (Format.fprintf fmt "@[<2>Subprogram {@,";
              (((((Format.fprintf fmt "@[%s =@ " "name";
-                  ((__12 ()) fmt) aname;
+                  (Format.fprintf fmt "%S") aname;
                   Format.fprintf fmt "@]");
                  Format.fprintf fmt ";@ ";
                  Format.fprintf fmt "@[%s =@ " "kind";
@@ -4179,7 +4179,12 @@ let rec pp_vhdl_declaration_t :
                  Format.fprintf fmt "@]");
                 Format.fprintf fmt ";@ ";
                 Format.fprintf fmt "@[%s =@ " "spec";
-                ((__13 ()) fmt) aspec;
+                ((function
+                  | None  -> Format.pp_print_string fmt "None"
+                  | Some x ->
+                      (Format.pp_print_string fmt "(Some ";
+                       ((__12 ()) fmt) x;
+                       Format.pp_print_string fmt ")"))) aspec;
                 Format.fprintf fmt "@]");
                Format.fprintf fmt ";@ ";
                Format.fprintf fmt "@[%s =@ " "decl_part";
@@ -4190,7 +4195,7 @@ let rec pp_vhdl_declaration_t :
                         (fun sep  ->
                            fun x  ->
                              if sep then Format.fprintf fmt ";@ ";
-                             ((__14 ()) fmt) x;
+                             ((__13 ()) fmt) x;
                              true) false x);
                    Format.fprintf fmt "@,]@]")) adecl_part;
                Format.fprintf fmt "@]");
@@ -4203,7 +4208,7 @@ let rec pp_vhdl_declaration_t :
                        (fun sep  ->
                           fun x  ->
                             if sep then Format.fprintf fmt ";@ ";
-                            ((__15 ()) fmt) x;
+                            ((__14 ()) fmt) x;
                             true) false x);
                   Format.fprintf fmt "@,]@]")) astmts;
               Format.fprintf fmt "@]");
@@ -4347,18 +4352,14 @@ let rec (vhdl_declaration_t_to_yojson :
                  :: fields
                 in
              let fields =
-               if
-                 arg0.spec =
-                   {
-                     name = "";
-                     typeMark = NoName;
-                     parameters = [];
-                     isPure = false
-                   }
+               if arg0.spec = None
                then fields
                else
                  ("spec",
-                   (((fun x  -> vhdl_subprogram_spec_t_to_yojson x))
+                   (((function
+                      | None  -> `Null
+                      | Some x ->
+                          ((fun x  -> vhdl_subprogram_spec_t_to_yojson x)) x))
                       arg0.spec))
                  :: fields
                 in
@@ -4372,10 +4373,12 @@ let rec (vhdl_declaration_t_to_yojson :
                  :: fields
                 in
              let fields =
-               if arg0.name = NoName
+               if arg0.name = ""
                then fields
                else
-                 ("name", (((fun x  -> vhdl_name_t_to_yojson x)) arg0.name))
+                 ("name",
+                   (((fun (x : Ppx_deriving_runtime.string)  -> `String x))
+                      arg0.name))
                  :: fields
                 in
              `Assoc fields)])
@@ -4569,8 +4572,12 @@ and (vhdl_declaration_t_of_yojson :
                   match xs with
                   | ("name",x)::xs ->
                       loop xs
-                        (((fun x  -> vhdl_name_t_of_yojson x) x), arg1, arg2,
-                          arg3, arg4)
+                        (((function
+                           | `String x -> Result.Ok x
+                           | _ ->
+                               Result.Error
+                                 "Vhdl_ast.vhdl_declaration_t.name") x),
+                          arg1, arg2, arg3, arg4)
                   | ("kind",x)::xs ->
                       loop xs
                         (arg0,
@@ -4583,7 +4590,12 @@ and (vhdl_declaration_t_of_yojson :
                   | ("spec",x)::xs ->
                       loop xs
                         (arg0, arg1,
-                          ((fun x  -> vhdl_subprogram_spec_t_of_yojson x) x),
+                          ((function
+                            | `Null -> Result.Ok None
+                            | x ->
+                                ((fun x  ->
+                                    vhdl_subprogram_spec_t_of_yojson x) x)
+                                  >>= ((fun x  -> Result.Ok (Some x)))) x),
                           arg3, arg4)
                   | ("decl_part",x)::xs ->
                       loop xs
@@ -4631,14 +4643,8 @@ and (vhdl_declaration_t_of_yojson :
                                                      })))))))
                   | _::xs -> loop xs _state  in
                 loop xs
-                  ((Result.Ok NoName), (Result.Ok ""),
-                    (Result.Ok
-                       {
-                         name = "";
-                         typeMark = NoName;
-                         parameters = [];
-                         isPure = false
-                       }), (Result.Ok []), (Result.Ok []))
+                  ((Result.Ok ""), (Result.Ok ""), (Result.Ok None),
+                    (Result.Ok []), (Result.Ok []))
             | _ -> Result.Error "Vhdl_ast.vhdl_declaration_t")) arg0
       | _ -> Result.Error "Vhdl_ast.vhdl_declaration_t")
   [@ocaml.warning "-A"])
@@ -5861,7 +5867,7 @@ type vhdl_entity_t =
   name: vhdl_name_t [@default NoName];
   generics: vhdl_port_t list [@default []];
   ports: vhdl_port_t list [@default []];
-  declaration: vhdl_declaration_t list
+  declaration: vhdl_declarative_item_t list
     [@key "ENTITY_DECLARATIVE_PART"][@default []];
   stmts: vhdl_concurrent_stmt_t list
     [@key "ENTITY_STATEMENT_PART"][@default []]}
@@ -5870,7 +5876,7 @@ let rec pp_vhdl_entity_t :
   Format.formatter -> vhdl_entity_t -> Ppx_deriving_runtime.unit =
   let __4 () = pp_vhdl_concurrent_stmt_t
   
-  and __3 () = pp_vhdl_declaration_t
+  and __3 () = pp_vhdl_declarative_item_t
   
   and __2 () = pp_vhdl_port_t
   
@@ -5881,21 +5887,26 @@ let rec pp_vhdl_entity_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          (((((
-               ((__0 ()) fmt) x.name;
-               Format.fprintf fmt " is@ ");
-              Format.fprintf fmt "@[<v>";
+          ((__0 ()) fmt) x.name;
+          Format.fprintf fmt " is@;";
+          (match x.generics with
+          | [] -> Format.fprintf fmt "";
+          | _ -> 
+              Format.fprintf fmt "generic (@[<v>";
               ((fun x  ->
-                  ignore
-                    (List.fold_left
-                       (fun sep  ->
-                          fun x  ->
-                            if sep then Format.fprintf fmt ";@;";
-                            ((__1 ()) fmt) x;
-                            true) false x))) x.generics;
-              Format.fprintf fmt "@]");
-             Format.fprintf fmt "port (@[<v>";
-             ((fun x  ->
+                ignore
+                (List.fold_left
+                  (fun sep  ->
+                    fun x  ->
+                      if sep then Format.fprintf fmt ";@;";
+                        ((__1 ()) fmt) x;
+                        true) false x))) x.generics;
+              Format.fprintf fmt "@]);");
+          (match x.ports with
+          | [] -> Format.fprintf fmt "";
+          | _ -> 
+              Format.fprintf fmt "port (@[<v>";
+              ((fun x  ->
                  ignore
                    (List.fold_left
                       (fun sep  ->
@@ -5903,32 +5914,33 @@ let rec pp_vhdl_entity_t :
                            if sep then Format.fprintf fmt ";@;";
                            ((__2 ()) fmt) x;
                            true) false x))) x.ports;
-             Format.fprintf fmt "@]);");
-            Format.fprintf fmt "@[<v>";
-            ((fun x  ->
-                Format.fprintf fmt "@[";
+              Format.fprintf fmt "@]);");
+          (match x.declaration with
+          | [] -> Format.fprintf fmt "";
+          | _ ->
+              Format.fprintf fmt "@;";
+              ((fun x  ->
                 ignore
                   (List.fold_left
                      (fun sep  ->
                         fun x  ->
-                          if sep then Format.fprintf fmt ";@ ";
+                          if sep then Format.fprintf fmt ";@;";
                           ((__3 ()) fmt) x;
-                          true) false x);
-                Format.fprintf fmt "@]")) x.declaration;
-            Format.fprintf fmt "@]");
-           Format.fprintf fmt "@[<v>";
-           ((fun x  ->
-               Format.fprintf fmt "@[";
-               ignore
-                 (List.fold_left
+                          true) false x))) x.declaration;
+              Format.fprintf fmt ";");
+          (match x.stmts with
+          | [] -> Format.fprintf fmt "";
+          | _ ->
+              Format.fprintf fmt "@;@[<v 2>begin@;";
+              ((fun x  ->
+                ignore
+                  (List.fold_left
                     (fun sep  ->
                        fun x  ->
-                         if sep then Format.fprintf fmt ";@ ";
+                         if sep then Format.fprintf fmt ";@;";
                          ((__4 ()) fmt) x;
-                         true) false x);
-               Format.fprintf fmt "@]")) x.stmts;
-           Format.fprintf fmt "@]");
-          Format.fprintf fmt "@]")
+                         true) false x))) x.stmts;
+              Format.fprintf fmt ";@]");)
     [@ocaml.warning "-A"])
 
 and show_vhdl_entity_t : vhdl_entity_t -> Ppx_deriving_runtime.string =
@@ -5956,7 +5968,8 @@ let rec (vhdl_entity_t_to_yojson : vhdl_entity_t -> Yojson.Safe.json) =
             ("ENTITY_DECLARATIVE_PART",
               (((fun x  ->
                    `List
-                     (List.map (fun x  -> vhdl_declaration_t_to_yojson x) x)))
+                     (List.map
+                        (fun x  -> vhdl_declarative_item_t_to_yojson x) x)))
                  x.declaration))
             :: fields
            in
@@ -6022,7 +6035,8 @@ and (vhdl_entity_t_of_yojson :
                   (arg0, arg1, arg2,
                     ((function
                       | `List xs ->
-                          map_bind (fun x  -> vhdl_declaration_t_of_yojson x)
+                          map_bind
+                            (fun x  -> vhdl_declarative_item_t_of_yojson x)
                             [] xs
                       | _ ->
                           Result.Error "Vhdl_ast.vhdl_entity_t.declaration")

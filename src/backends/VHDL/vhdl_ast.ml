@@ -94,7 +94,7 @@ and vhdl_assoc_element_t =
   }
 and vhdl_element_assoc_t =
   {
-    choices: vhdl_expr_t list;
+    choices: vhdl_expr_t list [@default []];
     expr: vhdl_expr_t;
   }
 and vhdl_array_attributes_t = 
@@ -223,9 +223,9 @@ type vhdl_declaration_t =
       ports: vhdl_port_t list [@default []];
     } [@name "COMPONENT_DECLARATION"]
   | Subprogram of {
-      name: vhdl_name_t [@default NoName]; 
+      name: string [@default ""]; 
       kind: string [@default ""]; 
-      spec: vhdl_subprogram_spec_t [@default {name="";typeMark=NoName;parameters=[];isPure=false}]; 
+      spec: vhdl_subprogram_spec_t option [@default None]; 
       decl_part: vhdl_declaration_t list [@default []]; 
       stmts: vhdl_sequential_stmt_t list [@default []]
     } [@name "SUBPROGRAM_BODY"]
@@ -323,7 +323,7 @@ type vhdl_entity_t =
     name: vhdl_name_t [@default NoName];
     generics: vhdl_port_t list [@default []];
     ports: vhdl_port_t list [@default []];
-    declaration: vhdl_declaration_t list [@key "ENTITY_DECLARATIVE_PART"] [@default []];
+    declaration: vhdl_declarative_item_t list [@key "ENTITY_DECLARATIVE_PART"] [@default []];
     stmts: vhdl_concurrent_stmt_t list [@key "ENTITY_STATEMENT_PART"] [@default []]; 
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;

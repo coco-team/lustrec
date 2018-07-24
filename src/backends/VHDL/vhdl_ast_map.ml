@@ -375,9 +375,9 @@ class virtual vhdl_map =
             let ports = self#list self#vhdl_port_t ports  in
             ComponentDecl { name; generics; ports }
         | Subprogram { name; kind; spec; decl_part; stmts } ->
-            let name = self#vhdl_name_t name  in
+            let name = self#string name  in
             let kind = self#string kind  in
-            let spec = self#vhdl_subprogram_spec_t spec  in
+            let spec = self#option self#vhdl_subprogram_spec_t spec  in
             let decl_part = self#list self#vhdl_declaration_t decl_part  in
             let stmts = self#list self#vhdl_sequential_stmt_t stmts  in
             Subprogram { name; kind; spec; decl_part; stmts }
@@ -465,7 +465,8 @@ class virtual vhdl_map =
         let name = self#vhdl_name_t name  in
         let generics = self#list self#vhdl_port_t generics  in
         let ports = self#list self#vhdl_port_t ports  in
-        let declaration = self#list self#vhdl_declaration_t declaration  in
+        let declaration = self#list self#vhdl_declarative_item_t declaration
+           in
         let stmts = self#list self#vhdl_concurrent_stmt_t stmts  in
         { name; generics; ports; declaration; stmts }
 
