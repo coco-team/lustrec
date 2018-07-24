@@ -23,3 +23,4 @@
 (declare-rel exp ( Real Real) )
 (declare-rel log ( Real Real) )
 (declare-rel log10 ( Real Real) )
+(declare-rel tanh ( Real Real) )
