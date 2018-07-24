@@ -432,7 +432,7 @@ and pp_vhdl_definition_t :
 and show_vhdl_definition_t : vhdl_definition_t -> Ppx_deriving_runtime.string
   = fun x  -> Format.asprintf "%a" pp_vhdl_definition_t x
 
-(* TODO adapt for Op, Time, Sig, suffixMod, Aggregate *)
+(* TODO adapt for Op, Time, Sig, suffixMod *)
 and pp_vhdl_expr_t :
   Format.formatter -> vhdl_expr_t -> Ppx_deriving_runtime.unit =
   let __8 () = pp_vhdl_element_assoc_t
@@ -2684,6 +2684,7 @@ and (vhdl_parameter_t_of_yojson :
 type vhdl_subprogram_spec_t =
   {
   name: string [@default ""];
+  subprogram_type: string [@default ""];
   typeMark: vhdl_name_t [@default NoName];
   parameters: vhdl_parameter_t list ;
   isPure: bool [@default false]}
@@ -2698,33 +2699,33 @@ let rec pp_vhdl_subprogram_spec_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          Format.fprintf fmt "@[<2>{ ";
-          ((((Format.fprintf fmt "@[%s =@ " "name";
-              (Format.fprintf fmt "%S") x.name;
-              Format.fprintf fmt "@]");
-             Format.fprintf fmt ";@ ";
-             Format.fprintf fmt "@[%s =@ " "typeMark";
-             ((__0 ()) fmt) x.typeMark;
-             Format.fprintf fmt "@]");
-            Format.fprintf fmt ";@ ";
-            Format.fprintf fmt "@[%s =@ " "parameters";
+          (match x.subprogram_type with
+          | "function" -> 
+              if (x.isPure) then
+                Format.fprintf fmt "pure %s" x.subprogram_type
+              else
+                Format.fprintf fmt "impure %s" x.subprogram_type
+          | "procedure" ->
+              Format.fprintf fmt "%s %s" x.subprogram_type x.name);
+          (match x.parameters with
+          | [] -> Format.fprintf fmt "";
+          | _ -> 
+            Format.fprintf fmt "(@[";
             ((fun x  ->
-                Format.fprintf fmt "@[<2>[";
                 ignore
                   (List.fold_left
                      (fun sep  ->
                         fun x  ->
-                          if sep then Format.fprintf fmt ";@ ";
+                          if sep then Format.fprintf fmt ",@ ";
                           ((__1 ()) fmt) x;
-                          true) false x);
-                Format.fprintf fmt "@,]@]")) x.parameters;
-            Format.fprintf fmt "@]");
-           Format.fprintf fmt ";@ ";
-           Format.fprintf fmt "@[%s =@ " "isPure";
-           (Format.fprintf fmt "%B") x.isPure;
-           Format.fprintf fmt "@]");
-          Format.fprintf fmt "@ }@]")
-    [@ocaml.warning "-A"])
+                          true) false x))) x.parameters;
+            Format.fprintf fmt "@])");
+          (match x.typeMark with
+          | NoName -> Format.fprintf fmt "";
+          | _ -> 
+              Format.fprintf fmt "returns ";
+              ((__0 ()) fmt) x.typeMark))
+   [@ocaml.warning "-A"])
 
 and show_vhdl_subprogram_spec_t :
   vhdl_subprogram_spec_t -> Ppx_deriving_runtime.string =
@@ -2763,6 +2764,15 @@ let rec (vhdl_subprogram_spec_t_to_yojson :
             :: fields
            in
         let fields =
+          if x.subprogram_type = ""
+          then fields
+          else
+            ("subprogram_type",
+              (((fun (x : Ppx_deriving_runtime.string)  -> `String x))
+                 x.subprogram_type))
+            :: fields
+           in
+        let fields =
           if x.name = ""
           then fields
           else
@@ -2780,7 +2790,7 @@ and (vhdl_subprogram_spec_t_of_yojson :
   ((let open! Ppx_deriving_yojson_runtime in
       function
       | `Assoc xs ->
-          let rec loop xs ((arg0,arg1,arg2,arg3) as _state) =
+          let rec loop xs ((arg0,arg1,arg2,arg3,arg4) as _state) =
             match xs with
             | ("name",x)::xs ->
                 loop xs
@@ -2788,13 +2798,23 @@ and (vhdl_subprogram_spec_t_of_yojson :
                      | `String x -> Result.Ok x
                      | _ ->
                          Result.Error "Vhdl_ast.vhdl_subprogram_spec_t.name")
-                      x), arg1, arg2, arg3)
+                      x), arg1, arg2, arg3, arg4)
+            | ("subprogram_type",x)::xs ->
+                loop xs
+                  (arg0,
+                    ((function
+                      | `String x -> Result.Ok x
+                      | _ ->
+                          Result.Error
+                            "Vhdl_ast.vhdl_subprogram_spec_t.subprogram_type")
+                       x), arg2, arg3, arg4)
             | ("typeMark",x)::xs ->
                 loop xs
-                  (arg0, ((fun x  -> vhdl_name_t_of_yojson x) x), arg2, arg3)
+                  (arg0, arg1, ((fun x  -> vhdl_name_t_of_yojson x) x), arg3,
+                    arg4)
             | ("parameters",x)::xs ->
                 loop xs
-                  (arg0, arg1,
+                  (arg0, arg1, arg2,
                     ((function
                       | `List xs ->
                           map_bind (fun x  -> vhdl_parameter_t_of_yojson x)
@@ -2802,35 +2822,38 @@ and (vhdl_subprogram_spec_t_of_yojson :
                       | _ ->
                           Result.Error
                             "Vhdl_ast.vhdl_subprogram_spec_t.parameters") x),
-                    arg3)
+                    arg4)
             | ("isPure",x)::xs ->
                 loop xs
-                  (arg0, arg1, arg2,
+                  (arg0, arg1, arg2, arg3,
                     ((function
                       | `Bool x -> Result.Ok x
                       | _ ->
                           Result.Error
                             "Vhdl_ast.vhdl_subprogram_spec_t.isPure") x))
             | [] ->
-                arg3 >>=
-                  ((fun arg3  ->
-                      arg2 >>=
-                        (fun arg2  ->
-                           arg1 >>=
-                             (fun arg1  ->
-                                arg0 >>=
-                                  (fun arg0  ->
-                                     Result.Ok
-                                       {
-                                         name = arg0;
-                                         typeMark = arg1;
-                                         parameters = arg2;
-                                         isPure = arg3
-                                       })))))
+                arg4 >>=
+                  ((fun arg4  ->
+                      arg3 >>=
+                        (fun arg3  ->
+                           arg2 >>=
+                             (fun arg2  ->
+                                arg1 >>=
+                                  (fun arg1  ->
+                                     arg0 >>=
+                                       (fun arg0  ->
+                                          Result.Ok
+                                            {
+                                              name = arg0;
+                                              subprogram_type = arg1;
+                                              typeMark = arg2;
+                                              parameters = arg3;
+                                              isPure = arg4
+                                            }))))))
             | _::xs -> loop xs _state  in
           loop xs
-            ((Result.Ok ""), (Result.Ok NoName), (Result.Ok []),
-              (Result.Ok false))
+            ((Result.Ok ""), (Result.Ok ""), (Result.Ok NoName),
+              (Result.Ok []), (Result.Ok false))
       | _ -> Result.Error "Vhdl_ast.vhdl_subprogram_spec_t")
   [@ocaml.warning "-A"])
 
@@ -3025,7 +3048,7 @@ let rec pp_vhdl_sequential_stmt_t :
                                         if sep then Format.fprintf fmt "";
                           ((__8 ()) fmt) x;
                           true) false x))) adefault));
-            Format.fprintf fmt "@;end if;@]"
+            Format.fprintf fmt "@;end if@]"
         | Case { label = alabel; guard = aguard; branches = abranches } ->
             (match alabel with
               | NoName -> Format.fprintf fmt "";
@@ -3043,7 +3066,7 @@ let rec pp_vhdl_sequential_stmt_t :
                           if sep then Format.fprintf fmt "";
                           ((__11 ()) fmt) x;
                           true) false x);)) abranches;
-            Format.fprintf fmt "@;end case;@]";
+            Format.fprintf fmt "@;end case@]";
         | Exit
             { label = alabel; loop_label = aloop_label;
               condition = acondition }
@@ -4062,13 +4085,10 @@ type vhdl_declaration_t =
   ports: vhdl_port_t list [@default []]} [@name "COMPONENT_DECLARATION"]
   | Subprogram of
   {
-  name: string [@default ""];
-  kind: string [@default ""];
-  spec: vhdl_subprogram_spec_t option [@default None];
+  spec: vhdl_subprogram_spec_t ;
   decl_part: vhdl_declaration_t list [@default []];
   stmts: vhdl_sequential_stmt_t list [@default []]} [@name "SUBPROGRAM_BODY"]
 
-(* Needs adaptation for: SubProgram *)
 let rec pp_vhdl_declaration_t :
   Format.formatter -> vhdl_declaration_t -> Ppx_deriving_runtime.unit =
   let __14 () = pp_vhdl_sequential_stmt_t
@@ -4176,53 +4196,36 @@ let rec pp_vhdl_declaration_t :
                         true) false x))) aports;
             Format.fprintf fmt "@]@;end component";
         | Subprogram
-            { name = aname; kind = akind; spec = aspec;
-              decl_part = adecl_part; stmts = astmts }
+            { spec = aspec; decl_part = adecl_part; stmts = astmts }
             ->
-            (Format.fprintf fmt "@[<2>Subprogram {@,";
-             (((((Format.fprintf fmt "@[%s =@ " "name";
-                  (Format.fprintf fmt "%S") aname;
-                  Format.fprintf fmt "@]");
-                 Format.fprintf fmt ";@ ";
-                 Format.fprintf fmt "@[%s =@ " "kind";
-                 (Format.fprintf fmt "%S") akind;
-                 Format.fprintf fmt "@]");
-                Format.fprintf fmt ";@ ";
-                Format.fprintf fmt "@[%s =@ " "spec";
-                ((function
-                  | None  -> Format.pp_print_string fmt "None"
-                  | Some x ->
-                      (Format.pp_print_string fmt "(Some ";
-                       ((__12 ()) fmt) x;
-                       Format.pp_print_string fmt ")"))) aspec;
-                Format.fprintf fmt "@]");
-               Format.fprintf fmt ";@ ";
-               Format.fprintf fmt "@[%s =@ " "decl_part";
-               ((fun x  ->
-                   Format.fprintf fmt "@[<2>[";
-                   ignore
-                     (List.fold_left
-                        (fun sep  ->
-                           fun x  ->
-                             if sep then Format.fprintf fmt ";@ ";
+              Format.fprintf fmt "@[<v 2>";
+              ((__12 ()) fmt) aspec;
+              Format.fprintf fmt " is";
+              (match adecl_part with
+              | [] -> Format.fprintf fmt "";
+              | _ ->
+                ((fun x  ->
+                  ignore
+                    (List.fold_left
+                      (fun sep  ->
+                         fun x  ->
+                           if sep then Format.fprintf fmt "";
+                             Format.fprintf fmt "@;";
                              ((__13 ()) fmt) x;
-                             true) false x);
-                   Format.fprintf fmt "@,]@]")) adecl_part;
-               Format.fprintf fmt "@]");
-              Format.fprintf fmt ";@ ";
-              Format.fprintf fmt "@[%s =@ " "stmts";
+                             Format.fprintf fmt ";";
+                             true) false x))) adecl_part);
+              Format.fprintf fmt "@]@;";
+              Format.fprintf fmt "@[<v 2>begin@;";
               ((fun x  ->
-                  Format.fprintf fmt "@[<2>[";
                   ignore
                     (List.fold_left
                        (fun sep  ->
                           fun x  ->
-                            if sep then Format.fprintf fmt ";@ ";
+                            if sep then Format.fprintf fmt "@;";
                             ((__14 ()) fmt) x;
-                            true) false x);
-                  Format.fprintf fmt "@,]@]")) astmts;
-              Format.fprintf fmt "@]");
-             Format.fprintf fmt "@]}"))
+                            Format.fprintf fmt ";";
+                            true) false x))) astmts;
+              Format.fprintf fmt "@]@;end";)
     [@ocaml.warning "-A"])
 
 and show_vhdl_declaration_t :
@@ -4362,35 +4365,9 @@ let rec (vhdl_declaration_t_to_yojson :
                  :: fields
                 in
              let fields =
-               if arg0.spec = None
-               then fields
-               else
-                 ("spec",
-                   (((function
-                      | None  -> `Null
-                      | Some x ->
-                          ((fun x  -> vhdl_subprogram_spec_t_to_yojson x)) x))
-                      arg0.spec))
-                 :: fields
-                in
-             let fields =
-               if arg0.kind = ""
-               then fields
-               else
-                 ("kind",
-                   (((fun (x : Ppx_deriving_runtime.string)  -> `String x))
-                      arg0.kind))
-                 :: fields
-                in
-             let fields =
-               if arg0.name = ""
-               then fields
-               else
-                 ("name",
-                   (((fun (x : Ppx_deriving_runtime.string)  -> `String x))
-                      arg0.name))
-                 :: fields
-                in
+               ("spec",
+                 ((fun x  -> vhdl_subprogram_spec_t_to_yojson x) arg0.spec))
+               :: fields  in
              `Assoc fields)])
   [@ocaml.warning "-A"])
 
@@ -4578,38 +4555,15 @@ and (vhdl_declaration_t_of_yojson :
       | `List ((`String "SUBPROGRAM_BODY")::arg0::[]) ->
           ((function
             | `Assoc xs ->
-                let rec loop xs ((arg0,arg1,arg2,arg3,arg4) as _state) =
+                let rec loop xs ((arg0,arg1,arg2) as _state) =
                   match xs with
-                  | ("name",x)::xs ->
-                      loop xs
-                        (((function
-                           | `String x -> Result.Ok x
-                           | _ ->
-                               Result.Error
-                                 "Vhdl_ast.vhdl_declaration_t.name") x),
-                          arg1, arg2, arg3, arg4)
-                  | ("kind",x)::xs ->
-                      loop xs
-                        (arg0,
-                          ((function
-                            | `String x -> Result.Ok x
-                            | _ ->
-                                Result.Error
-                                  "Vhdl_ast.vhdl_declaration_t.kind") x),
-                          arg2, arg3, arg4)
                   | ("spec",x)::xs ->
                       loop xs
-                        (arg0, arg1,
-                          ((function
-                            | `Null -> Result.Ok None
-                            | x ->
-                                ((fun x  ->
-                                    vhdl_subprogram_spec_t_of_yojson x) x)
-                                  >>= ((fun x  -> Result.Ok (Some x)))) x),
-                          arg3, arg4)
+                        (((fun x  -> vhdl_subprogram_spec_t_of_yojson x) x),
+                          arg1, arg2)
                   | ("decl_part",x)::xs ->
                       loop xs
-                        (arg0, arg1, arg2,
+                        (arg0,
                           ((function
                             | `List xs ->
                                 map_bind
@@ -4618,10 +4572,10 @@ and (vhdl_declaration_t_of_yojson :
                             | _ ->
                                 Result.Error
                                   "Vhdl_ast.vhdl_declaration_t.decl_part") x),
-                          arg4)
+                          arg2)
                   | ("stmts",x)::xs ->
                       loop xs
-                        (arg0, arg1, arg2, arg3,
+                        (arg0, arg1,
                           ((function
                             | `List xs ->
                                 map_bind
@@ -4632,28 +4586,22 @@ and (vhdl_declaration_t_of_yojson :
                                 Result.Error
                                   "Vhdl_ast.vhdl_declaration_t.stmts") x))
                   | [] ->
-                      arg4 >>=
-                        ((fun arg4  ->
-                            arg3 >>=
-                              (fun arg3  ->
-                                 arg2 >>=
-                                   (fun arg2  ->
-                                      arg1 >>=
-                                        (fun arg1  ->
-                                           arg0 >>=
-                                             (fun arg0  ->
-                                                Result.Ok
-                                                  (Subprogram
-                                                     {
-                                                       name = arg0;
-                                                       kind = arg1;
-                                                       spec = arg2;
-                                                       decl_part = arg3;
-                                                       stmts = arg4
-                                                     })))))))
+                      arg2 >>=
+                        ((fun arg2  ->
+                            arg1 >>=
+                              (fun arg1  ->
+                                 arg0 >>=
+                                   (fun arg0  ->
+                                      Result.Ok
+                                        (Subprogram
+                                           {
+                                             spec = arg0;
+                                             decl_part = arg1;
+                                             stmts = arg2
+                                           })))))
                   | _::xs -> loop xs _state  in
                 loop xs
-                  ((Result.Ok ""), (Result.Ok ""), (Result.Ok None),
+                  ((Result.Error "Vhdl_ast.vhdl_declaration_t.spec"),
                     (Result.Ok []), (Result.Ok []))
             | _ -> Result.Error "Vhdl_ast.vhdl_declaration_t")) arg0
       | _ -> Result.Error "Vhdl_ast.vhdl_declaration_t")

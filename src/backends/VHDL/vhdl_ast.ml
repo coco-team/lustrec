@@ -146,6 +146,7 @@ type vhdl_parameter_t =
 type vhdl_subprogram_spec_t =
   {
     name: string [@default ""];
+    subprogram_type: string [@default ""];
     typeMark: vhdl_name_t [@default NoName];
     parameters: vhdl_parameter_t list [@default []];
     isPure: bool [@default false];
@@ -223,9 +224,7 @@ type vhdl_declaration_t =
       ports: vhdl_port_t list [@default []];
     } [@name "COMPONENT_DECLARATION"]
   | Subprogram of {
-      name: string [@default ""]; 
-      kind: string [@default ""]; 
-      spec: vhdl_subprogram_spec_t option [@default None]; 
+      spec: vhdl_subprogram_spec_t; 
       decl_part: vhdl_declaration_t list [@default []]; 
       stmts: vhdl_sequential_stmt_t list [@default []]
     } [@name "SUBPROGRAM_BODY"]

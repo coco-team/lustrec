@@ -291,12 +291,13 @@ class virtual vhdl_to_lustre_map =
 
     method vhdl_subprogram_spec_t :
       vhdl_subprogram_spec_t -> vhdl_subprogram_spec_t=
-      fun { name; typeMark; parameters; isPure }  ->
+      fun { name; subprogram_type; typeMark; parameters; isPure }  ->
         let name = self#string name  in
+        let subprogram_type = self#string subprogram_type  in
         let typeMark = self#vhdl_name_t typeMark  in
         let parameters = self#list self#vhdl_parameter_t parameters  in
         let isPure = self#bool isPure  in
-        { name; typeMark; parameters; isPure }
+        { name; subprogram_type; typeMark; parameters; isPure }
 
     method vhdl_sequential_stmt_t :
       vhdl_sequential_stmt_t -> vhdl_sequential_stmt_t=
@@ -376,13 +377,11 @@ class virtual vhdl_to_lustre_map =
             let generics = self#list self#vhdl_port_t generics  in
             let ports = self#list self#vhdl_port_t ports  in
             ComponentDecl { name; generics; ports }
-        | Subprogram { name; kind; spec; decl_part; stmts } ->
-            let name = self#string name  in
-            let kind = self#string kind  in
-            let spec = self#option self#vhdl_subprogram_spec_t spec  in
+        | Subprogram { spec; decl_part; stmts } ->
+            let spec = self#vhdl_subprogram_spec_t spec  in
             let decl_part = self#list self#vhdl_declaration_t decl_part  in
             let stmts = self#list self#vhdl_sequential_stmt_t stmts  in
-            Subprogram { name; kind; spec; decl_part; stmts }
+            Subprogram { spec; decl_part; stmts }
 
     method vhdl_declarative_item_t :
       vhdl_declarative_item_t -> vhdl_declarative_item_t=
