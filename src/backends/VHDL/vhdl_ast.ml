@@ -147,7 +147,7 @@ type vhdl_subprogram_spec_t =
   {
     name: string [@default ""];
     typeMark: vhdl_name_t [@default NoName];
-    parameters: vhdl_parameter_t list;
+    parameters: vhdl_parameter_t list [@default []];
     isPure: bool [@default false];
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;
@@ -169,7 +169,7 @@ type vhdl_sequential_stmt_t =
   | Case of { label: vhdl_name_t [@default NoName]; guard: vhdl_expr_t; branches: vhdl_case_item_t list } [@name "CASE_STATEMENT_TREE"]
   | Exit of { label: vhdl_name_t [@default NoName]; loop_label: string option [@default Some ""]; condition: vhdl_expr_t option [@default Some IsNull]} [@name "EXIT_STATEMENT"]
   | Assert of { label: vhdl_name_t [@default NoName]; cond: vhdl_expr_t; report: vhdl_expr_t [@default IsNull]; severity: vhdl_expr_t [@default IsNull]} [@name "ASSERTION_STATEMENT"]
-  | ProcedureCall of { label: vhdl_name_t [@default NoName]; name: vhdl_name_t; assocs: vhdl_assoc_element_t list } [@name "PROCEDURE_CALL_STATEMENT"]
+  | ProcedureCall of { label: vhdl_name_t [@default NoName]; name: vhdl_name_t; assocs: vhdl_assoc_element_t list [@default []] } [@name "PROCEDURE_CALL_STATEMENT"]
   | Wait [@name "WAIT_STATEMENT"]
   | Null of { label: vhdl_name_t [@default NoName]} [@name "NULL_STATEMENT"]
   | Return of { label: vhdl_name_t [@default NoName]} [@name "RETURN_STATEMENT"]
