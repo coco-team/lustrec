@@ -531,20 +531,19 @@ and pp_vhdl_expr_t :
               Format.fprintf fmt "@]");
              Format.fprintf fmt "@]}")
         | Aggregate { elems = aelems } ->
-            (Format.fprintf fmt "--@[<2>Aggregate {@,";
-             (Format.fprintf fmt "@[%s =@ " "elems";
+            (match aelems with
+            | [] -> Format.fprintf fmt "";
+            | _ ->
+              (Format.fprintf fmt "(@[";
               ((fun x  ->
-                  Format.fprintf fmt "@[<2>[";
                   ignore
                     (List.fold_left
                        (fun sep  ->
                           fun x  ->
-                            if sep then Format.fprintf fmt ";@ ";
+                            if sep then Format.fprintf fmt ", ";
                             ((__8 ()) fmt) x;
-                            true) false x);
-                  Format.fprintf fmt "@,]@]")) aelems;
-              Format.fprintf fmt "@]");
-             Format.fprintf fmt "@]}")
+                            true) false x))) aelems;
+              Format.fprintf fmt ")@]");)
         | Others  -> Format.pp_print_string fmt "others")
     [@ocaml.warning "-A"])
 
@@ -699,7 +698,6 @@ and pp_vhdl_element_assoc_t :
             | [] -> Format.fprintf fmt "";
             | _ -> 
               (((fun x  ->
-                Format.fprintf fmt "@[<2>[";
                 ignore
                   (List.fold_left
                      (fun sep  ->
