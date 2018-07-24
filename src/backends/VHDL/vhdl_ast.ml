@@ -36,7 +36,7 @@ type vhdl_type_t =
   | Base of string
   | Range of string option * int * int
   | Bit_vector of int * int
-  | Array of { indexes: vhdl_name_t list; const: vhdl_constraint_t option [@default None]; definition: vhdl_subtype_indication_t } [@name "ARRAY_TYPE_DEFINITION"]
+  | Array of { indexes: vhdl_name_t list [@default []]; const: vhdl_constraint_t option [@default None]; definition: vhdl_subtype_indication_t } [@name "ARRAY_TYPE_DEFINITION"]
   | Record of vhdl_element_declaration_t list [@name "RECORD_TYPE_DEFINITION"]
   | Enumerated of vhdl_name_t list [@name "ENUMERATION_TYPE_DEFINITION"]
   | Void
@@ -231,6 +231,19 @@ type vhdl_declaration_t =
     } [@name "SUBPROGRAM_BODY"]
 [@@deriving show { with_path = false }, yojson {strict = false}];;
 
+type vhdl_load_t = 
+    Library of vhdl_name_t list [@name "LIBRARY_CLAUSE"] [@default []]
+  | Use of vhdl_name_t list [@name "USE_CLAUSE"] [@default []]
+[@@deriving show { with_path = false }, yojson];;
+
+type vhdl_declarative_item_t =
+  {
+    use_clause: vhdl_load_t option [@default None];
+    declaration: vhdl_declaration_t option [@default None];
+    definition: vhdl_definition_t option [@default None];
+  }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
+
 type vhdl_signal_condition_t =
   {                            
     expr: vhdl_expr_t list;              (* when expression *)
@@ -260,7 +273,7 @@ type vhdl_conditional_signal_t =
 type vhdl_process_t =
   { 
     id: vhdl_name_t [@default NoName];
-    declarations: vhdl_declaration_t list option [@key "PROCESS_DECLARATIVE_PART"] [@default Some []];
+    declarations: vhdl_declarative_item_t list [@key "PROCESS_DECLARATIVE_PART"] [@default []];
     active_sigs: vhdl_name_t list [@default []];
     body: vhdl_sequential_stmt_t list [@key "PROCESS_STATEMENT_PART"] [@default []]
   }
@@ -328,11 +341,6 @@ type vhdl_package_t =
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;
 
-type vhdl_load_t = 
-    Library of vhdl_name_t list [@name "LIBRARY_CLAUSE"] [@default []]
-  | Use of vhdl_name_t list [@name "USE_CLAUSE"] [@default []]
-[@@deriving show { with_path = false }, yojson];;
-
 (************************************************************************************)		   
 (*                        Architecture / VHDL Design                                *)
 (************************************************************************************)		   
@@ -341,8 +349,7 @@ type vhdl_architecture_t =
   {
     name: vhdl_name_t [@default NoName];
     entity: vhdl_name_t [@default NoName];
-    use_clauses: vhdl_load_t list [@default []];
-    declarations: vhdl_declaration_t list [@key "ARCHITECTURE_DECLARATIVE_PART"] [@default []];
+    declarations: vhdl_declarative_item_t list [@key "ARCHITECTURE_DECLARATIVE_PART"] [@default []];
     body: vhdl_concurrent_stmt_t list [@key "ARCHITECTURE_STATEMENT_PART"] [@default []]; 
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;

@@ -77,7 +77,7 @@ type vhdl_type_t =
   | Bit_vector of int * int 
   | Array of
   {
-  indexes: vhdl_name_t list ;
+  indexes: vhdl_name_t list [@default []];
   const: vhdl_constraint_t option [@default None];
   definition: vhdl_subtype_indication_t } [@name "ARRAY_TYPE_DEFINITION"]
   | Record of vhdl_element_declaration_t list
@@ -844,11 +844,16 @@ let rec (vhdl_type_t_to_yojson : vhdl_type_t -> Yojson.Safe.json) =
                  :: fields
                 in
              let fields =
-               ("indexes",
-                 ((fun x  ->
-                     `List (List.map (fun x  -> vhdl_name_t_to_yojson x) x))
-                    arg0.indexes))
-               :: fields  in
+               if arg0.indexes = []
+               then fields
+               else
+                 ("indexes",
+                   (((fun x  ->
+                        `List
+                          (List.map (fun x  -> vhdl_name_t_to_yojson x) x)))
+                      arg0.indexes))
+                 :: fields
+                in
              `Assoc fields)]
       | Record arg0 ->
           `List
@@ -946,8 +951,7 @@ and (vhdl_type_t_of_yojson :
                                            })))))
                   | _::xs -> loop xs _state  in
                 loop xs
-                  ((Result.Error "Vhdl_ast.vhdl_type_t.indexes"),
-                    (Result.Ok None),
+                  ((Result.Ok []), (Result.Ok None),
                     (Result.Error "Vhdl_ast.vhdl_type_t.definition"))
             | _ -> Result.Error "Vhdl_ast.vhdl_type_t")) arg0
       | `List ((`String "RECORD_TYPE_DEFINITION")::arg0::[]) ->
@@ -4639,6 +4643,213 @@ and (vhdl_declaration_t_of_yojson :
       | _ -> Result.Error "Vhdl_ast.vhdl_declaration_t")
   [@ocaml.warning "-A"])
 
+type vhdl_load_t =
+  | Library of vhdl_name_t list [@name "LIBRARY_CLAUSE"][@default []]
+  | Use of vhdl_name_t list [@name "USE_CLAUSE"][@default []]
+
+(* Adapted. TODO: check indentation *)
+let rec pp_vhdl_load_t :
+  Format.formatter -> vhdl_load_t -> Ppx_deriving_runtime.unit =
+  let __1 () = pp_vhdl_name_t
+  
+  and __0 () = pp_vhdl_name_t
+   in
+  ((let open! Ppx_deriving_runtime in
+      fun fmt  ->
+        function
+        | Library a0 ->
+            (Format.fprintf fmt "library ";
+             ((fun x  ->
+                 ignore
+                   (List.fold_left
+                      (fun sep  ->
+                         fun x  ->
+                           if sep then Format.fprintf fmt ".";
+                           ((__0 ()) fmt) x;
+                           true) false x))) a0;
+             Format.fprintf fmt ":")
+        | Use a0 ->
+            (Format.fprintf fmt "use ";
+             ((fun x  ->
+                 ignore
+                   (List.fold_left
+                      (fun sep  ->
+                         fun x  ->
+                           if sep then Format.fprintf fmt ".";
+                           ((__1 ()) fmt) x;
+                           true) false x))) a0;
+             Format.fprintf fmt ";"))
+    [@ocaml.warning "-A"])
+
+and show_vhdl_load_t : vhdl_load_t -> Ppx_deriving_runtime.string =
+  fun x  -> Format.asprintf "%a" pp_vhdl_load_t x
+
+let rec (vhdl_load_t_to_yojson : vhdl_load_t -> Yojson.Safe.json) =
+  ((let open! Ppx_deriving_yojson_runtime in
+      function
+      | Library arg0 ->
+          `List
+            [`String "LIBRARY_CLAUSE";
+            ((fun x  ->
+                `List (List.map (fun x  -> vhdl_name_t_to_yojson x) x))) arg0]
+      | Use arg0 ->
+          `List
+            [`String "USE_CLAUSE";
+            ((fun x  ->
+                `List (List.map (fun x  -> vhdl_name_t_to_yojson x) x))) arg0])
+  [@ocaml.warning "-A"])
+
+and (vhdl_load_t_of_yojson :
+      Yojson.Safe.json -> vhdl_load_t Ppx_deriving_yojson_runtime.error_or)
+  =
+  ((let open! Ppx_deriving_yojson_runtime in
+      function
+      | `List ((`String "LIBRARY_CLAUSE")::arg0::[]) ->
+          ((function
+            | `List xs -> map_bind (fun x  -> vhdl_name_t_of_yojson x) [] xs
+            | _ -> Result.Error "Vhdl_ast.vhdl_load_t") arg0) >>=
+            ((fun arg0  -> Result.Ok (Library arg0)))
+      | `List ((`String "USE_CLAUSE")::arg0::[]) ->
+          ((function
+            | `List xs -> map_bind (fun x  -> vhdl_name_t_of_yojson x) [] xs
+            | _ -> Result.Error "Vhdl_ast.vhdl_load_t") arg0) >>=
+            ((fun arg0  -> Result.Ok (Use arg0)))
+      | _ -> Result.Error "Vhdl_ast.vhdl_load_t")
+  [@ocaml.warning "-A"])
+
+type vhdl_declarative_item_t =
+  {
+  use_clause: vhdl_load_t option [@default None];
+  declaration: vhdl_declaration_t option [@default None];
+  definition: vhdl_definition_t option [@default None]}[@@deriving
+                                                         ((show
+                                                             {
+                                                               with_path =
+                                                                 false
+                                                             }),
+                                                           (yojson
+                                                              {
+                                                                strict =
+                                                                  false
+                                                              }))]
+let rec pp_vhdl_declarative_item_t :
+  Format.formatter -> vhdl_declarative_item_t -> Ppx_deriving_runtime.unit =
+  let __2 () = pp_vhdl_definition_t
+  
+  and __1 () = pp_vhdl_declaration_t
+  
+  and __0 () = pp_vhdl_load_t
+   in
+  ((let open! Ppx_deriving_runtime in
+      fun fmt  ->
+        fun x  ->
+          (match x.use_clause with
+          | None -> Format.fprintf fmt "";
+          | Some e -> ((__0 ()) fmt) e);
+          (match x.declaration with
+          | None -> Format.fprintf fmt "";
+          | Some e -> ((__1 ()) fmt) e);
+          (match x.definition with
+          | None -> Format.fprintf fmt "";
+          | Some e -> ((__2 ()) fmt) e);)
+    [@ocaml.warning "-A"])
+
+and show_vhdl_declarative_item_t :
+  vhdl_declarative_item_t -> Ppx_deriving_runtime.string =
+  fun x  -> Format.asprintf "%a" pp_vhdl_declarative_item_t x
+
+let rec (vhdl_declarative_item_t_to_yojson :
+          vhdl_declarative_item_t -> Yojson.Safe.json)
+  =
+  ((let open! Ppx_deriving_yojson_runtime in
+      fun x  ->
+        let fields = []  in
+        let fields =
+          if x.definition = None
+          then fields
+          else
+            ("definition",
+              (((function
+                 | None  -> `Null
+                 | Some x -> ((fun x  -> vhdl_definition_t_to_yojson x)) x))
+                 x.definition))
+            :: fields
+           in
+        let fields =
+          if x.declaration = None
+          then fields
+          else
+            ("declaration",
+              (((function
+                 | None  -> `Null
+                 | Some x -> ((fun x  -> vhdl_declaration_t_to_yojson x)) x))
+                 x.declaration))
+            :: fields
+           in
+        let fields =
+          if x.use_clause = None
+          then fields
+          else
+            ("use_clause",
+              (((function
+                 | None  -> `Null
+                 | Some x -> ((fun x  -> vhdl_load_t_to_yojson x)) x))
+                 x.use_clause))
+            :: fields
+           in
+        `Assoc fields)
+  [@ocaml.warning "-A"])
+
+and (vhdl_declarative_item_t_of_yojson :
+      Yojson.Safe.json ->
+        vhdl_declarative_item_t Ppx_deriving_yojson_runtime.error_or)
+  =
+  ((let open! Ppx_deriving_yojson_runtime in
+      function
+      | `Assoc xs ->
+          let rec loop xs ((arg0,arg1,arg2) as _state) =
+            match xs with
+            | ("use_clause",x)::xs ->
+                loop xs
+                  (((function
+                     | `Null -> Result.Ok None
+                     | x ->
+                         ((fun x  -> vhdl_load_t_of_yojson x) x) >>=
+                           ((fun x  -> Result.Ok (Some x)))) x), arg1, arg2)
+            | ("declaration",x)::xs ->
+                loop xs
+                  (arg0,
+                    ((function
+                      | `Null -> Result.Ok None
+                      | x ->
+                          ((fun x  -> vhdl_declaration_t_of_yojson x) x) >>=
+                            ((fun x  -> Result.Ok (Some x)))) x), arg2)
+            | ("definition",x)::xs ->
+                loop xs
+                  (arg0, arg1,
+                    ((function
+                      | `Null -> Result.Ok None
+                      | x ->
+                          ((fun x  -> vhdl_definition_t_of_yojson x) x) >>=
+                            ((fun x  -> Result.Ok (Some x)))) x))
+            | [] ->
+                arg2 >>=
+                  ((fun arg2  ->
+                      arg1 >>=
+                        (fun arg1  ->
+                           arg0 >>=
+                             (fun arg0  ->
+                                Result.Ok
+                                  {
+                                    use_clause = arg0;
+                                    declaration = arg1;
+                                    definition = arg2
+                                  }))))
+            | _::xs -> loop xs _state  in
+          loop xs ((Result.Ok None), (Result.Ok None), (Result.Ok None))
+      | _ -> Result.Error "Vhdl_ast.vhdl_declarative_item_t")
+  [@ocaml.warning "-A"])
+
 type vhdl_signal_condition_t =
   {
   expr: vhdl_expr_t list ;
@@ -4999,7 +5210,7 @@ and (vhdl_conditional_signal_t_of_yojson :
 type vhdl_process_t =
   {
   id: vhdl_name_t [@default NoName];
-  declarations: vhdl_declaration_t list option
+  declarations: vhdl_declarative_item_t list
     [@key "PROCESS_DECLARATIVE_PART"][@default Some []];
   active_sigs: vhdl_name_t list [@default []];
   body: vhdl_sequential_stmt_t list
@@ -5011,7 +5222,7 @@ let rec pp_vhdl_process_t :
   
   and __2 () = pp_vhdl_name_t
   
-  and __1 () = pp_vhdl_declaration_t
+  and __1 () = pp_vhdl_declarative_item_t
   
   and __0 () = pp_vhdl_name_t
    in
@@ -5037,18 +5248,15 @@ let rec pp_vhdl_process_t :
                               ((__2 ()) fmt) x;
                               true) false x))) x.active_sigs;
                  Format.fprintf fmt ")");
-          ((function
-             | None  -> Format.pp_print_string fmt ""
-             | Some x ->
-                 Format.fprintf fmt "@;";
-                  ((fun x  ->
-                      ignore
-                        (List.fold_left
-                           (fun sep  ->
-                              fun x  ->
-                                if sep then Format.fprintf fmt "@;";
-                                ((__1 ()) fmt) x;
-                                true) false x);)) x;)) x.declarations;
+          Format.fprintf fmt "@;";
+          ((fun x  ->
+            ignore
+            (List.fold_left
+              (fun sep  ->
+                fun x  ->
+                  if sep then Format.fprintf fmt "@;";
+                    ((__1 ()) fmt) x;
+                    true) false x))) x.declarations;
           Format.fprintf fmt "@]@;@[<v 2>begin@;";
           ((fun x  ->
                ignore
@@ -5091,18 +5299,15 @@ let rec (vhdl_process_t_to_yojson : vhdl_process_t -> Yojson.Safe.json) =
             :: fields
            in
         let fields =
-          if x.declarations = (Some [])
+          if x.declarations = []
           then fields
           else
             ("PROCESS_DECLARATIVE_PART",
-              (((function
-                 | None  -> `Null
-                 | Some x ->
-                     ((fun x  ->
-                         `List
-                           (List.map
-                              (fun x  -> vhdl_declaration_t_to_yojson x) x)))
-                       x)) x.declarations))
+              (((fun x  ->
+                   `List
+                     (List.map
+                        (fun x  -> vhdl_declarative_item_t_to_yojson x) x)))
+                 x.declarations))
             :: fields
            in
         let fields =
@@ -5128,18 +5333,13 @@ and (vhdl_process_t_of_yojson :
                 loop xs
                   (arg0,
                     ((function
-                      | `Null -> Result.Ok None
-                      | x ->
-                          ((function
-                            | `List xs ->
-                                map_bind
-                                  (fun x  -> vhdl_declaration_t_of_yojson x)
-                                  [] xs
-                            | _ ->
-                                Result.Error
-                                  "Vhdl_ast.vhdl_process_t.declarations") x)
-                            >>= ((fun x  -> Result.Ok (Some x)))) x), arg2,
-                    arg3)
+                      | `List xs ->
+                          map_bind
+                            (fun x  -> vhdl_declarative_item_t_of_yojson x)
+                            [] xs
+                      | _ ->
+                          Result.Error "Vhdl_ast.vhdl_process_t.declarations")
+                       x), arg2, arg3)
             | ("active_sigs",x)::xs ->
                 loop xs
                   (arg0, arg1,
@@ -5176,7 +5376,7 @@ and (vhdl_process_t_of_yojson :
                                        })))))
             | _::xs -> loop xs _state  in
           loop xs
-            ((Result.Ok NoName), (Result.Ok (Some [])), (Result.Ok []),
+            ((Result.Ok NoName), (Result.Ok []), (Result.Ok []),
               (Result.Ok []))
       | _ -> Result.Error "Vhdl_ast.vhdl_process_t")
   [@ocaml.warning "-A"])
@@ -5989,97 +6189,20 @@ and (vhdl_package_t_of_yojson :
       | _ -> Result.Error "Vhdl_ast.vhdl_package_t")
   [@ocaml.warning "-A"])
 
-type vhdl_load_t =
-  | Library of vhdl_name_t list [@name "LIBRARY_CLAUSE"][@default []]
-  | Use of vhdl_name_t list [@name "USE_CLAUSE"][@default []]
-
-(* Adapted. TODO: check indentation *)
-let rec pp_vhdl_load_t :
-  Format.formatter -> vhdl_load_t -> Ppx_deriving_runtime.unit =
-  let __1 () = pp_vhdl_name_t
-  
-  and __0 () = pp_vhdl_name_t
-   in
-  ((let open! Ppx_deriving_runtime in
-      fun fmt  ->
-        function
-        | Library a0 ->
-            (Format.fprintf fmt "library ";
-             ((fun x  ->
-                 ignore
-                   (List.fold_left
-                      (fun sep  ->
-                         fun x  ->
-                           if sep then Format.fprintf fmt ".";
-                           ((__0 ()) fmt) x;
-                           true) false x))) a0;
-             Format.fprintf fmt ":")
-        | Use a0 ->
-            (Format.fprintf fmt "use ";
-             ((fun x  ->
-                 ignore
-                   (List.fold_left
-                      (fun sep  ->
-                         fun x  ->
-                           if sep then Format.fprintf fmt ".";
-                           ((__1 ()) fmt) x;
-                           true) false x))) a0;
-             Format.fprintf fmt ";"))
-    [@ocaml.warning "-A"])
-
-and show_vhdl_load_t : vhdl_load_t -> Ppx_deriving_runtime.string =
-  fun x  -> Format.asprintf "%a" pp_vhdl_load_t x
-
-let rec (vhdl_load_t_to_yojson : vhdl_load_t -> Yojson.Safe.json) =
-  ((let open! Ppx_deriving_yojson_runtime in
-      function
-      | Library arg0 ->
-          `List
-            [`String "LIBRARY_CLAUSE";
-            ((fun x  ->
-                `List (List.map (fun x  -> vhdl_name_t_to_yojson x) x))) arg0]
-      | Use arg0 ->
-          `List
-            [`String "USE_CLAUSE";
-            ((fun x  ->
-                `List (List.map (fun x  -> vhdl_name_t_to_yojson x) x))) arg0])
-  [@ocaml.warning "-A"])
-
-and (vhdl_load_t_of_yojson :
-      Yojson.Safe.json -> vhdl_load_t Ppx_deriving_yojson_runtime.error_or)
-  =
-  ((let open! Ppx_deriving_yojson_runtime in
-      function
-      | `List ((`String "LIBRARY_CLAUSE")::arg0::[]) ->
-          ((function
-            | `List xs -> map_bind (fun x  -> vhdl_name_t_of_yojson x) [] xs
-            | _ -> Result.Error "Vhdl_ast.vhdl_load_t") arg0) >>=
-            ((fun arg0  -> Result.Ok (Library arg0)))
-      | `List ((`String "USE_CLAUSE")::arg0::[]) ->
-          ((function
-            | `List xs -> map_bind (fun x  -> vhdl_name_t_of_yojson x) [] xs
-            | _ -> Result.Error "Vhdl_ast.vhdl_load_t") arg0) >>=
-            ((fun arg0  -> Result.Ok (Use arg0)))
-      | _ -> Result.Error "Vhdl_ast.vhdl_load_t")
-  [@ocaml.warning "-A"])
-
 type vhdl_architecture_t =
   {
   name: vhdl_name_t [@default NoName];
   entity: vhdl_name_t [@default NoName];
-  use_clauses: vhdl_load_t list [@default []];
-  declarations: vhdl_declaration_t list
+  declarations: vhdl_declarative_item_t list
     [@key "ARCHITECTURE_DECLARATIVE_PART"][@default []];
   body: vhdl_concurrent_stmt_t list
     [@key "ARCHITECTURE_STATEMENT_PART"][@default []]}
 
 let rec pp_vhdl_architecture_t :
   Format.formatter -> vhdl_architecture_t -> Ppx_deriving_runtime.unit =
-  let __4 () = pp_vhdl_concurrent_stmt_t
+  let __3 () = pp_vhdl_concurrent_stmt_t
   
-  and __3 () = pp_vhdl_declaration_t
-  
-  and __2 () = pp_vhdl_load_t
+  and __2 () = pp_vhdl_declarative_item_t
   
   and __1 () = pp_vhdl_name_t
   
@@ -6093,21 +6216,12 @@ let rec pp_vhdl_architecture_t :
           ((__1 ()) fmt) x.entity;
           Format.fprintf fmt " is@;";
             ((fun x  ->
-               ignore
-                 (List.fold_left
-                    (fun sep  ->
-                       fun x  ->
-                         if sep then Format.fprintf fmt "";
-                         ((__2 ()) fmt) x;
-                         Format.fprintf fmt "@;";
-                         true) false x))) x.use_clauses;
-            ((fun x  ->
              ignore
                (List.fold_left
                   (fun sep  ->
                      fun x  ->
                        if sep then Format.fprintf fmt "@;";
-                       ((__3 ()) fmt) x;
+                       ((__2 ()) fmt) x;
                        Format.fprintf fmt ";";
                        true) false x))) x.declarations;
           Format.fprintf fmt "@;";
@@ -6120,7 +6234,7 @@ let rec pp_vhdl_architecture_t :
                     (fun sep  ->
                        fun x  ->
                          if sep then Format.fprintf fmt "@;";
-                         ((__4 ()) fmt) x;
+                         ((__3 ()) fmt) x;
                          true) false x))) x.body;
            Format.fprintf fmt "@]@;end;"))
     [@ocaml.warning "-A"])
@@ -6153,18 +6267,9 @@ let rec (vhdl_architecture_t_to_yojson :
             ("ARCHITECTURE_DECLARATIVE_PART",
               (((fun x  ->
                    `List
-                     (List.map (fun x  -> vhdl_declaration_t_to_yojson x) x)))
+                     (List.map
+                        (fun x  -> vhdl_declarative_item_t_to_yojson x) x)))
                  x.declarations))
-            :: fields
-           in
-        let fields =
-          if x.use_clauses = []
-          then fields
-          else
-            ("use_clauses",
-              (((fun x  ->
-                   `List (List.map (fun x  -> vhdl_load_t_to_yojson x) x)))
-                 x.use_clauses))
             :: fields
            in
         let fields =
@@ -6189,40 +6294,29 @@ and (vhdl_architecture_t_of_yojson :
   ((let open! Ppx_deriving_yojson_runtime in
       function
       | `Assoc xs ->
-          let rec loop xs ((arg0,arg1,arg2,arg3,arg4) as _state) =
+          let rec loop xs ((arg0,arg1,arg2,arg3) as _state) =
             match xs with
             | ("name",x)::xs ->
                 loop xs
-                  (((fun x  -> vhdl_name_t_of_yojson x) x), arg1, arg2, arg3,
-                    arg4)
+                  (((fun x  -> vhdl_name_t_of_yojson x) x), arg1, arg2, arg3)
             | ("entity",x)::xs ->
                 loop xs
-                  (arg0, ((fun x  -> vhdl_name_t_of_yojson x) x), arg2, arg3,
-                    arg4)
-            | ("use_clauses",x)::xs ->
+                  (arg0, ((fun x  -> vhdl_name_t_of_yojson x) x), arg2, arg3)
+            | ("ARCHITECTURE_DECLARATIVE_PART",x)::xs ->
                 loop xs
                   (arg0, arg1,
                     ((function
                       | `List xs ->
-                          map_bind (fun x  -> vhdl_load_t_of_yojson x) [] xs
-                      | _ ->
-                          Result.Error
-                            "Vhdl_ast.vhdl_architecture_t.use_clauses") x),
-                    arg3, arg4)
-            | ("ARCHITECTURE_DECLARATIVE_PART",x)::xs ->
-                loop xs
-                  (arg0, arg1, arg2,
-                    ((function
-                      | `List xs ->
-                          map_bind (fun x  -> vhdl_declaration_t_of_yojson x)
+                          map_bind
+                            (fun x  -> vhdl_declarative_item_t_of_yojson x)
                             [] xs
                       | _ ->
                           Result.Error
                             "Vhdl_ast.vhdl_architecture_t.declarations") x),
-                    arg4)
+                    arg3)
             | ("ARCHITECTURE_STATEMENT_PART",x)::xs ->
                 loop xs
-                  (arg0, arg1, arg2, arg3,
+                  (arg0, arg1, arg2,
                     ((function
                       | `List xs ->
                           map_bind
@@ -6231,28 +6325,25 @@ and (vhdl_architecture_t_of_yojson :
                       | _ -> Result.Error "Vhdl_ast.vhdl_architecture_t.body")
                        x))
             | [] ->
-                arg4 >>=
-                  ((fun arg4  ->
-                      arg3 >>=
-                        (fun arg3  ->
-                           arg2 >>=
-                             (fun arg2  ->
-                                arg1 >>=
-                                  (fun arg1  ->
-                                     arg0 >>=
-                                       (fun arg0  ->
-                                          Result.Ok
-                                            {
-                                              name = arg0;
-                                              entity = arg1;
-                                              use_clauses = arg2;
-                                              declarations = arg3;
-                                              body = arg4
-                                            }))))))
+                arg3 >>=
+                  ((fun arg3  ->
+                      arg2 >>=
+                        (fun arg2  ->
+                           arg1 >>=
+                             (fun arg1  ->
+                                arg0 >>=
+                                  (fun arg0  ->
+                                     Result.Ok
+                                       {
+                                         name = arg0;
+                                         entity = arg1;
+                                         declarations = arg2;
+                                         body = arg3
+                                       })))))
             | _::xs -> loop xs _state  in
           loop xs
             ((Result.Ok NoName), (Result.Ok NoName), (Result.Ok []),
-              (Result.Ok []), (Result.Ok []))
+              (Result.Ok []))
       | _ -> Result.Error "Vhdl_ast.vhdl_architecture_t")
   [@ocaml.warning "-A"])
 

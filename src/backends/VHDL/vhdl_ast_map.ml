@@ -23,6 +23,7 @@ let _ = fun (_ : vhdl_if_case_t)  -> ()
 let _ = fun (_ : vhdl_case_item_t)  -> () 
 let _ = fun (_ : vhdl_declaration_t)  -> () 
 let _ = fun (_ : vhdl_signal_selection_t)  -> () 
+let _ = fun (_ : vhdl_declarative_item_t)  -> () 
 let _ = fun (_ : vhdl_signal_condition_t)  -> () 
 let _ = fun (_ : vhdl_conditional_signal_t)  -> () 
 let _ = fun (_ : vhdl_process_t)  -> () 
@@ -63,6 +64,7 @@ class virtual vhdl_map =
     method virtual  vhdl_suffix_selection_t : vhdl_suffix_selection_t -> vhdl_suffix_selection_t
     method virtual  vhdl_declaration_t : vhdl_declaration_t -> vhdl_declaration_t
     method virtual  vhdl_sequential_stmt_t : vhdl_sequential_stmt_t -> vhdl_sequential_stmt_t
+    method virtual  vhdl_declarative_item_t : vhdl_declarative_item_t -> vhdl_declarative_item_t
     method virtual  vhdl_signal_condition_t : vhdl_signal_condition_t -> vhdl_signal_condition_t
     method virtual  vhdl_cst_val_t : vhdl_cst_val_t -> vhdl_cst_val_t
     method virtual  vhdl_subprogram_spec_t : vhdl_subprogram_spec_t -> vhdl_subprogram_spec_t
@@ -380,6 +382,14 @@ class virtual vhdl_map =
             let stmts = self#list self#vhdl_sequential_stmt_t stmts  in
             Subprogram { name; kind; spec; decl_part; stmts }
 
+    method vhdl_declarative_item_t :
+      vhdl_declarative_item_t -> vhdl_declarative_item_t=
+      fun { use_clause; declaration; definition }  ->
+        let use_clause = self#option self#vhdl_load_t use_clause  in
+        let declaration = self#option self#vhdl_declaration_t declaration  in
+        let definition = self#option self#vhdl_definition_t definition  in
+        { use_clause; declaration; definition }
+
     method vhdl_signal_condition_t : vhdl_signal_condition_t -> vhdl_signal_condition_t=
       fun { expr; cond }  ->
         let expr = self#list self#vhdl_expr_t expr  in
@@ -406,8 +416,7 @@ class virtual vhdl_map =
     method vhdl_process_t : vhdl_process_t -> vhdl_process_t=
       fun { id; declarations; active_sigs; body }  ->
         let id = self#vhdl_name_t id  in
-        let declarations =
-          self#option (self#list self#vhdl_declaration_t) declarations  in
+        let declarations = self#list self#vhdl_declarative_item_t declarations  in
         let active_sigs = self#list self#vhdl_name_t active_sigs  in
         let body = self#list self#vhdl_sequential_stmt_t body  in
         { id; declarations; active_sigs; body }
@@ -474,13 +483,12 @@ class virtual vhdl_map =
         | Use a -> let a = self#list self#vhdl_name_t a  in Use a
 
     method vhdl_architecture_t : vhdl_architecture_t -> vhdl_architecture_t=
-      fun { name; entity; use_clauses; declarations; body }  ->
+      fun { name; entity; declarations; body }  ->
         let name = self#vhdl_name_t name  in
         let entity = self#vhdl_name_t entity  in
-        let use_clauses = self#list self#vhdl_load_t use_clauses  in
-        let declarations = self#list self#vhdl_declaration_t declarations  in
+        let declarations = self#list self#vhdl_declarative_item_t declarations  in
         let body = self#list self#vhdl_concurrent_stmt_t body  in
-        { name; entity; use_clauses; declarations; body }
+        { name; entity; declarations; body }
 
     method vhdl_configuration_t :
       vhdl_configuration_t -> vhdl_configuration_t= self#unit
