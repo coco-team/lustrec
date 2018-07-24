@@ -5408,35 +5408,43 @@ let rec pp_vhdl_component_instantiation_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
+          Format.fprintf fmt "@[<v 2>";
           ((__0 ()) fmt) x.name;
           Format.fprintf fmt " : ";
           ((__1 ()) fmt) x.inst_unit;
           ((function
              | None  -> Format.pp_print_string fmt ""
              | Some x ->
-                 (Format.pp_print_string fmt "(";
+                 (Format.fprintf fmt "(";
                  ((__2 ()) fmt) x;
-                 Format.pp_print_string fmt ")@;"))) x.archi_name;
-          ((fun x  ->
-            Format.fprintf fmt "(@[<v 2>";
+                 Format.fprintf fmt ")@;"))) x.archi_name;
+          (match x.generic_map with
+          | [] -> Format.fprintf fmt "";
+          | _ ->
+            (Format.fprintf fmt "@[<v 2>generic map (";
+            ((fun x  ->
             ignore
             (List.fold_left
                (fun sep  ->
                  fun x  ->
-                   if sep then Format.fprintf fmt ",@;";
+                   if sep then Format.fprintf fmt ",@,";
                    ((__3 ()) fmt) x;
-                   true) false x);
-            Format.fprintf fmt "@]")) x.generic_map;
-          ((fun x  ->
-            Format.fprintf fmt "(@[<v 2>";
+                   true) false x))) x.generic_map;
+            Format.fprintf fmt ")@]@;"));
+          (match x.port_map with
+          | [] -> Format.fprintf fmt ";";
+          | _ ->
+            (Format.fprintf fmt "@[<v 2>port map (";
+            ((fun x  ->
             ignore
             (List.fold_left
                (fun sep  ->
                  fun x  ->
-                   if sep then Format.fprintf fmt ",@;";
+                   if sep then Format.fprintf fmt ",@,";
                    ((__4 ()) fmt) x;
-                   true) false x);
-            Format.fprintf fmt "@]")) x.port_map;)
+                   true) false x))) x.port_map;
+            Format.fprintf fmt ")@];"));
+          Format.fprintf fmt "@]")
     [@ocaml.warning "-A"])
 
 and show_vhdl_component_instantiation_t :
@@ -6099,7 +6107,7 @@ let rec pp_vhdl_architecture_t :
                  (List.fold_left
                     (fun sep  ->
                        fun x  ->
-                         if sep then Format.fprintf fmt "";
+                         if sep then Format.fprintf fmt "@;";
                          ((__3 ()) fmt) x;
                          true) false x))) x.body;
           Format.fprintf fmt "@]@;end;"))
