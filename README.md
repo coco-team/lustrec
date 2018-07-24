@@ -8,6 +8,13 @@ Current Status:    [![Build Status](https://travis-ci.org/coco-team/lustrec.svg?
 
 LustreC is a modular compiler of Lustre code into C and Horn Clauses.
 
+# Dependencies
+On a fresh ubuntu/debian-like install
+> apt-get install opam libmpfr-dev
+Get a fresh version of ocaml
+> opam switch 4.06.1
+Install some dependencies
+> opam install depext ocamlgraph mlmpfr num cmdliner fmt logs yojson menhir
 # Build
 ```
 > autoconf
