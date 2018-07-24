@@ -474,12 +474,13 @@ class virtual vhdl_map =
         | Use a -> let a = self#list self#vhdl_name_t a  in Use a
 
     method vhdl_architecture_t : vhdl_architecture_t -> vhdl_architecture_t=
-      fun { name; entity; declarations; body }  ->
+      fun { name; entity; use_clauses; declarations; body }  ->
         let name = self#vhdl_name_t name  in
         let entity = self#vhdl_name_t entity  in
+        let use_clauses = self#list self#vhdl_load_t use_clauses  in
         let declarations = self#list self#vhdl_declaration_t declarations  in
         let body = self#list self#vhdl_concurrent_stmt_t body  in
-        { name; entity; declarations; body }
+        { name; entity; use_clauses; declarations; body }
 
     method vhdl_configuration_t :
       vhdl_configuration_t -> vhdl_configuration_t= self#unit

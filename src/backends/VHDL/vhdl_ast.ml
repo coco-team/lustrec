@@ -341,6 +341,7 @@ type vhdl_architecture_t =
   {
     name: vhdl_name_t [@default NoName];
     entity: vhdl_name_t [@default NoName];
+    use_clauses: vhdl_load_t list [@default []];
     declarations: vhdl_declaration_t list [@key "ARCHITECTURE_DECLARATIVE_PART"] [@default []];
     body: vhdl_concurrent_stmt_t list [@key "ARCHITECTURE_STATEMENT_PART"] [@default []]; 
   }

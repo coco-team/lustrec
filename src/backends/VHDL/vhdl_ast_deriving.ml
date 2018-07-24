@@ -6067,6 +6067,7 @@ type vhdl_architecture_t =
   {
   name: vhdl_name_t [@default NoName];
   entity: vhdl_name_t [@default NoName];
+  use_clauses: vhdl_load_t list [@default []];
   declarations: vhdl_declaration_t list
     [@key "ARCHITECTURE_DECLARATIVE_PART"][@default []];
   body: vhdl_concurrent_stmt_t list
@@ -6074,9 +6075,11 @@ type vhdl_architecture_t =
 
 let rec pp_vhdl_architecture_t :
   Format.formatter -> vhdl_architecture_t -> Ppx_deriving_runtime.unit =
-  let __3 () = pp_vhdl_concurrent_stmt_t
+  let __4 () = pp_vhdl_concurrent_stmt_t
   
-  and __2 () = pp_vhdl_declaration_t
+  and __3 () = pp_vhdl_declaration_t
+  
+  and __2 () = pp_vhdl_load_t
   
   and __1 () = pp_vhdl_name_t
   
@@ -6089,28 +6092,37 @@ let rec pp_vhdl_architecture_t :
           Format.fprintf fmt " of ";
           ((__1 ()) fmt) x.entity;
           Format.fprintf fmt " is@;";
-          ((fun x  ->
+            ((fun x  ->
+               ignore
+                 (List.fold_left
+                    (fun sep  ->
+                       fun x  ->
+                         if sep then Format.fprintf fmt "";
+                         ((__2 ()) fmt) x;
+                         Format.fprintf fmt "@;";
+                         true) false x))) x.use_clauses;
+            ((fun x  ->
              ignore
                (List.fold_left
                   (fun sep  ->
                      fun x  ->
                        if sep then Format.fprintf fmt "@;";
-                       ((__2 ()) fmt) x;
+                       ((__3 ()) fmt) x;
                        Format.fprintf fmt ";";
                        true) false x))) x.declarations;
           Format.fprintf fmt "@;";
           (match x.body with
             | [] -> Format.fprintf fmt "";
             | _ -> Format.fprintf fmt "@[<v 2>begin@;";
-          ((fun x  ->
+               ((fun x  ->
                ignore
                  (List.fold_left
                     (fun sep  ->
                        fun x  ->
                          if sep then Format.fprintf fmt "@;";
-                         ((__3 ()) fmt) x;
+                         ((__4 ()) fmt) x;
                          true) false x))) x.body;
-          Format.fprintf fmt "@]@;end;"))
+           Format.fprintf fmt "@]@;end;"))
     [@ocaml.warning "-A"])
 
 and show_vhdl_architecture_t :
@@ -6146,6 +6158,16 @@ let rec (vhdl_architecture_t_to_yojson :
             :: fields
            in
         let fields =
+          if x.use_clauses = []
+          then fields
+          else
+            ("use_clauses",
+              (((fun x  ->
+                   `List (List.map (fun x  -> vhdl_load_t_to_yojson x) x)))
+                 x.use_clauses))
+            :: fields
+           in
+        let fields =
           if x.entity = NoName
           then fields
           else ("entity", (((fun x  -> vhdl_name_t_to_yojson x)) x.entity))
@@ -6167,17 +6189,29 @@ and (vhdl_architecture_t_of_yojson :
   ((let open! Ppx_deriving_yojson_runtime in
       function
       | `Assoc xs ->
-          let rec loop xs ((arg0,arg1,arg2,arg3) as _state) =
+          let rec loop xs ((arg0,arg1,arg2,arg3,arg4) as _state) =
             match xs with
             | ("name",x)::xs ->
                 loop xs
-                  (((fun x  -> vhdl_name_t_of_yojson x) x), arg1, arg2, arg3)
+                  (((fun x  -> vhdl_name_t_of_yojson x) x), arg1, arg2, arg3,
+                    arg4)
             | ("entity",x)::xs ->
                 loop xs
-                  (arg0, ((fun x  -> vhdl_name_t_of_yojson x) x), arg2, arg3)
-            | ("ARCHITECTURE_DECLARATIVE_PART",x)::xs ->
+                  (arg0, ((fun x  -> vhdl_name_t_of_yojson x) x), arg2, arg3,
+                    arg4)
+            | ("use_clauses",x)::xs ->
                 loop xs
                   (arg0, arg1,
+                    ((function
+                      | `List xs ->
+                          map_bind (fun x  -> vhdl_load_t_of_yojson x) [] xs
+                      | _ ->
+                          Result.Error
+                            "Vhdl_ast.vhdl_architecture_t.use_clauses") x),
+                    arg3, arg4)
+            | ("ARCHITECTURE_DECLARATIVE_PART",x)::xs ->
+                loop xs
+                  (arg0, arg1, arg2,
                     ((function
                       | `List xs ->
                           map_bind (fun x  -> vhdl_declaration_t_of_yojson x)
@@ -6185,10 +6219,10 @@ and (vhdl_architecture_t_of_yojson :
                       | _ ->
                           Result.Error
                             "Vhdl_ast.vhdl_architecture_t.declarations") x),
-                    arg3)
+                    arg4)
             | ("ARCHITECTURE_STATEMENT_PART",x)::xs ->
                 loop xs
-                  (arg0, arg1, arg2,
+                  (arg0, arg1, arg2, arg3,
                     ((function
                       | `List xs ->
                           map_bind
@@ -6197,25 +6231,28 @@ and (vhdl_architecture_t_of_yojson :
                       | _ -> Result.Error "Vhdl_ast.vhdl_architecture_t.body")
                        x))
             | [] ->
-                arg3 >>=
-                  ((fun arg3  ->
-                      arg2 >>=
-                        (fun arg2  ->
-                           arg1 >>=
-                             (fun arg1  ->
-                                arg0 >>=
-                                  (fun arg0  ->
-                                     Result.Ok
-                                       {
-                                         name = arg0;
-                                         entity = arg1;
-                                         declarations = arg2;
-                                         body = arg3
-                                       })))))
+                arg4 >>=
+                  ((fun arg4  ->
+                      arg3 >>=
+                        (fun arg3  ->
+                           arg2 >>=
+                             (fun arg2  ->
+                                arg1 >>=
+                                  (fun arg1  ->
+                                     arg0 >>=
+                                       (fun arg0  ->
+                                          Result.Ok
+                                            {
+                                              name = arg0;
+                                              entity = arg1;
+                                              use_clauses = arg2;
+                                              declarations = arg3;
+                                              body = arg4
+                                            }))))))
             | _::xs -> loop xs _state  in
           loop xs
             ((Result.Ok NoName), (Result.Ok NoName), (Result.Ok []),
-              (Result.Ok []))
+              (Result.Ok []), (Result.Ok []))
       | _ -> Result.Error "Vhdl_ast.vhdl_architecture_t")
   [@ocaml.warning "-A"])
 
