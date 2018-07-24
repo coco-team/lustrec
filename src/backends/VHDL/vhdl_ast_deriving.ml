@@ -2745,11 +2745,16 @@ let rec (vhdl_subprogram_spec_t_to_yojson :
             :: fields
            in
         let fields =
-          ("parameters",
-            ((fun x  ->
-                `List (List.map (fun x  -> vhdl_parameter_t_to_yojson x) x))
-               x.parameters))
-          :: fields  in
+          if x.parameters = []
+          then fields
+          else
+            ("parameters",
+              (((fun x  ->
+                   `List
+                     (List.map (fun x  -> vhdl_parameter_t_to_yojson x) x)))
+                 x.parameters))
+            :: fields
+           in
         let fields =
           if x.typeMark = NoName
           then fields
@@ -2824,8 +2829,7 @@ and (vhdl_subprogram_spec_t_of_yojson :
                                        })))))
             | _::xs -> loop xs _state  in
           loop xs
-            ((Result.Ok ""), (Result.Ok NoName),
-              (Result.Error "Vhdl_ast.vhdl_subprogram_spec_t.parameters"),
+            ((Result.Ok ""), (Result.Ok NoName), (Result.Ok []),
               (Result.Ok false))
       | _ -> Result.Error "Vhdl_ast.vhdl_subprogram_spec_t")
   [@ocaml.warning "-A"])
@@ -3088,7 +3092,10 @@ let rec pp_vhdl_sequential_stmt_t :
                      Format.fprintf fmt ":@ ")
             );
             ((__19 ()) fmt) aname;
-            ((fun x  ->
+            (match aassocs with
+            | [] -> Format.fprintf fmt "";
+            | _ ->
+               ((fun x  ->
                 Format.fprintf fmt "(";
                 ignore
                   (List.fold_left
@@ -3097,7 +3104,7 @@ let rec pp_vhdl_sequential_stmt_t :
                           if sep then Format.fprintf fmt ",@ ";
                           ((__20 ()) fmt) x;
                           true) false x);
-            Format.fprintf fmt ")")) aassocs;
+              Format.fprintf fmt ")")) aassocs);
         | Wait  -> Format.pp_print_string fmt "wait"
         | Null { label = alabel } ->
             (match alabel with
@@ -3353,12 +3360,17 @@ let rec (vhdl_sequential_stmt_t_to_yojson :
             [`String "PROCEDURE_CALL_STATEMENT";
             (let fields = []  in
              let fields =
-               ("assocs",
-                 ((fun x  ->
-                     `List
-                       (List.map (fun x  -> vhdl_assoc_element_t_to_yojson x)
-                          x)) arg0.assocs))
-               :: fields  in
+               if arg0.assocs = []
+               then fields
+               else
+                 ("assocs",
+                   (((fun x  ->
+                        `List
+                          (List.map
+                             (fun x  -> vhdl_assoc_element_t_to_yojson x) x)))
+                      arg0.assocs))
+                 :: fields
+                in
              let fields =
                ("name", ((fun x  -> vhdl_name_t_to_yojson x) arg0.name)) ::
                fields  in
@@ -3710,7 +3722,7 @@ and (vhdl_sequential_stmt_t_of_yojson :
                 loop xs
                   ((Result.Ok NoName),
                     (Result.Error "Vhdl_ast.vhdl_sequential_stmt_t.name"),
-                    (Result.Error "Vhdl_ast.vhdl_sequential_stmt_t.assocs"))
+                    (Result.Ok []))
             | _ -> Result.Error "Vhdl_ast.vhdl_sequential_stmt_t")) arg0
       | `List ((`String "WAIT_STATEMENT")::[]) -> Result.Ok Wait
       | `List ((`String "NULL_STATEMENT")::arg0::[]) ->
@@ -5233,7 +5245,7 @@ let rec pp_vhdl_process_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          Format.fprintf fmt "@[<v>@[<v 2>";
+          Format.fprintf fmt "@[<v 2>";
           (match x.id with
           | NoName -> Format.fprintf fmt "";
           | _ -> 
@@ -5252,7 +5264,7 @@ let rec pp_vhdl_process_t :
                               ((__2 ()) fmt) x;
                               true) false x))) x.active_sigs;
                  Format.fprintf fmt ")");
-          Format.fprintf fmt "@;";
+          Format.fprintf fmt " is@;";
           ((fun x  ->
             ignore
             (List.fold_left
@@ -5260,6 +5272,7 @@ let rec pp_vhdl_process_t :
                 fun x  ->
                   if sep then Format.fprintf fmt "@;";
                     ((__1 ()) fmt) x;
+                    Format.fprintf fmt ";";
                     true) false x))) x.declarations;
           Format.fprintf fmt "@]@;@[<v 2>begin@;";
           ((fun x  ->
@@ -5269,6 +5282,7 @@ let rec pp_vhdl_process_t :
                        fun x  ->
                          if sep then Format.fprintf fmt "@;";
                          ((__3 ()) fmt) x;
+                         Format.fprintf fmt ";";
                          true) false x);)) x.body;
           Format.fprintf fmt "@]@;end process;@;";
           Format.fprintf fmt "@]";)
