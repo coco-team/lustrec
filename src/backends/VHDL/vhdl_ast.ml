@@ -71,9 +71,10 @@ and vhdl_expr_t =
   | Op of { id: string [@default ""]; args: vhdl_expr_t list [@default []]} [@name "EXPRESSION"]
   | IsNull [@name "IsNull"]
   | Time of { value: int; phy_unit: string [@default ""]}
-  | Sig of { name: vhdl_name_t; att: vhdl_signal_attributes_t option }
+  | Sig of { name: vhdl_name_t; att: vhdl_signal_attributes_t option [@default None]}
   | SuffixMod of { expr : vhdl_expr_t; selection : vhdl_suffix_selection_t }
-  | Aggregate of { elems : vhdl_element_assoc_t list } [@name "AGGREGATE"]
+  | Aggregate of { elems : vhdl_element_assoc_t list [@default []]} [@name "AGGREGATE"]
+  | QualifiedExpression of { type_mark : vhdl_name_t; aggregate : vhdl_element_assoc_t list [@default []]; expression : vhdl_expr_t option [@default None]} [@name "QUALIFIED_EXPRESSION"]
   | Others [@name "OTHERS"]
 and vhdl_name_t = (* Add something like TOKEN_NAME for specific keywords (open, all, ...) ? *)
   | Simple of string [@name "SIMPLE_NAME"]

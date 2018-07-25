@@ -143,6 +143,11 @@ and vhdl_expr_t =
   selection: vhdl_suffix_selection_t } 
   | Aggregate of {
   elems: vhdl_element_assoc_t list } [@name "AGGREGATE"]
+  | QualifiedExpression of
+  {
+  type_mark: vhdl_name_t ;
+  aggregate: vhdl_element_assoc_t list ;
+  expression: vhdl_expr_t option } [@name "QUALIFIED_EXPRESSION"]
   | Others [@name "OTHERS"]
 and vhdl_name_t =
   | Simple of string [@name "SIMPLE_NAME"]
@@ -438,7 +443,13 @@ and show_vhdl_definition_t : vhdl_definition_t -> Ppx_deriving_runtime.string
 (* TODO adapt for Op, Time, Sig, suffixMod *)
 and pp_vhdl_expr_t :
   Format.formatter -> vhdl_expr_t -> Ppx_deriving_runtime.unit =
-  let __8 () = pp_vhdl_element_assoc_t
+  let __11 () = pp_vhdl_expr_t
+  
+  and __10 () = pp_vhdl_element_assoc_t
+  
+  and __9 () = pp_vhdl_name_t
+  
+  and __8 () = pp_vhdl_element_assoc_t
   
   and __7 () = pp_vhdl_suffix_selection_t
   
@@ -547,6 +558,29 @@ and pp_vhdl_expr_t :
                             ((__8 ()) fmt) x;
                             true) false x))) aelems;
               Format.fprintf fmt ")@]");)
+        | QualifiedExpression
+            { type_mark = atype_mark; aggregate = aaggregate;
+              expression = aexpression }
+            ->
+              ((__9 ()) fmt) atype_mark;
+              Format.fprintf fmt "'";
+              (match aaggregate with
+              | [] -> Format.fprintf fmt "";
+              | _ -> 
+                Format.fprintf fmt "(@[<v>";
+                ((fun x  ->
+                   ignore
+                     (List.fold_left
+                        (fun sep  ->
+                           fun x  ->
+                             if sep then Format.fprintf fmt ",@ ";
+                             ((__10 ()) fmt) x;
+                             true) false x))) aaggregate;
+              Format.fprintf fmt ")@]");
+              (match aexpression with
+              | None  -> Format.pp_print_string fmt ""
+              | Some x ->
+                  ((__11 ()) fmt) x;);
         | Others  -> Format.pp_print_string fmt "others")
     [@ocaml.warning "-A"])
 
@@ -661,27 +695,34 @@ and pp_vhdl_assoc_element_t :
           | Some a -> 
               (((__0 ()) fmt) a;
               (match x.formal_arg with
-              | None -> ()
-              | Some b -> Format.fprintf fmt "(";
-                          ((__1 ()) fmt) b;
-                          Format.fprintf fmt ")");
+              | None -> Format.pp_print_string fmt ""
+              | Some b -> ((__1 ()) fmt) b);
               Format.fprintf fmt " => "));
           (match x.actual_name with
-          | None -> Format.pp_print_string fmt ""
+          | None -> 
+              ((match x.actual_designator with
+              | None -> Format.pp_print_string fmt ""
+              | Some NoName -> Format.pp_print_string fmt ""
+              | Some b -> ((__3 ()) fmt) b);
+              (match x.actual_expr with
+              | None -> Format.pp_print_string fmt ""
+              | Some IsNull -> Format.pp_print_string fmt ""
+              | Some c -> ((__4 ()) fmt) c);)
           | Some a -> 
               (((__2 ()) fmt) a;
+              (match a with
+              | NoName -> ()
+              | _ -> Format.fprintf fmt "(");
               (match x.actual_designator with
-              | None -> ()
-              | Some NoName -> Format.pp_print_string fmt ""
-              | Some b -> (Format.fprintf fmt "(";
-                          ((__3 ()) fmt) b;
-                          Format.fprintf fmt ")"));
+              | None -> Format.pp_print_string fmt ""
+              | Some b -> ((__3 ()) fmt) b);
               (match x.actual_expr with
-              | None -> ()
+              | None -> Format.pp_print_string fmt ""
               | Some IsNull -> Format.pp_print_string fmt ""
-              | Some c -> (Format.fprintf fmt "(";
-                          ((__4 ()) fmt) c;
-                          Format.fprintf fmt ")"))));)
+              | Some c -> ((__4 ()) fmt) c);
+              (match a with
+              | NoName -> ()
+              | _ -> Format.fprintf fmt ")")));)
     [@ocaml.warning "-A"])
 
 and show_vhdl_assoc_element_t :
@@ -1481,13 +1522,17 @@ and (vhdl_expr_t_to_yojson : vhdl_expr_t -> Yojson.Safe.json) =
             [`String "Sig";
             (let fields = []  in
              let fields =
-               ("att",
-                 ((function
-                   | None  -> `Null
-                   | Some x ->
-                       ((fun x  -> vhdl_signal_attributes_t_to_yojson x)) x)
-                    arg0.att))
-               :: fields  in
+               if arg0.att = None
+               then fields
+               else
+                 ("att",
+                   (((function
+                      | None  -> `Null
+                      | Some x ->
+                          ((fun x  -> vhdl_signal_attributes_t_to_yojson x))
+                            x)) arg0.att))
+                 :: fields
+                in
              let fields =
                ("name", ((fun x  -> vhdl_name_t_to_yojson x) arg0.name)) ::
                fields  in
@@ -1510,11 +1555,48 @@ and (vhdl_expr_t_to_yojson : vhdl_expr_t -> Yojson.Safe.json) =
             [`String "AGGREGATE";
             (let fields = []  in
              let fields =
-               ("elems",
-                 ((fun x  ->
-                     `List
-                       (List.map (fun x  -> vhdl_element_assoc_t_to_yojson x)
-                          x)) arg0.elems))
+               if arg0.elems = []
+               then fields
+               else
+                 ("elems",
+                   (((fun x  ->
+                        `List
+                          (List.map
+                             (fun x  -> vhdl_element_assoc_t_to_yojson x) x)))
+                      arg0.elems))
+                 :: fields
+                in
+             `Assoc fields)]
+      | QualifiedExpression arg0 ->
+          `List
+            [`String "QUALIFIED_EXPRESSION";
+            (let fields = []  in
+             let fields =
+               if arg0.expression = None
+               then fields
+               else
+                 ("expression",
+                   (((function
+                      | None  -> `Null
+                      | Some x -> ((fun x  -> vhdl_expr_t_to_yojson x)) x))
+                      arg0.expression))
+                 :: fields
+                in
+             let fields =
+               if arg0.aggregate = []
+               then fields
+               else
+                 ("aggregate",
+                   (((fun x  ->
+                        `List
+                          (List.map
+                             (fun x  -> vhdl_element_assoc_t_to_yojson x) x)))
+                      arg0.aggregate))
+                 :: fields
+                in
+             let fields =
+               ("type_mark",
+                 ((fun x  -> vhdl_name_t_to_yojson x) arg0.type_mark))
                :: fields  in
              `Assoc fields)]
       | Others  -> `List [`String "OTHERS"])
@@ -1642,7 +1724,7 @@ and (vhdl_expr_t_of_yojson :
                   | _::xs -> loop xs _state  in
                 loop xs
                   ((Result.Error "Vhdl_ast.vhdl_expr_t.name"),
-                    (Result.Error "Vhdl_ast.vhdl_expr_t.att"))
+                    (Result.Ok None))
             | _ -> Result.Error "Vhdl_ast.vhdl_expr_t")) arg0
       | `List ((`String "SuffixMod")::arg0::[]) ->
           ((function
@@ -1685,7 +1767,53 @@ and (vhdl_expr_t_of_yojson :
                       arg0 >>=
                         ((fun arg0  -> Result.Ok (Aggregate { elems = arg0 })))
                   | _::xs -> loop xs _state  in
-                loop xs (Result.Error "Vhdl_ast.vhdl_expr_t.elems")
+                loop xs (Result.Ok [])
+            | _ -> Result.Error "Vhdl_ast.vhdl_expr_t")) arg0
+      | `List ((`String "QUALIFIED_EXPRESSION")::arg0::[]) ->
+          ((function
+            | `Assoc xs ->
+                let rec loop xs ((arg0,arg1,arg2) as _state) =
+                  match xs with
+                  | ("type_mark",x)::xs ->
+                      loop xs
+                        (((fun x  -> vhdl_name_t_of_yojson x) x), arg1, arg2)
+                  | ("aggregate",x)::xs ->
+                      loop xs
+                        (arg0,
+                          ((function
+                            | `List xs ->
+                                map_bind
+                                  (fun x  -> vhdl_element_assoc_t_of_yojson x)
+                                  [] xs
+                            | _ ->
+                                Result.Error "Vhdl_ast.vhdl_expr_t.aggregate")
+                             x), arg2)
+                  | ("expression",x)::xs ->
+                      loop xs
+                        (arg0, arg1,
+                          ((function
+                            | `Null -> Result.Ok None
+                            | x ->
+                                ((fun x  -> vhdl_expr_t_of_yojson x) x) >>=
+                                  ((fun x  -> Result.Ok (Some x)))) x))
+                  | [] ->
+                      arg2 >>=
+                        ((fun arg2  ->
+                            arg1 >>=
+                              (fun arg1  ->
+                                 arg0 >>=
+                                   (fun arg0  ->
+                                      Result.Ok
+                                        (QualifiedExpression
+                                           {
+                                             type_mark = arg0;
+                                             aggregate = arg1;
+                                             expression = arg2
+                                           })))))
+                  | _::xs -> loop xs _state  in
+                loop xs
+                  ((Result.Error "Vhdl_ast.vhdl_expr_t.type_mark"),
+                    (Result.Ok []), (Result.Ok None))
             | _ -> Result.Error "Vhdl_ast.vhdl_expr_t")) arg0
       | `List ((`String "OTHERS")::[]) -> Result.Ok Others
       | _ -> Result.Error "Vhdl_ast.vhdl_expr_t")
@@ -4746,8 +4874,7 @@ let rec pp_vhdl_load_t :
                          fun x  ->
                            if sep then Format.fprintf fmt ".";
                            ((__1 ()) fmt) x;
-                           true) false x))) a0;
-             Format.fprintf fmt ";"))
+                           true) false x))) a0))
     [@ocaml.warning "-A"])
 
 and show_vhdl_load_t : vhdl_load_t -> Ppx_deriving_runtime.string =

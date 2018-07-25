@@ -192,6 +192,11 @@ class virtual vhdl_map =
         | Aggregate { elems } ->
             let elems = self#list self#vhdl_element_assoc_t elems  in
             Aggregate { elems }
+        | QualifiedExpression { type_mark; aggregate; expression } ->
+            let type_mark = self#vhdl_name_t type_mark  in
+            let aggregate = self#list self#vhdl_element_assoc_t aggregate  in
+            let expression = self#option self#vhdl_expr_t expression  in
+            QualifiedExpression { type_mark; aggregate; expression }
         | Others  -> Others
     method vhdl_name_t : vhdl_name_t -> vhdl_name_t=
       fun x  ->
