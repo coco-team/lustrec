@@ -162,9 +162,16 @@ let bool_funs  = ["and"; "or"; "nand"; "nor"; "xor"; "not"]
 let rel_funs   = ["<";">";"<=";">=";"/=";"=";"?=";"?/=";"?<";"?<=";"?>";"?>=";"??"]
 let shift_funs = ["sll";"srl";"sla";"sra";"rol";"ror"]
 
+type vhdl_waveform_element_t =
+  {
+    value: vhdl_expr_t option [@default None];
+    delay: vhdl_expr_t option [@default None];
+  }
+[@@deriving show { with_path = false }, yojson {strict = false}];;
+
 type vhdl_sequential_stmt_t = 
   | VarAssign of { label: vhdl_name_t [@default NoName]; lhs: vhdl_name_t; rhs: vhdl_expr_t } [@name "VARIABLE_ASSIGNMENT_STATEMENT"]
-  | SigSeqAssign of { label: vhdl_name_t [@default NoName]; lhs: vhdl_name_t; rhs: vhdl_expr_t list} [@name "SIGNAL_ASSIGNMENT_STATEMENT"]
+  | SigSeqAssign of { label: vhdl_name_t [@default NoName]; lhs: vhdl_name_t; rhs: vhdl_waveform_element_t list} [@name "SIGNAL_ASSIGNMENT_STATEMENT"]
   | If of { label: vhdl_name_t [@default NoName]; if_cases: vhdl_if_case_t list;
     default: vhdl_sequential_stmt_t list [@default []]; } [@name "IF_STATEMENT"]
   | Case of { label: vhdl_name_t [@default NoName]; guard: vhdl_expr_t; branches: vhdl_case_item_t list } [@name "CASE_STATEMENT_TREE"]
@@ -245,7 +252,7 @@ type vhdl_declarative_item_t =
 
 type vhdl_signal_condition_t =
   {                            
-    expr: vhdl_expr_t list;              (* when expression *)
+    expr: vhdl_waveform_element_t list [@default []];              (* when expression *)
     cond: vhdl_expr_t [@default IsNull];  (* optional else case expression. 
                                              If None, could be a latch  *)
   }
@@ -253,7 +260,7 @@ type vhdl_signal_condition_t =
 
 type vhdl_signal_selection_t =
   {
-    expr : vhdl_expr_t;
+    expr : vhdl_waveform_element_t list [@default []];
     when_sel: vhdl_expr_t list [@default []];
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;
@@ -283,9 +290,9 @@ type vhdl_selected_signal_t =
     postponed: bool [@default false];
     label: vhdl_name_t [@default NoName];
     lhs: vhdl_name_t;      (* assigned signal = target *)
-    sel: vhdl_expr_t;  
+    sel: vhdl_expr_t;
     branches: vhdl_signal_selection_t list [@default []];
-    delay: vhdl_expr_t option;
+    delay: vhdl_expr_t option [@default None];
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;
 

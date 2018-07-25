@@ -24,6 +24,7 @@ let _ = fun (_ : vhdl_case_item_t)  -> ()
 let _ = fun (_ : vhdl_declaration_t)  -> () 
 let _ = fun (_ : vhdl_signal_selection_t)  -> () 
 let _ = fun (_ : vhdl_declarative_item_t)  -> () 
+let _ = fun (_ : vhdl_waveform_element_t)  -> ()
 let _ = fun (_ : vhdl_signal_condition_t)  -> () 
 let _ = fun (_ : vhdl_conditional_signal_t)  -> () 
 let _ = fun (_ : vhdl_process_t)  -> () 
@@ -65,6 +66,7 @@ class virtual vhdl_map =
     method virtual  vhdl_declaration_t : vhdl_declaration_t -> vhdl_declaration_t
     method virtual  vhdl_sequential_stmt_t : vhdl_sequential_stmt_t -> vhdl_sequential_stmt_t
     method virtual  vhdl_declarative_item_t : vhdl_declarative_item_t -> vhdl_declarative_item_t
+    method virtual  vhdl_waveform_element_t : vhdl_waveform_element_t -> vhdl_waveform_element_t
     method virtual  vhdl_signal_condition_t : vhdl_signal_condition_t -> vhdl_signal_condition_t
     method virtual  vhdl_cst_val_t : vhdl_cst_val_t -> vhdl_cst_val_t
     method virtual  vhdl_subprogram_spec_t : vhdl_subprogram_spec_t -> vhdl_subprogram_spec_t
@@ -308,7 +310,7 @@ class virtual vhdl_map =
         | SigSeqAssign { label; lhs; rhs } ->
             let label = self#vhdl_name_t label  in
             let lhs = self#vhdl_name_t lhs  in
-            let rhs = self#list self#vhdl_expr_t rhs  in
+            let rhs = self#list self#vhdl_waveform_element_t rhs  in
             SigSeqAssign { label; lhs; rhs }
         | If { label; if_cases; default } ->
             let label = self#vhdl_name_t label  in
@@ -389,14 +391,22 @@ class virtual vhdl_map =
         let definition = self#option self#vhdl_definition_t definition  in
         { use_clause; declaration; definition }
 
-    method vhdl_signal_condition_t : vhdl_signal_condition_t -> vhdl_signal_condition_t=
+    method vhdl_waveform_element_t :
+      vhdl_waveform_element_t -> vhdl_waveform_element_t=
+      fun { value; delay }  ->
+        let value = self#option self#vhdl_expr_t value  in
+        let delay = self#option self#vhdl_expr_t delay  in { value; delay }
+
+    method vhdl_signal_condition_t :
+      vhdl_signal_condition_t -> vhdl_signal_condition_t=
       fun { expr; cond }  ->
-        let expr = self#list self#vhdl_expr_t expr  in
+        let expr = self#list self#vhdl_waveform_element_t expr  in
         let cond = self#vhdl_expr_t cond  in { expr; cond }
 
-    method vhdl_signal_selection_t : vhdl_signal_selection_t -> vhdl_signal_selection_t=
+    method vhdl_signal_selection_t :
+      vhdl_signal_selection_t -> vhdl_signal_selection_t=
       fun { expr; when_sel }  ->
-        let expr = self#vhdl_expr_t expr  in
+        let expr = self#list self#vhdl_waveform_element_t expr  in
         let when_sel = self#list self#vhdl_expr_t when_sel  in
         { expr; when_sel }
 
@@ -420,7 +430,8 @@ class virtual vhdl_map =
         let body = self#list self#vhdl_sequential_stmt_t body  in
         { id; declarations; active_sigs; body }
 
-    method vhdl_selected_signal_t : vhdl_selected_signal_t -> vhdl_selected_signal_t=
+    method vhdl_selected_signal_t :
+      vhdl_selected_signal_t -> vhdl_selected_signal_t=
       fun { postponed; label; lhs; sel; branches; delay }  ->
         let postponed = self#bool postponed  in
         let label = self#vhdl_name_t label  in

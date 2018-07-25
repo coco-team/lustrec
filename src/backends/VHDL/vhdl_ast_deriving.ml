@@ -2874,6 +2874,104 @@ let rel_funs =
   "?>=";
   "??"] 
 let shift_funs = ["sll"; "srl"; "sla"; "sra"; "rol"; "ror"] 
+
+type vhdl_waveform_element_t =
+  {
+  value: vhdl_expr_t option [@default None];
+  delay: vhdl_expr_t option [@default None]}[@@deriving
+                                              ((show { with_path = false }),
+                                                (yojson { strict = false }))]
+
+let rec pp_vhdl_waveform_element_t :
+  Format.formatter -> vhdl_waveform_element_t -> Ppx_deriving_runtime.unit =
+  let __1 () = pp_vhdl_expr_t
+  
+  and __0 () = pp_vhdl_expr_t
+   in
+  ((let open! Ppx_deriving_runtime in
+      fun fmt  ->
+        fun x  ->
+          (match x.value with
+          | None -> Format.fprintf fmt "";
+          | Some IsNull -> Format.fprintf fmt "null";
+          | Some v -> ((__0 ()) fmt) v);
+          (match x.delay with
+          | None -> Format.fprintf fmt "";
+          | Some v -> 
+              Format.fprintf fmt " after ";
+              ((__1 ()) fmt) v))
+    [@ocaml.warning "-A"])
+
+and show_vhdl_waveform_element_t :
+  vhdl_waveform_element_t -> Ppx_deriving_runtime.string =
+  fun x  -> Format.asprintf "%a" pp_vhdl_waveform_element_t x
+
+let rec (vhdl_waveform_element_t_to_yojson :
+          vhdl_waveform_element_t -> Yojson.Safe.json)
+  =
+  ((let open! Ppx_deriving_yojson_runtime in
+      fun x  ->
+        let fields = []  in
+        let fields =
+          if x.delay = None
+          then fields
+          else
+            ("delay",
+              (((function
+                 | None  -> `Null
+                 | Some x -> ((fun x  -> vhdl_expr_t_to_yojson x)) x))
+                 x.delay))
+            :: fields
+           in
+        let fields =
+          if x.value = None
+          then fields
+          else
+            ("value",
+              (((function
+                 | None  -> `Null
+                 | Some x -> ((fun x  -> vhdl_expr_t_to_yojson x)) x))
+                 x.value))
+            :: fields
+           in
+        `Assoc fields)
+  [@ocaml.warning "-A"])
+
+and (vhdl_waveform_element_t_of_yojson :
+      Yojson.Safe.json ->
+        vhdl_waveform_element_t Ppx_deriving_yojson_runtime.error_or)
+  =
+  ((let open! Ppx_deriving_yojson_runtime in
+      function
+      | `Assoc xs ->
+          let rec loop xs ((arg0,arg1) as _state) =
+            match xs with
+            | ("value",x)::xs ->
+                loop xs
+                  (((function
+                     | `Null -> Result.Ok None
+                     | x ->
+                         ((fun x  -> vhdl_expr_t_of_yojson x) x) >>=
+                           ((fun x  -> Result.Ok (Some x)))) x), arg1)
+            | ("delay",x)::xs ->
+                loop xs
+                  (arg0,
+                    ((function
+                      | `Null -> Result.Ok None
+                      | x ->
+                          ((fun x  -> vhdl_expr_t_of_yojson x) x) >>=
+                            ((fun x  -> Result.Ok (Some x)))) x))
+            | [] ->
+                arg1 >>=
+                  ((fun arg1  ->
+                      arg0 >>=
+                        (fun arg0  ->
+                           Result.Ok { value = arg0; delay = arg1 })))
+            | _::xs -> loop xs _state  in
+          loop xs ((Result.Ok None), (Result.Ok None))
+      | _ -> Result.Error "Vhdl_ast.vhdl_waveform_element_t")
+  [@ocaml.warning "-A"])
+
 type vhdl_sequential_stmt_t =
   | VarAssign of
   {
@@ -2884,7 +2982,7 @@ type vhdl_sequential_stmt_t =
   {
   label: vhdl_name_t [@default NoName];
   lhs: vhdl_name_t ;
-  rhs: vhdl_expr_t list } [@name "SIGNAL_ASSIGNMENT_STATEMENT"]
+  rhs: vhdl_waveform_element_t list } [@name "SIGNAL_ASSIGNMENT_STATEMENT"]
   | If of
   {
   label: vhdl_name_t [@default NoName];
@@ -2962,7 +3060,7 @@ let rec pp_vhdl_sequential_stmt_t :
   
   and __6 () = pp_vhdl_name_t
   
-  and __5 () = pp_vhdl_expr_t
+  and __5 () = pp_vhdl_waveform_element_t
   
   and __4 () = pp_vhdl_name_t
   
@@ -3240,7 +3338,9 @@ let rec (vhdl_sequential_stmt_t_to_yojson :
              let fields =
                ("rhs",
                  ((fun x  ->
-                     `List (List.map (fun x  -> vhdl_expr_t_to_yojson x) x))
+                     `List
+                       (List.map
+                          (fun x  -> vhdl_waveform_element_t_to_yojson x) x))
                     arg0.rhs))
                :: fields  in
              let fields =
@@ -3491,8 +3591,10 @@ and (vhdl_sequential_stmt_t_of_yojson :
                         (arg0, arg1,
                           ((function
                             | `List xs ->
-                                map_bind (fun x  -> vhdl_expr_t_of_yojson x)
-                                  [] xs
+                                map_bind
+                                  (fun x  ->
+                                     vhdl_waveform_element_t_of_yojson x) []
+                                  xs
                             | _ ->
                                 Result.Error
                                   "Vhdl_ast.vhdl_sequential_stmt_t.rhs") x))
@@ -4816,14 +4918,16 @@ and (vhdl_declarative_item_t_of_yojson :
 
 type vhdl_signal_condition_t =
   {
-  expr: vhdl_expr_t list ;
-  cond: vhdl_expr_t [@default IsNull]}
+  expr: vhdl_waveform_element_t list [@default []];
+  cond: vhdl_expr_t [@default IsNull]}[@@deriving
+                                        ((show { with_path = false }),
+                                          (yojson { strict = false }))]
 
 let rec pp_vhdl_signal_condition_t :
   Format.formatter -> vhdl_signal_condition_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_expr_t
   
-  and __0 () = pp_vhdl_expr_t
+  and __0 () = pp_vhdl_waveform_element_t
    in
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
@@ -4859,11 +4963,17 @@ let rec (vhdl_signal_condition_t_to_yojson :
             fields
            in
         let fields =
-          ("expr",
-            ((fun x  ->
-                `List (List.map (fun x  -> vhdl_expr_t_to_yojson x) x))
-               x.expr))
-          :: fields  in
+          if x.expr = []
+          then fields
+          else
+            ("expr",
+              (((fun x  ->
+                   `List
+                     (List.map
+                        (fun x  -> vhdl_waveform_element_t_to_yojson x) x)))
+                 x.expr))
+            :: fields
+           in
         `Assoc fields)
   [@ocaml.warning "-A"])
 
@@ -4880,7 +4990,9 @@ and (vhdl_signal_condition_t_of_yojson :
                 loop xs
                   (((function
                      | `List xs ->
-                         map_bind (fun x  -> vhdl_expr_t_of_yojson x) [] xs
+                         map_bind
+                           (fun x  -> vhdl_waveform_element_t_of_yojson x) []
+                           xs
                      | _ ->
                          Result.Error "Vhdl_ast.vhdl_signal_condition_t.expr")
                       x), arg1)
@@ -4892,45 +5004,43 @@ and (vhdl_signal_condition_t_of_yojson :
                       arg0 >>=
                         (fun arg0  -> Result.Ok { expr = arg0; cond = arg1 })))
             | _::xs -> loop xs _state  in
-          loop xs
-            ((Result.Error "Vhdl_ast.vhdl_signal_condition_t.expr"),
-              (Result.Ok IsNull))
+          loop xs ((Result.Ok []), (Result.Ok IsNull))
       | _ -> Result.Error "Vhdl_ast.vhdl_signal_condition_t")
   [@ocaml.warning "-A"])
 
 type vhdl_signal_selection_t =
   {
-  expr: vhdl_expr_t ;
-  when_sel: vhdl_expr_t list [@default []]}
+  expr: vhdl_waveform_element_t list [@default []];
+  when_sel: vhdl_expr_t list [@default []]}[@@deriving
+                                             ((show { with_path = false }),
+                                               (yojson { strict = false }))]
 
-(* TODO *)
 let rec pp_vhdl_signal_selection_t :
   Format.formatter -> vhdl_signal_selection_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_expr_t
   
-  and __0 () = pp_vhdl_expr_t
+  and __0 () = pp_vhdl_waveform_element_t
    in
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          Format.fprintf fmt "@[<2>{ ";
-          ((Format.fprintf fmt "@[%s =@ " "expr";
-            ((__0 ()) fmt) x.expr;
-            Format.fprintf fmt "@]");
-           Format.fprintf fmt ";@ ";
-           Format.fprintf fmt "@[%s =@ " "when_sel";
-           ((fun x  ->
-               Format.fprintf fmt "@[<2>[";
-               ignore
-                 (List.fold_left
-                    (fun sep  ->
-                       fun x  ->
-                         if sep then Format.fprintf fmt ";@ ";
-                         ((__1 ()) fmt) x;
-                         true) false x);
-               Format.fprintf fmt "@,]@]")) x.when_sel;
-           Format.fprintf fmt "@]");
-          Format.fprintf fmt "@ }@]")
+          ((fun x  ->
+            ignore
+              (List.fold_left
+                (fun sep  ->
+                  fun x  ->
+                    if sep then Format.fprintf fmt "@ ";
+                      ((__0 ()) fmt) x;
+                      true) false x))) x.expr;
+          Format.fprintf fmt " when ";
+          ((fun x  ->
+            ignore
+              (List.fold_left
+                (fun sep  ->
+                  fun x  ->
+                    if sep then Format.fprintf fmt "|@ ";
+                      ((__1 ()) fmt) x;
+                      true) false x))) x.when_sel)
     [@ocaml.warning "-A"])
 
 and show_vhdl_signal_selection_t :
@@ -4953,8 +5063,18 @@ let rec (vhdl_signal_selection_t_to_yojson :
                  x.when_sel))
             :: fields
            in
-        let fields = ("expr", ((fun x  -> vhdl_expr_t_to_yojson x) x.expr))
-          :: fields  in
+        let fields =
+          if x.expr = []
+          then fields
+          else
+            ("expr",
+              (((fun x  ->
+                   `List
+                     (List.map
+                        (fun x  -> vhdl_waveform_element_t_to_yojson x) x)))
+                 x.expr))
+            :: fields
+           in
         `Assoc fields)
   [@ocaml.warning "-A"])
 
@@ -4968,7 +5088,15 @@ and (vhdl_signal_selection_t_of_yojson :
           let rec loop xs ((arg0,arg1) as _state) =
             match xs with
             | ("expr",x)::xs ->
-                loop xs (((fun x  -> vhdl_expr_t_of_yojson x) x), arg1)
+                loop xs
+                  (((function
+                     | `List xs ->
+                         map_bind
+                           (fun x  -> vhdl_waveform_element_t_of_yojson x) []
+                           xs
+                     | _ ->
+                         Result.Error "Vhdl_ast.vhdl_signal_selection_t.expr")
+                      x), arg1)
             | ("when_sel",x)::xs ->
                 loop xs
                   (arg0,
@@ -4985,9 +5113,7 @@ and (vhdl_signal_selection_t_of_yojson :
                         (fun arg0  ->
                            Result.Ok { expr = arg0; when_sel = arg1 })))
             | _::xs -> loop xs _state  in
-          loop xs
-            ((Result.Error "Vhdl_ast.vhdl_signal_selection_t.expr"),
-              (Result.Ok []))
+          loop xs ((Result.Ok []), (Result.Ok []))
       | _ -> Result.Error "Vhdl_ast.vhdl_signal_selection_t")
   [@ocaml.warning "-A"])
 
@@ -5354,9 +5480,10 @@ type vhdl_selected_signal_t =
   lhs: vhdl_name_t ;
   sel: vhdl_expr_t ;
   branches: vhdl_signal_selection_t list [@default []];
-  delay: vhdl_expr_t option }
+  delay: vhdl_expr_t option [@default None]}[@@deriving
+                                              ((show { with_path = false }),
+                                                (yojson { strict = false }))]
 
-(* TODO *)
 let rec pp_vhdl_selected_signal_t :
   Format.formatter -> vhdl_selected_signal_t -> Ppx_deriving_runtime.unit =
   let __4 () = pp_vhdl_expr_t
@@ -5372,45 +5499,30 @@ let rec pp_vhdl_selected_signal_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          Format.fprintf fmt "@[<2>{ ";
-          ((((((Format.fprintf fmt "@[%s =@ " "postponed";
-                (Format.fprintf fmt "%B") x.postponed;
-                Format.fprintf fmt "@]");
-               Format.fprintf fmt ";@ ";
-               Format.fprintf fmt "@[%s =@ " "label";
-               ((__0 ()) fmt) x.label;
-               Format.fprintf fmt "@]");
-              Format.fprintf fmt ";@ ";
-              Format.fprintf fmt "@[%s =@ " "lhs";
-              ((__1 ()) fmt) x.lhs;
-              Format.fprintf fmt "@]");
-             Format.fprintf fmt ";@ ";
-             Format.fprintf fmt "@[%s =@ " "sel";
-             ((__2 ()) fmt) x.sel;
-             Format.fprintf fmt "@]");
-            Format.fprintf fmt ";@ ";
-            Format.fprintf fmt "@[%s =@ " "branches";
-            ((fun x  ->
-                Format.fprintf fmt "@[<2>[";
-                ignore
-                  (List.fold_left
-                     (fun sep  ->
-                        fun x  ->
-                          if sep then Format.fprintf fmt ";@ ";
-                          ((__3 ()) fmt) x;
-                          true) false x);
-                Format.fprintf fmt "@,]@]")) x.branches;
-            Format.fprintf fmt "@]");
-           Format.fprintf fmt ";@ ";
-           Format.fprintf fmt "@[%s =@ " "delay";
-           ((function
-             | None  -> Format.pp_print_string fmt "None"
-             | Some x ->
-                 (Format.pp_print_string fmt "(Some ";
-                  ((__4 ()) fmt) x;
-                  Format.pp_print_string fmt ")"))) x.delay;
-           Format.fprintf fmt "@]");
-          Format.fprintf fmt "@ }@]")
+          Format.fprintf fmt "@[<v 2>";
+          (match x.label with
+            | NoName -> Format.fprintf fmt "";
+            | _ -> (((__0 ()) fmt) x.label;
+                   Format.fprintf fmt ":@ ")
+          );
+          Format.fprintf fmt "with ";
+          ((__2 ()) fmt) x.sel;
+          Format.fprintf fmt " select@;";
+          ((__1 ()) fmt) x.lhs;
+          Format.fprintf fmt " <= ";
+          ((function
+            | None  -> Format.pp_print_string fmt ""
+            | Some x ->
+               ((__4 ()) fmt) x)) x.delay;
+          ((fun x  ->
+            ignore
+              (List.fold_left
+                (fun sep  ->
+                  fun x  ->
+                    if sep then Format.fprintf fmt ",@ ";
+                      ((__3 ()) fmt) x;
+                      true) false x))) x.branches;
+          Format.fprintf fmt "@]";)
     [@ocaml.warning "-A"])
 
 and show_vhdl_selected_signal_t :
@@ -5424,11 +5536,16 @@ let rec (vhdl_selected_signal_t_to_yojson :
       fun x  ->
         let fields = []  in
         let fields =
-          ("delay",
-            ((function
-              | None  -> `Null
-              | Some x -> ((fun x  -> vhdl_expr_t_to_yojson x)) x) x.delay))
-          :: fields  in
+          if x.delay = None
+          then fields
+          else
+            ("delay",
+              (((function
+                 | None  -> `Null
+                 | Some x -> ((fun x  -> vhdl_expr_t_to_yojson x)) x))
+                 x.delay))
+            :: fields
+           in
         let fields =
           if x.branches = []
           then fields
@@ -5539,8 +5656,7 @@ and (vhdl_selected_signal_t_of_yojson :
             ((Result.Ok false), (Result.Ok NoName),
               (Result.Error "Vhdl_ast.vhdl_selected_signal_t.lhs"),
               (Result.Error "Vhdl_ast.vhdl_selected_signal_t.sel"),
-              (Result.Ok []),
-              (Result.Error "Vhdl_ast.vhdl_selected_signal_t.delay"))
+              (Result.Ok []), (Result.Ok None))
       | _ -> Result.Error "Vhdl_ast.vhdl_selected_signal_t")
   [@ocaml.warning "-A"])
 
