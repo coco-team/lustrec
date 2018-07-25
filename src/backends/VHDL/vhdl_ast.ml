@@ -344,6 +344,7 @@ type vhdl_package_t =
     name: vhdl_name_t [@default NoName];
     shared_defs: vhdl_definition_t list [@default []];
     shared_decls: vhdl_declaration_t list [@default []];
+    shared_uses: vhdl_load_t list [@default []];
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;
 

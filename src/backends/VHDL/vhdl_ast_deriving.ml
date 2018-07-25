@@ -6156,12 +6156,17 @@ type vhdl_package_t =
   {
   name: vhdl_name_t [@default NoName];
   shared_defs: vhdl_definition_t list [@default []];
-  shared_decls: vhdl_declaration_t list [@default []]}
+  shared_decls: vhdl_declaration_t list [@default []];
+  shared_uses: vhdl_load_t list [@default []]}[@@deriving
+                                                ((show { with_path = false }),
+                                                  (yojson { strict = false }))]
 
 let rec pp_vhdl_package_t :
   Format.formatter -> vhdl_package_t -> Ppx_deriving_runtime.unit =
-  let __2 () = pp_vhdl_declaration_t
-
+  let __3 () = pp_vhdl_load_t
+  
+  and __2 () = pp_vhdl_declaration_t
+  
   and __1 () = pp_vhdl_definition_t
   
   and __0 () = pp_vhdl_name_t
@@ -6190,7 +6195,17 @@ let rec pp_vhdl_package_t :
                          if sep then Format.fprintf fmt "";
                          ((__2 ()) fmt) x;
                          Format.fprintf fmt ";";
-                         true) false x))) x.shared_decls;)
+                         true) false x))) x.shared_decls;
+          ((fun x  ->
+               ignore
+                 (List.fold_left
+                    (fun sep  ->
+                       fun x  ->
+                         Format.fprintf fmt "@;";
+                         if sep then Format.fprintf fmt "";
+                         ((__3 ()) fmt) x;
+                         Format.fprintf fmt ";";
+                         true) false x))) x.shared_uses;)
     [@ocaml.warning "-A"])
 
 and show_vhdl_package_t : vhdl_package_t -> Ppx_deriving_runtime.string =
@@ -6200,6 +6215,16 @@ let rec (vhdl_package_t_to_yojson : vhdl_package_t -> Yojson.Safe.json) =
   ((let open! Ppx_deriving_yojson_runtime in
       fun x  ->
         let fields = []  in
+        let fields =
+          if x.shared_uses = []
+          then fields
+          else
+            ("shared_uses",
+              (((fun x  ->
+                   `List (List.map (fun x  -> vhdl_load_t_to_yojson x) x)))
+                 x.shared_uses))
+            :: fields
+           in
         let fields =
           if x.shared_decls = []
           then fields
@@ -6237,10 +6262,11 @@ and (vhdl_package_t_of_yojson :
   ((let open! Ppx_deriving_yojson_runtime in
       function
       | `Assoc xs ->
-          let rec loop xs ((arg0,arg1,arg2) as _state) =
+          let rec loop xs ((arg0,arg1,arg2,arg3) as _state) =
             match xs with
             | ("name",x)::xs ->
-                loop xs (((fun x  -> vhdl_name_t_of_yojson x) x), arg1, arg2)
+                loop xs
+                  (((fun x  -> vhdl_name_t_of_yojson x) x), arg1, arg2, arg3)
             | ("shared_defs",x)::xs ->
                 loop xs
                   (arg0,
@@ -6250,7 +6276,7 @@ and (vhdl_package_t_of_yojson :
                             [] xs
                       | _ ->
                           Result.Error "Vhdl_ast.vhdl_package_t.shared_defs")
-                       x), arg2)
+                       x), arg2, arg3)
             | ("shared_decls",x)::xs ->
                 loop xs
                   (arg0, arg1,
@@ -6260,22 +6286,36 @@ and (vhdl_package_t_of_yojson :
                             [] xs
                       | _ ->
                           Result.Error "Vhdl_ast.vhdl_package_t.shared_decls")
+                       x), arg3)
+            | ("shared_uses",x)::xs ->
+                loop xs
+                  (arg0, arg1, arg2,
+                    ((function
+                      | `List xs ->
+                          map_bind (fun x  -> vhdl_load_t_of_yojson x) [] xs
+                      | _ ->
+                          Result.Error "Vhdl_ast.vhdl_package_t.shared_uses")
                        x))
             | [] ->
-                arg2 >>=
-                  ((fun arg2  ->
-                      arg1 >>=
-                        (fun arg1  ->
-                           arg0 >>=
-                             (fun arg0  ->
-                                Result.Ok
-                                  {
-                                    name = arg0;
-                                    shared_defs = arg1;
-                                    shared_decls = arg2
-                                  }))))
+                arg3 >>=
+                  ((fun arg3  ->
+                      arg2 >>=
+                        (fun arg2  ->
+                           arg1 >>=
+                             (fun arg1  ->
+                                arg0 >>=
+                                  (fun arg0  ->
+                                     Result.Ok
+                                       {
+                                         name = arg0;
+                                         shared_defs = arg1;
+                                         shared_decls = arg2;
+                                         shared_uses = arg3
+                                       })))))
             | _::xs -> loop xs _state  in
-          loop xs ((Result.Ok NoName), (Result.Ok []), (Result.Ok []))
+          loop xs
+            ((Result.Ok NoName), (Result.Ok []), (Result.Ok []),
+              (Result.Ok []))
       | _ -> Result.Error "Vhdl_ast.vhdl_package_t")
   [@ocaml.warning "-A"])
 

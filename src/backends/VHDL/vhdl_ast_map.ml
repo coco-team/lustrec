@@ -481,11 +481,12 @@ class virtual vhdl_map =
         { name; generics; ports; declaration; stmts }
 
     method vhdl_package_t : vhdl_package_t -> vhdl_package_t=
-      fun { name; shared_defs; shared_decls }  ->
+      fun { name; shared_defs; shared_decls; shared_uses }  ->
         let name = self#vhdl_name_t name  in
         let shared_defs = self#list self#vhdl_definition_t shared_defs  in
         let shared_decls = self#list self#vhdl_declaration_t shared_decls  in
-        { name; shared_defs; shared_decls }
+        let shared_uses = self#list self#vhdl_load_t shared_uses  in
+        { name; shared_defs; shared_decls; shared_uses }
 
     method vhdl_load_t : vhdl_load_t -> vhdl_load_t=
       fun x  ->
