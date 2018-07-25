@@ -221,6 +221,7 @@ in
             (match aindexes with
             | [] -> Format.fprintf fmt "";
             | _ ->
+              Format.fprintf fmt "(@[<v>";
               ((fun x  ->
                 ignore
                 (List.fold_left
@@ -228,7 +229,9 @@ in
                     fun x  ->
                       if sep then Format.fprintf fmt ",@ ";
                       ((__0 ()) fmt) x;
-                      true) false x)) aindexes));
+                      Format.fprintf fmt " range <>";
+                      true) false x)) aindexes);
+              Format.fprintf fmt ")@]");
             (function
               | None  -> Format.pp_print_string fmt ""
               | Some x ->
