@@ -3347,16 +3347,16 @@ let rec pp_vhdl_sequential_stmt_t :
             (match aassocs with
             | [] -> Format.fprintf fmt "";
             | _ ->
+               Format.fprintf fmt "(@[<v>";
                ((fun x  ->
-                Format.fprintf fmt "(";
                 ignore
                   (List.fold_left
                      (fun sep  ->
                         fun x  ->
                           if sep then Format.fprintf fmt ",@ ";
                           ((__20 ()) fmt) x;
-                          true) false x);
-              Format.fprintf fmt ")")) aassocs);
+                          true) false x))) aassocs;
+               Format.fprintf fmt "@])");
         | Wait  -> Format.pp_print_string fmt "wait"
         | Null { label = alabel } ->
             (match alabel with
