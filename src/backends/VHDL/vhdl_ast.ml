@@ -181,7 +181,7 @@ type vhdl_sequential_stmt_t =
   | ProcedureCall of { label: vhdl_name_t [@default NoName]; name: vhdl_name_t; assocs: vhdl_assoc_element_t list [@default []] } [@name "PROCEDURE_CALL_STATEMENT"]
   | Wait [@name "WAIT_STATEMENT"]
   | Null of { label: vhdl_name_t [@default NoName]} [@name "NULL_STATEMENT"]
-  | Return of { label: vhdl_name_t [@default NoName]} [@name "RETURN_STATEMENT"]
+  | Return of { label: vhdl_name_t option [@default None]; expr: vhdl_expr_t option [@default None]} [@name "RETURN_STATEMENT"]
 and vhdl_if_case_t = 
   {
     if_cond: vhdl_expr_t;
@@ -300,6 +300,7 @@ type vhdl_component_instantiation_t =
   {
     name: vhdl_name_t;
     inst_unit: vhdl_name_t;
+    inst_unit_type : string [@default ""];
     archi_name: vhdl_name_t option [@default None];
     generic_map: vhdl_assoc_element_t list [@default []];
     port_map: vhdl_assoc_element_t list [@default []];

@@ -346,8 +346,10 @@ class virtual vhdl_map =
         | Wait  -> Wait
         | Null { label } ->
             let label = self#vhdl_name_t label  in Null { label }
-        | Return { label } ->
-            let label = self#vhdl_name_t label  in Return { label }
+        | Return { label; expr } ->
+            let label = self#option self#vhdl_name_t label  in
+            let expr = self#option self#vhdl_expr_t expr in
+            Return { label; expr }
     method vhdl_if_case_t : vhdl_if_case_t -> vhdl_if_case_t=
       fun { if_cond; if_block }  ->
         let if_cond = self#vhdl_expr_t if_cond  in
@@ -449,13 +451,14 @@ class virtual vhdl_map =
 
     method vhdl_component_instantiation_t :
       vhdl_component_instantiation_t -> vhdl_component_instantiation_t=
-      fun { name; inst_unit; archi_name; generic_map; port_map }  ->
+        fun { name; inst_unit; inst_unit_type; archi_name; generic_map; port_map }  ->
         let name = self#vhdl_name_t name  in
         let inst_unit = self#vhdl_name_t inst_unit  in
+        let inst_unit_type = self#string inst_unit_type  in
         let archi_name = self#option self#vhdl_name_t archi_name  in
         let generic_map = self#list self#vhdl_assoc_element_t generic_map  in
         let port_map = self#list self#vhdl_assoc_element_t port_map  in
-        { name; inst_unit; archi_name; generic_map; port_map }
+        { name; inst_unit; inst_unit_type; archi_name; generic_map; port_map }
 
     method vhdl_concurrent_stmt_t :
       vhdl_concurrent_stmt_t -> vhdl_concurrent_stmt_t=

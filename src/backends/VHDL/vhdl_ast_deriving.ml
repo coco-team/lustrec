@@ -250,10 +250,11 @@ in
                 (List.fold_left
                   (fun sep  ->
                     fun x  ->
-                      if sep then Format.fprintf fmt ";@;";
+                      if sep then ();
                         ((__3 ()) fmt) x;
+                        Format.fprintf fmt ";@;";
                         true) false x);
-              Format.fprintf fmt "@]@;end record") a0;
+              Format.fprintf fmt "@]end record") a0;
         | Enumerated a0 ->
             (Format.fprintf fmt "(";
             ((fun x  ->
@@ -286,10 +287,10 @@ and pp_vhdl_element_declaration_t :
                   (List.fold_left
                      (fun sep  ->
                         fun x  ->
-                          if sep then Format.fprintf fmt ",@ ";
+                          if sep then Format.fprintf fmt ", ";
                           ((__0 ()) fmt) x;
                           true) false x)) x.names;
-           Format.fprintf fmt ":@ ";
+           Format.fprintf fmt ": ";
            ((__1 ()) fmt) x.definition)
     [@ocaml.warning "-A"])
 
@@ -485,10 +486,12 @@ and pp_vhdl_expr_t :
             | hd::[] ->
                (Format.fprintf fmt "%s") aid;
                ((__3 ()) fmt) hd
-            | hd::(hd2::[]) -> 
+            | hd::(hd2::[]) ->
+               Format.fprintf fmt "(";
                ((__3 ()) fmt) hd;
                (Format.fprintf fmt " %s ") aid;
-               ((__3 ()) fmt) hd2
+               ((__3 ()) fmt) hd2;
+               Format.fprintf fmt ")"
             | _ ->
             (Format.fprintf fmt "@[<2>Op {@,";
              ((Format.fprintf fmt "@[%s =@ " "id";
@@ -580,7 +583,9 @@ and pp_vhdl_expr_t :
               (match aexpression with
               | None  -> Format.pp_print_string fmt ""
               | Some x ->
-                  ((__11 ()) fmt) x;);
+                  Format.fprintf fmt "(@[<v>";
+                  ((__11 ()) fmt) x;
+                  Format.fprintf fmt ")@]");
         | Others  -> Format.pp_print_string fmt "others")
     [@ocaml.warning "-A"])
 
@@ -663,7 +668,7 @@ and pp_vhdl_name_t :
                 (List.fold_left
                    (fun sep  ->
                       fun x  ->
-                        if sep then Format.fprintf fmt ";@ ";
+                        if sep then Format.fprintf fmt ",@ ";
                         ((__9 ()) fmt) x;
                         true) false x);
             Format.fprintf fmt "@]")) aassoc_list;
@@ -2669,13 +2674,14 @@ let rec pp_vhdl_parameter_t :
                      if sep then Format.fprintf fmt ", ";
                        ((__0 ()) fmt) x;
                        true) false x))) x.names;
+          Format.fprintf fmt ": ";
           ((fun x  ->
              ignore
                (List.fold_left
                  (fun sep  ->
                    fun x  ->
                      if sep then Format.fprintf fmt "";
-                       Format.fprintf fmt ": %s" x;
+                       Format.fprintf fmt "%s " x;
                        true) false x))) x.mode;
           ((__1 ()) fmt) x.typ;
           (match x.init_val with
@@ -2827,7 +2833,7 @@ let rec pp_vhdl_subprogram_spec_t :
                   (List.fold_left
                      (fun sep  ->
                         fun x  ->
-                          if sep then Format.fprintf fmt ",@ ";
+                          if sep then Format.fprintf fmt ";@ ";
                           ((__1 ()) fmt) x;
                           true) false x))) x.parameters;
             Format.fprintf fmt "@])");
@@ -3124,8 +3130,10 @@ type vhdl_sequential_stmt_t =
   | Wait [@name "WAIT_STATEMENT"]
   | Null of {
   label: vhdl_name_t [@default NoName]} [@name "NULL_STATEMENT"]
-  | Return of {
-  label: vhdl_name_t [@default NoName]} [@name "RETURN_STATEMENT"]
+  | Return of
+  {
+  label: vhdl_name_t option [@default None];
+  expr: vhdl_expr_t option [@default None]} [@name "RETURN_STATEMENT"]
 and vhdl_if_case_t =
   {
   if_cond: vhdl_expr_t ;
@@ -3137,7 +3145,9 @@ and vhdl_case_item_t =
 
 let rec pp_vhdl_sequential_stmt_t :
   Format.formatter -> vhdl_sequential_stmt_t -> Ppx_deriving_runtime.unit =
-  let __22 () = pp_vhdl_name_t
+  let __23 () = pp_vhdl_expr_t
+  
+  and __22 () = pp_vhdl_name_t
   
   and __21 () = pp_vhdl_name_t
   
@@ -3182,7 +3192,7 @@ let rec pp_vhdl_sequential_stmt_t :
   and __1 () = pp_vhdl_name_t
   
   and __0 () = pp_vhdl_name_t
-   in
+  in
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         function
@@ -3224,7 +3234,7 @@ let rec pp_vhdl_sequential_stmt_t :
                  (List.fold_left
                    (fun sep  ->
                      fun x  ->
-                       if sep then Format.fprintf fmt "";
+                       if sep then Format.fprintf fmt ", ";
                         ((__5 ()) fmt) x;
                         true) false x);
             Format.fprintf fmt "@]@]")) arhs;
@@ -3346,13 +3356,17 @@ let rec pp_vhdl_sequential_stmt_t :
                      Format.fprintf fmt ":@ ")
             );
             Format.fprintf fmt "null";
-        | Return { label = alabel } ->
+        | Return { label = alabel; expr = aexpr } ->
             (match alabel with
-              | NoName -> Format.fprintf fmt "";
-              | _ -> (((__19 ()) fmt) alabel;
+              | None -> ();
+              | Some a -> (((__19 ()) fmt) a;
                      Format.fprintf fmt ":@ ")
             );
-            Format.fprintf fmt "return";)
+            Format.fprintf fmt "return";
+            (match aexpr with
+                | None  -> ()
+                | Some a ->
+                     ((__23 ()) fmt) a);)
     [@ocaml.warning "-A"])
 
 and show_vhdl_sequential_stmt_t :
@@ -3638,11 +3652,25 @@ let rec (vhdl_sequential_stmt_t_to_yojson :
             [`String "RETURN_STATEMENT";
             (let fields = []  in
              let fields =
-               if arg0.label = NoName
+               if arg0.expr = None
+               then fields
+               else
+                 ("expr",
+                   (((function
+                      | None  -> `Null
+                      | Some x -> ((fun x  -> vhdl_expr_t_to_yojson x)) x))
+                      arg0.expr))
+                 :: fields
+                in
+             let fields =
+               if arg0.label = None
                then fields
                else
                  ("label",
-                   (((fun x  -> vhdl_name_t_to_yojson x)) arg0.label))
+                   (((function
+                      | None  -> `Null
+                      | Some x -> ((fun x  -> vhdl_name_t_to_yojson x)) x))
+                      arg0.label))
                  :: fields
                 in
              `Assoc fields)])
@@ -3979,15 +4007,32 @@ and (vhdl_sequential_stmt_t_of_yojson :
       | `List ((`String "RETURN_STATEMENT")::arg0::[]) ->
           ((function
             | `Assoc xs ->
-                let rec loop xs (arg0 as _state) =
+                let rec loop xs ((arg0,arg1) as _state) =
                   match xs with
                   | ("label",x)::xs ->
-                      loop xs ((fun x  -> vhdl_name_t_of_yojson x) x)
+                      loop xs
+                        (((function
+                           | `Null -> Result.Ok None
+                           | x ->
+                               ((fun x  -> vhdl_name_t_of_yojson x) x) >>=
+                                 ((fun x  -> Result.Ok (Some x)))) x), arg1)
+                  | ("expr",x)::xs ->
+                      loop xs
+                        (arg0,
+                          ((function
+                            | `Null -> Result.Ok None
+                            | x ->
+                                ((fun x  -> vhdl_expr_t_of_yojson x) x) >>=
+                                  ((fun x  -> Result.Ok (Some x)))) x))
                   | [] ->
-                      arg0 >>=
-                        ((fun arg0  -> Result.Ok (Return { label = arg0 })))
+                      arg1 >>=
+                        ((fun arg1  ->
+                            arg0 >>=
+                              (fun arg0  ->
+                                 Result.Ok
+                                   (Return { label = arg0; expr = arg1 }))))
                   | _::xs -> loop xs _state  in
-                loop xs (Result.Ok NoName)
+                loop xs ((Result.Ok None), (Result.Ok None))
             | _ -> Result.Error "Vhdl_ast.vhdl_sequential_stmt_t")) arg0
       | _ -> Result.Error "Vhdl_ast.vhdl_sequential_stmt_t")
   [@ocaml.warning "-A"])
@@ -4393,22 +4438,32 @@ let rec pp_vhdl_declaration_t :
             Format.fprintf fmt "@[<v 2>component ";
             ((__9 ()) fmt) aname;
             Format.fprintf fmt " is@;";
-            ((fun x  ->
-              ignore
-                (List.fold_left
-                  (fun sep  ->
-                    fun x  ->
-                      if sep then Format.fprintf fmt "@;";
-                        ((__10 ()) fmt) x;
-                        true) false x))) agenerics;
-            ((fun x  ->
-              ignore
-                (List.fold_left
-                  (fun sep  ->
-                    fun x  ->
-                      if sep then Format.fprintf fmt "@;";
-                        ((__11 ()) fmt) x;
-                        true) false x))) aports;
+            (match agenerics with
+            | [] -> ()
+            | _ ->
+                Format.fprintf fmt "generic (@[<v>";
+                ((fun x  ->
+                  ignore
+                    (List.fold_left
+                      (fun sep  ->
+                        fun x  ->
+                          if sep then Format.fprintf fmt ";@;";
+                            ((__10 ()) fmt) x;
+                            true) false x))) agenerics;
+                Format.fprintf fmt "@]);");
+            (match aports with
+            | [] -> ()
+            | _ ->
+                Format.fprintf fmt "port (@[<v>";
+                ((fun x  ->
+                  ignore
+                    (List.fold_left
+                      (fun sep  ->
+                        fun x  ->
+                          if sep then Format.fprintf fmt ";@;";
+                            ((__11 ()) fmt) x;
+                            true) false x))) aports;
+                Format.fprintf fmt "@]);");
             Format.fprintf fmt "@]@;end component";
         | Subprogram
             { spec = aspec; decl_part = adecl_part; stmts = astmts }
@@ -4843,7 +4898,7 @@ let rec pp_vhdl_load_t :
                    (List.fold_left
                       (fun sep  ->
                          fun x  ->
-                           if sep then Format.fprintf fmt ".";
+                           if sep then Format.fprintf fmt ",";
                            ((__0 ()) fmt) x;
                            true) false x))) a0);
         | Use a0 ->
@@ -5047,7 +5102,7 @@ let rec pp_vhdl_signal_condition_t :
                   (List.fold_left
                      (fun sep  ->
                         fun x  ->
-                          if sep then Format.fprintf fmt " else ";
+                          if sep then Format.fprintf fmt ",@,";
                           ((__0 ()) fmt) x;
                           true) false x))) x.expr;
           (match x.cond with
@@ -5764,6 +5819,7 @@ type vhdl_component_instantiation_t =
   {
   name: vhdl_name_t ;
   inst_unit: vhdl_name_t ;
+  inst_unit_type: string [@default ""];
   archi_name: vhdl_name_t option [@default None];
   generic_map: vhdl_assoc_element_t list [@default []];
   port_map: vhdl_assoc_element_t list [@default []]}[@@deriving
@@ -5793,6 +5849,7 @@ let rec pp_vhdl_component_instantiation_t :
           Format.fprintf fmt "@[<v 2>";
           ((__0 ()) fmt) x.name;
           Format.fprintf fmt " : ";
+          Format.fprintf fmt "%s " x.inst_unit_type;
           ((__1 ()) fmt) x.inst_unit;
           ((function
              | None  -> Format.pp_print_string fmt ""
@@ -5803,7 +5860,7 @@ let rec pp_vhdl_component_instantiation_t :
           (match x.generic_map with
           | [] -> Format.fprintf fmt "";
           | _ ->
-            (Format.fprintf fmt "@[<v 2>generic map (";
+            (Format.fprintf fmt " generic map (@[<v 2>";
             ((fun x  ->
             ignore
             (List.fold_left
@@ -5816,7 +5873,7 @@ let rec pp_vhdl_component_instantiation_t :
           (match x.port_map with
           | [] -> Format.fprintf fmt ";";
           | _ ->
-            (Format.fprintf fmt "@[<v 2>port map (";
+            (Format.fprintf fmt " port map (@[<v 2>";
             ((fun x  ->
             ignore
             (List.fold_left
@@ -5873,6 +5930,15 @@ let rec (vhdl_component_instantiation_t_to_yojson :
             :: fields
            in
         let fields =
+          if x.inst_unit_type = ""
+          then fields
+          else
+            ("inst_unit_type",
+              (((fun (x : Ppx_deriving_runtime.string)  -> `String x))
+                 x.inst_unit_type))
+            :: fields
+           in
+        let fields =
           ("inst_unit", ((fun x  -> vhdl_name_t_to_yojson x) x.inst_unit)) ::
           fields  in
         let fields = ("name", ((fun x  -> vhdl_name_t_to_yojson x) x.name))
@@ -5887,27 +5953,36 @@ and (vhdl_component_instantiation_t_of_yojson :
   ((let open! Ppx_deriving_yojson_runtime in
       function
       | `Assoc xs ->
-          let rec loop xs ((arg0,arg1,arg2,arg3,arg4) as _state) =
+          let rec loop xs ((arg0,arg1,arg2,arg3,arg4,arg5) as _state) =
             match xs with
             | ("name",x)::xs ->
                 loop xs
                   (((fun x  -> vhdl_name_t_of_yojson x) x), arg1, arg2, arg3,
-                    arg4)
+                    arg4, arg5)
             | ("inst_unit",x)::xs ->
                 loop xs
                   (arg0, ((fun x  -> vhdl_name_t_of_yojson x) x), arg2, arg3,
-                    arg4)
-            | ("archi_name",x)::xs ->
+                    arg4, arg5)
+            | ("inst_unit_type",x)::xs ->
                 loop xs
                   (arg0, arg1,
+                    ((function
+                      | `String x -> Result.Ok x
+                      | _ ->
+                          Result.Error
+                            "Vhdl_ast.vhdl_component_instantiation_t.inst_unit_type")
+                       x), arg3, arg4, arg5)
+            | ("archi_name",x)::xs ->
+                loop xs
+                  (arg0, arg1, arg2,
                     ((function
                       | `Null -> Result.Ok None
                       | x ->
                           ((fun x  -> vhdl_name_t_of_yojson x) x) >>=
-                            ((fun x  -> Result.Ok (Some x)))) x), arg3, arg4)
+                            ((fun x  -> Result.Ok (Some x)))) x), arg4, arg5)
             | ("generic_map",x)::xs ->
                 loop xs
-                  (arg0, arg1, arg2,
+                  (arg0, arg1, arg2, arg3,
                     ((function
                       | `List xs ->
                           map_bind
@@ -5916,10 +5991,10 @@ and (vhdl_component_instantiation_t_of_yojson :
                       | _ ->
                           Result.Error
                             "Vhdl_ast.vhdl_component_instantiation_t.generic_map")
-                       x), arg4)
+                       x), arg5)
             | ("port_map",x)::xs ->
                 loop xs
-                  (arg0, arg1, arg2, arg3,
+                  (arg0, arg1, arg2, arg3, arg4,
                     ((function
                       | `List xs ->
                           map_bind
@@ -5930,30 +6005,34 @@ and (vhdl_component_instantiation_t_of_yojson :
                             "Vhdl_ast.vhdl_component_instantiation_t.port_map")
                        x))
             | [] ->
-                arg4 >>=
-                  ((fun arg4  ->
-                      arg3 >>=
-                        (fun arg3  ->
-                           arg2 >>=
-                             (fun arg2  ->
-                                arg1 >>=
-                                  (fun arg1  ->
-                                     arg0 >>=
-                                       (fun arg0  ->
-                                          Result.Ok
-                                            {
-                                              name = arg0;
-                                              inst_unit = arg1;
-                                              archi_name = arg2;
-                                              generic_map = arg3;
-                                              port_map = arg4
-                                            }))))))
+                arg5 >>=
+                  ((fun arg5  ->
+                      arg4 >>=
+                        (fun arg4  ->
+                           arg3 >>=
+                             (fun arg3  ->
+                                arg2 >>=
+                                  (fun arg2  ->
+                                     arg1 >>=
+                                       (fun arg1  ->
+                                          arg0 >>=
+                                            (fun arg0  ->
+                                               Result.Ok
+                                                 {
+                                                   name = arg0;
+                                                   inst_unit = arg1;
+                                                   inst_unit_type = arg2;
+                                                   archi_name = arg3;
+                                                   generic_map = arg4;
+                                                   port_map = arg5
+                                                 })))))))
             | _::xs -> loop xs _state  in
           loop xs
             ((Result.Error "Vhdl_ast.vhdl_component_instantiation_t.name"),
               (Result.Error
                  "Vhdl_ast.vhdl_component_instantiation_t.inst_unit"),
-              (Result.Ok None), (Result.Ok []), (Result.Ok []))
+              (Result.Ok ""), (Result.Ok None), (Result.Ok []),
+              (Result.Ok []))
       | _ -> Result.Error "Vhdl_ast.vhdl_component_instantiation_t")
   [@ocaml.warning "-A"])
 
@@ -6455,9 +6534,10 @@ let rec pp_vhdl_architecture_t :
                        Format.fprintf fmt ";";
                        true) false x))) x.declarations;
           Format.fprintf fmt "@;";
+          Format.fprintf fmt "@[<v 2>begin@;";
           (match x.body with
             | [] -> Format.fprintf fmt "";
-            | _ -> Format.fprintf fmt "@[<v 2>begin@;";
+            | _ ->
                ((fun x  ->
                ignore
                  (List.fold_left
@@ -6465,8 +6545,8 @@ let rec pp_vhdl_architecture_t :
                        fun x  ->
                          if sep then Format.fprintf fmt "@;";
                          ((__3 ()) fmt) x;
-                         true) false x))) x.body;
-           Format.fprintf fmt "@;"))
+                         true) false x))) x.body);
+          Format.fprintf fmt "@]@;")
     [@ocaml.warning "-A"])
 
 and show_vhdl_architecture_t :
