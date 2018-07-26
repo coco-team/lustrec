@@ -254,7 +254,7 @@ type vhdl_declarative_item_t =
 type vhdl_signal_condition_t =
   {                            
     expr: vhdl_waveform_element_t list [@default []];              (* when expression *)
-    cond: vhdl_expr_t [@default IsNull];  (* optional else case expression. 
+    cond: vhdl_expr_t option [@default None];  (* optional else case expression. 
                                              If None, could be a latch  *)
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;
@@ -272,7 +272,6 @@ type vhdl_conditional_signal_t =
     label: vhdl_name_t [@default NoName];
     lhs: vhdl_name_t;        (* assigned signal = target*)
     rhs: vhdl_signal_condition_t list;                   (* expression *)
-    cond: vhdl_expr_t [@default IsNull];
     delay: vhdl_expr_t [@default IsNull];
   }
 [@@deriving show { with_path = false }, yojson {strict = false}];;

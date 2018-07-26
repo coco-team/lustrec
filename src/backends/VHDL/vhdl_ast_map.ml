@@ -406,7 +406,7 @@ class virtual vhdl_map =
       vhdl_signal_condition_t -> vhdl_signal_condition_t=
       fun { expr; cond }  ->
         let expr = self#list self#vhdl_waveform_element_t expr  in
-        let cond = self#vhdl_expr_t cond  in { expr; cond }
+        let cond = self#option self#vhdl_expr_t cond  in { expr; cond }
 
     method vhdl_signal_selection_t :
       vhdl_signal_selection_t -> vhdl_signal_selection_t=
@@ -417,15 +417,13 @@ class virtual vhdl_map =
 
     method vhdl_conditional_signal_t :
       vhdl_conditional_signal_t -> vhdl_conditional_signal_t=
-      fun { postponed; label; lhs; rhs; cond; delay }  ->
+      fun { postponed; label; lhs; rhs; delay }  ->
         let postponed = self#bool postponed  in
         let label = self#vhdl_name_t label  in
         let lhs = self#vhdl_name_t lhs  in
         let rhs = self#list self#vhdl_signal_condition_t rhs  in
-        let cond = self#vhdl_expr_t cond  in
         let delay = self#vhdl_expr_t delay  in
-        { postponed; label; lhs; rhs; cond; delay }
-
+        { postponed; label; lhs; rhs; delay }
 
     method vhdl_process_t : vhdl_process_t -> vhdl_process_t=
       fun { id; declarations; active_sigs; body }  ->

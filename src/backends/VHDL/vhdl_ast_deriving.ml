@@ -440,7 +440,7 @@ and pp_vhdl_definition_t :
 and show_vhdl_definition_t : vhdl_definition_t -> Ppx_deriving_runtime.string
   = fun x  -> Format.asprintf "%a" pp_vhdl_definition_t x
 
-(* TODO adapt for Op, Time, Sig, suffixMod *)
+(* TODO adapt for Op (more than 2 operand), Time, Sig, suffixMod *)
 and pp_vhdl_expr_t :
   Format.formatter -> vhdl_expr_t -> Ppx_deriving_runtime.unit =
   let __11 () = pp_vhdl_expr_t
@@ -2650,7 +2650,6 @@ type vhdl_parameter_t =
   typ: vhdl_subtype_indication_t ;
   init_val: vhdl_cst_val_t option [@default None]}
 
-(* TODO *)
 let rec pp_vhdl_parameter_t :
   Format.formatter -> vhdl_parameter_t -> Ppx_deriving_runtime.unit =
   let __2 () = pp_vhdl_cst_val_t
@@ -2662,46 +2661,28 @@ let rec pp_vhdl_parameter_t :
   ((let open! Ppx_deriving_runtime in
       fun fmt  ->
         fun x  ->
-          Format.fprintf fmt "@[<2>{ ";
-          ((((Format.fprintf fmt "@[%s =@ " "names";
-              ((fun x  ->
-                  Format.fprintf fmt "@[<2>[";
-                  ignore
-                    (List.fold_left
-                       (fun sep  ->
-                          fun x  ->
-                            if sep then Format.fprintf fmt ";@ ";
-                            ((__0 ()) fmt) x;
-                            true) false x);
-                  Format.fprintf fmt "@,]@]")) x.names;
-              Format.fprintf fmt "@]");
-             Format.fprintf fmt ";@ ";
-             Format.fprintf fmt "@[%s =@ " "mode";
-             ((fun x  ->
-                 Format.fprintf fmt "@[<2>[";
-                 ignore
-                   (List.fold_left
-                      (fun sep  ->
-                         fun x  ->
-                           if sep then Format.fprintf fmt ";@ ";
-                           (Format.fprintf fmt "%S") x;
-                           true) false x);
-                 Format.fprintf fmt "@,]@]")) x.mode;
-             Format.fprintf fmt "@]");
-            Format.fprintf fmt ";@ ";
-            Format.fprintf fmt "@[%s =@ " "typ";
-            ((__1 ()) fmt) x.typ;
-            Format.fprintf fmt "@]");
-           Format.fprintf fmt ";@ ";
-           Format.fprintf fmt "@[%s =@ " "init_val";
-           ((function
-             | None  -> Format.pp_print_string fmt "None"
-             | Some x ->
-                 (Format.pp_print_string fmt "(Some ";
-                  ((__2 ()) fmt) x;
-                  Format.pp_print_string fmt ")"))) x.init_val;
-           Format.fprintf fmt "@]");
-          Format.fprintf fmt "@ }@]")
+          ((fun x  ->
+             ignore
+               (List.fold_left
+                 (fun sep  ->
+                   fun x  ->
+                     if sep then Format.fprintf fmt ", ";
+                       ((__0 ()) fmt) x;
+                       true) false x))) x.names;
+          ((fun x  ->
+             ignore
+               (List.fold_left
+                 (fun sep  ->
+                   fun x  ->
+                     if sep then Format.fprintf fmt "";
+                       Format.fprintf fmt ": %s" x;
+                       true) false x))) x.mode;
+          ((__1 ()) fmt) x.typ;
+          (match x.init_val with
+           | None  -> Format.pp_print_string fmt ""
+           | Some x ->
+                 (Format.pp_print_string fmt " := ";
+                 ((__2 ()) fmt) x));)
     [@ocaml.warning "-A"])
 
 and show_vhdl_parameter_t : vhdl_parameter_t -> Ppx_deriving_runtime.string =
@@ -2820,7 +2801,6 @@ type vhdl_subprogram_spec_t =
   parameters: vhdl_parameter_t list ;
   isPure: bool [@default false]}
 
-(* TODO *)
 let rec pp_vhdl_subprogram_spec_t :
   Format.formatter -> vhdl_subprogram_spec_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_parameter_t
@@ -2833,9 +2813,9 @@ let rec pp_vhdl_subprogram_spec_t :
           (match x.subprogram_type with
           | "function" -> 
               if (x.isPure) then
-                Format.fprintf fmt "pure %s" x.subprogram_type
+                Format.fprintf fmt "pure %s %s" x.subprogram_type x.name
               else
-                Format.fprintf fmt "impure %s" x.subprogram_type
+                Format.fprintf fmt "impure %s %s" x.subprogram_type x.name
           | "procedure" ->
               Format.fprintf fmt "%s %s" x.subprogram_type x.name);
           (match x.parameters with
@@ -2854,7 +2834,7 @@ let rec pp_vhdl_subprogram_spec_t :
           (match x.typeMark with
           | NoName -> Format.fprintf fmt "";
           | _ -> 
-              Format.fprintf fmt "returns ";
+              Format.fprintf fmt "return ";
               ((__0 ()) fmt) x.typeMark))
    [@ocaml.warning "-A"])
 
@@ -3260,7 +3240,7 @@ let rec pp_vhdl_sequential_stmt_t :
                (List.fold_left
                  (fun sep  ->
                    fun x  ->
-                           if sep then Format.fprintf fmt "@;elseif";
+                           if sep then Format.fprintf fmt "@;elsif";
                                 ((__7 ()) fmt) x;
                                 true
                  ) false x);
@@ -3276,6 +3256,7 @@ let rec pp_vhdl_sequential_stmt_t :
                                 fun x  ->
                                         if sep then Format.fprintf fmt "";
                           ((__8 ()) fmt) x;
+                          Format.fprintf fmt ";";
                           true) false x))) adefault));
             Format.fprintf fmt "@;end if@]"
         | Case { label = alabel; guard = aguard; branches = abranches } ->
@@ -3308,7 +3289,7 @@ let rec pp_vhdl_sequential_stmt_t :
             Format.fprintf fmt "exit";
             (match aloop_label with
                | None  -> Format.pp_print_string fmt ""
-               | Some x -> (Format.fprintf fmt "@ %s@ ") x);
+               | Some x -> (Format.fprintf fmt "@ %s@ ") x);
             ((function
                | None  -> Format.pp_print_string fmt ""
                | Some x ->
@@ -3397,6 +3378,7 @@ and pp_vhdl_if_case_t :
                      fun x  ->
                              if sep then Format.fprintf fmt "@;<0 2>";
                        ((__1 ()) fmt) x;
+                       Format.fprintf fmt ";";
                        true) false x);
           )) x.if_block;)
     [@ocaml.warning "-A"])
@@ -3422,7 +3404,7 @@ and pp_vhdl_case_item_t :
                           if sep then Format.fprintf fmt "@ |@ ";
                           ((__0 ()) fmt) x;
                           true) false x);)) x.when_cond;
-           Format.fprintf fmt " => ";
+           Format.fprintf fmt " => ";
            (fun x  ->
                ignore
                  (List.fold_left
@@ -4384,9 +4366,9 @@ let rec pp_vhdl_declaration_t :
                               if sep then Format.fprintf fmt ",";
                               ((__3 ()) fmt) x;
                               true) false x);)) anames;
-               Format.fprintf fmt " : ";
-               ((__4 ()) fmt) atyp;
-              Format.fprintf fmt ":=";
+              Format.fprintf fmt " : ";
+              ((__4 ()) fmt) atyp;
+              Format.fprintf fmt " := ";
               ((__5 ()) fmt) ainit_val)))
         | SigDecl { names = anames; typ = atyp; init_val = ainit_val } ->
             (Format.fprintf fmt "signal ";
@@ -4863,8 +4845,7 @@ let rec pp_vhdl_load_t :
                          fun x  ->
                            if sep then Format.fprintf fmt ".";
                            ((__0 ()) fmt) x;
-                           true) false x))) a0;
-             Format.fprintf fmt ":")
+                           true) false x))) a0);
         | Use a0 ->
             (Format.fprintf fmt "use ";
              ((fun x  ->
@@ -5048,11 +5029,10 @@ and (vhdl_declarative_item_t_of_yojson :
 
 type vhdl_signal_condition_t =
   {
-  expr: vhdl_waveform_element_t list [@default []];
-  cond: vhdl_expr_t [@default IsNull]}[@@deriving
-                                        ((show { with_path = false }),
-                                          (yojson { strict = false }))]
-
+    expr: vhdl_waveform_element_t list [@default []];
+  cond: vhdl_expr_t option [@default None]}[@@deriving
+                                             ((show { with_path = false }),
+                                               (yojson { strict = false }))]
 let rec pp_vhdl_signal_condition_t :
   Format.formatter -> vhdl_signal_condition_t -> Ppx_deriving_runtime.unit =
   let __1 () = pp_vhdl_expr_t
@@ -5063,17 +5043,17 @@ let rec pp_vhdl_signal_condition_t :
       fun fmt  ->
         fun x  ->
           ((fun x  ->
-              ignore
-                (List.fold_left
-                   (fun sep  ->
-                      fun x  ->
-                        if sep then Format.fprintf fmt ";@ ";
-                        ((__0 ()) fmt) x;
-                        true) false x))) x.expr;
+                ignore
+                  (List.fold_left
+                     (fun sep  ->
+                        fun x  ->
+                          if sep then Format.fprintf fmt " else ";
+                          ((__0 ()) fmt) x;
+                          true) false x))) x.expr;
           (match x.cond with
-          | IsNull -> Format.fprintf fmt "";
-          | _ -> Format.fprintf fmt "when ";
-                 ((__1 ()) fmt) x.cond);)
+          | None -> Format.fprintf fmt "";
+          | Some e -> Format.fprintf fmt " when ";
+                 ((__1 ()) fmt) e);)
     [@ocaml.warning "-A"])
 
 and show_vhdl_signal_condition_t :
@@ -5087,10 +5067,15 @@ let rec (vhdl_signal_condition_t_to_yojson :
       fun x  ->
         let fields = []  in
         let fields =
-          if x.cond = IsNull
+          if x.cond = None
           then fields
-          else ("cond", (((fun x  -> vhdl_expr_t_to_yojson x)) x.cond)) ::
-            fields
+          else
+            ("cond",
+              (((function
+                 | None  -> `Null
+                 | Some x -> ((fun x  -> vhdl_expr_t_to_yojson x)) x)) 
+                 x.cond))
+            :: fields
            in
         let fields =
           if x.expr = []
@@ -5127,14 +5112,20 @@ and (vhdl_signal_condition_t_of_yojson :
                          Result.Error "Vhdl_ast.vhdl_signal_condition_t.expr")
                       x), arg1)
             | ("cond",x)::xs ->
-                loop xs (arg0, ((fun x  -> vhdl_expr_t_of_yojson x) x))
+                loop xs
+                  (arg0,
+                    ((function
+                      | `Null -> Result.Ok None
+                      | x ->
+                          ((fun x  -> vhdl_expr_t_of_yojson x) x) >>=
+                            ((fun x  -> Result.Ok (Some x)))) x))
             | [] ->
                 arg1 >>=
                   ((fun arg1  ->
                       arg0 >>=
                         (fun arg0  -> Result.Ok { expr = arg0; cond = arg1 })))
             | _::xs -> loop xs _state  in
-          loop xs ((Result.Ok []), (Result.Ok IsNull))
+          loop xs ((Result.Ok []), (Result.Ok None))
       | _ -> Result.Error "Vhdl_ast.vhdl_signal_condition_t")
   [@ocaml.warning "-A"])
 
@@ -5253,15 +5244,13 @@ type vhdl_conditional_signal_t =
   label: vhdl_name_t [@default NoName];
   lhs: vhdl_name_t ;
   rhs: vhdl_signal_condition_t list ;
-  cond: vhdl_expr_t [@default IsNull];
-  delay: vhdl_expr_t [@default IsNull]}
-
+  delay: vhdl_expr_t [@default IsNull]}[@@deriving
+                                         ((show { with_path = false }),
+                                           (yojson { strict = false }))]
 let rec pp_vhdl_conditional_signal_t :
   Format.formatter -> vhdl_conditional_signal_t -> Ppx_deriving_runtime.unit
   =
-  let __4 () = pp_vhdl_expr_t
-  
-  and __3 () = pp_vhdl_expr_t
+  let __3 () = pp_vhdl_expr_t
   
   and __2 () = pp_vhdl_signal_condition_t
   
@@ -5282,7 +5271,7 @@ let rec pp_vhdl_conditional_signal_t :
           Format.fprintf fmt " <= ";
           (match x.delay with
             | IsNull -> Format.fprintf fmt "";
-            | _ -> ((__4 ()) fmt) x.delay;
+            | _ -> ((__3 ()) fmt) x.delay;
                    Format.fprintf fmt " ");
           ((fun x  ->
              Format.fprintf fmt "@[";
@@ -5290,16 +5279,11 @@ let rec pp_vhdl_conditional_signal_t :
                (List.fold_left
                  (fun sep  ->
                    fun x  ->
-                     if sep then Format.fprintf fmt "";
+                     if sep then Format.fprintf fmt " else ";
                       ((__2 ()) fmt) x;
-                      Format.fprintf fmt ";";
                       true) false x);
           Format.fprintf fmt "@]")) x.rhs;
-          (match x.cond with
-            | IsNull -> Format.fprintf fmt "";
-            | _ -> Format.fprintf fmt "when (";
-                   ((__3 ()) fmt) x.cond;
-                   Format.fprintf fmt ")"))
+          Format.fprintf fmt ";")
    [@ocaml.warning "-A"])
 
 and show_vhdl_conditional_signal_t :
@@ -5316,12 +5300,6 @@ let rec (vhdl_conditional_signal_t_to_yojson :
           if x.delay = IsNull
           then fields
           else ("delay", (((fun x  -> vhdl_expr_t_to_yojson x)) x.delay)) ::
-            fields
-           in
-        let fields =
-          if x.cond = IsNull
-          then fields
-          else ("cond", (((fun x  -> vhdl_expr_t_to_yojson x)) x.cond)) ::
             fields
            in
         let fields =
@@ -5358,7 +5336,7 @@ and (vhdl_conditional_signal_t_of_yojson :
   ((let open! Ppx_deriving_yojson_runtime in
       function
       | `Assoc xs ->
-          let rec loop xs ((arg0,arg1,arg2,arg3,arg4,arg5) as _state) =
+          let rec loop xs ((arg0,arg1,arg2,arg3,arg4) as _state) =
             match xs with
             | ("postponed",x)::xs ->
                 loop xs
@@ -5367,15 +5345,15 @@ and (vhdl_conditional_signal_t_of_yojson :
                      | _ ->
                          Result.Error
                            "Vhdl_ast.vhdl_conditional_signal_t.postponed") x),
-                    arg1, arg2, arg3, arg4, arg5)
+                    arg1, arg2, arg3, arg4)
             | ("label",x)::xs ->
                 loop xs
                   (arg0, ((fun x  -> vhdl_name_t_of_yojson x) x), arg2, arg3,
-                    arg4, arg5)
+                    arg4)
             | ("lhs",x)::xs ->
                 loop xs
                   (arg0, arg1, ((fun x  -> vhdl_name_t_of_yojson x) x), arg3,
-                    arg4, arg5)
+                    arg4)
             | ("rhs",x)::xs ->
                 loop xs
                   (arg0, arg1, arg2,
@@ -5387,43 +5365,36 @@ and (vhdl_conditional_signal_t_of_yojson :
                       | _ ->
                           Result.Error
                             "Vhdl_ast.vhdl_conditional_signal_t.rhs") x),
-                    arg4, arg5)
-            | ("cond",x)::xs ->
-                loop xs
-                  (arg0, arg1, arg2, arg3,
-                    ((fun x  -> vhdl_expr_t_of_yojson x) x), arg5)
+                    arg4)
             | ("delay",x)::xs ->
                 loop xs
-                  (arg0, arg1, arg2, arg3, arg4,
+                  (arg0, arg1, arg2, arg3,
                     ((fun x  -> vhdl_expr_t_of_yojson x) x))
             | [] ->
-                arg5 >>=
-                  ((fun arg5  ->
-                      arg4 >>=
-                        (fun arg4  ->
-                           arg3 >>=
-                             (fun arg3  ->
-                                arg2 >>=
-                                  (fun arg2  ->
-                                     arg1 >>=
-                                       (fun arg1  ->
-                                          arg0 >>=
-                                            (fun arg0  ->
-                                               Result.Ok
-                                                 {
-                                                   postponed = arg0;
-                                                   label = arg1;
-                                                   lhs = arg2;
-                                                   rhs = arg3;
-                                                   cond = arg4;
-                                                   delay = arg5
-                                                 })))))))
+                arg4 >>=
+                  ((fun arg4  ->
+                      arg3 >>=
+                        (fun arg3  ->
+                           arg2 >>=
+                             (fun arg2  ->
+                                arg1 >>=
+                                  (fun arg1  ->
+                                     arg0 >>=
+                                       (fun arg0  ->
+                                          Result.Ok
+                                            {
+                                              postponed = arg0;
+                                              label = arg1;
+                                              lhs = arg2;
+                                              rhs = arg3;
+                                              delay = arg4
+                                            }))))))
             | _::xs -> loop xs _state  in
           loop xs
             ((Result.Ok false), (Result.Ok NoName),
               (Result.Error "Vhdl_ast.vhdl_conditional_signal_t.lhs"),
               (Result.Error "Vhdl_ast.vhdl_conditional_signal_t.rhs"),
-              (Result.Ok IsNull), (Result.Ok IsNull))
+              (Result.Ok IsNull))
       | _ -> Result.Error "Vhdl_ast.vhdl_conditional_signal_t")
   [@ocaml.warning "-A"])
 
@@ -5488,8 +5459,7 @@ let rec pp_vhdl_process_t :
                          ((__3 ()) fmt) x;
                          Format.fprintf fmt ";";
                          true) false x);)) x.body;
-          Format.fprintf fmt "@]@;end process;@;";
-          Format.fprintf fmt "@]";)
+          Format.fprintf fmt "@]@;end process;@;")
     [@ocaml.warning "-A"])
 
 and show_vhdl_process_t : vhdl_process_t -> Ppx_deriving_runtime.string =
@@ -5652,7 +5622,7 @@ let rec pp_vhdl_selected_signal_t :
                     if sep then Format.fprintf fmt ",@ ";
                       ((__3 ()) fmt) x;
                       true) false x))) x.branches;
-          Format.fprintf fmt "@]";)
+          Format.fprintf fmt ";@]";)
     [@ocaml.warning "-A"])
 
 and show_vhdl_selected_signal_t :
@@ -6496,7 +6466,7 @@ let rec pp_vhdl_architecture_t :
                          if sep then Format.fprintf fmt "@;";
                          ((__3 ()) fmt) x;
                          true) false x))) x.body;
-           Format.fprintf fmt "@]@;end;"))
+           Format.fprintf fmt "@;"))
     [@ocaml.warning "-A"])
 
 and show_vhdl_architecture_t :
@@ -6658,7 +6628,7 @@ let rec pp_vhdl_library_unit_t :
       fun fmt  ->
         function
         | Package a0 ->
-            (Format.fprintf fmt "@[<v 2>package ";
+            (Format.fprintf fmt "@[<v 2>package ";
              ((__0 ()) fmt) a0;
              Format.fprintf fmt "@.end;@]")
         | Entities a0 ->
@@ -6747,6 +6717,7 @@ let rec pp_vhdl_design_unit_t :
                         fun x  ->
                           if sep then Format.fprintf fmt "@.";
                           ((__0 ()) fmt) x;
+                          Format.fprintf fmt ";";
                           true) false x);
                 )) x.contexts;
            Format.fprintf fmt "@.";);
