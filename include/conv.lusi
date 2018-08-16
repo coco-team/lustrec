@@ -1,3 +1,4 @@
+#open <lustrec_math>
 function real_to_int (in1: real) returns (out: int) prototype C;
 function _Floor (in1: real) returns (out: int) prototype C;
 function _floor (in1: real) returns (out: real) prototype C;
