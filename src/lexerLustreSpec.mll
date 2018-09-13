@@ -25,7 +25,6 @@ let keyword_table =
   create_hashtable 20 [
   (* "true", TRUE; *)
   (* "false", FALSE; *)
-  "stateless", STATELESS;
   "if", IF;
   "then", THEN;
   "else", ELSE;
@@ -41,14 +40,12 @@ let keyword_table =
   "returns", RETURNS;
   "var", VAR;
   "imported", IMPORTED;
-  "wcet", WCET;
   "int", TINT;
   "bool", TBOOL;
   (* "float", TFLOAT; *)
   "real", TREAL;
   "clock", TCLOCK;
   "not", NOT;
-  "tail", TAIL;
   "and", AND;
   "or", OR;
   "xor", OR;

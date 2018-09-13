@@ -134,6 +134,22 @@ But also some not-so-nice features (ploc's remarks):
 ** Development
 *** Done
 *** To be done
+**** Court terme
+
+- repartir la branche acsl2018 qui contient la normalisation des eexpr
+  - le refaire compiler
+  - merger avec unstable 
+- transformer cette normalisation pour partager les definitions locales de
+  variables dans le noeud de spec, aka contract
+- retirer le parser Kind21 et revenir à celui de lustrec
+- (CG) etendre la syntaxe pour coller à la definition donnée ci-dessus
+  - lexeur/parseur lustreSpec + document latex de grammaire
+
+**** Apres
+- developper dans les backends
+  - C
+  - EMF
+  - LustreV
 
 * TODO refactoring + doc
 - separate lustre types from machine types in different files
