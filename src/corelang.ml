@@ -165,7 +165,7 @@ let consts_of_enum_type top_decl =
 (*   Eexpr functions *)
 (************************************************************)
 
-let merge_node_annot ann1 ann2 =
+let merge_contracts ann1 ann2 =
   { requires = ann1.requires @ ann2.requires;
     ensures = ann1.ensures @ ann2.ensures;
     behaviors = ann1.behaviors @ ann2.behaviors;

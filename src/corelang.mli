@@ -156,7 +156,7 @@ val copy_prog: top_decl list -> top_decl list
 
 (** Annotation expression related functions *)
 val mkeexpr: Location.t ->  expr -> eexpr
-val merge_node_annot: node_annot -> node_annot -> node_annot 
+val merge_contracts:  contract_desc -> contract_desc -> contract_desc 
 val extend_eexpr: (quantifier_type * var_decl list) list -> eexpr -> eexpr
 val update_expr_annot: ident -> expr -> expr_annot -> expr
 (* val mkpredef_call: Location.t -> ident -> eexpr list -> eexpr*)

@@ -16,7 +16,6 @@ true: use_menhir
 "tools/stateflow/semantics": include
 "tools/stateflow/models": include
 "tools/stateflow/json-parser": include
-"cocospec": include
 
 # svn
 <**/.svn>: -traverse

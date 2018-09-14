@@ -24,7 +24,6 @@ let keyword_table =
   "state", STATE;
   "until", UNTIL;
   "unless", UNLESS;
-  "last", LAST;
   "resume", RESUME;
   "restart", RESTART;
   "if", IF;
@@ -42,7 +41,6 @@ let keyword_table =
   "returns", RETURNS;
   "var", VAR;
   "imported", IMPORTED;
-  "wcet", WCET;
   "type", TYPE;
   "int", TINT;
   "bool", TBOOL;
@@ -50,7 +48,6 @@ let keyword_table =
   "real", TREAL;
   "clock", TCLOCK;
   "not", NOT;
-  "tail", TAIL;
   "true", TRUE;
   "false", FALSE;
   "and", AND;
@@ -71,13 +68,13 @@ let keyword_table =
 (* Buffer for parsing specification/annotation *)
 let buf = Buffer.create 1024
 
-let make_annot lexbuf s = 
+let make_annot lexbuf s =
   try
     let ann = LexerLustreSpec.annot s in
     ANNOT ann
   with LexerLustreSpec.Error loc -> raise (Parse.Error (Location.shift (Location.curr lexbuf) loc, Parse.Annot_error s))
 
-let make_spec lexbuf s = 
+let make_spec lexbuf s =
   try
     let ns = LexerLustreSpec.spec s in
     NODESPEC ns
@@ -85,7 +82,7 @@ let make_spec lexbuf s =
 
 
 let make_kind_spec lexbuf s =
-  try 
+  try
     let s_lexbuf = Lexing.from_string s in
     (*Format.printf "KIND SPEC \"%s\"@." s;*)
     let contract = KindLustreParser.contract_in_block_main KindLustreLexer.token s_lexbuf in
@@ -98,7 +95,6 @@ let make_kind_spec lexbuf s =
   with exn -> ((*Printexc.print_backtrace stderr; *) raise exn)
 
 (*let make_spec = make_kind_spec*)
-}
 
 let newline = ('\010' | '\013' | "\013\010")
 let notnewline = [^ '\010' '\013']
@@ -107,11 +103,11 @@ let blank = [' ' '\009' '\012']
 rule token = parse
 | "--@" { Buffer.clear buf;
 	  spec_singleline lexbuf }
-| "(*@" { Buffer.clear buf; 
+| "(*@" { Buffer.clear buf;
 	  spec_multiline 0 lexbuf }
-| "--!" { Buffer.clear buf; 
+| "--!" { Buffer.clear buf;
 	  annot_singleline lexbuf }
-| "(*!" { Buffer.clear buf; 
+| "(*!" { Buffer.clear buf;
 	  annot_multiline 0 lexbuf }
 | "(*"
     { comment 0 lexbuf }
@@ -127,7 +123,7 @@ rule token = parse
     {REAL (Num.num_of_string (l^r), String.length r + -1 * int_of_string exp , s)}
 | ((['0'-'9']+ as l) '.' (['0'-'9']* as r)) as s
     {REAL (Num.num_of_string (l^r), String.length r, s)}
-| ['0'-'9']+ 
+| ['0'-'9']+
     {INT (int_of_string (Lexing.lexeme lexbuf)) }
 | "tel." {TEL}
 | "tel;" {TEL}
@@ -195,10 +191,10 @@ and annot_singleline = parse
 
 and annot_multiline n = parse
   | eof { raise (Parse.Error (Location.curr lexbuf, Parse.Unfinished_annot)) }
-  | "*)" as s { 
-    if n > 0 then 
-      (Buffer.add_string buf s; annot_multiline (n-1) lexbuf) 
-    else 
+  | "*)" as s {
+    if n > 0 then
+      (Buffer.add_string buf s; annot_multiline (n-1) lexbuf)
+    else
       make_annot lexbuf (Buffer.contents buf) }
   | "(*" as s { Buffer.add_string buf s; annot_multiline (n+1) lexbuf }
   | newline as s { incr_line lexbuf; Buffer.add_string buf s; annot_multiline n lexbuf }
@@ -211,11 +207,10 @@ and spec_singleline = parse
 
 and spec_multiline n = parse
   | eof { raise (Parse.Error (Location.curr lexbuf, Parse.Unfinished_node_spec)) }
-  | "*)" as s { if n > 0 then 
-      (Buffer.add_string buf s; spec_multiline (n-1) lexbuf) 
-    else 
+  | "*)" as s { if n > 0 then
+      (Buffer.add_string buf s; spec_multiline (n-1) lexbuf)
+    else
       make_spec lexbuf (Buffer.contents buf) }
   | "(*" as s { Buffer.add_string buf s; spec_multiline (n+1) lexbuf }
   | newline as s { incr_line lexbuf; Buffer.add_string buf s; spec_multiline n lexbuf }
   | _ as c { Buffer.add_char buf c; spec_multiline n lexbuf }
-

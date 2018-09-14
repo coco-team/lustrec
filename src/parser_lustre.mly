@@ -56,22 +56,20 @@ let rec fby expr n init =
 %token <Num.num * int * string> REAL
 
 %token <string> STRING
-%token AUTOMATON STATE UNTIL UNLESS RESTART RESUME LAST
-%token STATELESS ASSERT OPEN QUOTE FUNCTION
+%token AUTOMATON STATE UNTIL UNLESS RESTART RESUME 
+%token ASSERT OPEN QUOTE FUNCTION
 %token <string> IDENT
 %token <string> UIDENT
 %token TRUE FALSE
 %token <Lustre_types.expr_annot> ANNOT
-%token <Lustre_types.node_annot> NODESPEC
+%token <Lustre_types.contract_desc> NODESPEC
 %token LBRACKET RBRACKET LCUR RCUR LPAR RPAR SCOL COL COMMA COLCOL 
 %token AMPERAMPER BARBAR NOT POWER
 %token IF THEN ELSE
-%token UCLOCK DCLOCK PHCLOCK TAIL
 %token MERGE FBY WHEN WHENNOT EVERY
-%token NODE LET TEL RETURNS VAR IMPORTED SENSOR ACTUATOR WCET TYPE CONST
+%token NODE LET TEL RETURNS VAR IMPORTED TYPE CONST
 %token STRUCT ENUM
 %token TINT TREAL TBOOL TCLOCK
-%token RATE DUE
 %token EQ LT GT LTE GTE NEQ
 %token AND OR XOR IMPL
 %token MULT DIV MOD
@@ -89,7 +87,7 @@ let rec fby expr n init =
 %left MERGE IF
 %nonassoc ELSE
 %right ARROW FBY
-%left WHEN WHENNOT UCLOCK DCLOCK PHCLOCK
+%left WHEN WHENNOT 
 %right COLCOL
 %right IMPL
 %left OR XOR BARBAR
@@ -115,7 +113,7 @@ let rec fby expr n init =
 %type <Lustre_types.expr_annot> lustre_annot
 
 %start lustre_spec
-%type <Lustre_types.node_annot> lustre_spec
+%type <Lustre_types.contract_desc> lustre_spec
 
 %start signed_const
 %type <Lustre_types.constant> signed_const
@@ -250,7 +248,7 @@ nodespec_list:
 | NODESPEC nodespec_list { 
   (function 
   | None    -> (fun s1 -> Some s1) 
-  | Some s2 -> (fun s1 -> Some (merge_node_annot s1 s2))) $2 $1 }
+  | Some s2 -> (fun s1 -> Some (merge_contracts s1 s2))) $2 $1 }
 
 typ_def_list:
     /* empty */             { (fun itf -> []) }
