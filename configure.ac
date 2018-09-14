@@ -3,6 +3,11 @@ define([gitbranch], esyscmd([sh -c "git branch | grep \* | cut -d ' ' -f2"]))
 AC_INIT([lustrec], 1.5-gitversion, [ploc@garoche.net])
 AC_SUBST(VERSION_CODENAME, "Xia/Shao Kang-dev")
 AC_SUBST(GITBRANCH, gitbranch)
+if test x"$GITBRANCH" != "xmaster"; then
+  AC_SUBST(CDASHSUBPROJ, "unstable")
+else
+  AC_SUBST(CDASHSUBPROJ, "master")
+fi
 # Next release will be
 #AC_INIT([lustrec], [1.6], [ploc@garoche.net])
 #AC_SUBST(VERSION_CODENAME, "Xia/Zhu")
