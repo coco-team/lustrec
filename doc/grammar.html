@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Grammar</title>
+    <style>
+      .specification td, th{
+          vertical-align: baseline;
+          padding: 0;
+          margin: 0;
+          font-weight: normal;
+      }
+      .specification td {
+          text-align: left;
+      }
+      .specification th {
+          text-align: right;
+          white-space: nowrap;
+      }
+      .specification th::after {
+          content: "\a0::=\a0";
+      }
+      .specification th.bar {
+          text-align: right;
+      }
+      .specification th.bar::after {
+          content: "|\a0";
+      }
+      .rule th, td {
+          padding-top: .5em;
+      }
+      .nonterminal::before {
+          content: "<";
+      }
+      .nonterminal::after {
+          content: ">";
+      }
+      .list::after {
+          content: "*";
+          vertical-align: super;
+          font-size: smaller;
+      }
+      .ne_list::after {
+          content: "+";
+          vertical-align: super;
+          font-size: smaller;
+      }
+      .option::before {
+          content: "[";
+      }
+      .option::after {
+          content: "]";
+      }
+    </style>
+  </head>
+  
+  <body>
+    
+    <table class="specification">
+      
+      <tr class="rule">
+        <th><span class="nonterminal">module_ident</span></th>
+        <td>UIDENT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>IDENT</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">tag_ident</span></th>
+        <td>UIDENT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>TRUE</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>FALSE</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">node_ident</span></th>
+        <td>UIDENT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>IDENT</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">node_ident_decl</span></th>
+        <td><span class="nonterminal">node_ident</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">vdecl_ident</span></th>
+        <td>UIDENT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>IDENT</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">const_ident</span></th>
+        <td>UIDENT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>IDENT</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">type_ident</span></th>
+        <td>IDENT</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">prog</span></th>
+        <td><span class="list"><span class="nonterminal">open_lusi</span></span>
+        <span class="nonterminal">typ_def_prog</span>
+        <span class="list"><span class="nonterminal">top_decl</span></span>
+        EOF</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">typ_def_prog</span></th>
+        <td><span class="list"><span class="nonterminal">typ_def</span>
+        SCOL</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">header</span></th>
+        <td><span class="list"><span class="nonterminal">open_lusi</span></span>
+        <span class="nonterminal">typ_def_header</span>
+        <span class="list"><span class="nonterminal">top_decl_header</span></span>
+        EOF</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">typ_def_header</span></th>
+        <td><span class="list"><span class="nonterminal">typ_def</span>
+        SCOL</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">open_lusi</span></th>
+        <td>OPEN
+        QUOTE
+        <span class="nonterminal">module_ident</span>
+        QUOTE</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>OPEN
+        LT
+        <span class="nonterminal">module_ident</span>
+        GT</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">state_annot</span></th>
+        <td>FUNCTION</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>NODE</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">top_decl_header</span></th>
+        <td>CONST
+        <span class="nonterminal">cdecl_list</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="list">NODESPEC</span>
+        <span class="nonterminal">state_annot</span>
+        <span class="nonterminal">node_ident</span>
+        LPAR
+        <span class="nonterminal">vdecl</span><sup>+</sup><sub>SCOL</sub>
+        <span class="option">SCOL</span>
+        RPAR
+        RETURNS
+        LPAR
+        <span class="nonterminal">vdecl</span><sup>+</sup><sub>SCOL</sub>
+        <span class="option">SCOL</span>
+        RPAR
+        <span class="option">PROTOTYPE
+        <span class="nonterminal">node_ident</span></span>
+        <span class="list">LIB
+        <span class="nonterminal">module_ident</span></span>
+        SCOL</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">top_decl</span></th>
+        <td>CONST
+        <span class="nonterminal">cdecl_list</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="list">NODESPEC</span>
+        <span class="nonterminal">state_annot</span>
+        <span class="nonterminal">node_ident_decl</span>
+        LPAR
+        <span class="nonterminal">vdecl</span><sup>+</sup><sub>SCOL</sub>
+        <span class="option">SCOL</span>
+        RPAR
+        RETURNS
+        LPAR
+        <span class="nonterminal">vdecl</span><sup>+</sup><sub>SCOL</sub>
+        <span class="option">SCOL</span>
+        RPAR
+        <span class="option">SCOL</span>
+        <span class="option">VAR
+        <span class="nonterminal">local_vdecl_list</span>
+        SCOL</span>
+        LET
+        <span class="nonterminal">stmt_list</span>
+        TEL</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">typ_def</span></th>
+        <td>TYPE
+        <span class="nonterminal">type_ident</span>
+        EQ
+        <span class="nonterminal">typ_def_rhs</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">typ_def_rhs</span></th>
+        <td><span class="nonterminal">typeconst</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>ENUM
+        LCUR
+        UIDENT<sup>+</sup><sub>COMMA</sub>
+        RCUR</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>STRUCT
+        LCUR
+        <span class="list">IDENT
+        COL
+        <span class="nonterminal">typeconst</span>
+        SCOL</span>
+        RCUR</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">typeconst</span></th>
+        <td>TINT
+        <span class="list">POWER
+        <span class="nonterminal">dim</span></span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>TBOOL
+        <span class="list">POWER
+        <span class="nonterminal">dim</span></span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>TREAL
+        <span class="list">POWER
+        <span class="nonterminal">dim</span></span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">type_ident</span>
+        <span class="list">POWER
+        <span class="nonterminal">dim</span></span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>TBOOL
+        TCLOCK</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>IDENT
+        TCLOCK</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">stmt_list</span></th>
+        <td>epsilon
+        </td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">eq</span>
+        <span class="nonterminal">stmt_list</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">assert_</span>
+        <span class="nonterminal">stmt_list</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>ANNOT
+        <span class="nonterminal">stmt_list</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">automaton</span>
+        <span class="nonterminal">stmt_list</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">automaton</span></th>
+        <td>AUTOMATON
+        <span class="nonterminal">type_ident</span>
+        <span class="list"><span class="nonterminal">handler</span></span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">handler</span></th>
+        <td>STATE
+        UIDENT
+        COL
+        <span class="list"><span class="nonterminal">unless</span></span>
+        <span class="option">VAR
+        <span class="nonterminal">local_vdecl_list</span>
+        SCOL</span>
+        LET
+        <span class="nonterminal">stmt_list</span>
+        TEL
+        <span class="list"><span class="nonterminal">until</span></span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">unless</span></th>
+        <td>UNLESS
+        <span class="nonterminal">expr</span>
+        RESTART
+        UIDENT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>UNLESS
+        <span class="nonterminal">expr</span>
+        RESUME
+        UIDENT</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">until</span></th>
+        <td>UNTIL
+        <span class="nonterminal">expr</span>
+        RESTART
+        UIDENT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>UNTIL
+        <span class="nonterminal">expr</span>
+        RESUME
+        UIDENT</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">assert_</span></th>
+        <td>ASSERT
+        <span class="nonterminal">expr</span>
+        SCOL</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">eq</span></th>
+        <td><span class="nonterminal">vdecl_ident</span><sup>+</sup><sub>COMMA</sub>
+        EQ
+        <span class="nonterminal">expr</span>
+        SCOL</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>LPAR
+        <span class="nonterminal">vdecl_ident</span><sup>+</sup><sub>COMMA</sub>
+        RPAR
+        EQ
+        <span class="nonterminal">expr</span>
+        SCOL</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">lustre_spec</span></th>
+        <td><span class="nonterminal">contract</span>
+        EOF</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">contract</span></th>
+        <td><span class="list">REQUIRES
+        <span class="nonterminal">qexpr</span>
+        SCOL</span>
+        <span class="nonterminal">ensures</span>
+        <span class="list">BEHAVIOR
+        IDENT
+        COL
+        <span class="nonterminal">assumes</span>
+        <span class="nonterminal">ensures</span></span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">ensures</span></th>
+        <td>epsilon
+        </td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>ENSURES
+        <span class="nonterminal">qexpr</span>
+        SCOL
+        <span class="nonterminal">ensures</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>OBSERVER
+        <span class="nonterminal">node_ident</span>
+        LPAR
+        <span class="nonterminal">tuple_expr</span>
+        RPAR
+        SCOL
+        <span class="nonterminal">ensures</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">tuple_qexpr</span></th>
+        <td><span class="nonterminal">qexpr</span>
+        COMMA
+        <span class="nonterminal">qexpr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">tuple_qexpr</span>
+        COMMA
+        <span class="nonterminal">qexpr</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">qexpr</span></th>
+        <td><span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>EXISTS
+        <span class="nonterminal">vdecl</span>
+        SCOL
+        <span class="nonterminal">qexpr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>FORALL
+        <span class="nonterminal">vdecl</span>
+        SCOL
+        <span class="nonterminal">qexpr</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">tuple_expr</span></th>
+        <td><span class="nonterminal">expr</span>
+        COMMA
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">tuple_expr</span>
+        COMMA
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">expr</span></th>
+        <td>INT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>REAL</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>STRING</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>IDENT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">tag_ident</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>LPAR
+        ANNOT
+        <span class="nonterminal">expr</span>
+        RPAR</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>LPAR
+        <span class="nonterminal">expr</span>
+        RPAR</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>LPAR
+        <span class="nonterminal">tuple_expr</span>
+        RPAR</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>LBRACKET
+        <span class="nonterminal">expr</span><sup>+</sup><sub>COMMA</sub>
+        RBRACKET</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        POWER
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        LBRACKET
+        <span class="nonterminal">dim</span>
+        RBRACKET<sup>+</sup><sub>LBRACKET</sub></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>PRE
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        ARROW
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        FBY
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        WHEN
+        <span class="nonterminal">vdecl_ident</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        WHENNOT
+        <span class="nonterminal">vdecl_ident</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        WHEN
+        <span class="nonterminal">tag_ident</span>
+        LPAR
+        <span class="nonterminal">vdecl_ident</span>
+        RPAR</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>MERGE
+        <span class="nonterminal">vdecl_ident</span>
+        <span class="list"><span class="nonterminal">handler_expr</span></span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">node_ident</span>
+        LPAR
+        <span class="nonterminal">expr</span>
+        RPAR</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">node_ident</span>
+        LPAR
+        <span class="nonterminal">expr</span>
+        RPAR
+        EVERY
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">node_ident</span>
+        LPAR
+        <span class="nonterminal">tuple_expr</span>
+        RPAR</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">node_ident</span>
+        LPAR
+        <span class="nonterminal">tuple_expr</span>
+        RPAR
+        EVERY
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        AND
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        AMPERAMPER
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        OR
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        BARBAR
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        XOR
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>NOT
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        IMPL
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        EQ
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        LT
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        LTE
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        GT
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        GTE
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        NEQ
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        PLUS
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        MINUS
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        MULT
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        DIV
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>MINUS
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">expr</span>
+        MOD
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>IF
+        <span class="nonterminal">expr</span>
+        THEN
+        <span class="nonterminal">expr</span>
+        ELSE
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">handler_expr</span></th>
+        <td>LPAR
+        <span class="nonterminal">tag_ident</span>
+        ARROW
+        <span class="nonterminal">expr</span>
+        RPAR</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">signed_const</span></th>
+        <td>INT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>REAL</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">tag_ident</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>MINUS
+        INT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>MINUS
+        REAL</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>LCUR
+        IDENT
+        EQ
+        <span class="nonterminal">signed_const</span><sup>+</sup><sub>COMMA</sub>
+        RCUR</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>LBRACKET
+        <span class="nonterminal">signed_const</span><sup>+</sup><sub>COMMA</sub>
+        RBRACKET</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">dim</span></th>
+        <td>INT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>LPAR
+        <span class="nonterminal">dim</span>
+        RPAR</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>UIDENT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>IDENT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        AND
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        AMPERAMPER
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        OR
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        BARBAR
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        XOR
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>NOT
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        IMPL
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        EQ
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        LT
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        LTE
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        GT
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        GTE
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        NEQ
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        PLUS
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        MINUS
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        MULT
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        DIV
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>MINUS
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">dim</span>
+        MOD
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>IF
+        <span class="nonterminal">dim</span>
+        THEN
+        <span class="nonterminal">dim</span>
+        ELSE
+        <span class="nonterminal">dim</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">vdecl</span></th>
+        <td><span class="nonterminal">vdecl_ident</span><sup>+</sup><sub>COMMA</sub>
+        COL
+        <span class="nonterminal">typeconst</span>
+        <span class="nonterminal">when_cond</span><sup>*</sup><sub>epsilon
+        </sub></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>CONST
+        <span class="nonterminal">vdecl_ident</span><sup>+</sup><sub>COMMA</sub></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>CONST
+        <span class="nonterminal">vdecl_ident</span><sup>+</sup><sub>COMMA</sub>
+        COL
+        <span class="nonterminal">typeconst</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">local_vdecl</span></th>
+        <td><span class="nonterminal">vdecl_ident</span><sup>+</sup><sub>COMMA</sub></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">vdecl_ident</span><sup>+</sup><sub>COMMA</sub>
+        COL
+        <span class="nonterminal">typeconst</span>
+        <span class="nonterminal">when_cond</span><sup>*</sup><sub>epsilon
+        </sub></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>CONST
+        <span class="nonterminal">vdecl_ident</span>
+        EQ
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>CONST
+        <span class="nonterminal">vdecl_ident</span>
+        COL
+        <span class="nonterminal">typeconst</span>
+        EQ
+        <span class="nonterminal">expr</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">cdecl_list</span></th>
+        <td><span class="nonterminal">cdecl</span>
+        SCOL</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td><span class="nonterminal">cdecl</span>
+        <span class="nonterminal">cdecl_list</span>
+        SCOL</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">cdecl</span></th>
+        <td><span class="nonterminal">const_ident</span>
+        EQ
+        <span class="nonterminal">signed_const</span></td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">when_cond</span></th>
+        <td>WHEN
+        IDENT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>WHENNOT
+        IDENT</td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>WHEN
+        <span class="nonterminal">tag_ident</span>
+        LPAR
+        IDENT
+        RPAR</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">lustre_annot</span></th>
+        <td><span class="nonterminal">lustre_annot_list</span>
+        EOF</td>
+      </tr>
+      
+      <tr class="rule">
+        <th><span class="nonterminal">lustre_annot_list</span></th>
+        <td>epsilon
+        </td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>DIV<sup>+</sup><sub>IDENT</sub>
+        COL
+        <span class="nonterminal">qexpr</span>
+        SCOL
+        <span class="nonterminal">lustre_annot_list</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>IDENT
+        COL
+        <span class="nonterminal">qexpr</span>
+        SCOL
+        <span class="nonterminal">lustre_annot_list</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>INVARIANT
+        COL
+        <span class="nonterminal">qexpr</span>
+        SCOL
+        <span class="nonterminal">lustre_annot_list</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>OBSERVER
+        COL
+        <span class="nonterminal">qexpr</span>
+        SCOL
+        <span class="nonterminal">lustre_annot_list</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>CCODE
+        COL
+        <span class="nonterminal">qexpr</span>
+        SCOL
+        <span class="nonterminal">lustre_annot_list</span></td>
+      </tr>
+      <tr>
+        <th class="bar"></th>
+        <td>MATLAB
+        COL
+        <span class="nonterminal">qexpr</span>
+        SCOL
+        <span class="nonterminal">lustre_annot_list</span></td>
+      </tr>
+      
+      
+    </table>
+    
+  </body>
+  
+</html>
