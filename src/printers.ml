@@ -274,6 +274,18 @@ let pp_typedec fmt ty =
 (*   ) *)
 
 
+
+let pp_quantifiers fmt (q, vars) =
+  match q with
+    | Forall -> fprintf fmt "forall %a" (fprintf_list ~sep:"; " pp_var) vars 
+    | Exists -> fprintf fmt "exists %a" (fprintf_list ~sep:"; " pp_var) vars 
+
+let pp_eexpr fmt e =
+  fprintf fmt "%a%t %a"
+    (Utils.fprintf_list ~sep:"; " pp_quantifiers) e.eexpr_quantifiers
+    (fun fmt -> match e.eexpr_quantifiers with [] -> () | _ -> fprintf fmt ";")
+    pp_expr e.eexpr_qfexpr
+
 let pp_spec fmt spec =
   fprintf fmt "@[<hov 2>(*@@ ";
   fprintf_list ~sep:"@,@@ " (fun fmt r -> fprintf fmt "requires %a;" pp_eexpr r) fmt spec.requires;

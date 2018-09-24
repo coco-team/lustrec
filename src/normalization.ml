@@ -369,15 +369,116 @@ let rec normalize_eq node defvars eq =
     let norm_eq = { eq with eq_rhs = norm_rhs } in
     norm_eq::defs', vars'
 
-(** normalize_node node returns a normalized node,
-    ie.
+let normalize_eq_split node defvars eq =
+  
+  let defs, vars = normalize_eq node defvars eq in
+  List.fold_right (fun eq (def, vars) -> 
+    let eq_defs = Splitting.tuple_split_eq eq in
+    if eq_defs = [eq] then
+      eq::def, vars 
+    else
+      List.fold_left (normalize_eq node) (def, vars) eq_defs
+  ) defs ([], vars)  
+
+let normalize_eexpr decls node vars ee =
+  (* New output variable *)
+  let output_id = "spec" ^ string_of_int ee.eexpr_tag in
+  let output_var = 
+    mkvar_decl 
+      ee.eexpr_loc 
+      (output_id, 
+       mktyp ee.eexpr_loc Tydec_any, (*TODO: Make it bool when it is spec *)
+       mkclock ee.eexpr_loc Ckdec_any, 
+       false (* not a constant *),
+       None,
+       None
+      ) 
+  in
+  let quant_vars = List.flatten (List.map snd ee.eexpr_quantifiers) in
+  (* Calls are first inlined *)
+  let nodes = get_nodes decls in
+  let calls = ISet.elements (get_expr_calls nodes ee.eexpr_qfexpr) in
+(* TODO remettre egalement, i ly a un probleme de decapsulage de nodes
+   let calls = List.map 
+    (fun called_nd -> List.find (fun nd2 -> nd2.node_id = called_nd) nodes) calls 
+  in
+*)
+  (*Format.eprintf "eexpr %a@.calls: %a@.@?" Printers.pp_eexpr ee (Utils.fprintf_list ~sep:", " (fun fmt nd -> pp_print_string fmt nd.node_id)) calls;  *)
+  let eq = mkeq ee.eexpr_loc ([output_id], ee.eexpr_qfexpr) in
+  let locals = node.node_locals @ (List.fold_left (fun accu (_, q) -> q@accu) [] ee.eexpr_quantifiers) in  
+  let (new_locals, eqs) =
+    if calls = [] && not (eq_has_arrows eq) then
+      (locals, [eq])     
+    else ( (* TODO remettre le code. Je l'ai enleve pour des dependances cycliques *)
+(*      let new_locals, eqs, asserts = Inliner.inline_eq ~arrows:true eq locals calls in
+      (*Format.eprintf "eqs %a@.@?" 
+	(Utils.fprintf_list ~sep:", " Printers.pp_node_eq) eqs;  *)
+      (new_locals, eqs)
+*)
+           (locals, [eq])     
+ 
+    ) in
+  (* Normalizing expr and eqs *)
+  let defs, vars = List.fold_left (normalize_eq_split node) ([], new_locals) eqs in
+  let todefine = List.fold_left
+    (fun m x-> if List.exists (fun y-> x.var_id = y.var_id) (locals) then m else ISet.add x.var_id m)
+    (ISet.add output_id ISet.empty) vars in
+  try
+    let env = Typing.type_var_decl_list quant_vars Basic_library.type_env quant_vars in
+    let env = Typing.type_var_decl [] env output_var in (* typing the variable *)
+    (* Format.eprintf "typing var %s: %a@." output_id Types.print_ty output_var.var_type; *)
+    let env = Typing.type_var_decl_list (vars@node.node_outputs@node.node_inputs) env (vars@node.node_outputs@node.node_inputs) in
+    (*Format.eprintf "Env: %a@.@?" (Env.pp_env Types.print_ty) env;*)
+    let undefined_vars = List.fold_left (Typing.type_eq (env, quant_vars@vars) false) todefine defs in
+  (* check that table is empty *)
+    if (not (ISet.is_empty undefined_vars)) then
+      raise (Types.Error (ee.eexpr_loc, Types.Undefined_var undefined_vars));
+    
+    (*Format.eprintf "normalized eqs %a@.@?" 
+      (Utils.fprintf_list ~sep:", " Printers.pp_node_eq) defs;  *)
+    ee.eexpr_normalized <- Some (output_var, defs, vars)
+  with (Types.Error (loc,err)) as exc ->
+    eprintf "Typing error for eexpr %a: %a%a%a@."
+      Printers.pp_eexpr ee
+      Types.pp_error err
+      (Utils.fprintf_list ~sep:", " Printers.pp_node_eq) defs
+      Location.pp_loc loc
+      
+;
+    raise exc
+
+let normalize_spec decls node vars s =
+  let nee = normalize_eexpr decls node vars in
+  List.iter nee s.requires;
+  List.iter nee s.ensures;
+  List.iter (fun (_, assumes, ensures, _) -> 
+      List.iter nee assumes;
+    List.iter nee ensures
+  ) s.behaviors
+  
+    
+(* The normalization phase introduces new local variables
+   - output cannot be memories. If this happen, new local variables acting as
+   memories are introduced. 
+   - array constants, pre, arrow, fby, ite, merge, calls to node with index
+   access
+   Thoses values are shared, ie. no duplicate expressions are introduced.
+
+   Concerning specification, a similar process is applied, replacing an
+   expression by a list of local variables and definitions
+*)
+
+(** normalize_node node returns a normalized node, 
+    ie. 
     - updated locals
     - new equations
     -
 *)
-let normalize_node node =
+let normalize_node decls node =
   reset_cpt_fresh ();
   let inputs_outputs = node.node_inputs@node.node_outputs in
+  let is_local v =
+    List.for_all ((<>) v) inputs_outputs in
   let orig_vars = inputs_outputs@node.node_locals in
   let not_is_orig_var v =
     List.for_all ((!=) v) orig_vars in
@@ -465,6 +566,21 @@ let normalize_node node =
 	annots
     ) new_annots new_locals
   in
+  if !Options.spec <> "no" then 
+    begin
+      (* Update mutable fields of eexpr to perform normalization of specification/annotations *)
+      List.iter 
+	(fun a -> 
+	  List.iter 
+	    (fun (_, ann) -> normalize_eexpr decls node inputs_outputs ann) 
+	    a.annots
+	)
+	node.node_annot;
+      match node.node_spec with None -> () | Some s -> normalize_spec decls node [] s 
+    end;
+  
+ 
+ let new_locals = List.filter is_local vars in (* TODO a quoi ca sert ? *)
   let node =
     { node with
       node_locals = all_locals;
@@ -477,15 +593,15 @@ let normalize_node node =
   )
 
 
-let normalize_decl decl =
+let normalize_decl (decls: program) (decl: top_decl) : top_decl =
   match decl.top_decl_desc with
   | Node nd ->
-    let decl' = {decl with top_decl_desc = Node (normalize_node nd)} in
+    let decl' = {decl with top_decl_desc = Node (normalize_node decls nd)} in
     Hashtbl.replace Corelang.node_table nd.node_id decl';
     decl'
   | Open _ | ImportedNode _ | Const _ | TypeDef _ -> decl
 
-let normalize_prog ?(backend="C") decls =
+let normalize_prog ?(backend="C") decls : program =
   let old_unfold_arrow_active = !unfold_arrow_active in
   let old_force_alias_ite = !force_alias_ite in
   let old_force_alias_internal_fun = !force_alias_internal_fun in
@@ -505,7 +621,7 @@ let normalize_prog ?(backend="C") decls =
   in
 
   (* Main algorithm: iterates over nodes *)
-  let res = List.map normalize_decl decls in
+  let res = List.map (normalize_decl decls) decls in
   
   (* Restoring previous settings *)
   unfold_arrow_active := old_unfold_arrow_active;
