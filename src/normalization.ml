@@ -370,8 +370,8 @@ let rec normalize_eq node defvars eq =
     norm_eq::defs', vars'
 
 let normalize_eq_split node defvars eq =
-  
-  let defs, vars = normalize_eq node defvars eq in
+  try
+    let defs, vars = normalize_eq node defvars eq in
   List.fold_right (fun eq (def, vars) -> 
     let eq_defs = Splitting.tuple_split_eq eq in
     if eq_defs = [eq] then
@@ -379,6 +379,11 @@ let normalize_eq_split node defvars eq =
     else
       List.fold_left (normalize_eq node) (def, vars) eq_defs
   ) defs ([], vars)  
+
+  with _ -> (
+    Format.eprintf "Issue normalizing eq split: %a@." Printers.pp_node_eq eq;
+    assert false
+  )
 
 let normalize_eexpr decls node vars ee =
   (* New output variable *)
@@ -394,6 +399,7 @@ let normalize_eexpr decls node vars ee =
        None
       ) 
   in
+  
   let quant_vars = List.flatten (List.map snd ee.eexpr_quantifiers) in
   (* Calls are first inlined *)
   let nodes = get_nodes decls in
@@ -419,10 +425,11 @@ let normalize_eexpr decls node vars ee =
  
     ) in
   (* Normalizing expr and eqs *)
-  let defs, vars = List.fold_left (normalize_eq_split node) ([], new_locals) eqs in
-  let todefine = List.fold_left
+    let defs, vars = List.fold_left (normalize_eq_split node) ([], new_locals) eqs in
+    let todefine = List.fold_left
     (fun m x-> if List.exists (fun y-> x.var_id = y.var_id) (locals) then m else ISet.add x.var_id m)
     (ISet.add output_id ISet.empty) vars in
+  
   try
     let env = Typing.type_var_decl_list quant_vars Basic_library.type_env quant_vars in
     let env = Typing.type_var_decl [] env output_var in (* typing the variable *)
@@ -437,16 +444,20 @@ let normalize_eexpr decls node vars ee =
     (*Format.eprintf "normalized eqs %a@.@?" 
       (Utils.fprintf_list ~sep:", " Printers.pp_node_eq) defs;  *)
     ee.eexpr_normalized <- Some (output_var, defs, vars)
+    
   with (Types.Error (loc,err)) as exc ->
     eprintf "Typing error for eexpr %a: %a%a%a@."
       Printers.pp_eexpr ee
       Types.pp_error err
       (Utils.fprintf_list ~sep:", " Printers.pp_node_eq) defs
       Location.pp_loc loc
+  
       
-;
+    ;
     raise exc
-
+    
+ 
+    
 let normalize_spec decls node vars s =
   let nee = normalize_eexpr decls node vars in
   List.iter nee s.requires;
@@ -568,14 +579,18 @@ let normalize_node decls node =
   in
   if !Options.spec <> "no" then 
     begin
-      (* Update mutable fields of eexpr to perform normalization of specification/annotations *)
-      List.iter 
-	(fun a -> 
-	  List.iter 
-	    (fun (_, ann) -> normalize_eexpr decls node inputs_outputs ann) 
-	    a.annots
-	)
-	node.node_annot;
+      (* Update mutable fields of eexpr to perform normalization of
+	 specification.
+
+	 Careful: we do not normalize annotations, since they can have the form
+	 x = (a, b, c) *)
+      (* List.iter  *)
+      (* 	(fun a ->  *)
+      (* 	  List.iter  *)
+      (* 	    (fun (_, ann) -> normalize_eexpr decls node inputs_outputs ann)  *)
+      (* 	    a.annots *)
+      (* 	) *)
+      (* 	node.node_annot; *)
       match node.node_spec with None -> () | Some s -> normalize_spec decls node [] s 
     end;
   
