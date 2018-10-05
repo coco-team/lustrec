@@ -460,12 +460,12 @@ let normalize_eexpr decls node vars ee =
     
 let normalize_spec decls node vars s =
   let nee = normalize_eexpr decls node vars in
-  List.iter nee s.requires;
-  List.iter nee s.ensures;
-  List.iter (fun (_, assumes, ensures, _) -> 
-      List.iter nee assumes;
-    List.iter nee ensures
-  ) s.behaviors
+  List.iter nee s.assume;
+  List.iter nee s.guarantees;
+  List.iter (fun m -> 
+      List.iter nee m.require;
+    List.iter nee m.ensure
+  ) s.modes
   
     
 (* The normalization phase introduces new local variables

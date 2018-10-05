@@ -55,12 +55,13 @@ let keyword_table =
   "const", CONST;
   (* "include", INCLUDE; *)
   "assert", ASSERT;
-  "ensures", ENSURES;
-  "requires", REQUIRES;
-  "observer", OBSERVER;
+  "ensure", ENSURE;
+  "require", REQUIRE;
+  (* "observer", OBSERVER; *)
   "invariant", INVARIANT;
-  "behavior", BEHAVIOR;
-  "assumes", ASSUMES;
+  "mode", MODE;
+  "assume", ASSUME;
+  "guarantees", GUARANTEES;
   "exists", EXISTS;
   "forall", FORALL;
   "c_code", CCODE;

@@ -52,6 +52,7 @@ type constant =
   | Const_array of constant list
   | Const_tag of label
   | Const_string of string (* used only for annotations *)
+  | Const_modeid of string (* used only for annotations *)
   | Const_struct of (label * constant) list
 
 type quantifier_type = Exists | Forall
@@ -124,18 +125,27 @@ and expr_annot =
  {annots: (string list * eexpr) list;
   annot_loc: Location.t}
 
-type contract_desc = {
+type contract_mode =
+  { mode_id: ident; require: eexpr list; ensure: eexpr list; mode_loc: Location.t}
+
+type contract_import =
+  { import_nodeid: ident; inputs: expr list; outputs: expr list; import_loc: Location.t }
+    
+type contract_desc = 
+  {
 (* TODO: 
    local variables 
    rename: assume/guarantee
            in behavior mode (id, requires/ensures)
    import contract
 *)
-  
-  requires: eexpr list;
-  ensures: eexpr list;
-  behaviors: (string * eexpr list * eexpr list * Location.t) list;
-  spec_loc: Location.t;
+       consts: var_decl list;
+       locals: var_decl list;
+       assume: eexpr list;
+       guarantees: eexpr list;
+       modes: contract_mode list;
+       imports: contract_import list; 
+       spec_loc: Location.t;
 }
 
 type offset =
