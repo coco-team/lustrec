@@ -431,7 +431,7 @@ let normalize_eexpr decls node vars ee =
     (ISet.add output_id ISet.empty) vars in
   
   try
-    let env = Typing.type_var_decl_list quant_vars Basic_library.type_env quant_vars in
+    let env = Typing.type_var_decl_list quant_vars !Global.type_env quant_vars in
     let env = Typing.type_var_decl [] env output_var in (* typing the variable *)
     (* Format.eprintf "typing var %s: %a@." output_id Types.print_ty output_var.var_type; *)
     let env = Typing.type_var_decl_list (vars@node.node_outputs@node.node_inputs) env (vars@node.node_outputs@node.node_inputs) in

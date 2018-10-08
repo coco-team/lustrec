@@ -75,7 +75,7 @@ let rec fby expr n init =
 %token MULT DIV MOD
 %token MINUS PLUS UMINUS
 %token PRE ARROW
-%token REQUIRE ENSURE ASSUME GUARANTEES IMPORT
+%token REQUIRE ENSURE ASSUME GUARANTEES IMPORT CONTRACT
 %token INVARIANT MODE CCODE MATLAB
 %token EXISTS FORALL
 %token PROTOTYPE LIB
@@ -331,6 +331,7 @@ lustre_spec:
 
 contract:
 { empty_contract }
+| CONTRACT contract { $2 }
 | CONST IDENT EQ expr SCOL contract
     { merge_contracts (mk_contract_var $2 true None $4 (get_loc())) $6 }
 | CONST IDENT COL typeconst EQ expr SCOL contract

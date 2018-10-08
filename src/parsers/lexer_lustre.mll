@@ -58,6 +58,7 @@ let keyword_table =
   "div", DIV;
   "const", CONST;
   "assert", ASSERT;
+  "contract", CONTRACT;
   "lib", LIB;
   "prototype", PROTOTYPE;
   "c_code", CCODE; (* not sure how it is used *)

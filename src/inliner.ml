@@ -444,7 +444,7 @@ let witness filename main_name orig inlined type_env clock_env =
     ()
   end (* xx *)
 
-let global_inline basename prog type_env clock_env =
+let global_inline basename prog (*type_env clock_env*) =
   (* We select the main node desc *)
   let main_node, other_nodes, other_tops = 
     List.fold_right
