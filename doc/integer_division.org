@@ -26,20 +26,14 @@ Some properties:
 
 * From C to Euclidian
 
-a mod_M b = (a mod_C b) + (a < 0 ? abs(b) : 0) 
+a mod_M b = (a mod_C b) + (a mod_C b < 0 ? abs(b) : 0) 
 
 a div_M b = (a - (a mod_M b)) div_C b
-          = (a - ((a mod_C b) + (a < 0 ? abs(b) : 0))) div_C b
+          = (a - ((a mod_C b) + (a mod_C b < 0 ? abs(b) : 0))) div_C b
 
 * From Euclidian to C
 
-a mod_C b = (a >= 0 ? a mod_M b : - ((-a) mod_M b)) 
-            (using math def to ensure positiveness of remainder))
-          = (a mod_M b) - (a < 0 ? abs(b) : 0)
-            (using the def of mod_M above)
+a mod_C b = a mod_M b - ((a mod_M b <> 0 && a <= 0) ? abs(b) : 0)
 
 a div_C b = (a - (a mod_C b)) div_M b
-          = (a - ((a mod_M b) - (a < 0 ? abs(b) : 0))) div_M b
-          
-Let's chosse the second, simpler, def of mod_C
-
+          = (a mod_M b <> 0 && a <= 0)?((a - a mod_M b + abs(b)) div_M b) :((a - a mod_M b) div_M b)

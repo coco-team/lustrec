@@ -110,19 +110,21 @@ let pp_machine_step_name fmt id = fprintf fmt "%s_step" id
 
 let pp_mod pp_val v1 v2 fmt =
   if !Options.integer_div_euclidean then
-    (* (a mod_C b) + (a < 0 ? abs(b) : 0) *)
-    Format.fprintf fmt "((%a %% %a) + (%a < 0?(abs(%a)):0))"
+    (* (a mod_C b) + (a mod_C b < 0 ? abs(b) : 0) *)
+    Format.fprintf fmt "((%a %% %a) + ((%a %% %a) < 0?(abs(%a)):0))"
       pp_val v1 pp_val v2
       pp_val v1 pp_val v2
+      pp_val v2
   else (* Regular behavior: printing a % *)
     Format.fprintf fmt "(%a %% %a)" pp_val v1 pp_val v2
 
 let pp_div pp_val v1 v2 fmt =
   if !Options.integer_div_euclidean then
-    (* (a - ((a mod_C b) + (a < 0 ? abs(b) : 0))) div_C b *)
-    Format.fprintf fmt "(%a - ((%a %% %a) + (%a < 0 ? abs(%a) : 0))) / %a"
-      pp_val v1 pp_val v1 pp_val v2
-      pp_val v1 pp_val v2 pp_val v2
+    (* (a - ((a mod_C b) + (a mod_C b < 0 ? abs(b) : 0))) div_C b *)
+    Format.fprintf fmt "(%a - %t) / %a"
+      pp_val v1
+      (pp_mod pp_val v1 v2)
+      pp_val v2
   else (* Regular behavior: printing a / *)
     Format.fprintf fmt "(%a / %a)" pp_val v1 pp_val v2
   
