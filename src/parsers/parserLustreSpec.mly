@@ -84,24 +84,25 @@ lustre_spec:
 | contract EOF { $1 }
 
 contract:
-requires ensures behaviors { { requires = $1; ensures = $2; behaviors = $3; } }
- 
-requires:
 { [] }
-| REQUIRES qexpr SCOL requires { $2::$4 }
+| CONST ident EQ expr SCOL contract
+    { Const($2, None, $4)::$3 }
+| CONST ident COL typeconst EQ expr SCOL contract
+    { Const($2, Some($4), $6)::$3 }
+| ASSUME qexpr SCOL contract
+    { Assume($2)::$4 }
+| GUARANTEES qexpr SCOL contract	
+    { Guarantees($2)::$4 }
+| MODE ident LPAR mode_content RPAR SCOL contract
+    { Mode($2,$4)::$7 }	
+| IMPORT ident LPAR tuple_expr RPAR returns LPAR tuple_expr RPAR SCOL contract
+    { Import($2, $4, $8)::$11 }
+	
 
-ensures:
+mode_content:
 { [] }
-| ENSURES qexpr SCOL ensures { (EnsuresExpr $2) :: $4 }
-| OBSERVER IDENT LPAR tuple_qexpr RPAR SCOL ensures { (SpecObserverNode($2,$4)) :: $7 }
-
-behaviors:
-{ [] }
-| BEHAVIOR IDENT COL assumes ensures behaviors { ($2,$4,$5)::$6 }
-
-assumes:
-{ [] }
-| ASSUMES qexpr SCOL assumes { $2::$4 } 
+| REQUIRE qexpr COL mode_content { Require($2)::$4 }
+| ENSURE qexpr COL mode_content { Require($2)::$4 }
 
 tuple_qexpr:
 | qexpr COMMA qexpr {[$3;$1]}

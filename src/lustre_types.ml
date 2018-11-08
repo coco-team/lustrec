@@ -52,6 +52,7 @@ type constant =
   | Const_array of constant list
   | Const_tag of label
   | Const_string of string (* used only for annotations *)
+  | Const_modeid of string (* used only for annotations *)
   | Const_struct of (label * constant) list
 
 type quantifier_type = Exists | Forall
@@ -124,11 +125,27 @@ and expr_annot =
  {annots: (string list * eexpr) list;
   annot_loc: Location.t}
 
-type node_annot = {
-  requires: eexpr list;
-  ensures: eexpr list;
-  behaviors: (string * eexpr list * eexpr list * Location.t) list;
-  spec_loc: Location.t;
+type contract_mode =
+  { mode_id: ident; require: eexpr list; ensure: eexpr list; mode_loc: Location.t}
+
+type contract_import =
+  { import_nodeid: ident; inputs: expr list; outputs: expr list; import_loc: Location.t }
+    
+type contract_desc = 
+  {
+(* TODO: 
+   local variables 
+   rename: assume/guarantee
+           in behavior mode (id, requires/ensures)
+   import contract
+*)
+       consts: var_decl list;
+       locals: var_decl list;
+       assume: eexpr list;
+       guarantees: eexpr list;
+       modes: contract_mode list;
+       imports: contract_import list; 
+       spec_loc: Location.t;
 }
 
 type offset =
@@ -173,7 +190,7 @@ type node_desc =
      node_stmts: statement list;
      mutable node_dec_stateless: bool;
      mutable node_stateless: bool option;
-     node_spec: node_annot option;
+     node_spec: contract_desc option;
      node_annot: expr_annot list;
     }
 
@@ -184,7 +201,7 @@ type imported_node_desc =
      nodei_inputs: var_decl list;
      nodei_outputs: var_decl list;
      nodei_stateless: bool;
-     nodei_spec: node_annot option;
+     nodei_spec: contract_desc option;
      (* nodei_annot: expr_annot list; *)
      nodei_prototype: string option;
      nodei_in_lib: string list;
@@ -204,7 +221,8 @@ type top_decl_desc =
 | Open of bool * string (* the boolean set to true denotes a local
 			   lusi vs a lusi installed at system level *)
 | TypeDef of typedef_desc
-
+| Contract of contract_desc
+    
 type top_decl =
     {top_decl_desc: top_decl_desc;      (* description of the symbol *)
      top_decl_owner: Location.filename; (* the module where it is defined *)

@@ -58,8 +58,8 @@ let stage1 prog dirname basename =
   (* Importing source *)
   let _ = Modules.load_program ISet.empty prog in
 
-  (* Extracting dependencies *)
-  let dependencies, type_env, clock_env = import_dependencies prog in
+  (* Extracting dependencies (and updating Global.(type_env/clock_env) *)
+  let dependencies = import_dependencies prog in
 
   (* Sorting nodes *)
   let prog = SortProg.sort prog in
@@ -68,7 +68,7 @@ let stage1 prog dirname basename =
   let orig, prog =
     if !Options.global_inline && !Options.main_node <> "" then
       (if !Options.witnesses then prog else []),
-      Inliner.global_inline basename prog type_env clock_env
+      Inliner.global_inline basename prog 
     else (* if !Option.has_local_inline *)
       [],
       Inliner.local_inline prog (* type_env clock_env *)
@@ -81,10 +81,10 @@ let stage1 prog dirname basename =
     check_stateless_decls prog;
 
   (* Typing *)
-  let computed_types_env = type_decls type_env prog in
+  Global.type_env := type_decls !Global.type_env prog;
 
   (* Clock calculus *)
-  let computed_clocks_env = clock_decls clock_env prog in
+  Global.clock_env := clock_decls !Global.clock_env prog;
 
   (* Registering and checking machine types *)
   if Machine_types.is_active then Machine_types.load prog;
@@ -133,12 +133,13 @@ let stage1 prog dirname basename =
   (* Compatibility with Lusi *)
   (* Checking the existence of a lusi (Lustre Interface file) *)
   let extension = ".lusi" in
-  compile_source_to_header prog computed_types_env computed_clocks_env dirname basename extension;
+  compile_source_to_header prog !Global.type_env !Global.clock_env dirname basename extension;
 
   Typing.uneval_prog_generics prog;
   Clock_calculus.uneval_prog_generics prog;
 
 
+(* Disabling witness option. Could but reactivated later 
   if !Options.global_inline && !Options.main_node <> "" && !Options.witnesses then
     begin
       let orig = Corelang.copy_prog orig in
@@ -153,7 +154,8 @@ let stage1 prog dirname basename =
 	!Options.main_node
 	orig prog type_env clock_env
     end;
-  
+*)  
+
   (* Computes and stores generic calls for each node,
      only useful for ANSI C90 compliant generic node compilation *)
   if !Options.ansi then Causality.NodeDep.compute_generic_calls prog;

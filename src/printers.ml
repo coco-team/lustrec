@@ -274,16 +274,42 @@ let pp_typedec fmt ty =
 (*   ) *)
 
 
+
+let pp_quantifiers fmt (q, vars) =
+  match q with
+    | Forall -> fprintf fmt "forall %a" (fprintf_list ~sep:"; " pp_var) vars 
+    | Exists -> fprintf fmt "exists %a" (fprintf_list ~sep:"; " pp_var) vars 
+
+let pp_eexpr fmt e =
+  fprintf fmt "%a%t %a"
+    (Utils.fprintf_list ~sep:"; " pp_quantifiers) e.eexpr_quantifiers
+    (fun fmt -> match e.eexpr_quantifiers with [] -> () | _ -> fprintf fmt ";")
+    pp_expr e.eexpr_qfexpr
+
 let pp_spec fmt spec =
   fprintf fmt "@[<hov 2>(*@@ ";
-  fprintf_list ~sep:"@,@@ " (fun fmt r -> fprintf fmt "requires %a;" pp_eexpr r) fmt spec.requires;
-  fprintf_list ~sep:"@,@@ " (fun fmt r -> fprintf fmt "ensures %a; " pp_eexpr r) fmt spec.ensures;
-  fprintf_list ~sep:"@," (fun fmt (name, assumes, ensures, _) -> 
-    fprintf fmt "behavior %s:@[@ %a@ %a@]" 
-      name
-      (fprintf_list ~sep:"@ " (fun fmt r -> fprintf fmt "assumes %a;" pp_eexpr r)) assumes
-      (fprintf_list ~sep:"@ " (fun fmt r -> fprintf fmt "ensures %a;" pp_eexpr r)) ensures
-  ) fmt spec.behaviors;
+  (* const are prefixed with const in pp_var and with nothing for regular
+     variables. We adapt the call to produce the appropriate output. *)
+  fprintf_list ~sep:"@,@@ " (fun fmt v ->
+    fprintf fmt "%s%a = %t;"
+      (if v.var_dec_const then "" else "var")
+      pp_var v
+      (fun fmt -> match v.var_dec_value with None -> () | Some e -> pp_expr fmt e)
+  ) fmt (spec.consts @ spec.locals);
+  fprintf_list ~sep:"@,@@ " (fun fmt r -> fprintf fmt "assume %a;" pp_eexpr r) fmt spec.assume;
+  fprintf_list ~sep:"@,@@ " (fun fmt r -> fprintf fmt "guarantees %a;" pp_eexpr r) fmt spec.guarantees;
+  fprintf_list ~sep:"@,@@ " (fun fmt mode ->
+    fprintf fmt "mode %s (@[@ %a@ %a@]);" 
+      mode.mode_id
+      (fprintf_list ~sep:"@ " (fun fmt r -> fprintf fmt "require %a;" pp_eexpr r)) mode.require
+      (fprintf_list ~sep:"@ " (fun fmt r -> fprintf fmt "ensure %a;" pp_eexpr r)) mode.ensure
+  ) fmt spec.modes;
+  fprintf_list ~sep:"@,@@ " (fun fmt import ->
+    fprintf fmt "import %s (%a) returns (%a);" 
+      import.import_nodeid
+      (fprintf_list ~sep:"@ " pp_expr) import.inputs
+      (fprintf_list ~sep:"@ " pp_expr) import.outputs
+  ) fmt spec.imports;
   fprintf fmt "@]*)";
   ()
 

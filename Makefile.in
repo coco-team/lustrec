@@ -93,7 +93,7 @@ test-config: ${bindir}/lustrec
 	if @PATH_TO_TESTS_DEFINED@; then \
 	  mkdir -p test; \
 	  cd test; \
-	  cmake -DLUSTRE_PATH_HINT=${bindir} -DSUBPROJ=@GITBRANCH@ ../@PATH_TO_TESTS@; \
+	  cmake -DLUSTRE_PATH_HINT=${bindir} -DSUBPROJ=@CDASHSUBPROJ@ ../@PATH_TO_TESTS@; \
 	fi
 
 test-no-submit: test-config

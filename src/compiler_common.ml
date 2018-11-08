@@ -147,6 +147,7 @@ let clock_decls env decls =
     Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 2>  %a@]@ " Corelang.pp_prog_clock decls);
   new_env
 
+(* Typing/Clocking with an empty env *)
 let check_top_decls header =
   let new_tenv = type_decls Basic_library.type_env header in   (* Typing *)
   let new_cenv = clock_decls Basic_library.clock_env header in   (* Clock calculus *)
@@ -231,11 +232,11 @@ let is_stateful topdecl =
   | ImportedNode nd -> not nd.nodei_stateless 
   | _ -> false
 
-
-let rec import_dependencies prog =
+(* Beware of the side effect: reads and modifies Global.(type_env/clock_env) *)
+let rec import_dependencies prog : dep_t list =
   Log.report ~level:1 (fun fmt -> fprintf fmt "@[<v 4>.. extracting dependencies");
   let dependencies = Corelang.get_dependencies prog in
-  let deps =
+  let (compilation_deps, type_env, clock_env) =
   List.fold_left
     (fun (compilation_dep, type_env, clock_env) dep ->
       let (local, s) = Corelang.dependency_of_top dep in
@@ -243,20 +244,20 @@ let rec import_dependencies prog =
       Log.report ~level:1 (fun fmt -> Format.fprintf fmt "@ Library %s@ " basename);
       let lusic = Modules.import_dependency dep.top_decl_loc (local, s) in
       (*Log.report ~level:1 (fun fmt -> Format.fprintf fmt "");*)
-      let lusic_deps, type_env', clock_env' = import_dependencies lusic.Lusic.contents in
-      let type_env = Env.overwrite type_env type_env' in
-      let clock_env = Env.overwrite clock_env clock_env' in
+      let lusic_deps = import_dependencies lusic.Lusic.contents in
       let (lusi_type_env, lusi_clock_env) = get_envs_from_top_decls lusic.Lusic.contents in
       let is_stateful = List.exists is_stateful lusic.Lusic.contents in
       let new_dep = Dep (local, s, lusic.Lusic.contents, is_stateful ) in
       new_dep::lusic_deps@compilation_dep,
       Env.overwrite type_env lusi_type_env,
       Env.overwrite clock_env lusi_clock_env)
-    ([], Basic_library.type_env, Basic_library.clock_env)
+    ([], !Global.type_env, !Global.clock_env)
     dependencies in
+  Global.type_env := type_env; 
+  Global.clock_env := clock_env;
   begin
     Log.report ~level:1 (fun fmt -> fprintf fmt "@]@ ");
-    deps
+    compilation_deps
   end
 
 let track_exception () =

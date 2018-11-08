@@ -24,7 +24,6 @@ let keyword_table =
   "state", STATE;
   "until", UNTIL;
   "unless", UNLESS;
-  "last", LAST;
   "resume", RESUME;
   "restart", RESTART;
   "if", IF;
@@ -42,7 +41,6 @@ let keyword_table =
   "returns", RETURNS;
   "var", VAR;
   "imported", IMPORTED;
-  "wcet", WCET;
   "type", TYPE;
   "int", TINT;
   "bool", TBOOL;
@@ -50,7 +48,6 @@ let keyword_table =
   "real", TREAL;
   "clock", TCLOCK;
   "not", NOT;
-  "tail", TAIL;
   "true", TRUE;
   "false", FALSE;
   "and", AND;
@@ -61,6 +58,7 @@ let keyword_table =
   "div", DIV;
   "const", CONST;
   "assert", ASSERT;
+  "contract", CONTRACT;
   "lib", LIB;
   "prototype", PROTOTYPE;
   "c_code", CCODE; (* not sure how it is used *)
@@ -83,14 +81,6 @@ let make_spec lexbuf s =
     NODESPEC ns
   with LexerLustreSpec.Error loc -> raise (Parse.Error (Location.shift (Location.curr lexbuf) loc, Parse.Node_spec_error s))
 
-(*
-let make_kind_spec lexbuf s =
-    let s_lexbuf = Lexing.from_string s in
-    let _ = KindLustreParser.contract_in_block KindLustreLexer.token s_lexbuf in
-    let dummy_ns = { Lustre_types.requires = []; ensures = []; behaviors = []; spec_loc = Location.dummy_loc} in
-    NODESPEC dummy_ns
-
-let make_spec = make_kind_spec*)
 }
 
 let newline = ('\010' | '\013' | "\013\010")
