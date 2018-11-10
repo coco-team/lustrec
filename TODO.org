@@ -1,3 +1,155 @@
+* Cocospec integration
+** Objective
+Enable the parsing of cocospec in comments. The syntax is the one of Kind2 but
+could be extended later.
+
+In terms of integration within LustreC, it has to be done at all stages
+- parsing/lexing
+- typing
+- clocking
+- normalization: the cocospec lustre equations have to be normalized 
+- printing
+- machine code
+- various backends
+  - EMF
+  - LustreV/Zustre
+  - C code
+
+** Open questions
+
+The cocospec syntax is appealing for multiple aspects wrt the our previous
+annotation language.
+- more structure
+- notion of contracts that can be imported, reused
+- more expressivity: local variables within contracts (more like regular lustre
+  definitions *)
+
+But also some not-so-nice features (ploc's remarks):
+- annotations next to the node header shall be before rather than after. We also
+  don't want pure specification artifact as top level definition in the lustre
+  file (no contract def outside comments)
+  - Frama-C inspiration
+    I would prefer like in framac:  
+    //@ensures prop; 
+    node foo (...) returns (...);
+
+    Rather than
+    node foo (...) returns (...);
+    //@ensures prop; 
+  
+    While it make sense when you provide specification within the lustre file, it
+    is less appropriate when specifying outside the lustre model. Eg in a lusi, #open
+    spec.lusi
+
+  - Kind2 approach
+    In Kind2 they have a notion of interfaces, but they need an explicit local
+    annotation linking the node to the contract
+
+    In foo.lus we would have 
+    #include foo_spec.lus
+
+    node bar (...) returns (...);
+    (*@ contract import bar_spec (in) returns (out); *)
+    let  ... tel 
+  
+    In foo_spec.lus 
+    contract bar_spec (..) returns (..)
+
+  - Remote specification (in lusi)
+    We would like to enable both local spec and remote ones (in a separate file).
+    A solution could be to extend the lusi syntax, for example something like
+    node bar (...) returns (...)
+    let
+      @ensures ...
+      @requires ...
+    tel
+
+    Or, more generally, support contracts definition only in lusi and assigning
+    contracts to nodes in the lusi or in the lus
+ 
+    For example in the lusi
+
+    contract bar_spec1 () returns ();
+    let 
+     ... contract 1
+    tel
+
+    contract bar_spec2 () returns ();
+    let 
+     ... contract 2
+    tel
+
+    node bar (...) returns (...);
+    (*@ contract 
+          import bar_spec1 (in) returns (out);
+          import bar_spec2 (in) returns (out);
+    *)
+  
+    node bar2 (...) returns (...);
+    (*@ contract guarantee expr; *)
+  
+    Or with annotations before the headers
+    (*@ contract 
+          import bar_spec1 (in) returns (out);
+          import bar_spec2 (in) returns (out);
+    *)
+    node bar (...) returns (...);
+  
+    (*@ contract guarantee expr; *)
+    node bar2 (...) returns (...);
+
+    In the associated lustre file
+    
+    #open my_spec.lusi
+    
+    node bar (...) returns (...)
+    let
+      full definition
+    tel
+   
+    node bar3 (...) returns (...)
+    (*@ contract my_remote contract *)
+    let
+      full definition
+    tel
+
+    -- a local contract
+    node bar4 (...) returns (...)
+    (*@ contract guarantee expr; *)
+    let
+      full definition
+    tel
+
+    But no contracts definition within the lustre ourside of special comments
+
+** Current status
+- Existing works in lustrec
+  ensures/requires/observer in the syntax, which were parsed, typed, normalized
+
+- Choice of placement of annotations
+  - no contract in lustre only in lusi
+  - in lustre file: contract attached to lustre node before the locals/let
+  - in lusi file: contract attached to lustre node before the node foo ...
+
+** Development
+*** Done
+- (ploc) retirer le parser Kind2 et revenir à celui de lustrec
+*** To be done
+**** Court terme
+- (CG) etendre la syntaxe pour coller à la definition donnée ci-dessus
+  - lexeur/parseur lustreSpec + document latex de grammaire
+- repartir la branche acsl2018 qui contient la normalisation des eexpr
+  - le refaire compiler
+  - merger avec unstable 
+- transformer cette normalisation pour partager les definitions locales de
+  variables dans le noeud de spec, aka contract
+
+**** Apres
+- developper dans les backends
+  - C
+  - EMF
+  - LustreV
+
 * TODO refactoring + doc
 - separate lustre types from machine types in different files
 - split basic libs into backend specific files

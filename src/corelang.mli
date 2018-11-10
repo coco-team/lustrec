@@ -156,7 +156,13 @@ val copy_prog: top_decl list -> top_decl list
 
 (** Annotation expression related functions *)
 val mkeexpr: Location.t ->  expr -> eexpr
-val merge_node_annot: node_annot -> node_annot -> node_annot 
+val empty_contract: contract_desc
+val mk_contract_var: ident -> bool -> type_dec option -> expr -> Location.t -> contract_desc
+val mk_contract_guarantees: eexpr -> contract_desc
+val mk_contract_assume: eexpr -> contract_desc
+val mk_contract_mode: ident -> eexpr list -> eexpr list -> Location.t -> contract_desc
+val mk_contract_import: ident -> expr list -> expr list -> Location.t -> contract_desc
+val merge_contracts:  contract_desc -> contract_desc -> contract_desc 
 val extend_eexpr: (quantifier_type * var_decl list) list -> eexpr -> eexpr
 val update_expr_annot: ident -> expr -> expr_annot -> expr
 (* val mkpredef_call: Location.t -> ident -> eexpr list -> eexpr*)
@@ -165,6 +171,13 @@ val expr_contains_expr: tag -> expr -> bool
 
 val reset_cpt_fresh: unit -> unit
 val mk_fresh_var: node_desc -> Location.t -> Types.type_expr ->  Clocks.clock_expr -> var_decl
+
+
+val get_expr_calls: top_decl list -> expr -> Utils.ISet.t
+
+val eq_has_arrows: eq -> bool
+
+
 (* Local Variables: *)
 (* compile-command:"make -C .." *)
 (* End: *)

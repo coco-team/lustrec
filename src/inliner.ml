@@ -421,12 +421,8 @@ let witness filename main_name orig inlined type_env clock_env =
     node_dec_stateless = false;
     node_stateless = None;
     node_spec = Some 
-      {requires = []; 
-       ensures = [mkeexpr loc (mkexpr loc (Expr_ident ok_ident))];
-       behaviors = [];
-       spec_loc = loc
-      };
-    node_annot = [];
+      (mk_contract_guarantees (mkeexpr loc (mkexpr loc (Expr_ident ok_ident))));
+      node_annot = [];
   }
   in
   let main = [{ top_decl_desc = Node main_node; top_decl_loc = loc; top_decl_owner = filename; top_decl_itf = false }] in
@@ -448,7 +444,7 @@ let witness filename main_name orig inlined type_env clock_env =
     ()
   end (* xx *)
 
-let global_inline basename prog type_env clock_env =
+let global_inline basename prog (*type_env clock_env*) =
   (* We select the main node desc *)
   let main_node, other_nodes, other_tops = 
     List.fold_right

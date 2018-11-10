@@ -165,10 +165,40 @@ let consts_of_enum_type top_decl =
 (*   Eexpr functions *)
 (************************************************************)
 
-let merge_node_annot ann1 ann2 =
-  { requires = ann1.requires @ ann2.requires;
-    ensures = ann1.ensures @ ann2.ensures;
-    behaviors = ann1.behaviors @ ann2.behaviors;
+
+let empty_contract =
+  {
+    consts = []; locals = []; assume = []; guarantees = []; modes = []; imports = []; spec_loc = Location.dummy_loc;
+  }
+    
+let mk_contract_var id is_const type_opt expr loc =
+  let typ = match type_opt with None -> mktyp loc Tydec_any | Some t -> t in
+  let v = mkvar_decl loc (id, typ, mkclock loc Ckdec_any, is_const, Some expr, None) in
+  if is_const then
+  { empty_contract with consts = [v]; spec_loc = loc; }
+  else
+    { empty_contract with locals = [v]; spec_loc = loc; }
+
+let mk_contract_guarantees eexpr =
+  { empty_contract with guarantees = [eexpr]; spec_loc = eexpr.eexpr_loc }
+
+let mk_contract_assume eexpr =
+  { empty_contract with assume = [eexpr]; spec_loc = eexpr.eexpr_loc }
+
+let mk_contract_mode id rl el loc =
+  { empty_contract with modes = [{ mode_id = id; require = rl; ensure = el; mode_loc = loc; }]; spec_loc = loc }
+
+let mk_contract_import id ins outs loc =
+  { empty_contract with imports = [{import_nodeid = id; inputs = ins; outputs = outs; import_loc = loc; }]; spec_loc = loc }
+
+    
+let merge_contracts ann1 ann2 = (* keeping the first item loc *)
+  { consts = ann1.consts @ ann2.consts;
+    locals = ann1.locals @ ann2.locals;
+    assume = ann1.assume @ ann2.assume;
+    guarantees = ann1.guarantees @ ann2.guarantees;
+    modes = ann1.modes @ ann2.modes;
+    imports = ann1.imports @ ann2.imports;
     spec_loc = ann1.spec_loc
   }
 

@@ -56,29 +56,27 @@ let rec fby expr n init =
 %token <Num.num * int * string> REAL
 
 %token <string> STRING
-%token AUTOMATON STATE UNTIL UNLESS RESTART RESUME LAST
-%token STATELESS ASSERT OPEN QUOTE FUNCTION
+%token AUTOMATON STATE UNTIL UNLESS RESTART RESUME 
+%token ASSERT OPEN QUOTE FUNCTION
 %token <string> IDENT
 %token <string> UIDENT
 %token TRUE FALSE
 %token <Lustre_types.expr_annot> ANNOT
-%token <Lustre_types.node_annot> NODESPEC
+%token <Lustre_types.contract_desc> NODESPEC
 %token LBRACKET RBRACKET LCUR RCUR LPAR RPAR SCOL COL COMMA COLCOL 
 %token AMPERAMPER BARBAR NOT POWER
 %token IF THEN ELSE
-%token UCLOCK DCLOCK PHCLOCK TAIL
 %token MERGE FBY WHEN WHENNOT EVERY
-%token NODE LET TEL RETURNS VAR IMPORTED SENSOR ACTUATOR WCET TYPE CONST
+%token NODE LET TEL RETURNS VAR IMPORTED TYPE CONST
 %token STRUCT ENUM
 %token TINT TREAL TBOOL TCLOCK
-%token RATE DUE
 %token EQ LT GT LTE GTE NEQ
 %token AND OR XOR IMPL
 %token MULT DIV MOD
 %token MINUS PLUS UMINUS
 %token PRE ARROW
-%token REQUIRES ENSURES OBSERVER
-%token INVARIANT BEHAVIOR ASSUMES CCODE MATLAB
+%token REQUIRE ENSURE ASSUME GUARANTEES IMPORT CONTRACT
+%token INVARIANT MODE CCODE MATLAB
 %token EXISTS FORALL
 %token PROTOTYPE LIB
 %token EOF
@@ -89,7 +87,7 @@ let rec fby expr n init =
 %left MERGE IF
 %nonassoc ELSE
 %right ARROW FBY
-%left WHEN WHENNOT UCLOCK DCLOCK PHCLOCK
+%left WHEN WHENNOT 
 %right COLCOL
 %right IMPL
 %left OR XOR BARBAR
@@ -115,7 +113,7 @@ let rec fby expr n init =
 %type <Lustre_types.expr_annot> lustre_annot
 
 %start lustre_spec
-%type <Lustre_types.node_annot> lustre_spec
+%type <Lustre_types.contract_desc> lustre_spec
 
 %start signed_const
 %type <Lustre_types.constant> signed_const
@@ -216,30 +214,30 @@ in_lib_list:
 
 top_decl:
 | CONST cdecl_list { List.rev ($2 false) }
-| nodespec_list state_annot node_ident_decl LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt locals LET stmt_list TEL 
+| state_annot node_ident_decl LPAR vdecl_list SCOL_opt RPAR RETURNS LPAR vdecl_list SCOL_opt RPAR SCOL_opt nodespec_list locals LET stmt_list TEL 
     {
      let stmts, asserts, annots = $16 in
       (* Declaring eqs annots *)
       List.iter (fun ann -> 
 	List.iter (fun (key, _) -> 
-	  Annotations.add_node_ann $3 key
+	  Annotations.add_node_ann $2 key
 	) ann.annots
       ) annots;
      (* Building the node *)
      let nd = mktop_decl false (Node
-				  {node_id = $3;
+				  {node_id = $2;
 				   node_type = Types.new_var ();
 				   node_clock = Clocks.new_var true;
-				   node_inputs = List.rev $5;
-				   node_outputs = List.rev $10;
+				   node_inputs = List.rev $4;
+				   node_outputs = List.rev $9;
 				   node_locals = List.rev $14;
 				   node_gencalls = [];
 				   node_checks = [];
 				   node_asserts = asserts; 
 				   node_stmts = stmts;
-				   node_dec_stateless = $2;
+				   node_dec_stateless = $1;
 				   node_stateless = None;
-				   node_spec = $1;
+				   node_spec = $13;
 				   node_annot = annots})
      in
      pop_node ();
@@ -250,7 +248,7 @@ nodespec_list:
 | NODESPEC nodespec_list { 
   (function 
   | None    -> (fun s1 -> Some s1) 
-  | Some s2 -> (fun s1 -> Some (merge_node_annot s1 s2))) $2 $1 }
+  | Some s2 -> (fun s1 -> Some (merge_contracts s1 s2))) $2 $1 }
 
 typ_def_list:
     /* empty */             { (fun itf -> []) }
@@ -332,26 +330,32 @@ lustre_spec:
 | contract EOF { $1 }
 
 contract:
-requires ensures behaviors { { requires = $1; ensures = $2; behaviors = $3; spec_loc = get_loc () } }
- 
-requires:
-{ [] }
-| REQUIRES qexpr SCOL requires { $2::$4 }
+{ empty_contract }
+| CONTRACT contract { $2 }
+| CONST IDENT EQ expr SCOL contract
+    { merge_contracts (mk_contract_var $2 true None $4 (get_loc())) $6 }
+| CONST IDENT COL typeconst EQ expr SCOL contract
+    { merge_contracts (mk_contract_var $2 true (Some(mktyp $4)) $6 (get_loc())) $8 }
+| VAR IDENT EQ expr SCOL contract
+    { merge_contracts (mk_contract_var $2 false None $4 (get_loc())) $6 }
+| VAR IDENT COL typeconst EQ expr SCOL contract
+    { merge_contracts (mk_contract_var $2 false (Some(mktyp $4)) $6 (get_loc())) $8 }
+| ASSUME qexpr SCOL contract
+    { merge_contracts (mk_contract_assume $2) $4 }
+| GUARANTEES qexpr SCOL contract	
+    { merge_contracts (mk_contract_guarantees $2) $4 }
+| MODE IDENT LPAR mode_content RPAR SCOL contract
+	{ merge_contracts (
+	  let r, e = $4 in 
+	  mk_contract_mode $2 r e (get_loc())) $7 }	
+| IMPORT IDENT LPAR tuple_expr RPAR RETURNS LPAR tuple_expr RPAR SCOL contract
+    { merge_contracts (mk_contract_import $2  $4  $8 (get_loc())) $11 }
+	
 
-ensures:
-{ [] }
-| ENSURES qexpr SCOL ensures { $2 :: $4 }
-| OBSERVER node_ident LPAR tuple_expr RPAR SCOL ensures { 
-  mkeexpr (mkexpr ((Expr_appl ($2, mkexpr (Expr_tuple $4), None)))) :: $7
-}
-
-behaviors:
-{ [] }
-| BEHAVIOR IDENT COL assumes ensures behaviors { ($2,$4,$5,get_loc ())::$6 }
-
-assumes:
-{ [] }
-| ASSUMES qexpr SCOL assumes { $2::$4 } 
+mode_content:
+{ [], [] }
+| REQUIRE qexpr SCOL mode_content { let (r,e) = $4 in $2::r, e }
+| ENSURE qexpr SCOL mode_content { let (r,e) = $4 in r, $2::e }
 
 /* WARNING: UNUSED RULES */
 tuple_qexpr:
@@ -383,7 +387,8 @@ expr:
   INT {mkexpr (Expr_const (Const_int $1))}
 | REAL {let c,e,s = $1 in mkexpr (Expr_const (Const_real (c,e,s)))}
 | STRING {mkexpr (Expr_const (Const_string $1))}
-
+| COLCOL IDENT {mkexpr (Expr_const (Const_modeid $2))} 
+    
 /* | FLOAT {mkexpr (Expr_const (Const_float $1))}*/
 /* Idents or type enum tags */
 | IDENT { mkexpr (Expr_ident $1) }
@@ -647,7 +652,7 @@ lustre_annot_list:
 | kwd COL qexpr SCOL lustre_annot_list { ($1,$3)::$5 }
 | IDENT COL qexpr SCOL lustre_annot_list { ([$1],$3)::$5 }
 | INVARIANT COL qexpr SCOL lustre_annot_list{ (["invariant"],$3)::$5 }
-| OBSERVER COL qexpr SCOL lustre_annot_list { (["observer"],$3)::$5 }
+// (* | OBSERVER COL qexpr SCOL lustre_annot_list { (["observer"],$3)::$5 } *)
 | CCODE COL qexpr SCOL lustre_annot_list{ (["c_code"],$3)::$5 }
 | MATLAB COL qexpr SCOL lustre_annot_list{ (["matlab"],$3)::$5 }
 

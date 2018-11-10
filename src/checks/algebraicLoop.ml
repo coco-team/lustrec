@@ -144,7 +144,7 @@ let fast_stages_processing prog =
 
   (* Mini stage 1 *)
   (* Extracting dependencies *)
-  let dependencies, type_env, clock_env = Compiler_common.import_dependencies prog in
+  let dependencies = Compiler_common.import_dependencies prog in
   (* Local inlining *)
   let prog = Inliner.local_inline prog (* type_env clock_env *) in
   (* Checking stateless/stateful status *)
@@ -153,9 +153,9 @@ let fast_stages_processing prog =
   else
     Compiler_common.check_stateless_decls prog;
   (* Typing *)
-  let _ (*computed_types_env*) = Compiler_common.type_decls type_env prog in
+  let _ (*computed_types_env*) = Compiler_common.type_decls !Global.type_env prog in
   (* Clock calculus *)
-  let _ (*computed_clocks_env*) = Compiler_common.clock_decls clock_env prog in
+  let _ (*computed_clocks_env*) = Compiler_common.clock_decls !Global.clock_env prog in
   (* Normalization *)
   let prog = Normalization.normalize_prog ~backend:!Options.output prog in
   (* Mini stage 2 : Scheduling *)
