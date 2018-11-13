@@ -148,6 +148,7 @@ type contract_desc =
        spec_loc: Location.t;
 }
 
+
 type offset =
 | Index of Dimension.dim_expr
 | Field of label
@@ -214,6 +215,7 @@ type const_desc =
      mutable const_type: Types.type_expr;
     }
 
+  
 type top_decl_desc =
 | Node of node_desc
 | Const of const_desc
@@ -221,7 +223,6 @@ type top_decl_desc =
 | Open of bool * string (* the boolean set to true denotes a local
 			   lusi vs a lusi installed at system level *)
 | TypeDef of typedef_desc
-| Contract of contract_desc
     
 type top_decl =
     {top_decl_desc: top_decl_desc;      (* description of the symbol *)

@@ -211,6 +211,21 @@ let rec inject_eq node defvars eq =
   let norm_eq = { eq with eq_rhs = norm_rhs } in
   norm_eq::defs', vars'
 
+(* let inject_eexpr ee =
+ *   { ee with eexpr_qfexpr = inject_expr ee.eexpr_qfexpr }
+ *   
+ * let inject_spec s =
+ *   { s with
+ *     assume = List.map inject_eexpr s.assume;
+ *     guarantees = List.map inject_eexpr s.guarantees;
+ *     modes = List.map (fun m ->
+ *                 { m with
+ *                   require = List.map inject_eexpr m.require;
+ *                   ensure = List.map inject_eexpr m.ensure
+ *                 }
+ *               ) s.modes
+ *   } *)
+  
 (** normalize_node node returns a normalized node, 
     ie. 
     - updated locals
@@ -247,10 +262,25 @@ let inject_node node =
      - compute the associated expression without aliases     
   *)
   (* let diff_vars = List.filter (fun v -> not (List.mem v node.node_locals)) new_locals in *)
+  (* See comment below
+   *  let spec = match node.node_spec with
+   *   | None -> None
+   *   | Some spec -> Some (inject_spec spec)
+   * in *)
   let node =
   { node with 
     node_locals = new_locals; 
     node_stmts = List.map (fun eq -> Eq eq) (defs @ assert_defs);
+    (* Incomplete work: TODO. Do we have to inject MPFR code here?
+       Does it make sense for annotations? For me, only if we produce
+       C code for annotations. Otherwise the various verification
+       backend should have their own understanding, but would not
+       necessarily require this additional normalization. *)
+    (* 
+       node_spec = spec;
+       node_annot = List.map (fun ann -> {ann with
+           annots = List.map (fun (ids, ee) -> ids, inject_eexpr ee) ann.annots}
+         ) node.node_annot *)
   }
   in ((*Printers.pp_node Format.err_formatter node;*) node)
 

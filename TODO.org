@@ -131,6 +131,13 @@ But also some not-so-nice features (ploc's remarks):
   - in lustre file: contract attached to lustre node before the locals/let
   - in lusi file: contract attached to lustre node before the node foo ...
 
+- Dev. choices
+  - contracts rely look like imported node: a signature and a contract content attached
+    - in lusi one could have an alias for contract / imported node
+    - in lus similarly a top level contract could be parsed as an imported node
+    - contract import would amount to concatenate contract elements
+      from provided nodes or imported nodes.
+
 ** Development
 *** Done
 - (ploc) retirer le parser Kind2 et revenir à celui de lustrec
@@ -150,6 +157,12 @@ But also some not-so-nice features (ploc's remarks):
   - EMF
   - LustreV
 
+* Slicing
+  - reprendre le slicing inlined de seal pour
+  - when provided with a main node and a selection of outputs or memories
+    - slice the local node
+    - for each node called try to slice to the selected vars
+  - could be used to analyze counterexamples
 * TODO refactoring + doc
 - separate lustre types from machine types in different files
 - split basic libs into backend specific files

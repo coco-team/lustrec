@@ -137,7 +137,8 @@ let rec pp_c_const_suffix var_type fmt c =
     | Const_array ca       -> let var_type = Types.array_element_type var_type in
                               fprintf fmt "(%a[]){%a }" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_c_const_suffix var_type)) ca
     | Const_struct fl       -> fprintf fmt "{%a }" (Utils.fprintf_list ~sep:", " (fun fmt (f, c) -> (pp_c_const_suffix (Types.struct_field_type var_type f)) fmt c)) fl
-    | Const_string _        -> assert false (* string occurs in annotations not in C *)
+    | Const_string _
+      | Const_modeid _ -> assert false (* string occurs in annotations not in C *)
 
 
 (* Prints a [value] of type [var_type] indexed by the suffix list [loop_vars] *)

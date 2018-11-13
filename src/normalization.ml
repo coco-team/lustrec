@@ -488,8 +488,6 @@ let normalize_spec decls node vars s =
 let normalize_node decls node =
   reset_cpt_fresh ();
   let inputs_outputs = node.node_inputs@node.node_outputs in
-  let is_local v =
-    List.for_all ((<>) v) inputs_outputs in
   let orig_vars = inputs_outputs@node.node_locals in
   let not_is_orig_var v =
     List.for_all ((!=) v) orig_vars in
@@ -595,7 +593,6 @@ let normalize_node decls node =
     end;
   
  
- let new_locals = List.filter is_local vars in (* TODO a quoi ca sert ? *)
   let node =
     { node with
       node_locals = all_locals;

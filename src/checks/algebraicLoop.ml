@@ -143,8 +143,8 @@ let fast_stages_processing prog =
   Options.verbose_level := !Options.verbose_level - 2;
 
   (* Mini stage 1 *)
-  (* Extracting dependencies *)
-  let dependencies = Compiler_common.import_dependencies prog in
+  (* Extracting dependencies: fill some table with typing info *)
+  ignore (Compiler_common.import_dependencies prog);
   (* Local inlining *)
   let prog = Inliner.local_inline prog (* type_env clock_env *) in
   (* Checking stateless/stateful status *)

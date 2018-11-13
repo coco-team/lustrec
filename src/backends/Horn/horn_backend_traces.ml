@@ -112,7 +112,8 @@ let memories_next  machines m = (* We remove the topest pre in each expression *
               (fun def ->
                 match def with
                 | Eq eq -> (match eq.eq_lhs with
-                            | [v] -> v = var_id 
+                            | [v] -> v = var_id
+                            | _ -> assert false
                            )
                 | _ -> false)
               m.mname.node_stmts

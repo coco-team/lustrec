@@ -767,8 +767,7 @@ module Make (T: Types.S) (Expr_type_hub: EXPR_TYPE_HUB with type type_expr = T.t
          type_top_const env c
       | TypeDef _ -> List.fold_left type_top_decl env (consts_of_enum_type decl)
       | Open _  -> env
-      | Contract c -> type_spec env c
-
+    
     let get_type_of_call decl =
       match decl.top_decl_desc with
       | Node nd         ->
@@ -812,7 +811,6 @@ module Make (T: Types.S) (Expr_type_hub: EXPR_TYPE_HUB with type type_expr = T.t
          uneval_node_generics (nd.node_inputs @ nd.node_outputs)
       | ImportedNode nd ->
          uneval_node_generics (nd.nodei_inputs @ nd.nodei_outputs)
-      | Contract c -> uneval_spec_generics c
       | Const _
         | TypeDef _
         | Open _

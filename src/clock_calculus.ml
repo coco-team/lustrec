@@ -734,6 +734,9 @@ let clock_imported_node env loc nd =
   nd.nodei_clock <- ck_node;
   Env.add_value env nd.nodei_id ck_node
 
+
+let new_env = clock_var_decl_list
+              
 let clock_top_const env cdecl=
   let ck = new_var false in
   try_generalize ck cdecl.const_loc;

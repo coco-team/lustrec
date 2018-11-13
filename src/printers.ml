@@ -367,7 +367,6 @@ let pp_decl fmt decl =
   | Const c -> fprintf fmt "const %a" pp_const_decl c
   | Open (local, s) -> if local then fprintf fmt "#open \"%s\"" s else fprintf fmt "#open <%s>" s
   | TypeDef tdef -> fprintf fmt "%a" pp_typedef tdef
-  | Contract c -> pp_spec fmt c (* TODO: may be we need to produce it outside of comments.To be discussed *)
   
 let pp_prog fmt prog =
   (* we first print types: the function SortProg.sort could do the job but ut
@@ -385,8 +384,7 @@ let pp_short_decl fmt decl =
   | Const c -> fprintf fmt "const %a@ " pp_const_decl c
   | Open (local, s) -> if local then fprintf fmt "#open \"%s\"@ " s else fprintf fmt "#open <%s>@ " s
   | TypeDef tdef -> fprintf fmt "type %s;@ " tdef.tydef_id
-  | Contract c -> fprintf fmt "(*@ contract *)@ "
-
+  
 let pp_lusi fmt decl = 
   match decl.top_decl_desc with
   | ImportedNode ind -> fprintf fmt "%a;@ " pp_imported_node ind
@@ -394,7 +392,6 @@ let pp_lusi fmt decl =
   | Open (local, s) -> if local then fprintf fmt "#open \"%s\"@ " s else fprintf fmt "#open <%s>@ " s
   | TypeDef tdef -> fprintf fmt "%a@ " pp_typedef tdef
   | Node _ -> assert false
-  | Contract c -> pp_spec fmt c (* TODO idem pp_node: how to print contract in lusi, within/without comments brackets ? *)
                 
 let pp_lusi_header fmt basename prog =
   fprintf fmt "@[<v 0>";

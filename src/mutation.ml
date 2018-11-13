@@ -223,6 +223,7 @@ let rdm_mutate_const_value c =
   | Const_real (n, i, s) -> let (n', i', s') = rdm_mutate_real (n, i, s) in Const_real (n', i', s')
   | Const_array _
   | Const_string _
+  | Const_modeid _
   | Const_struct _
   | Const_tag _ -> c
 
