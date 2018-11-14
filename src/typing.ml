@@ -389,7 +389,7 @@ module Make (T: Types.S) (Expr_type_hub: EXPR_TYPE_HUB with type type_expr = T.t
       else (
         type_dependent_call env in_main loc const f (List.combine args targs)
       )
-
+      
     (* type a call with possible dependent types. [targs] is here a list of (argument, type) pairs. *)
     and type_dependent_call env in_main loc const f targs =
       (* Format.eprintf "Typing.type_dependent_call %s@." f; *)
@@ -494,9 +494,9 @@ module Make (T: Types.S) (Expr_type_hub: EXPR_TYPE_HUB with type type_expr = T.t
                check_constant expr.expr_loc const false;	
                type_subtyping_arg env in_main const c (* Type_predef. *)type_bool);
            let args_list = expr_list_of_expr args in
+           let touts = type_appl env in_main expr.expr_loc const id args_list in
            let targs = new_ty (Ttuple (List.map (fun a -> Expr_type_hub.import a.expr_type) args_list)) in
            args.expr_type <- Expr_type_hub.export targs;
-           let touts = type_appl env in_main expr.expr_loc const id args_list in
            expr.expr_type <- Expr_type_hub.export touts;
            touts
         | Expr_fby (e1,e2)
