@@ -365,7 +365,13 @@ let rdm_mutate nb prog =
 (*                  Random mutation                              *)
 (*****************************************************************)
 
-type mutant_t = Boolexpr of int | Pre of int | Op of string * int * string | IncrIntCst of int | DecrIntCst of int | SwitchIntCst of int * int 
+type mutant_t =
+  | Boolexpr of int
+  | Pre of int
+  | Op of string * int * string
+  | IncrIntCst of int
+  | DecrIntCst of int
+  | SwitchIntCst of int * int 
 
 (* Denotes the parent node, the equation lhs and the location of the mutation *)
 type mutation_loc = ident * ident list * Location.t
@@ -709,10 +715,10 @@ let fold_mutate nb prog =
 		       ith element of the set of gathered constants
 		       !record.consts *)
       IntSet.fold (fun cst_id set ->
-	IntSet.fold (fun ith_cst set ->
-	  DblIntSet.add (cst_id, ith_cst) set
-	) !records.consts set
-      ) possible_const_id DblIntSet.empty 
+	  IntSet.fold (fun ith_cst set ->
+	      DblIntSet.add (cst_id, ith_cst) set
+	    ) !records.consts set
+        ) possible_const_id DblIntSet.empty 
   in
 
   let create_new_switch registered build =
@@ -768,9 +774,16 @@ let fold_mutate nb prog =
 	  | 1 -> !records.nb_boolexpr > 0, Boolexpr (try Random.int !records.nb_boolexpr with _ -> 0)
 	  | 0 -> let bindings = OpCount.bindings !records.nb_op in
 		 let bindings_len = List.length bindings in
-		 let op, nb_op = List.nth bindings (try Random.int (List.length bindings) with _ -> 0) in
-		 let new_op = List.nth (op_mutation op) (try Random.int (List.length (op_mutation op)) with _ -> 0) in
-	         bindings_len > 0, Op (op, (try Random.int nb_op with _ -> 0), new_op)
+		 if bindings_len > 0 then
+                   let op, nb_op = List.nth bindings (try Random.int bindings_len with _ -> 0) in
+                   let op_mut = op_mutation op in
+		   let new_op = List.nth op_mut (try Random.int (List.length op_mut) with _ -> 0) in
+	           true, Op (op, (try Random.int nb_op with _ -> 0), new_op)
+                 else
+                   false, Boolexpr 0 (* Providing a dummy construct,
+                                        it will be filtered out thanks
+                                        to the negative status (fst =
+                                        false) *)
 	  | _ -> assert false
 	in
 	match transforms with
@@ -785,9 +798,9 @@ let fold_mutate nb prog =
       let ok, random_mutation = apply_transform transforms in
       let stop_process () =
 	report ~level:1 (fun fmt -> fprintf fmt
-	  "Only %i mutants directives generated out of %i expected@ "
-	  (nb-rnb)
-	  nb); 
+	                              "Only %i mutants directives generated out of %i expected@ "
+	                              (nb-rnb)
+	                              nb); 
 	mutants
       in
       if not ok then
@@ -806,8 +819,8 @@ let fold_mutate nb prog =
   in
   let mutants_directives = create_mutants_directives nb [] in
   List.map (fun d ->
-    let mutant, loc = create_mutant prog d in
-    d, loc, mutant ) mutants_directives 
+      let mutant, loc = create_mutant prog d in
+      d, loc, mutant ) mutants_directives 
   
 
 let mutate nb prog =
