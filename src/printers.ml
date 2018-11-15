@@ -317,31 +317,47 @@ let pp_spec fmt spec =
   ()
 
     
-let pp_node fmt nd = 
-fprintf fmt "@[<v 0>%a%t%s @[<hov 0>%s (@[%a)@]@ returns (@[%a)@]@]@ %a%alet@[<h 2>   @ @[<v>%a@ %a@ %a@]@]@ tel@]@ "
-  (fun fmt s -> match s with Some s -> pp_spec fmt s | _ -> ()) nd.node_spec
-  (fun fmt -> match nd.node_spec with None -> () | Some _ -> fprintf fmt "@ ")
-  (if nd.node_dec_stateless then "function" else "node")
-  nd.node_id
-  pp_node_args nd.node_inputs
-  pp_node_args nd.node_outputs
-  (fun fmt locals ->
-  match locals with [] -> () | _ ->
-    fprintf fmt "@[<v 4>var %a@]@ " 
-      (fprintf_list ~sep:"@ " 
-	 (fun fmt v -> fprintf fmt "%a;" pp_node_var v))
-      locals
-  ) nd.node_locals
-  (fun fmt checks ->
-  match checks with [] -> () | _ ->
-    fprintf fmt "@[<v 4>check@ %a@]@ " 
-      (fprintf_list ~sep:"@ " 
-	 (fun fmt d -> fprintf fmt "%a" Dimension.pp_dimension d))
-      checks
-  ) nd.node_checks
-  (fprintf_list ~sep:"@ " pp_expr_annot) nd.node_annot
-  pp_node_stmts nd.node_stmts
-  pp_asserts nd.node_asserts
+let pp_node fmt nd =
+  fprintf fmt "@[<v 0>";
+  (* Prototype *)
+  fprintf fmt  "%s @[<hov 0>%s (@[%a)@]@ returns (@[%a)@]@]@ "
+    (if nd.node_dec_stateless then "function" else "node")
+    nd.node_id
+    pp_node_args nd.node_inputs
+    pp_node_args nd.node_outputs;
+  (* Contracts *)
+  fprintf fmt "%a%t"
+    (fun fmt s -> match s with Some s -> pp_spec fmt s | _ -> ()) nd.node_spec
+    (fun fmt -> match nd.node_spec with None -> () | Some _ -> fprintf fmt "@ ");
+  (* Locals *)
+  fprintf fmt "%a" (fun fmt locals ->
+      match locals with [] -> () | _ ->
+                                    fprintf fmt "@[<v 4>var %a@]@ " 
+                                      (fprintf_list ~sep:"@ " 
+	                                 (fun fmt v -> fprintf fmt "%a;" pp_node_var v))
+                                      locals
+    ) nd.node_locals;
+  (* Checks *)
+  fprintf fmt "%a"
+    (fun fmt checks ->
+      match checks with [] -> () | _ ->
+                                    fprintf fmt "@[<v 4>check@ %a@]@ " 
+                                      (fprintf_list ~sep:"@ " 
+	                                 (fun fmt d -> fprintf fmt "%a" Dimension.pp_dimension d))
+                                      checks
+    ) nd.node_checks;
+  (* Body *)
+  fprintf fmt "let@[<h 2>   @ @[<v>";
+  (* Annotations *)
+  fprintf fmt "%a@ " (fprintf_list ~sep:"@ " pp_expr_annot) nd.node_annot;
+  (* Statements *)
+  fprintf fmt "%a@ " pp_node_stmts nd.node_stmts;
+  (* Asserts *)    
+  fprintf fmt "%a" pp_asserts nd.node_asserts;
+  (* closing boxes body (2)  and node (1) *) 
+  fprintf fmt "@]@]@ tel@]@ "
+
+
 (*fprintf fmt "@ /* Scheduling: %a */ @ " (fprintf_list ~sep:", " pp_print_string) (Scheduling.schedule_node nd)*)
 
 let pp_imported_node fmt ind = 
