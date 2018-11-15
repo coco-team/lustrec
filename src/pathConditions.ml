@@ -271,15 +271,13 @@ let mcdc_top_decl td =
        List.map
 	 (fun (v, _, atom, atom_valid) ->
 	  let e = expr_of_vdecl v in
-	  let ee = expr_to_eexpr e in
 	  let neg_ee = expr_to_eexpr (mkpredef_call e.expr_loc "not" [e]) in
 	  {annots =  [["PROPERTY"], neg_ee; (* Using negated property to force
                                                model-checker to produce a
                                                suitable covering trace *)
-		      let _ = Printers.pp_expr Format.str_formatter atom in
-		      let atom_as_string = Format.flush_str_formatter () in
-		      let valid = if atom_valid then "true" else "false" in
-		      ["coverage";"mcdc";atom_as_string;valid], ee
+                      let loc = Location.dummy_loc in
+		      let valid_e = let open Corelang in mkexpr loc (Expr_const (const_of_bool atom_valid)) in
+		      ["coverage";"mcdc";v.var_id], expr_to_eexpr (Corelang.expr_of_expr_list loc [e; atom; valid_e])
 		     ];
 	   annot_loc = v.var_loc})
 	 fresh_cov_vars
