@@ -387,10 +387,14 @@ let pp_decl fmt decl =
 let pp_prog fmt prog =
   (* we first print types: the function SortProg.sort could do the job but ut
      introduces a cyclic dependance *)
-  let type_decl, others =
+
+  let open_decl, prog =
+    List.partition (fun decl -> match decl.top_decl_desc with Open _ -> true | _ -> false) prog
+  in
+  let type_decl, prog =
     List.partition (fun decl -> match decl.top_decl_desc with TypeDef _ -> true | _ -> false) prog
   in
-  fprintf fmt "@[<v 0>%a@]" (fprintf_list ~sep:"@ " pp_decl) (type_decl@others)
+  fprintf fmt "@[<v 0>%a@]" (fprintf_list ~sep:"@ " pp_decl) (open_decl@type_decl@prog)
 
 (* Gives a short overview of model content. Do not print all node content *)
 let pp_short_decl fmt decl =
