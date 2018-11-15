@@ -10,13 +10,15 @@
 (********************************************************************)
 
 open Utils
-open LustreSpec
+open Lustre_types
+open Machine_code_types
 open Corelang
 open Normalization
-open Machine_code
+open Machine_code_common
 
 let mpfr_module = mktop (Open(false, "mpfr_lustre"))
-
+let cpt_fresh = ref 0
+  
 let mpfr_rnd () = "MPFR_RNDN"
 
 let mpfr_prec () = !Options.mpfr_prec
@@ -43,11 +45,11 @@ let inject_id_id expr =
     expr_clock = expr.expr_clock;
   }
 
-let pp_inject_real pp_var fmt var value =
+let pp_inject_real pp_var pp_val fmt var value =
   Format.fprintf fmt "%s(%a, %a, %s);"
     inject_real_id
     pp_var var
-    pp_var value
+    pp_val value
     (mpfr_rnd ())
 
 let inject_assign expr =
@@ -67,7 +69,7 @@ let pp_inject_copy pp_var fmt var value =
 let rec pp_inject_assign pp_var fmt var value =
   if is_const_value value
   then
-    pp_inject_real pp_var fmt var value
+    pp_inject_real pp_var pp_var fmt var value
   else
     pp_inject_copy pp_var fmt var value
 
@@ -139,7 +141,7 @@ let rec inject_list alias node inject_element defvars elist =
     ) elist (defvars, [])
 
 let rec inject_expr ?(alias=true) node defvars expr =
-let res=
+let res =
   match expr.expr_desc with
   | Expr_const (Const_real _)  -> mk_expr_alias_opt alias node defvars expr
   | Expr_const (Const_array _) -> inject_expr ~alias:alias node defvars (expr_of_const_array expr)
@@ -209,6 +211,21 @@ let rec inject_eq node defvars eq =
   let norm_eq = { eq with eq_rhs = norm_rhs } in
   norm_eq::defs', vars'
 
+(* let inject_eexpr ee =
+ *   { ee with eexpr_qfexpr = inject_expr ee.eexpr_qfexpr }
+ *   
+ * let inject_spec s =
+ *   { s with
+ *     assume = List.map inject_eexpr s.assume;
+ *     guarantees = List.map inject_eexpr s.guarantees;
+ *     modes = List.map (fun m ->
+ *                 { m with
+ *                   require = List.map inject_eexpr m.require;
+ *                   ensure = List.map inject_eexpr m.ensure
+ *                 }
+ *               ) s.modes
+ *   } *)
+  
 (** normalize_node node returns a normalized node, 
     ie. 
     - updated locals
@@ -221,8 +238,10 @@ let inject_node node =
   let is_local v =
     List.for_all ((!=) v) inputs_outputs in
   let orig_vars = inputs_outputs@node.node_locals in
-  let defs, vars = 
-    List.fold_left (inject_eq node) ([], orig_vars) (get_node_eqs node) in
+  let defs, vars =
+    let eqs, auts = get_node_eqs node in
+    if auts != [] then assert false; (* Automata should be expanded by now. *)
+    List.fold_left (inject_eq node) ([], orig_vars) eqs in
   (* Normalize the asserts *)
   let vars, assert_defs, asserts = 
     List.fold_left (
@@ -243,10 +262,25 @@ let inject_node node =
      - compute the associated expression without aliases     
   *)
   (* let diff_vars = List.filter (fun v -> not (List.mem v node.node_locals)) new_locals in *)
+  (* See comment below
+   *  let spec = match node.node_spec with
+   *   | None -> None
+   *   | Some spec -> Some (inject_spec spec)
+   * in *)
   let node =
   { node with 
     node_locals = new_locals; 
     node_stmts = List.map (fun eq -> Eq eq) (defs @ assert_defs);
+    (* Incomplete work: TODO. Do we have to inject MPFR code here?
+       Does it make sense for annotations? For me, only if we produce
+       C code for annotations. Otherwise the various verification
+       backend should have their own understanding, but would not
+       necessarily require this additional normalization. *)
+    (* 
+       node_spec = spec;
+       node_annot = List.map (fun ann -> {ann with
+           annots = List.map (fun (ids, ee) -> ids, inject_eexpr ee) ann.annots}
+         ) node.node_annot *)
   }
   in ((*Printers.pp_node Format.err_formatter node;*) node)
 
