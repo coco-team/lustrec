@@ -140,8 +140,8 @@ let testgen_source dirname basename extension =
   let cmake_file = open_out cmakelists in
   let cmake_fmt = formatter_of_out_channel cmake_file in
   Format.fprintf cmake_fmt "cmake_minimum_required(VERSION 3.5)@.";
-  Format.fprintf cmake_fmt "include(\"/home/ploc/Local/share/helpful_functions.cmake\")@.";
-  Format.fprintf cmake_fmt "include(\"/home/ploc/Local/share/FindLustre.cmake\")@."; 
+  Format.fprintf cmake_fmt "include(\"%s/share/helpful_functions.cmake\")@." Version.prefix;
+  Format.fprintf cmake_fmt "include(\"%s/share/FindLustre.cmake\")@." Version.prefix;
   Format.fprintf cmake_fmt "LUSTREFILES(LFILES ${CMAKE_CURRENT_SOURCE_DIR} )@.";
   Format.fprintf cmake_fmt "@[<v 2>FOREACH(lus_file ${LFILES})@ ";
   Format.fprintf cmake_fmt "get_lustre_name_ext(${lus_file} L E)@ ";
