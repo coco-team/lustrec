@@ -4,26 +4,32 @@ open Corelang
   
 let print_statelocaltag = true
 
-let rec pp_val fmt v =
+let is_memory m id =
+  List.exists (fun o -> o.var_id = id.var_id) m.mmemory
+
+let rec pp_val m fmt v =
+  let pp_val = pp_val m in
   match v.value_desc with
-    | Cst c         -> Printers.pp_const fmt c 
-    | LocalVar v    ->
+  | Cst c         -> Printers.pp_const fmt c 
+  | Var v    ->
+     if is_memory m v then
+       if print_statelocaltag then
+	 Format.fprintf fmt "%s(S)" v.var_id
+       else
+	 Format.pp_print_string fmt v.var_id 
+     else     
        if print_statelocaltag then
 	 Format.fprintf fmt "%s(L)" v.var_id
        else
 	 Format.pp_print_string fmt v.var_id
-	   
-    | StateVar v    ->
-       if print_statelocaltag then
-	 Format.fprintf fmt "%s(S)" v.var_id
-       else
-	 Format.pp_print_string fmt v.var_id
-    | Array vl      -> Format.fprintf fmt "[%a]" (Utils.fprintf_list ~sep:", " pp_val)  vl
-    | Access (t, i) -> Format.fprintf fmt "%a[%a]" pp_val t pp_val i
-    | Power (v, n)  -> Format.fprintf fmt "(%a^%a)" pp_val v pp_val n
-    | Fun (n, vl)   -> Format.fprintf fmt "%s (%a)" n (Utils.fprintf_list ~sep:", " pp_val)  vl
+  | Array vl      -> Format.fprintf fmt "[%a]" (Utils.fprintf_list ~sep:", " pp_val)  vl
+  | Access (t, i) -> Format.fprintf fmt "%a[%a]" pp_val t pp_val i
+  | Power (v, n)  -> Format.fprintf fmt "(%a^%a)" pp_val v pp_val n
+  | Fun (n, vl)   -> Format.fprintf fmt "%s (%a)" n (Utils.fprintf_list ~sep:", " pp_val)  vl
 
-let rec pp_instr fmt i =
+let rec  pp_instr m fmt i =
+ let     pp_val = pp_val m and
+      pp_branch = pp_branch m in
   let _ =
     match i.instr_desc with
     | MLocalAssign (i,v) -> Format.fprintf fmt "%s<-l- %a" i.var_id pp_val v
@@ -51,11 +57,11 @@ let rec pp_instr fmt i =
   in
   ()
     
-and pp_branch fmt (t, h) =
-  Format.fprintf fmt "@[<v 2>%s:@,%a@]" t (Utils.fprintf_list ~sep:"@," pp_instr) h
+and pp_branch m fmt (t, h) =
+  Format.fprintf fmt "@[<v 2>%s:@,%a@]" t (Utils.fprintf_list ~sep:"@," (pp_instr m)) h
 
-and pp_instrs fmt il =
-  Format.fprintf fmt "@[<v 2>%a@]" (Utils.fprintf_list ~sep:"@," pp_instr) il
+and pp_instrs m fmt il =
+  Format.fprintf fmt "@[<v 2>%a@]" (Utils.fprintf_list ~sep:"@," (pp_instr m)) il
 
 
 (* merge log: get_node_def was in c0f8 *)
@@ -75,14 +81,14 @@ let get_node_def id m =
 (* merge log: machine_vars was in 44686 *)
 let machine_vars m = m.mstep.step_inputs @ m.mstep.step_locals @ m.mstep.step_outputs @ m.mmemory
 
-let pp_step fmt s =
+let pp_step m fmt s =
   Format.fprintf fmt "@[<v>inputs : %a@ outputs: %a@ locals : %a@ checks : %a@ instrs : @[%a@]@ asserts : @[%a@]@]@ "
     (Utils.fprintf_list ~sep:", " Printers.pp_var) s.step_inputs
     (Utils.fprintf_list ~sep:", " Printers.pp_var) s.step_outputs
     (Utils.fprintf_list ~sep:", " Printers.pp_var) s.step_locals
-    (Utils.fprintf_list ~sep:", " (fun fmt (_, c) -> pp_val fmt c)) s.step_checks
-    (Utils.fprintf_list ~sep:"@ " pp_instr) s.step_instrs
-    (Utils.fprintf_list ~sep:", " pp_val) s.step_asserts
+    (Utils.fprintf_list ~sep:", " (fun fmt (_, c) -> pp_val m fmt c)) s.step_checks
+    (Utils.fprintf_list ~sep:"@ " (pp_instr m)) s.step_instrs
+    (Utils.fprintf_list ~sep:", " (pp_val m)) s.step_asserts
 
 
 let pp_static_call fmt (node, args) =
@@ -96,9 +102,9 @@ let pp_machine fmt m =
     m.mname.node_id
     (Utils.fprintf_list ~sep:", " Printers.pp_var) m.mmemory
     (Utils.fprintf_list ~sep:", " (fun fmt (o1, o2) -> Format.fprintf fmt "(%s, %a)" o1 pp_static_call o2)) m.minstances
-    (Utils.fprintf_list ~sep:"@ " pp_instr) m.minit
-    (Utils.fprintf_list ~sep:"@ " pp_instr) m.mconst
-    pp_step m.mstep
+    (Utils.fprintf_list ~sep:"@ " (pp_instr m)) m.minit
+    (Utils.fprintf_list ~sep:"@ " (pp_instr m)) m.mconst
+    (pp_step m) m.mstep
     (fun fmt -> match m.mspec with | None -> () | Some spec -> Printers.pp_spec fmt spec)
     (Utils.fprintf_list ~sep:"@ " Printers.pp_expr_annot) m.mannot
 
@@ -122,8 +128,6 @@ let is_input m id =
 let is_output m id =
   List.exists (fun o -> o.var_id = id.var_id) m.mstep.step_outputs
 
-let is_memory m id =
-  List.exists (fun o -> o.var_id = id.var_id) m.mmemory
 
 let mk_conditional ?lustre_eq c t e =
   mkinstr ?lustre_eq:lustre_eq  (MBranch(c, [ (tag_true, t); (tag_false, e) ]))
@@ -156,12 +160,12 @@ let arrow_machine =
       step_outputs = Arrow.arrow_desc.node_outputs;
       step_locals = [];
       step_checks = [];
-      step_instrs = [mk_conditional (mk_val (StateVar var_state) Type_predef.type_bool)
+      step_instrs = [mk_conditional (mk_val (Var var_state) Type_predef.type_bool)
 			(List.map mkinstr
 			[MStateAssign(var_state, cst false);
-			 MLocalAssign(var_output, mk_val (LocalVar var_input1) t_arg)])
+			 MLocalAssign(var_output, mk_val (Var var_input1) t_arg)])
                         (List.map mkinstr
-			[MLocalAssign(var_output, mk_val (LocalVar var_input2) t_arg)]) ];
+			[MLocalAssign(var_output, mk_val (Var var_input2) t_arg)]) ];
       step_asserts = [];
     };
     mspec = None;
@@ -248,15 +252,15 @@ let value_of_ident loc m id =
   (* is is a state var *)
   try
     let v = List.find (fun v -> v.var_id = id) m.mmemory
-    in mk_val (StateVar v) v.var_type 
+    in mk_val (Var v) v.var_type 
   with Not_found ->
     try (* id is a node var *)
       let v = get_node_var id m.mname
-      in mk_val (LocalVar v) v.var_type
+      in mk_val (Var v) v.var_type
   with Not_found ->
     try (* id is a constant *)
       let c = Corelang.var_decl_of_const (const_of_top (Hashtbl.find Corelang.consts_table id))
-      in mk_val (LocalVar c) c.var_type
+      in mk_val (Var c) c.var_type
     with Not_found ->
       (* id is a tag *)
       let t = Const_tag id
@@ -290,7 +294,7 @@ let rec dimension_of_value value =
   | Cst (Const_tag t) when t = Corelang.tag_true  -> Dimension.mkdim_bool  Location.dummy_loc true
   | Cst (Const_tag t) when t = Corelang.tag_false -> Dimension.mkdim_bool  Location.dummy_loc false
   | Cst (Const_int i)                             -> Dimension.mkdim_int   Location.dummy_loc i
-  | LocalVar v                                    -> Dimension.mkdim_ident Location.dummy_loc v.var_id
+  | Var v                                         -> Dimension.mkdim_ident Location.dummy_loc v.var_id
   | Fun (f, args)                                 -> Dimension.mkdim_appl  Location.dummy_loc f (List.map dimension_of_value args)
   | _                                             -> assert false
 

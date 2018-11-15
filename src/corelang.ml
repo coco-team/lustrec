@@ -25,8 +25,15 @@ end
 
 module VMap = Map.Make(VDeclModule)
 
-module VSet : Set.S with type elt = var_decl = Set.Make(VDeclModule)
-
+module VSet: sig
+  include Set.S
+  val pp: Format.formatter -> t -> unit 
+end with type elt = var_decl =
+  struct
+    include Set.Make(VDeclModule)
+    let pp fmt s =
+      Format.fprintf fmt "{@[%a}@]" (Utils.fprintf_list ~sep:",@ " Printers.pp_var) (elements s)  
+  end
 let dummy_type_dec = {ty_dec_desc=Tydec_any; ty_dec_loc=Location.dummy_loc}
 
 let dummy_clock_dec = {ck_dec_desc=Ckdec_any; ck_dec_loc=Location.dummy_loc}

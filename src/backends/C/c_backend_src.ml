@@ -38,8 +38,7 @@ struct
   let rec expansion_depth v =
     match v.value_desc with
     | Cst cst -> expansion_depth_cst cst
-    | LocalVar _
-    | StateVar _  -> 0
+    | Var _ -> 0
     | Fun (_, vl) -> List.fold_right (fun v -> max (expansion_depth v)) vl 0
     | Array vl    -> 1 + List.fold_right (fun v -> max (expansion_depth v)) vl 0
     | Access (v, i) -> max 0 (expansion_depth v - 1)
@@ -59,8 +58,7 @@ struct
   let rec static_loop_profile v =
     match v.value_desc with
     | Cst cst  -> static_loop_profile_cst cst
-    | LocalVar _
-    | StateVar _  -> []
+    | Var _  -> []
     | Fun (_, vl) -> List.fold_right (fun v lp -> merge_static_loop_profiles lp (static_loop_profile v)) vl []
     | Array vl    -> true :: List.fold_right (fun v lp -> merge_static_loop_profiles lp (static_loop_profile v)) vl []
     | Access (v, i) -> (match (static_loop_profile v) with [] -> [] | _ :: q -> q)
@@ -90,7 +88,7 @@ let rec value_offsets v offsets =
  | Cst (Const_array cl)     , LInt r :: q -> value_offsets (Cst (List.nth cl !r)) q
  | Fun (f, vl)              , _           -> Fun (f, List.map (fun v -> value_offsets v offsets) vl)
  | _                        , LInt r :: q -> value_offsets (Access (v, Cst (Const_int !r))) q
- | _                        , LVar i :: q -> value_offsets (Access (v, LocalVar i)) q
+ | _                        , LVar i :: q -> value_offsets (Access (v, Var i)) q
 *)
 (* Computes the list of nested loop variables together with their dimension bounds.
    - LInt r stands for loop expansion (no loop variable, but int loop index)
@@ -114,15 +112,15 @@ let reorder_loop_variables loop_vars =
   var_loops @ int_loops
 
 (* Prints a one loop variable suffix for arrays *)
-let pp_loop_var fmt lv =
+let pp_loop_var m fmt lv =
  match snd lv with
  | LVar v -> fprintf fmt "[%s]" v
  | LInt r -> fprintf fmt "[%d]" !r
- | LAcc i -> fprintf fmt "[%a]" pp_val i
+ | LAcc i -> fprintf fmt "[%a]" (pp_val m) i
 
 (* Prints a suffix of loop variables for arrays *)
-let pp_suffix fmt loop_vars =
- Utils.fprintf_list ~sep:"" pp_loop_var fmt loop_vars
+let pp_suffix m fmt loop_vars =
+ Utils.fprintf_list ~sep:"" (pp_loop_var m) fmt loop_vars
 
 (* Prints a value expression [v], with internal function calls only.
    [pp_var] is a printer for variables (typically [pp_c_var_read]),
@@ -142,49 +140,54 @@ let rec pp_c_const_suffix var_type fmt c =
 
 
 (* Prints a [value] of type [var_type] indexed by the suffix list [loop_vars] *)
-let rec pp_value_suffix self var_type loop_vars pp_value fmt value =
+let rec pp_value_suffix m self var_type loop_vars pp_value fmt value =
   (*Format.eprintf "pp_value_suffix: %a %a %a@." Types.print_ty var_type Machine_code.pp_val value pp_suffix loop_vars;*)
+  let pp_suffix = pp_suffix m in
   (
     match loop_vars, value.value_desc with
     | (x, LAcc i) :: q, _ when is_const_index i ->
        let r = ref (Dimension.size_const_dimension (dimension_of_value i)) in
-       pp_value_suffix self var_type ((x, LInt r)::q) pp_value fmt value
+       pp_value_suffix m self var_type ((x, LInt r)::q) pp_value fmt value
     | (_, LInt r) :: q, Cst (Const_array cl) ->
        let var_type = Types.array_element_type var_type in
-       pp_value_suffix self var_type q pp_value fmt (mk_val (Cst (List.nth cl !r)) Type_predef.type_int)
+       pp_value_suffix m self var_type q pp_value fmt (mk_val (Cst (List.nth cl !r)) Type_predef.type_int)
     | (_, LInt r) :: q, Array vl      ->
        let var_type = Types.array_element_type var_type in
-       pp_value_suffix self var_type q pp_value fmt (List.nth vl !r)
+       pp_value_suffix m self var_type q pp_value fmt (List.nth vl !r)
     | loop_var    :: q, Array vl      ->
        let var_type = Types.array_element_type var_type in
-       Format.fprintf fmt "(%a[]){%a }%a" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_value_suffix self var_type q pp_value)) vl pp_suffix [loop_var]
+       Format.fprintf fmt "(%a[]){%a }%a" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_value_suffix m self var_type q pp_value)) vl pp_suffix [loop_var]
     | []              , Array vl      ->
        let var_type = Types.array_element_type var_type in
-       Format.fprintf fmt "(%a[]){%a }" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_value_suffix self var_type [] pp_value)) vl
+       Format.fprintf fmt "(%a[]){%a }" (pp_c_type "") var_type (Utils.fprintf_list ~sep:", " (pp_value_suffix m self var_type [] pp_value)) vl
     | _           :: q, Power (v, n)  ->
-       pp_value_suffix self var_type q pp_value fmt v
+       pp_value_suffix m self var_type q pp_value fmt v
     | _               , Fun (n, vl)   ->
-       pp_basic_lib_fun (Types.is_int_type value.value_type) n (pp_value_suffix self var_type loop_vars pp_value) fmt vl
+       pp_basic_lib_fun (Types.is_int_type value.value_type) n (pp_value_suffix m self var_type loop_vars pp_value) fmt vl
     | _               , Access (v, i) ->
        let var_type = Type_predef.type_array (Dimension.mkdim_var ()) var_type in
-       pp_value_suffix self var_type ((Dimension.mkdim_var (), LAcc i) :: loop_vars) pp_value fmt v
-    | _               , LocalVar v    -> Format.fprintf fmt "%a%a" pp_value v pp_suffix loop_vars
-    | _               , StateVar v    ->
-       (* array memory vars are represented by an indirection to a local var with the right type,
-	  in order to avoid casting everywhere. *)
-       if Types.is_array_type v.var_type
-       then Format.fprintf fmt "%a%a" pp_value v pp_suffix loop_vars
-       else Format.fprintf fmt "%s->_reg.%a%a" self pp_value v pp_suffix loop_vars
+       pp_value_suffix m self var_type ((Dimension.mkdim_var (), LAcc i) :: loop_vars) pp_value fmt v
+    | _               , Var v    ->
+       if is_memory m v then (
+         (* array memory vars are represented by an indirection to a local var with the right type,
+	    in order to avoid casting everywhere. *)
+         if Types.is_array_type v.var_type
+         then Format.fprintf fmt "%a%a" pp_value v pp_suffix loop_vars
+         else Format.fprintf fmt "%s->_reg.%a%a" self pp_value v pp_suffix loop_vars
+       )
+       else (
+         Format.fprintf fmt "%a%a" pp_value v pp_suffix loop_vars
+       )
     | _               , Cst cst       -> pp_c_const_suffix var_type fmt cst
-    | _               , _             -> (Format.eprintf "internal error: C_backend_src.pp_value_suffix %a %a %a@." Types.print_ty var_type pp_val value pp_suffix loop_vars; assert false)
+    | _               , _             -> (Format.eprintf "internal error: C_backend_src.pp_value_suffix %a %a %a@." Types.print_ty var_type (pp_val m) value pp_suffix loop_vars; assert false)
   )
    
 (* Subsumes C_backend_common.pp_c_val to cope with aggressive substitution
    which may yield constant arrays in expressions.
    Type is needed to correctly print constant arrays.
  *)
-let pp_c_val self pp_var fmt v =
-  pp_value_suffix self v.value_type [] pp_var fmt v
+let pp_c_val m self pp_var fmt v =
+  pp_value_suffix m self v.value_type [] pp_var fmt v
 
 let pp_basic_assign pp_var fmt typ var_name value =
   if Types.is_real_type typ && !Options.mpfr
@@ -209,7 +212,7 @@ let pp_assign m self pp_var fmt var_type var_name value =
   let rec aux typ fmt vars =
     match vars with
     | [] ->
-       pp_basic_assign (pp_value_suffix self var_type loop_vars pp_var) fmt typ var_name value
+       pp_basic_assign (pp_value_suffix m self var_type loop_vars pp_var) fmt typ var_name value
     | (d, LVar i) :: q ->
        let typ' = Types.array_element_type typ in
       (*eprintf "pp_aux %a %s@." Dimension.pp_dimension d i;*)
@@ -308,7 +311,7 @@ let pp_instance_call dependencies m self fmt i (inputs: value_t list) (outputs: 
     let inputs = List.combine input_types inputs in
     if has_c_prototype i dependencies
     then (* external C function *)
-      let outputs = List.map2 (fun t v -> t, LocalVar v) output_types outputs in
+      let outputs = List.map2 (fun t v -> t, Var v) output_types outputs in
       fprintf fmt "%a = %s(%a);"
 	(Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) outputs
 	i
@@ -322,7 +325,7 @@ let pp_instance_call dependencies m self fmt i (inputs: value_t list) (outputs: 
 *)
 let rec pp_conditional dependencies (m: machine_t) self fmt c tl el =
   fprintf fmt "@[<v 2>if (%a) {%t%a@]@,@[<v 2>} else {%t%a@]@,}"
-    (pp_c_val self (pp_c_var_read m)) c
+    (pp_c_val m self (pp_c_var_read m)) c
     (Utils.pp_newline_if_non_empty tl)
     (Utils.fprintf_list ~sep:"@," (pp_machine_instr dependencies m self)) tl
     (Utils.pp_newline_if_non_empty el)
@@ -336,24 +339,24 @@ and pp_machine_instr dependencies (m: machine_t) self fmt instr =
   | MLocalAssign (i,v) ->
     pp_assign
       m self (pp_c_var_read m) fmt
-      i.var_type (mk_val (LocalVar i) i.var_type) v
+      i.var_type (mk_val (Var i) i.var_type) v
   | MStateAssign (i,v) ->
     pp_assign
       m self (pp_c_var_read m) fmt
-      i.var_type (mk_val (StateVar i) i.var_type) v
+      i.var_type (mk_val (Var i) i.var_type) v
   | MStep ([i0], i, vl) when Basic_library.is_value_internal_fun (mk_val (Fun (i, vl)) i0.var_type)  ->
     pp_machine_instr dependencies m self fmt 
       (update_instr_desc instr (MLocalAssign (i0, mk_val (Fun (i, vl)) i0.var_type)))
   | MStep ([i0], i, vl) when has_c_prototype i dependencies -> 
     fprintf fmt "%a = %s(%a);" 
-      (pp_c_val self (pp_c_var_read m)) (mk_val (LocalVar i0) i0.var_type)
+      (pp_c_val m self (pp_c_var_read m)) (mk_val (Var i0) i0.var_type)
       i
-      (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) vl
+      (Utils.fprintf_list ~sep:", " (pp_c_val m self (pp_c_var_read m))) vl
   | MStep (il, i, vl) when Mpfr.is_homomorphic_fun i ->
     pp_instance_call m self fmt i vl il
   | MStep (il, i, vl) ->
     pp_basic_instance_call m self fmt i vl il
-  | MBranch (_, []) -> (Format.eprintf "internal error: C_backend_src.pp_machine_instr %a@." pp_instr instr; assert false)
+  | MBranch (_, []) -> (Format.eprintf "internal error: C_backend_src.pp_machine_instr %a@." (pp_instr m) instr; assert false)
   | MBranch (g, hl) ->
     if let t = fst (List.hd hl) in t = tag_true || t = tag_false
     then (* boolean case, needs special treatment in C because truth value is not unique *)
@@ -364,7 +367,7 @@ and pp_machine_instr dependencies (m: machine_t) self fmt instr =
     else (* enum type case *)
       (*let g_typ = Typing.type_const Location.dummy_loc (Const_tag (fst (List.hd hl))) in*)
       fprintf fmt "@[<v 2>switch(%a) {@,%a@,}@]"
-	(pp_c_val self (pp_c_var_read m)) g
+	(pp_c_val m self (pp_c_var_read m)) g
 	(Utils.fprintf_list ~sep:"@," (pp_machine_branch dependencies m self)) hl
   | MComment s  -> 
       fprintf fmt "/*%s*/@ " s
@@ -612,7 +615,7 @@ let print_global_init_code fmt basename prog dependencies =
     print_global_init_prototype baseNAME
     (pp_c_basic_type_desc Type_predef.type_bool)
     (* constants *) 
-    (Utils.fprintf_list ~sep:"@," (pp_const_initialize (pp_c_var_read empty_machine))) constants
+    (Utils.fprintf_list ~sep:"@," (pp_const_initialize empty_machine (pp_c_var_read empty_machine))) constants
     (Utils.pp_final_char_if_non_empty "@," dependencies)
     (* dependencies initialization *)
     (Utils.fprintf_list ~sep:"@," print_import_init) dependencies

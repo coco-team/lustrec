@@ -18,7 +18,7 @@ let pp_call fmt m f outputs inputs =
         name lib;
       fprintf fmt "\"lhs\": [@[%a@]],@ \"args\": [@[%a@]]"
 	(Utils.fprintf_list ~sep:",@ " (fun fmt v -> fprintf fmt "\"%a\"" Printers.pp_var_name v)) outputs
-	pp_emf_cst_or_var_list inputs
+	(pp_emf_cst_or_var_list m) inputs
     )
     | _ ->
        Format.eprintf "Calls to function %s in library %s are not handled yet.@."

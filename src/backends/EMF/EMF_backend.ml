@@ -260,15 +260,14 @@ let rec pp_emf_instr m fmt i =
 	  fprintf fmt "\"lhs\": \"%a\",@ " pp_var_name lhs;
 	  fprintf fmt "\"name\": \"%s\",@ \"args\": [@[%a@]]"
 	    fun_id
-	    pp_emf_cst_or_var_list vl
+	    (pp_emf_cst_or_var_list m) vl
 	)	 
 	| Array _ | Access _ | Power _ -> assert false (* No array expression allowed yet *)
 	| Cst _ 
-	| LocalVar _
-	| StateVar _ -> (
+	| Var _ -> (
 	  fprintf fmt "\"kind\": \"local_assign\",@ \"lhs\": \"%a\",@ \"rhs\": %a"
 	    pp_var_name lhs
-	    pp_emf_cst_or_var expr
+	    (pp_emf_cst_or_var m) expr
 	))    )
 
     | MStateAssign(lhs, expr) (* a Pre construct Shall only be defined by a
@@ -276,7 +275,7 @@ let rec pp_emf_instr m fmt i =
       -> (
 	fprintf fmt "\"kind\": \"pre\",@ \"lhs\": \"%a\",@ \"rhs\": %a"
 	  pp_var_name lhs
-	  pp_emf_cst_or_var expr
+	  (pp_emf_cst_or_var m) expr
       )
        
     | MReset id           
@@ -307,7 +306,7 @@ let rec pp_emf_instr m fmt i =
 
       (* ; *)
       fprintf fmt "\"kind\": \"branch\",@ ";
-      fprintf fmt "\"guard\": %a,@ " pp_emf_cst_or_var g; (* it has to be a variable or a constant *)
+      fprintf fmt "\"guard\": %a,@ " (pp_emf_cst_or_var m) g; (* it has to be a variable or a constant *)
       fprintf fmt "\"outputs\": [%a],@ " (fprintf_list ~sep:", " pp_var_string) (ISet.elements outputs);
       fprintf fmt "\"inputs\": [%a],@ " pp_emf_vars_decl
 	(* (let guard_inputs = get_expr_vars g in
@@ -348,7 +347,7 @@ let rec pp_emf_instr m fmt i =
 	f;
       fprintf fmt "\"lhs\": [@[%a@]],@ \"args\": [@[%a@]]"
 	(fprintf_list ~sep:",@ " (fun fmt v -> fprintf fmt "\"%a\"" pp_var_name v)) outputs
-	pp_emf_cst_or_var_list inputs;
+	(pp_emf_cst_or_var_list m) inputs;
       if is_stateful then
 	fprintf fmt ",@ \"reset\": { \"name\": \"%s\", \"resetable\": \"%b\"}"
 	  (reset_name f)

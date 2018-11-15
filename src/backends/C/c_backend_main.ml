@@ -115,7 +115,7 @@ let print_main_clear mname main_mem fmt m =
 
 let print_main_loop mname main_mem fmt m =
   let input_values =
-    List.map (fun v -> mk_val (LocalVar v) v.var_type)
+    List.map (fun v -> mk_val (Var v) v.var_type)
       m.mstep.step_inputs in
   begin
     fprintf fmt "@ ISATTY = isatty(0);@ ";

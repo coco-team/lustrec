@@ -19,6 +19,7 @@ open Causality
 exception NormalizationError
 
 
+       
 (* translate_<foo> : node -> context -> <foo> -> machine code/expression *)
 (* the context contains  m : state aka memory variables  *)
 (*                      si : initialization instructions *)
@@ -29,19 +30,11 @@ let translate_ident node (m, si, j, d, s) id =
   (* Format.eprintf "trnaslating ident: %s@." id; *)
   try (* id is a node var *)
     let var_id = get_node_var id node in
-    if VSet.exists (fun v -> v.var_id = id) m
-    then (
-      (* Format.eprintf "a STATE VAR@."; *)
-      mk_val (StateVar var_id) var_id.var_type
-    )
-    else (
-      (* Format.eprintf "a LOCAL VAR@."; *)
-      mk_val (LocalVar var_id) var_id.var_type
-    )
+    mk_val (Var var_id) var_id.var_type
   with Not_found ->
     try (* id is a constant *)
       let vdecl = (Corelang.var_decl_of_const (const_of_top (Hashtbl.find Corelang.consts_table id))) in
-      mk_val (LocalVar vdecl) vdecl.var_type
+      mk_val (Var vdecl) vdecl.var_type
     with Not_found ->
       (* id is a tag *)
       (* DONE construire une liste des enum declarés et alors chercher dedans la liste

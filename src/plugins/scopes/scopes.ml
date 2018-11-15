@@ -221,7 +221,7 @@ let pp_scopes fmt scopes =
 let update_machine machine =
   let stateassign vdecl =
     mkinstr 
-    (MStateAssign (vdecl, mk_val (LocalVar vdecl) vdecl.var_type))
+    (MStateAssign (vdecl, mk_val (Var vdecl) vdecl.var_type))
   in
   let local_decls = machine.mstep.step_inputs
     (* @ machine.mstep.step_outputs   *)

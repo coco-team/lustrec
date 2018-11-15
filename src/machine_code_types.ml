@@ -9,8 +9,7 @@ type value_t =
   }
 and value_t_desc =
   | Cst of constant
-  | LocalVar of var_decl
-  | StateVar of var_decl
+  | Var of var_decl
   | Fun of ident * value_t list
   | Array of value_t list
   | Access of value_t * value_t

@@ -173,8 +173,7 @@ let rec value_t2salsa_expr constEnv vt =
     (* 	raise (Salsa.Prelude.Error ("Entschuldigung6, constant tag not yet implemented")) *)
     (*   ) *)
     | MT.Cst(cst)                ->        (* Format.eprintf "v2s: cst tag 2: %a@." Printers.pp_const cst;  *)FloatIntSalsa.inject cst
-    | MT.LocalVar(v)            
-    | MT.StateVar(v)            ->       (* Format.eprintf "v2s: var %s@." v.LT.var_id; *) 
+    | MT.Var(v)            ->       (* Format.eprintf "v2s: var %s@." v.LT.var_id; *) 
       let sel_fun = (fun (vname, _) -> v.LT.var_id = vname) in
       if List.exists sel_fun  constEnv then
 	let _, cst = List.find sel_fun constEnv in
@@ -295,10 +294,7 @@ let rec salsa_expr2value_t vars_env cst_env e  =
       (*   MC.Cst(LT.Const_tag(get_const salsa_label)) *)
       (* else *) 
        let var_id = try get_var vars_env id with Not_found -> assert false in
-       if var_id.is_local then
-	 MC.mk_val (MT.LocalVar(var_id.vdecl)) var_id.vdecl.LT.var_type
-       else
-	 MC.mk_val (MT.StateVar(var_id.vdecl)) var_id.vdecl.LT.var_type
+      	 MC.mk_val (MT.Var(var_id.vdecl)) var_id.vdecl.LT.var_type
   | ST.Plus(x, y, _)               -> binop "+" x y Type_predef.type_real
   | ST.Minus(x, y, _)              -> binop "-" x y Type_predef.type_real
   | ST.Times(x, y, _)              -> binop "*" x y Type_predef.type_real
@@ -368,7 +364,7 @@ struct
 
   let empty (): fe_t = Hashtbl.create 13
 
-  let pp fmt env = pp_hash ~sep:";@ " (fun k (_,v) fmt -> Format.fprintf fmt "%s -> %a" k MC.pp_val v) fmt env
+  let pp m fmt env = pp_hash ~sep:";@ " (fun k (_,v) fmt -> Format.fprintf fmt "%s -> %a" k (MC.pp_val m) v) fmt env
 
 
   let get_sort_fun env =

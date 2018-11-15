@@ -51,12 +51,14 @@ let rec pp_const fmt c =
 let rec pp_val m fmt v =
   match v with
     | Cst c -> pp_const fmt c
-    | LocalVar v ->
-      if List.exists (fun o -> o.var_id = v) m.mstep.step_outputs then
-	fprintf fmt "*%s" v
-      else
-	pp_print_string fmt v
-    | StateVar v -> fprintf fmt "%s" v
+    | Var v ->
+       if is_state_vars m.memories v then
+         fprintf fmt "%s" v
+       else
+         if List.exists (fun o -> o.var_id = v) m.mstep.step_outputs then
+	   fprintf fmt "*%s" v
+         else
+	   pp_print_string fmt v
     | Fun (n, vl) -> if Basic_library.is_internal_fun n then
 	Basic_library.pp_java n (pp_val m) fmt vl
       else

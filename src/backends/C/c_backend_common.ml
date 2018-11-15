@@ -233,25 +233,29 @@ let rec pp_c_const fmt c =
     | Const_struct fl -> fprintf fmt "{%a }" (Utils.fprintf_list ~sep:", " (fun fmt (f, c) -> pp_c_const fmt c)) fl
     | Const_string _ | Const_modeid _ -> assert false (* string occurs in annotations not in C *)
 
-       
+                  
 (* Prints a value expression [v], with internal function calls only.
    [pp_var] is a printer for variables (typically [pp_c_var_read]),
    but an offset suffix may be added for array variables
 *)
-let rec pp_c_val self pp_var fmt v =
+let rec pp_c_val m self pp_var fmt v =
+  let pp_c_val = pp_c_val m self pp_var in
   match v.value_desc with
   | Cst c         -> pp_c_const fmt c
-  | Array vl      -> fprintf fmt "{%a}" (Utils.fprintf_list ~sep:", " (pp_c_val self pp_var)) vl
-  | Access (t, i) -> fprintf fmt "%a[%a]" (pp_c_val self pp_var) t (pp_c_val self pp_var) i
-  | Power (v, n)  -> (Format.eprintf "internal error: C_backend_common.pp_c_val %a@." pp_val v; assert false)
-  | LocalVar v    -> pp_var fmt v
-  | StateVar v    ->
-    (* array memory vars are represented by an indirection to a local var with the right type,
-       in order to avoid casting everywhere. *)
-    if Types.is_array_type v.var_type && not (Types.is_real_type v.var_type && !Options.mpfr)
-    then fprintf fmt "%a" pp_var v
-    else fprintf fmt "%s->_reg.%a" self pp_var v
-  | Fun (n, vl)   -> pp_basic_lib_fun (Types.is_int_type v.value_type) n (pp_c_val self pp_var) fmt vl
+  | Array vl      -> fprintf fmt "{%a}" (Utils.fprintf_list ~sep:", " pp_c_val) vl
+  | Access (t, i) -> fprintf fmt "%a[%a]" pp_c_val t pp_c_val i
+  | Power (v, n)  -> (Format.eprintf "internal error: C_backend_common.pp_c_val %a@." (pp_val m) v; assert false)
+  | Var v    ->
+     if is_memory m v then (
+       (* array memory vars are represented by an indirection to a local var with the right type,
+          in order to avoid casting everywhere. *)
+       if Types.is_array_type v.var_type && not (Types.is_real_type v.var_type && !Options.mpfr)
+       then fprintf fmt "%a" pp_var v
+       else fprintf fmt "%s->_reg.%a" self pp_var v
+     )
+     else
+       pp_var fmt v
+  | Fun (n, vl)   -> pp_basic_lib_fun (Types.is_int_type v.value_type) n pp_c_val fmt vl
 
 (* Access to the value of a variable:
    - if it's not a scalar output, then its name is enough
@@ -318,7 +322,7 @@ let pp_c_decl_local_var m fmt id =
   then
     Format.fprintf fmt "%a = %a"
       (pp_c_type  ~var_opt:(Some id) id.var_id) id.var_type
-      (pp_c_val "" (pp_c_var_read m)) (get_const_assign m id)
+      (pp_c_val m "" (pp_c_var_read m)) (get_const_assign m id)
   else
     Format.fprintf fmt "%a"
       (pp_c_type  ~var_opt:(Some id) id.var_id) id.var_type
@@ -347,7 +351,7 @@ let pp_c_checks self fmt m =
       fprintf fmt 
 	"@[<v>%a@,assert (%a);@]@," 
 	Location.pp_c_loc loc
-	(pp_c_val self (pp_c_var_read m)) check
+	(pp_c_val m self (pp_c_var_read m)) check
     ) 
     fmt 
     m.mstep.step_checks
@@ -512,24 +516,20 @@ let pp_main_call mname self fmt m (inputs: value_t list) (outputs: var_decl list
   then
     fprintf fmt "%a (%a%t%a);"
       pp_machine_step_name mname
-      (Utils.fprintf_list ~sep:", " (pp_c_val self pp_c_main_var_input)) inputs
+      (Utils.fprintf_list ~sep:", " (pp_c_val m self pp_c_main_var_input)) inputs
       (Utils.pp_final_char_if_non_empty ", " inputs) 
       (Utils.fprintf_list ~sep:", " pp_c_main_var_output) outputs
   else
     fprintf fmt "%a (%a%t%a%t%s);"
       pp_machine_step_name mname
-      (Utils.fprintf_list ~sep:", " (pp_c_val self pp_c_main_var_input)) inputs
+      (Utils.fprintf_list ~sep:", " (pp_c_val m self pp_c_main_var_input)) inputs
       (Utils.pp_final_char_if_non_empty ", " inputs) 
       (Utils.fprintf_list ~sep:", " pp_c_main_var_output) outputs
       (Utils.pp_final_char_if_non_empty ", " outputs)
       self
 
 let pp_c_var m self pp_var fmt var =
-  if is_memory m var
-  then
-    pp_c_val self pp_var fmt (mk_val (StateVar var) var.var_type)
-  else
-    pp_c_val self pp_var fmt (mk_val (LocalVar var) var.var_type)
+    pp_c_val m self pp_var fmt (mk_val (Var var) var.var_type)
   
 
 let pp_array_suffix fmt loop_vars =
@@ -560,8 +560,8 @@ let pp_initialize m self pp_var fmt var =
       aux [] fmt var.var_type
     end
 
-let pp_const_initialize pp_var fmt const =
-  let var = mk_val (LocalVar (Corelang.var_decl_of_const const)) const.const_type in
+let pp_const_initialize m pp_var fmt const =
+  let var = mk_val (Var (Corelang.var_decl_of_const const)) const.const_type in
   let rec aux indices value fmt typ =
     if Types.is_array_type typ
     then
@@ -576,7 +576,7 @@ let pp_const_initialize pp_var fmt const =
     else
       let indices = List.rev indices in
       let pp_var_suffix fmt var =
-	fprintf fmt "%a%a" (pp_c_val "" pp_var) var pp_array_suffix indices in
+	fprintf fmt "%a%a" (pp_c_val m "" pp_var) var pp_array_suffix indices in
       begin
 	Mpfr.pp_inject_init pp_var_suffix fmt var;
 	fprintf fmt "@,";
@@ -644,7 +644,7 @@ let pp_call m self pp_read pp_write fmt i (inputs: Machine_code_types.value_t li
    let (n,_) = List.assoc i m.minstances in
    fprintf fmt "%a (%a%t%a%t%s->%s);"
      pp_machine_step_name (node_name n)
-     (Utils.fprintf_list ~sep:", " (pp_c_val self pp_read)) inputs
+     (Utils.fprintf_list ~sep:", " (pp_c_val m self pp_read)) inputs
      (Utils.pp_final_char_if_non_empty ", " inputs) 
      (Utils.fprintf_list ~sep:", " pp_write) outputs
      (Utils.pp_final_char_if_non_empty ", " outputs)
@@ -654,7 +654,7 @@ let pp_call m self pp_read pp_write fmt i (inputs: Machine_code_types.value_t li
    let (n,_) = List.assoc i m.mcalls in
    fprintf fmt "%a (%a%t%a);"
      pp_machine_step_name (node_name n)
-     (Utils.fprintf_list ~sep:", " (pp_c_val self pp_read)) inputs
+     (Utils.fprintf_list ~sep:", " (pp_c_val m self pp_read)) inputs
      (Utils.pp_final_char_if_non_empty ", " inputs) 
      (Utils.fprintf_list ~sep:", " pp_write) outputs 
 
@@ -665,7 +665,7 @@ let pp_basic_instance_call m self fmt i (inputs: Machine_code_types.value_t list
    let (n,_) = List.assoc i m.minstances in
    fprintf fmt "%a (%a%t%a%t%s->%s);"
      pp_machine_step_name (node_name n)
-     (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
+     (Utils.fprintf_list ~sep:", " (pp_c_val m self (pp_c_var_read m))) inputs
      (Utils.pp_final_char_if_non_empty ", " inputs) 
      (Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs
      (Utils.pp_final_char_if_non_empty ", " outputs)
@@ -675,7 +675,7 @@ let pp_basic_instance_call m self fmt i (inputs: Machine_code_types.value_t list
    let (n,_) = List.assoc i m.mcalls in
    fprintf fmt "%a (%a%t%a);"
      pp_machine_step_name (node_name n)
-     (Utils.fprintf_list ~sep:", " (pp_c_val self (pp_c_var_read m))) inputs
+     (Utils.fprintf_list ~sep:", " (pp_c_val m self (pp_c_var_read m))) inputs
      (Utils.pp_final_char_if_non_empty ", " inputs) 
      (Utils.fprintf_list ~sep:", " (pp_c_var_write m)) outputs 
 *)

@@ -14,7 +14,7 @@ let rec get_idx x l =
 let rec get_expr_vars v =
   match v.value_desc with
   | Cst c -> VSet.empty
-  | LocalVar v | StateVar v -> VSet.singleton v
+  | Var v -> VSet.singleton v
   | Fun (_, args) -> List.fold_left (fun accu v -> VSet.union accu (get_expr_vars v)) VSet.empty args
   | _ -> assert false (* Invalid argument *)
 
@@ -210,22 +210,21 @@ let pp_emf_cst fmt c =
   )
   
   
-let pp_emf_cst_or_var fmt v =
+let pp_emf_cst_or_var m fmt v =
   match v.value_desc with
   | Cst c -> pp_emf_cst fmt c
-  | LocalVar v
-  | StateVar v -> (
+  | Var v -> (
     fprintf fmt "{@[\"type\": \"variable\",@ \"value\": \"%a\",@ "
       pp_var_name v;
     (*    fprintf fmt "\"original_name\": \"%a\",@ " Printers.pp_var_name v; *)
     fprintf fmt "\"datatype\": \"%a\"@ " pp_var_type v;
     fprintf fmt "@]}"
   )
-  | _ -> eprintf "Not of cst or var: %a@." pp_val v ; assert false (* Invalid argument *)
+  | _ -> eprintf "Not of cst or var: %a@." (pp_val m) v ; assert false (* Invalid argument *)
 
 
-let pp_emf_cst_or_var_list =
-  Utils.fprintf_list ~sep:",@ " pp_emf_cst_or_var
+let pp_emf_cst_or_var_list m =
+  Utils.fprintf_list ~sep:",@ " (pp_emf_cst_or_var m)
 
 (* Printer lustre expr and eexpr *)
     
