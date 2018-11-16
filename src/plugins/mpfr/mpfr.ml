@@ -123,9 +123,6 @@ let base_inject_op id =
   | "sqrt" -> "MPFRsqrt"
   | "trunc" -> "MPFRtrunc"
   | "tan" -> "MPFRtan"
-
-           
-  | "pow"    -> "MPFRpow"
   | _        -> raise Not_found
 
 let inject_op id =
