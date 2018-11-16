@@ -77,16 +77,25 @@ let pp_var_name fmt v = print_protect fmt (fun fmt -> Printers.pp_var_name fmt v
   
   
 let pp_tag_type fmt typ =
-  let const_list = match typ.tydef_desc with Tydec_enum tl -> tl | _ -> assert false in
-  let size = List.length const_list in
-  if size < 255 then
-    fprintf fmt "uint8"
-  else if size < 65535 then
-fprintf fmt "uint16"
-  else
-    assert false (* Too much states. This not reasonable *)
-      
-   
+  let rec aux tydec_desc =
+  match tydec_desc with  
+  | Tydec_int -> fprintf fmt "int"
+  | Tydec_real -> fprintf fmt "real"
+  | Tydec_bool -> fprintf fmt "bool"
+  | Tydec_clock ty -> aux ty
+  | Tydec_enum const_list -> (
+    let size = List.length const_list in
+    if size < 255 then
+      fprintf fmt "uint8"
+    else if size < 65535 then
+      fprintf fmt "uint16"
+    else
+      assert false (* Too much states. This not reasonable *)
+  )
+  | Tydec_const _ | Tydec_struct _ | Tydec_array _ | Tydec_any -> eprintf "unhandled cst tag in EMF: %a@." Printers.pp_var_type_dec_desc tydec_desc; assert false
+  in
+  aux typ.tydef_desc
+
      
 let pp_cst_type fmt c (*infered_typ*) =
   match c with
