@@ -30,7 +30,6 @@ true: bin_annot, color(always)
 <**/main_lustre_compiler.native>: use_unix
 <**/main_lustre_testgen.native> : use_unix
 <**/sf_sem.native>              : use_unix
-<**/*.ml>                       : package(num)
 <**/*.native>                   : package(num)
 <**/*.ml>                       : package(logs)
 <**/*.native>                   : package(logs)
@@ -46,6 +45,7 @@ true: bin_annot, color(always)
 
 # Required for ocamldoc. Otherwise failed to build
 <**/*.ml{,i}>: package(ocamlgraph)
+<**/*.ml{,i}>: package(num)
 
 # Plugin dependencies
 @SALSA_TAG@
