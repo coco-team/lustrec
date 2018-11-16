@@ -347,13 +347,13 @@ and pp_machine_instr dependencies (m: machine_t) self fmt instr =
   | MStep ([i0], i, vl) when Basic_library.is_value_internal_fun (mk_val (Fun (i, vl)) i0.var_type)  ->
     pp_machine_instr dependencies m self fmt 
       (update_instr_desc instr (MLocalAssign (i0, mk_val (Fun (i, vl)) i0.var_type)))
+  | MStep (il, i, vl) when !Options.mpfr && Mpfr.is_homomorphic_fun i ->
+     pp_instance_call m self fmt i vl il
   | MStep ([i0], i, vl) when has_c_prototype i dependencies -> 
     fprintf fmt "%a = %s(%a);" 
       (pp_c_val m self (pp_c_var_read m)) (mk_val (Var i0) i0.var_type)
       i
       (Utils.fprintf_list ~sep:", " (pp_c_val m self (pp_c_var_read m))) vl
-  | MStep (il, i, vl) when Mpfr.is_homomorphic_fun i ->
-    pp_instance_call m self fmt i vl il
   | MStep (il, i, vl) ->
     pp_basic_instance_call m self fmt i vl il
   | MBranch (_, []) -> (Format.eprintf "internal error: C_backend_src.pp_machine_instr %a@." (pp_instr m) instr; assert false)

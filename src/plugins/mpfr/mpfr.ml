@@ -97,9 +97,39 @@ let base_inject_op id =
   | ">"      -> "MPFRGt"
   | "="      -> "MPFREq"
   | "!="     -> "MPFRNeq"
+  (* Math library functions *)
+  | "acos" -> "MPFRacos"
+  | "acosh" -> "MPFRacosh"
+  | "asin" -> "MPFRasin"
+  | "asinh" -> "MPFRasinh"
+  | "atan" -> "MPFRatan"
+  | "atan2" -> "MPFRatan2"
+  | "atanh" -> "MPFRatanh"
+  | "cbrt" -> "MPFRcbrt"
+  | "cos" -> "MPFRcos"
+  | "cosh" -> "MPFRcosh"
+  | "ceil" -> "MPFRceil"
+  | "erf" -> "MPFRerf"
+  | "exp" -> "MPFRexp"
+  | "fabs" -> "MPFRfabs"
+  | "floor" -> "MPFRfloor"
+  | "fmod" -> "MPFRfmod"
+  | "log" -> "MPFRlog"
+  | "log10" -> "MPFRlog10"
+  | "pow" -> "MPFRpow"
+  | "round" -> "MPFRround"
+  | "sin" -> "MPFRsin"
+  | "sinh" -> "MPFRsinh"
+  | "sqrt" -> "MPFRsqrt"
+  | "trunc" -> "MPFRtrunc"
+  | "tan" -> "MPFRtan"
+
+           
+  | "pow"    -> "MPFRpow"
   | _        -> raise Not_found
 
 let inject_op id =
+  Format.eprintf "trying to inject mpfr into function %s@." id;
   try
     base_inject_op id
   with Not_found -> id

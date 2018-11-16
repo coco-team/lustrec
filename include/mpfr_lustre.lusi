@@ -1,5 +1,3 @@
-
-
 function MPFRUminus(i: real) returns (out: real) lib gmp lib mpfr;
 
 function MPFRPlus(i1, i2: real) returns (out: real);
@@ -21,3 +19,31 @@ function MPFRGt(i1, i2: real) returns (out: bool);
 function MPFREq(i1, i2: real) returns (out: bool);
 
 function MPFRNeq(i1, i2: real) returns (out: bool);
+
+-- Functions already available in lustrec_math
+
+function MPFRacos (x: real) returns (y: real) ;
+function MPFRacosh (x: real) returns (y: real) ;
+function MPFRasin (x: real) returns (y: real) ;
+function MPFRasinh (x: real) returns (y: real) ;
+function MPFRatan (x: real) returns (y: real) ;
+function MPFRatan2(x:real; n: real) returns (y: real) ;
+function MPFRatanh (x: real) returns (y: real) ;
+function MPFRcbrt (x: real) returns (y: real) ;
+function MPFRcos (x: real) returns (y: real) ;
+function MPFRcosh (x: real) returns (y: real) ;
+function MPFRceil (x: real) returns (y: real) ;
+function MPFRerf (x: real) returns (y: real) ;
+function MPFRexp (x: real) returns (y: real) ;
+function MPFRfabs (x: real) returns (y: real) ;
+function MPFRfloor (x: real) returns (y: real) ;
+function MPFRfmod (x,y: real) returns (z: real) ;
+function MPFRlog (x: real) returns (y: real) ;
+function MPFRlog10 (x: real) returns (y: real) ;
+function MPFRpow (x:real; n: real) returns (y: real) ;
+function MPFRround (x: real) returns (y: real) ;
+function MPFRsin (x: real) returns (y: real) ;
+function MPFRsinh (x: real) returns (y: real) ;
+function MPFRsqrt (x: real) returns (y: real) ;
+function MPFRtrunc (x: real) returns (y: real) ;
+function MPFRtan (x: real) returns (y: real) ;
