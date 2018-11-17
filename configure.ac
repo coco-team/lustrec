@@ -1,6 +1,9 @@
 define([gitversion], esyscmd([sh -c "git log --oneline | wc -l | tr -d ' \n'"]))
+
 AC_INIT([lustrec], 1.6-gitversion, [ploc@garoche.net])
+AC_SUBST(VERSION_NUMBER, 1.6)
 AC_SUBST(VERSION_CODENAME, "Xia/Zhu-dev")
+
 
 gitbranch=`git branch | grep \* | sed "s/\*[ ]*//"`
 #define([gitbranch], esyscmd([sh -c "git branch | grep \* | cut -d ' ' -f2"]))
@@ -158,7 +161,8 @@ dnl refers to ${prefix}.  Thus we have to use `eval' twice.
 AC_DEFINE_DIR([abs_datadir], [datadir])
 
 # Instanciation
-AC_CONFIG_FILES([Makefile
+AC_CONFIG_FILES([opam
+		 Makefile
 		 src/Makefile
 		 src/version.ml
 		 src/pluginList.ml

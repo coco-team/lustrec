@@ -55,7 +55,7 @@ dist-gzip: $(LOCAL_BINDIR)/lustrec dist-src-clean
 	@echo "Source distribution built: ../$(DIST_ARCHIVE_NAME)"
 
 dist-clean: dist-src-clean
-	@rm -f configure Makefile
+	@rm -f configure Makefile opam share/FindLustre.cmake
 
 %.lusic: %.lusi
 	@echo Compiling $<

@@ -1,0 +1,44 @@
+opam-version: "2.0"
+name: "lustrec"
+version: "@VERSION_NUMBER@"
+maintainer: "Pierre-Loic Garoche <ploc@garoche.net>"
+authors: ["Pierre-Loic Garoche <ploc@garoche.net>" "Xavier Thirioux <thirioux@enseeiht.fr>"]
+homepage: "https://cavale.enseeiht.fr/redmine/projects/lustrec/"
+bug-reports: "https://cavale.enseeiht.fr/redmine/projects/lustrec/issues"
+license: "LGPL"
+dev-repo: "git+https://cavale.enseeiht.fr/git/lustrec#unstable"
+build: [
+  ["autoconf"]
+  ["./configure" "--prefix=%{prefix}%"]
+  [make]
+]
+install: [make "install"]
+remove: [make "uninstall"]
+depends: [
+  "ocamlfind"
+  "yojson"
+  "cmdliner"
+  "fmt"
+  "ppx_deriving_yojson"
+  "ppx_traverse_builtins"
+  "ppxlib"
+  "menhir"
+  "ocamlgraph"
+  "logs"
+  "z3"
+  "num"
+]
+synopsis: "A Lustre compiler toolset"
+description: """
+lustrec is structured around the modular compilation scheme proposed
+by Biernacki, Colaço, Hamon, and Pouzet at LCTES'08.  It is an open
+source lustre compiler that provides verification capabilities.
+It is currently mainly used through the CocoSim platform, a Matlab
+toolbox to perform V&V of Simulink models. Within CocoSim, the Lustre
+language is used as an intermediate representation and relies mainly
+on lustrec to produce code or verification artifacts.
+"""
+url {
+  src: "https://cavale.enseeiht.fr/redmine/attachments/download/114/lustrec-1.5-Xia-Shao-Kang-src.tgz"
+  checksum: "md5=f06e87d5fbb24c91894bdc55bf6cc496"
+}
